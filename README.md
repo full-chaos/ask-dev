@@ -1,33 +1,48 @@
-# Ask Dev Workbench
+# Context Fabric Workbench
 
-Temporary frontend for the ACR **Context Fabric**: ask a question, read the
-investigation result.
+Standalone answer test platform for the ACR **Context Fabric**: ask a question,
+inspect both the intelligence and its presentation.
 
-Tracked as **CHAOS-3803**.
+Tracked as **CHAOS-3738** (repo scaffolded under CHAOS-3803).
 
 ## What this is, and what it is not
 
-The workbench is a **read-only consumer**. It renders an investigation result
-exactly as the service produced it. It authors no facts, no metrics, no health
-states, and no authorization decisions — that boundary is CHAOS-3738, and it is
-the reason this repo has no server, no database, and no write path.
+The Workbench lets an authorized tester ask Context Fabric the real product
+questions and inspect the answer **and** its presentation, without depending on
+the legacy Ask Dev path or its UX. It is platform/test scoped until the Context
+Fabric beta gate passes, and is explicitly **separate from the Ask Dev window
+and `/dev`**.
 
-It is also **temporary**. It exists so the Context Fabric result shape can be
-looked at and argued about before the surface has a permanent home. Two futures
-are expected, and the code is written for either:
+It is a **read-only consumer**. It authors no facts, metrics, health states,
+drivers, evidence, scope, or authorization. Its only write-shaped interaction is
+asking a question.
 
-- the components migrate into `dev-health-web`, or
-- this becomes a separate entry point of its own.
+It **calls the real ACR investigation API**. It does not consume mock
+investigation results — fixtures exist only inside unit tests, and a lint rule
+fails the build if product code imports one.
 
-Both are served by the same rule: **stay portable**. React + TypeScript, minimal
-dependencies, no framework lock beyond React. There is no router, no state
-library, no CSS framework, and no server runtime to unpick later.
+The manifest, component library, and interaction model are meant to be promoted
+into Ask Dev later, so portability is a standing constraint: React + TypeScript,
+minimal dependencies, and the same Next.js version `dev-health-web` runs.
 
-## Current scope (scaffold)
+## The three views
 
-The app answers from **committed mock fixtures**, not a live service. The
-fixtures are derived from the pinned ACR contract examples and validated against
-the pinned JSON Schemas in the unit suite.
+One immutable result, three views (CHAOS-3738):
+
+1. **Canonical result inspector** — the complete ACR result with structure
+   unhidden: resolved subjects and bound receipts, analytical goal and scope,
+   cohort membership with inclusion/exclusion rationale, relationship and
+   evidence paths, canonical facts, coverage and limitations, every version
+   stamp, and the raw contract payload.
+2. **Deterministic answer view** — the reference answer and the fallback,
+   rendered by a native component set with no model involved.
+3. **OpenUI enrichment view** — _not yet built_ (M3). It will be driven by a
+   Dev Health-owned, reference-only presentation manifest and a closed component
+   library, validated in full before rendering and failing closed to the
+   deterministic view.
+
+The raw and deterministic views stay available beside the enriched one, so
+presentation can never mask an answer-quality failure.
 
 Rendered today:
 
@@ -42,20 +57,41 @@ Rendered today:
   finding, per candidate, and for the result as a whole;
 - provenance — the full `versions` block.
 
-Not yet wired: any live call. `VITE_ASK_DEV_API_BASE_URL` is read by
-`src/config.ts` but unused.
-
 ## Running it
 
 ```sh
 pnpm install
-pnpm dev            # http://127.0.0.1:5180
+pnpm dev            # http://127.0.0.1:3000
 ```
 
-Configuration is build-time only. Copy `.env.example` to `.env.local` (git
-ignored) to override. No `.env` is committed, no endpoint is hardcoded, and no
-credential belongs in a `VITE_*` variable — Vite inlines them into the public
-bundle.
+The Workbench needs a configured server hop before it can answer. Without one it
+still runs and says so — it has no mock path, so an unconfigured server reports
+`workbench_misconfigured` rather than inventing an answer.
+
+| Variable                     | Required | Purpose                                     |
+| ---------------------------- | -------- | ------------------------------------------- |
+| `ACR_API_ORIGIN`             | yes      | ACR base URL, e.g. `http://127.0.0.1:18080` |
+| `ACR_ORG_ID`                 | yes      | Organization to investigate as              |
+| `ACR_WEB_ASSERTION_KEY_FILE` | yes      | **Path** to the Ed25519 signing key         |
+| `ACR_REPOSITORY_SCOPES`      | yes      | Comma-separated `owner/name` slugs          |
+| `ACR_WEB_ASSERTION_ISSUER`   | no       | Default `dev-health-web`                    |
+| `ACR_WEB_ASSERTION_AUDIENCE` | no       | Default `dev-health-acr`                    |
+| `ACR_WEB_ASSERTION_KID`      | no       | Default `acr-dev-web`                       |
+| `ACR_SUBJECT`                | no       | Default `context-fabric-workbench`          |
+| `ACR_TIMEOUT_MS`             | no       | Default `120000`                            |
+
+No `.env` is committed and no endpoint is hardcoded. The signing key is
+referenced **by path** and never enters this repo. Nothing is `NEXT_PUBLIC_*`,
+so no ACR value can reach the browser bundle.
+
+## Why there is a server
+
+Both ACR credentials are server-to-server by construction: `bearerAuth` is a
+client secret, and `webAssertionAuth` requires signing each request with an
+Ed25519 **private** key, bound to the exact method, path, and body digest, with
+a 30-second lifetime. A browser cannot hold either. `src/app/api/investigations`
+is the hop that signs and forwards; it mirrors `dev-health-web`'s server-only
+ACR client so the code ports cleanly when this surface migrates.
 
 ## Gates
 
@@ -72,6 +108,11 @@ bash ci/run_checks.sh unit
 bash ci/run_checks.sh build
 bash ci/run_checks.sh e2e         # Playwright smoke over the BUILT artifact
 ```
+
+The smoke suite runs with **no** ACR configuration on purpose. The Workbench has
+no mock path, so the only honest thing it can do unconfigured is say so — and
+proving that a failure presents as a failure, never as a thin answer, is exactly
+what that suite is for.
 
 Workflows: `tests.yml` (the gates above), `codeql-analysis.yml`, and
 `security-scan.yml` (Gitleaks + `pnpm audit`). Gitleaks is a hard gate here —
@@ -125,10 +166,39 @@ place a rename has to be absorbed.
 Currently pinned: `0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c` (acr main,
 CHAOS-3783).
 
-## Mock fixtures
+## ACR integration notes
 
-`src/mocks/investigations.ts` holds four scenarios: `complete` (the canonical
-example, unmodified), `degraded`, `clarification`, and `no-match`.
+Things worth knowing before touching the client, learned against the live
+service rather than from documentation:
+
+- **`repository_scopes` must not be empty.** `validWebRepositories` in acr
+  `internal/auth/web_assertion_binding.go:34-37` opens with
+  `if len(scopes) == 0 { return false }`, and the whole assertion then fails as
+  `invalid_web_assertion` — reaching the caller as a bare `401 invalid_token`
+  that says nothing about scopes. `dev-health-web` never trips this because its
+  scopes always come from a resolved org authorization. `signWebAssertion`
+  guards it locally so a new consumer gets a named error instead. Recorded as an
+  observation, not a patch: acr is not this repo's to change, and failing closed
+  on an empty scope set may well be deliberate.
+- **A 503 from the investigations route is usually an operator state, not a
+  blip.** ACR serves a static 503 when the investigator is not composed, which
+  needs three independent things: `ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED`, a
+  configured graph backend (`ACR_CONTEXT_FABRIC_FALKOR_ADDR`, with the
+  `context-fabric-graph` compose profile up), and a configured model provider.
+- **A 504 is not an unreachable service.** ACR's global `ACR_REQUEST_TIMEOUT`
+  defaults to 15s while its model call budget defaults to 45s, so a real
+  model-backed investigation can exhaust the HTTP budget while the pipeline is
+  still running. The Workbench reports that as `acr_timeout`, separately from
+  `acr_unreachable`, because the two lead to different investigations.
+
+## Test fixtures
+
+`src/test/fixtures/investigations.ts` holds four scenarios: `complete` (the
+canonical example, unmodified), `degraded`, `clarification`, and `no-match`.
+
+**These are test inputs only and may never be presented as answers.** An ESLint
+`no-restricted-imports` rule fails the build if anything under `src/app`,
+`src/components`, or `src/lib` imports them.
 
 Every scenario is a structural clone of the pinned canonical example with named
 fields overridden. **Mocks mirror the real vocabulary — nothing is invented.**
@@ -137,7 +207,7 @@ service itself emits (`canonical_fact:<kind>` source names, the
 `pruned:subject_kind_unsupported: …` prune reason, `"<fact kind>: <reason>"`
 degraded entries, `endpoint_lookup_failed:<n>`).
 
-`src/mocks/investigations.test.ts` validates every scenario against the pinned
+`src/test/fixtures/investigations.test.ts` validates every scenario against the pinned
 schemas, and carries the negative controls that make that validation mean
 something: an invented coverage state, a missing required field, and an invented
 subject-candidate state must all be rejected.
@@ -156,3 +226,21 @@ by default with a light `prefers-color-scheme` block.
 **Hard rule: no bright borders on the dark theme.** Separation comes from
 surface elevation and low-alpha hairlines, never from a light outline on a dark
 ground.
+
+## OpenUI
+
+`@openuidev/react-lang` (caged renderer) and `@openuidev/react-headless` (chat
+hooks) will be adopted in M3. `@openuidev/react-ui` was evaluated and
+**deliberately excluded**: it pulls roughly twenty extra dependencies including
+sixteen Radix packages and its own design system, and it contains the only two
+things in that codebase we must not ship — a `dangerouslySetInnerHTML` and a
+`window.open`. Please do not add it back.
+
+OpenUI is a **replaceable adapter**. The enrichment interface and the manifest
+are the product boundary; Query, Mutation, MCP, arbitrary URL, HTML, JavaScript,
+CSS, external embeds, and model-authored factual props are all unavailable by
+construction, and the whole composition is validated before anything renders.
+
+`@openuidev/lang-core` ships an install-time telemetry `postinstall`. The
+`allowBuilds` allowlist in `pnpm-workspace.yaml` blocks it, and CI additionally
+sets `DO_NOT_TRACK` and `OPENUI_TELEMETRY_DISABLED`.
