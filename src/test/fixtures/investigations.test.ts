@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import { mockScenarios, resolveMockScenario } from "@/mocks/investigations";
-import { validateContract } from "@/test/contract-validator";
+import { mockScenarios, resolveMockScenario } from "@/test/fixtures/investigations";
+import { validateContract } from "@/lib/acr/validate";
 
 const RESULT_SCHEMA = "context_fabric_investigation_result.v1.schema.json";
 

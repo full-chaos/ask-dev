@@ -1,47 +1,39 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Smoke coverage for the built artifact: the shell loads, a question can be
- * asked, and the sections that must never be hidden are present.
+ * Smoke coverage for the built artifact.
+ *
+ * These tests deliberately run with NO ACR configuration. The Workbench has no
+ * mock path, so the only honest thing it can do without a configured server hop
+ * is say so — and proving THAT is the point: a failure must present as a
+ * failure, never as a thin answer.
  */
-test.describe("Ask Dev Workbench smoke", () => {
-    test("renders the canonical investigation result", async ({ page }) => {
+test.describe("Context Fabric Workbench smoke", () => {
+    test("renders the shell and its platform/test framing", async ({ page }) => {
         await page.goto("/");
 
-        await expect(page.getByRole("heading", { name: "Ask Dev Workbench" })).toBeVisible();
-        const result = page.getByRole("article", { name: "Investigation result" });
-        await expect(result).toBeVisible();
-        await expect(result.getByText(/Ask Dev is not release-ready\./).first()).toBeVisible();
-        await expect(page.getByRole("region", { name: "Coverage" })).toBeVisible();
-        await expect(page.getByRole("region", { name: "Limitations" })).toBeVisible();
-        await expect(page.getByRole("region", { name: "Evidence references" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Context Fabric Workbench" })).toBeVisible();
+        await expect(page.getByText(/separate from the Ask Dev window and \/dev/)).toBeVisible();
+        await expect(page.getByLabel("Ask Context Fabric")).toBeVisible();
+        await expect(page.getByText("Ask a question to run an investigation.")).toBeVisible();
     });
 
-    test("asking a different question re-renders the result", async ({ page }) => {
+    test("reports an unconfigured server hop as a failure, not an answer", async ({ page }) => {
         await page.goto("/");
 
-        await page.getByLabel("Ask a question").fill("Is Atlas on track?");
+        await page.getByLabel("Ask Context Fabric").fill("What is the status of dev-health-ops?");
         await page.getByRole("button", { name: "Investigate" }).click();
 
-        const subjects = page.getByRole("region", { name: "Subjects" });
-        await expect(subjects.getByText("Nothing committed.")).toBeVisible();
-        await expect(page.getByText("The service returned no direct judgment.")).toBeVisible();
-    });
+        // Named explicitly: Next renders its own route announcer with
+        // role="alert", so a bare getByRole("alert") is ambiguous.
+        const failure = page.getByRole("alert", { name: "No answer" });
+        await expect(failure).toBeVisible();
+        await expect(failure.getByText(/workbench_misconfigured/)).toBeVisible();
 
-    test("degraded coverage states are visible, not hidden", async ({ page }) => {
-        await page.goto("/");
-
-        await page
-            .getByRole("button", {
-                name: "Which projects are slipping, and how confident can we be in that?",
-            })
-            .click();
-
-        const coverage = page.getByRole("region", { name: "Coverage" });
-        await expect(
-            coverage.getByText("Partial — some sources did not contribute."),
-        ).toBeVisible();
-        await expect(coverage.getByTitle("pruned")).toBeVisible();
-        await expect(coverage.getByTitle("unauthorized")).toBeVisible();
+        // The crucial negative: no answer surface appears.
+        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveCount(0);
+        await expect(page.getByRole("article", { name: "Canonical result inspector" })).toHaveCount(
+            0,
+        );
     });
 });
