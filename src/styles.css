@@ -1,0 +1,366 @@
+/*
+ * Ask Dev Workbench — minimal styling.
+ *
+ * Temporary workbench, not a design system: one stylesheet, plain class names,
+ * no CSS framework. Everything here is meant to be thrown away or absorbed when
+ * the surface migrates into dev-health-web.
+ *
+ * HARD RULE (house standard): no bright borders on the dark theme. Separation
+ * comes from surface elevation and low-alpha hairlines, never from a light
+ * outline on a dark ground.
+ */
+
+:root {
+    color-scheme: dark light;
+
+    --surface-0: #0e1117;
+    --surface-1: #151a23;
+    --surface-2: #1b212c;
+    --text-strong: #e8ecf3;
+    --text: #c3cbd8;
+    --text-muted: #8b94a5;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-strong: rgba(255, 255, 255, 0.11);
+    --accent: #7aa2f7;
+    --accent-soft: rgba(122, 162, 247, 0.14);
+
+    /* State tints. Kept low-chroma so no state reads as a bright outline. */
+    --state-ok: #6ec28a;
+    --state-warn: #d8b070;
+    --state-bad: #d98a8a;
+    --state-neutral: #8b94a5;
+
+    --radius: 8px;
+    --gap: 16px;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --surface-0: #f7f8fa;
+        --surface-1: #ffffff;
+        --surface-2: #f0f2f6;
+        --text-strong: #12161d;
+        --text: #333c4a;
+        --text-muted: #626c7d;
+        --border: rgba(16, 22, 32, 0.1);
+        --border-strong: rgba(16, 22, 32, 0.16);
+        --accent: #2f5fd0;
+        --accent-soft: rgba(47, 95, 208, 0.1);
+        --state-ok: #2f7d4f;
+        --state-warn: #8a6417;
+        --state-bad: #a5423f;
+        --state-neutral: #626c7d;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--surface-0);
+    color: var(--text);
+    font-family:
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+}
+
+.workbench {
+    margin: 0 auto;
+    max-width: 900px;
+    padding: 32px 20px 64px;
+}
+
+.workbench__masthead h1 {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 22px;
+    letter-spacing: -0.01em;
+}
+
+.workbench__masthead p {
+    margin: 4px 0 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.question-form {
+    margin: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.question-form__label {
+    color: var(--text-strong);
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.question-form__row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.question-form__input {
+    flex: 1 1 320px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+    color: var(--text-strong);
+    font: inherit;
+}
+
+.question-form__input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.question-form__submit {
+    padding: 10px 18px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.question-form__submit:hover {
+    background: var(--accent-soft);
+    filter: brightness(1.15);
+}
+
+.question-form__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.suggestions__button {
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.panel {
+    margin-top: var(--gap);
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-1);
+}
+
+.panel__title {
+    margin: 0 0 10px;
+    color: var(--text-strong);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.panel__empty {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-style: italic;
+}
+
+.answer__judgment {
+    margin: 0 0 8px;
+    color: var(--text-strong);
+    font-size: 17px;
+    line-height: 1.45;
+}
+
+.answer__body {
+    margin: 0 0 12px;
+}
+
+.stack {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stack--tight {
+    gap: 6px;
+}
+
+.record {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.record__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.record__title {
+    color: var(--text-strong);
+    font-weight: 600;
+}
+
+.record__meta {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.record__body {
+    margin: 6px 0 0;
+}
+
+.badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--state-neutral);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.badge--ok {
+    color: var(--state-ok);
+}
+
+.badge--warn {
+    color: var(--state-warn);
+}
+
+.badge--bad {
+    color: var(--state-bad);
+}
+
+.coverage {
+    display: grid;
+    gap: 8px;
+}
+
+.coverage__source {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: baseline;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.coverage__name {
+    color: var(--text-strong);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.coverage__reason {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.evidence-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+
+.evidence-ref {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.versions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 6px 16px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.versions div {
+    display: flex;
+    gap: 6px;
+}
+
+.versions dt {
+    font-weight: 600;
+}
+
+.versions dd {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    overflow-wrap: anywhere;
+}
+
+.result__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.result__question {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.workbench__footer {
+    margin-top: 32px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
