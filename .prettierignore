@@ -1,0 +1,13 @@
+# Dependencies and build output
+node_modules
+dist
+coverage
+playwright-report
+test-results
+
+# Exact copied ACR wire artifacts stay byte-identical to the pinned acr source.
+# The sync script owns their formatting; Prettier must never rewrite them.
+src/contracts/
+
+pnpm-lock.yaml
+.env*

@@ -1,0 +1,14 @@
+node_modules
+dist
+coverage
+test-results
+playwright-report
+.pnpm-store
+
+# Never commit real environment values. .env.example carries the documented keys.
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log
