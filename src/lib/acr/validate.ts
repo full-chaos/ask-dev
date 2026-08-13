@@ -1,11 +1,17 @@
 /**
- * Validates values against the PINNED ACR JSON Schemas.
+ * Validates payloads against the PINNED ACR JSON Schemas.
  *
- * Test-scoped on purpose. The workbench is a read-only consumer that renders
- * what it is given; it does not gate, authorize, or re-judge anything at
- * runtime (CHAOS-3738 boundary). Schema validation is a build-time guard that
- * the committed mock fixtures still speak the contract's vocabulary — so `ajv`
- * stays a devDependency and never reaches the shipped bundle.
+ * This is PRODUCT code, not a test helper (CHAOS-3738). Two things depend on it:
+ *
+ *   1. The server hop validates every investigation result ACR returns before
+ *      handing it to the UI. A result that does not satisfy its own contract is
+ *      an upstream failure, and the Workbench reports it as one rather than
+ *      rendering a half-understood payload as if it were an answer.
+ *   2. M3's enrichment adapter validates the whole presentation composition
+ *      before rendering, and falls closed to the deterministic view.
+ *
+ * Validating an incoming payload is not authoring one — the Workbench still
+ * originates no fact, metric, health state, or judgment (CHAOS-3738 boundary).
  */
 import Ajv2020 from "ajv/dist/2020";
 import addFormats from "ajv-formats";
