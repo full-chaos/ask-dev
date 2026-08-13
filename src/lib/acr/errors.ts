@@ -22,6 +22,16 @@ export const workbenchFailureCodes = [
      * is which stage was too slow.
      */
     "acr_timeout",
+    /**
+     * ACR ran the investigation and it failed inside the engine.
+     *
+     * Also distinct from `acr_unreachable`: the service answered, so the
+     * question is which stage broke, not whether the network is up. ACR
+     * deliberately does not put the underlying reason on the wire, so the
+     * request_id is the handle for matching it in ACR's own logs — which is
+     * why the Workbench surfaces that id rather than a guess.
+     */
+    "acr_investigation_failed",
     /** ACR could not be reached at all. */
     "acr_unreachable",
     /** The server hop is not configured (missing env, unreadable key). */
@@ -38,6 +48,14 @@ export type WorkbenchFailure = {
     readonly httpStatus?: number;
     /** ACR's own `error.v1` code, when it sent one. */
     readonly upstreamCode?: string;
+    /**
+     * ACR's own request id.
+     *
+     * ACR keeps the underlying reason for an engine failure off the wire, so
+     * this id is the ONLY handle for matching a failure to ACR's logs. Showing
+     * it turns "it broke" into something an operator can actually look up.
+     */
+    readonly upstreamRequestId?: string;
     /** Contract validation errors, when the payload failed validation. */
     readonly details?: readonly string[];
     readonly retryable: boolean;

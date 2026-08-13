@@ -25,6 +25,12 @@ export function FailurePanel({ failure }: FailurePanelProps) {
                 {failure.upstreamCode === undefined ? "" : ` · ${failure.upstreamCode}`}
                 {failure.retryable ? " · retryable" : " · not retryable"}
             </p>
+            {failure.upstreamRequestId === undefined ? null : (
+                <p className="record__meta">
+                    ACR request id <code>{failure.upstreamRequestId}</code> — quote this to match
+                    the failure against ACR&apos;s own logs.
+                </p>
+            )}
             {failure.details !== undefined && failure.details.length > 0 ? (
                 <ul className="stack stack--tight" style={{ marginTop: 10 }}>
                     {failure.details.map((detail) => (

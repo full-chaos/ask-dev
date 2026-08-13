@@ -183,6 +183,32 @@ describe("investigate", () => {
         expect(failure.retryable).toBe(true);
     });
 
+    /**
+     * ACR keeps the reason for an engine failure off the wire on purpose, so
+     * its request id is the only handle for matching the failure to ACR's logs.
+     * Losing it would leave a tester with "it broke" and nothing to look up.
+     */
+    it("surfaces ACR's request id on an engine failure instead of guessing a cause", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: "req_0dceba3522cfdea61dd957eb9bb51e1d",
+                error: {
+                    code: "internal_error",
+                    message: "Context Fabric investigation failed",
+                    http_status: 500,
+                    retryable: false,
+                },
+            },
+            500,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.code).toBe("acr_investigation_failed");
+        expect(failure.upstreamRequestId).toBe("req_0dceba3522cfdea61dd957eb9bb51e1d");
+        expect(failure.httpStatus).toBe(500);
+    });
+
     it("reports an unreachable service rather than throwing raw", async () => {
         vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
 

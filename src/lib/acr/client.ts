@@ -70,14 +70,19 @@ type UpstreamError = {
     readonly code?: string;
     readonly message?: string;
     readonly retryable?: boolean;
+    readonly requestId?: string;
 };
 
 function parseUpstreamError(payload: unknown): UpstreamError {
     if (typeof payload !== "object" || payload === null) return {};
+    // `request_id` sits at the TOP level of error.v1, not inside `error`.
+    const requestId = (payload as { request_id?: unknown }).request_id;
     const error = (payload as { error?: unknown }).error;
-    if (typeof error !== "object" || error === null) return {};
+    const base = typeof requestId === "string" ? { requestId } : {};
+    if (typeof error !== "object" || error === null) return base;
     const { code, message, retryable } = error as Record<string, unknown>;
     return {
+        ...base,
         ...(typeof code === "string" ? { code } : {}),
         ...(typeof message === "string" ? { message } : {}),
         ...(typeof retryable === "boolean" ? { retryable } : {}),
@@ -97,6 +102,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     const upstreamFields = {
         httpStatus: status,
         ...(upstream.code === undefined ? {} : { upstreamCode: upstream.code }),
+        ...(upstream.requestId === undefined ? {} : { upstreamRequestId: upstream.requestId }),
     };
     if (status === 401 || status === 403) {
         return {
@@ -138,11 +144,24 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             retryable: true,
         };
     }
+    if (status >= 500) {
+        // ACR answered, so this is not a reachability problem — the engine ran
+        // and failed. It deliberately keeps the underlying reason off the wire,
+        // so the honest thing to show is the failure plus ACR's request id for
+        // log matching, not a guess at the cause.
+        return {
+            ...upstreamFields,
+            code: "acr_investigation_failed",
+            message:
+                "ACR ran the investigation and it failed inside the engine. Match the ACR request id below against ACR's logs for the reason.",
+            retryable: upstream.retryable ?? false,
+        };
+    }
     return {
         ...upstreamFields,
         code: "acr_unreachable",
         message: upstream.message ?? `ACR returned an unexpected status (${status}).`,
-        retryable: upstream.retryable ?? status >= 500,
+        retryable: upstream.retryable ?? false,
     };
 }
 

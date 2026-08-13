@@ -180,6 +180,14 @@ service rather than from documentation:
   guards it locally so a new consumer gets a named error instead. Recorded as an
   observation, not a patch: acr is not this repo's to change, and failing closed
   on an empty scope set may well be deliberate.
+- **TLS is ON by default for the graph dial, and `ALLOW_INSECURE` does not turn
+  it off.** `ACR_CONTEXT_FABRIC_FALKOR_TLS` defaults to true while
+  `ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE` only relaxes certificate
+  _validation_. Against a plaintext FalkorDB port the dial TLS-handshakes and
+  hangs until a timeout, so an authenticated investigation reaches the engine
+  and dies there — presenting as a slow, generic timeout rather than a
+  connection error. Set `ACR_CONTEXT_FABRIC_FALKOR_TLS=false` for a plaintext
+  local backend.
 - **A 503 from the investigations route is usually an operator state, not a
   blip.** ACR serves a static 503 when the investigator is not composed, which
   needs three independent things: `ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED`, a
@@ -190,6 +198,14 @@ service rather than from documentation:
   model-backed investigation can exhaust the HTTP budget while the pipeline is
   still running. The Workbench reports that as `acr_timeout`, separately from
   `acr_unreachable`, because the two lead to different investigations.
+- **A 5xx is not an unreachable service either.** ACR deliberately keeps the
+  underlying reason for an engine failure off the wire, so the Workbench reports
+  `acr_investigation_failed` and surfaces **ACR's own `request_id`** — the only
+  handle for matching the failure against ACR's logs. It never guesses a cause.
+- **The graph key is derived, not literal.** Reader and projector both call
+  `graphKey(prefix, orgID)`, so the live graph is `acr-cf-<hash>`, not
+  `acr-cf-<org-uuid>`. An empty `acr-cf-<org-uuid>` key in FalkorDB is a leftover
+  and is not the graph being read.
 
 ## Test fixtures
 

@@ -43,6 +43,7 @@ function statusFor(failure: WorkbenchFailure): number {
         case "acr_timeout":
             return 504;
         case "acr_contract_violation":
+        case "acr_investigation_failed":
         case "acr_unreachable":
             return 502;
         case "workbench_misconfigured":
