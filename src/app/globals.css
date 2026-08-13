@@ -416,3 +416,21 @@ body {
     font-size: 12px;
     line-height: 1.5;
 }
+
+.comparison {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.comparison th,
+.comparison td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+
+.comparison th {
+    color: var(--text-muted);
+    font-weight: 600;
+}

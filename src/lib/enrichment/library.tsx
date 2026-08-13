@@ -3,6 +3,8 @@
 import { createLibrary, defineComponent } from "@openuidev/react-lang";
 import { z } from "zod";
 
+import { useResolvedRef } from "@/lib/enrichment/context";
+
 /**
  * The CLOSED enrichment component library (CHAOS-3738).
  *
@@ -22,10 +24,18 @@ import { z } from "zod";
  *     attach to.
  *
  * Material props are typed as strings here because they carry `@result.`
- * REFERENCES, not values. The values are resolved from the immutable result at
- * render time by the enrichment view. Validation guarantees every one of them
- * resolved before this library is ever mounted.
+ * REFERENCES, not values. Each renderer resolves them through
+ * `useResolvedRef`, against the one result the composition was validated
+ * against. Validation has already proved every reference resolves before this
+ * library is ever mounted, so a resolution failure here means the validated and
+ * rendered compositions diverged — the error boundary catches it and the view
+ * falls closed.
  */
+
+/** Renders one reference prop as text. */
+function Ref({ value }: { readonly value: unknown }) {
+    return <>{useResolvedRef(value)}</>;
+}
 
 const ref = z.string();
 
@@ -33,14 +43,27 @@ export const EvidenceRef = defineComponent({
     name: "EvidenceRef",
     description: "One canonical evidence reference id from the result.",
     props: z.object({ evidenceRefId: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <li className="evidence-ref">
+            <Ref value={props.evidenceRefId} />
+        </li>
+    ),
 });
 
 export const Prose = defineComponent({
     name: "Prose",
     description: "Answer prose taken verbatim from the result, with inline evidence.",
     props: z.object({ text: ref, evidence: z.array(EvidenceRef.ref).optional() }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <div className="panel">
+            <p className="answer__body">
+                <Ref value={props.text} />
+            </p>
+            {props.evidence === undefined ? null : (
+                <ul className="evidence-list">{renderNode(props.evidence)}</ul>
+            )}
+        </div>
+    ),
 });
 
 export const DriverCard = defineComponent({
@@ -53,7 +76,27 @@ export const DriverCard = defineComponent({
         confidence: ref,
         evidence: z.array(EvidenceRef.ref).optional(),
     }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <div className="record">
+            <div className="record__head">
+                <span className="record__title">
+                    <Ref value={props.title} />
+                </span>
+                <span className="badge">
+                    <Ref value={props.standing} />
+                </span>
+                <span className="record__meta">
+                    confidence <Ref value={props.confidence} />
+                </span>
+            </div>
+            <p className="record__body">
+                <Ref value={props.summary} />
+            </p>
+            {props.evidence === undefined ? null : (
+                <ul className="evidence-list">{renderNode(props.evidence)}</ul>
+            )}
+        </div>
+    ),
 });
 
 export const FindingCard = defineComponent({
@@ -64,14 +107,35 @@ export const FindingCard = defineComponent({
         summary: ref,
         evidence: z.array(EvidenceRef.ref).optional(),
     }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <div className="record">
+            <span className="record__title">
+                <Ref value={props.kind} />
+            </span>
+            <p className="record__body">
+                <Ref value={props.summary} />
+            </p>
+            {props.evidence === undefined ? null : (
+                <ul className="evidence-list">{renderNode(props.evidence)}</ul>
+            )}
+        </div>
+    ),
 });
 
 export const ComparisonRow = defineComponent({
     name: "ComparisonRow",
     description: "One labelled row of a comparison.",
     props: z.object({ label: ref, value: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <tr>
+            <th scope="row">
+                <Ref value={props.label} />
+            </th>
+            <td>
+                <Ref value={props.value} />
+            </td>
+        </tr>
+    ),
 });
 
 export const Comparison = defineComponent({
@@ -81,7 +145,11 @@ export const Comparison = defineComponent({
         layout: z.enum(["rows", "columns"]).optional(),
         rows: z.array(ComparisonRow.ref),
     }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <table className="comparison">
+            <tbody>{renderNode(props.rows)}</tbody>
+        </table>
+    ),
 });
 
 export const Metric = defineComponent({
@@ -92,28 +160,55 @@ export const Metric = defineComponent({
         value: ref,
         trend: z.enum(["up", "down", "flat", "unknown"]).optional(),
     }),
-    component: () => null,
+    component: ({ props }) => (
+        <div className="record">
+            <span className="record__meta">
+                <Ref value={props.label} />
+            </span>
+            <p className="answer__judgment">
+                <Ref value={props.value} />
+            </p>
+            {props.trend === undefined ? null : (
+                <span className="record__meta">trend {String(props.trend)}</span>
+            )}
+        </div>
+    ),
 });
 
 export const TimelineEntry = defineComponent({
     name: "TimelineEntry",
     description: "One observed point on a timeline.",
     props: z.object({ label: ref, observedAt: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <li className="record">
+            <span className="record__title">
+                <Ref value={props.label} />
+            </span>
+            <span className="record__meta">
+                <Ref value={props.observedAt} />
+            </span>
+        </li>
+    ),
 });
 
 export const Timeline = defineComponent({
     name: "Timeline",
     description: "An ordered sequence of observed points.",
     props: z.object({ entries: z.array(TimelineEntry.ref) }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <ol className="stack stack--tight">{renderNode(props.entries)}</ol>
+    ),
 });
 
 export const RelationshipEdgeView = defineComponent({
     name: "RelationshipEdgeView",
     description: "One edge of a relationship path.",
     props: z.object({ from: ref, to: ref, type: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <li className="record__meta">
+            <Ref value={props.from} /> —<Ref value={props.type} />→ <Ref value={props.to} />
+        </li>
+    ),
 });
 
 export const RelationshipPathView = defineComponent({
@@ -124,42 +219,102 @@ export const RelationshipPathView = defineComponent({
         whyRelevant: ref,
         edges: z.array(RelationshipEdgeView.ref),
     }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <div className="record">
+            <span className="record__title">
+                <Ref value={props.pathId} />
+            </span>
+            <p className="record__body">
+                <Ref value={props.whyRelevant} />
+            </p>
+            <ul className="stack stack--tight">{renderNode(props.edges)}</ul>
+        </div>
+    ),
 });
 
 export const CoverageSource = defineComponent({
     name: "CoverageSource",
     description: "One source observation and its contract state.",
     props: z.object({ source: ref, state: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <div className="coverage__source">
+            <span className="coverage__name">
+                <Ref value={props.source} />
+            </span>
+            <span className="badge">
+                <Ref value={props.state} />
+            </span>
+        </div>
+    ),
 });
 
 export const Coverage = defineComponent({
     name: "Coverage",
     description: "What the investigation could and could not read. Mandatory.",
     props: z.object({ partial: ref, sources: z.array(CoverageSource.ref) }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <section className="panel" aria-label="Coverage">
+            <h3 className="panel__title">Coverage</h3>
+            <p className="record__meta">
+                partial: <Ref value={props.partial} />
+            </p>
+            <div className="coverage">{renderNode(props.sources)}</div>
+        </section>
+    ),
 });
 
 export const LimitationItem = defineComponent({
     name: "LimitationItem",
     description: "One limitation stated by the result.",
     props: z.object({ text: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <li className="record">
+            <Ref value={props.text} />
+        </li>
+    ),
 });
 
 export const Limitations = defineComponent({
     name: "Limitations",
     description: "What the service said it cannot support. Mandatory.",
     props: z.object({ items: z.array(LimitationItem.ref) }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <section className="panel" aria-label="Limitations">
+            <h3 className="panel__title">Limitations</h3>
+            <ul className="stack stack--tight">{renderNode(props.items)}</ul>
+        </section>
+    ),
 });
 
 export const DataTrustPanel = defineComponent({
     name: "DataTrustPanel",
     description: "Backend and version provenance for the result.",
     props: z.object({ backend: ref, projectionVersion: ref, queryVersion: ref }),
-    component: () => null,
+    component: ({ props }) => (
+        <section className="panel" aria-label="Data trust">
+            <h3 className="panel__title">Data trust</h3>
+            <dl className="versions">
+                <div>
+                    <dt>backend</dt>
+                    <dd>
+                        <Ref value={props.backend} />
+                    </dd>
+                </div>
+                <div>
+                    <dt>projection</dt>
+                    <dd>
+                        <Ref value={props.projectionVersion} />
+                    </dd>
+                </div>
+                <div>
+                    <dt>query</dt>
+                    <dd>
+                        <Ref value={props.queryVersion} />
+                    </dd>
+                </div>
+            </dl>
+        </section>
+    ),
 });
 
 export const Answer = defineComponent({
@@ -182,7 +337,14 @@ export const Answer = defineComponent({
             ]),
         ),
     }),
-    component: () => null,
+    component: ({ props, renderNode }) => (
+        <article aria-label="Enriched answer">
+            <h2 className="answer__judgment">
+                <Ref value={props.headline} />
+            </h2>
+            {renderNode(props.sections)}
+        </article>
+    ),
 });
 
 export const enrichmentLibrary = createLibrary({
