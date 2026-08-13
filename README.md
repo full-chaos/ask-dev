@@ -264,6 +264,44 @@ by default with a light `prefers-color-scheme` block.
 surface elevation and low-alpha hairlines, never from a light outline on a dark
 ground.
 
+## Enrichment (M3, not yet wired live)
+
+`src/lib/enrichment/` holds the pieces the enriched view will sit on. The tab
+stays **disabled** until a real answer renders in the deterministic view and
+every validator predicate test is green.
+
+- **`manifest.ts`** — the Dev Health-owned presentation manifest. It declares
+  the closed component set, which props are _material_, the closed vocabularies
+  for the rest, and the mandatory sections. It carries no answer, fact, metric,
+  or judgment; only headings and layout vocabulary. **The manifest, not OpenUI,
+  is the product boundary.**
+- **`library.tsx`** — the closed component library. Every renderer takes no
+  `className`, `style`, `href`, or `src`, declares no action, and renders text
+  as a React text child, never through `dangerouslySetInnerHTML`.
+- **`refs.ts`** — reference-only resolution. A material prop may never be a
+  literal; it must be a `@result.` reference resolved against the immutable
+  result. Only own properties and integer array indices resolve, and only to
+  scalars, so `@result.constructor`, `@result.__proto__.x`, and
+  `@result.limitations.length` all fail.
+- **`validate.ts`** — the fail-closed validator. It parses the WHOLE
+  composition and checks every predicate before anything mounts, because
+  OpenUI's renderer is progressive by design: left to itself it drops the
+  offending node and renders the rest.
+
+Two predicates exist because of behaviour observed in a probe, not because the
+documentation suggested them — and a validator without them would have shipped
+holes:
+
+1. `meta.unresolved` is populated while `meta.errors` stays **empty** for a
+   dangling reference. Checking only `errors` passes a composition that
+   references nothing.
+2. Built-in functions (`@Count(...)`) and `$state` variables raise **no error**;
+   they appear only as nodes flagged `hasDynamicProps`. That flag is the tell
+   for a model-computed value, which the spec forbids outright.
+
+Each predicate has a hostile payload in `validate.test.ts`, plus a passing
+control — without one, a validator that rejected everything would look perfect.
+
 ## OpenUI
 
 `@openuidev/react-lang` (caged renderer) and `@openuidev/react-headless` (chat

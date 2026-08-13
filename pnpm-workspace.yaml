@@ -1,3 +1,8 @@
 allowBuilds:
     esbuild: true
     sharp: true
+    # DENIED on purpose. @openuidev/lang-core ships an install-time telemetry
+    # postinstall. It is not needed to build or run the package, and an
+    # internal, read-only tool should not phone home at install time. CI also
+    # sets DO_NOT_TRACK and OPENUI_TELEMETRY_DISABLED, which the script honors.
+    "@openuidev/lang-core": false
