@@ -75,10 +75,18 @@ install_playwright_browser() {
   pnpm exec playwright install chromium
 }
 
-# The smoke suite serves dist/ through `vite preview`, so the build must have
-# run first. `ci` guarantees that ordering; a bare `e2e` builds on demand.
+# The smoke suite serves the production build through `next start`, so the
+# build must have run first. `ci` guarantees that ordering; a bare `e2e` builds
+# on demand.
+#
+# Drop the dev server's compiled chunks first. dev-health-web learned this the
+# hard way: a stale .next/dev makes `next dev` serve chunks that do not match
+# the tree, and the symptom is unrelated PRODUCT specs failing, not a build
+# error. Scoped to .next/dev so the production build this tier just made
+# survives.
 run_e2e() {
-  if [[ ! -d dist ]]; then
+  rm -rf .next/dev
+  if [[ ! -d .next ]]; then
     run_step "build (required by e2e)" run_build
   fi
   run_step "playwright browser installation" install_playwright_browser

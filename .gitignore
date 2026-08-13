@@ -1,14 +1,23 @@
 node_modules
-dist
+.pnpm-store
+
+# Next.js build output
+.next
+out
+next-env.d.ts
+
+# Test artifacts
 coverage
 test-results
 playwright-report
-.pnpm-store
 
-# Never commit real environment values. .env.example carries the documented keys.
+# Never commit real environment values, and never the ACR signing key.
+# ACR_WEB_ASSERTION_KEY_FILE points at a path outside this repo.
 .env
 .env.*
 !.env.example
+*.pem
+*.key
 
 .DS_Store
 *.log
