@@ -1,39 +1,31 @@
 import { AnswerPanel } from "@/components/AnswerPanel";
-import { Badge } from "@/components/Badge";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import type { InvestigationResult } from "@/lib/contracts";
-import { humanizeTerm, statusTone } from "@/lib/presentation";
 
-export type InvestigationResultViewProps = {
+export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
 };
 
 /**
- * Renders one investigation result.
+ * The deterministic answer view — the REFERENCE answer and the fallback
+ * (CHAOS-3738).
+ *
+ * A native component set renders the result directly. No model is involved and
+ * nothing is inferred: every value on screen comes from the immutable result.
+ * When M3's enriched view fails its pre-render validation, this is what the
+ * tester sees instead, and the answer must be identical.
  *
  * Section order follows what a reader needs to trust the answer: what was said,
  * who it is about, what is left, what could not be read, and what the service
- * itself said it cannot support. Limitations and coverage are never collapsed
- * away or shown only on failure.
+ * itself said it cannot support. Coverage and limitations are never collapsed
+ * away and never shown only on failure.
  */
-export function InvestigationResultView({ result }: InvestigationResultViewProps) {
+export function DeterministicAnswerView({ result }: DeterministicAnswerViewProps) {
     return (
-        <article aria-label="Investigation result">
-            <div className="result__head">
-                <h2 className="result__question">{result.question}</h2>
-                <Badge tone={statusTone(result.status)} title={result.status}>
-                    {humanizeTerm(result.status)}
-                </Badge>
-                {result.reused ? (
-                    <Badge tone="neutral" title="reused">
-                        reused
-                    </Badge>
-                ) : null}
-            </div>
-
+        <article aria-label="Deterministic answer">
             <AnswerPanel result={result} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
@@ -93,28 +85,6 @@ export function InvestigationResultView({ result }: InvestigationResultViewProps
                 ) : (
                     <EvidenceReferences evidenceRefIds={result.evidence_ref_ids} />
                 )}
-            </section>
-
-            <section className="panel" aria-labelledby="versions-title">
-                <h2 className="panel__title" id="versions-title">
-                    Provenance
-                </h2>
-                <dl className="versions">
-                    {Object.entries(result.versions).map(([name, value]) => (
-                        <div key={name}>
-                            <dt>{humanizeTerm(name)}</dt>
-                            <dd>{String(value)}</dd>
-                        </div>
-                    ))}
-                    <div>
-                        <dt>result id</dt>
-                        <dd>{result.result_id}</dd>
-                    </div>
-                    <div>
-                        <dt>generated at</dt>
-                        <dd>{result.generated_at}</dd>
-                    </div>
-                </dl>
             </section>
         </article>
     );

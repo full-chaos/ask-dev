@@ -1,64 +1,54 @@
+"use client";
+
 import { useState } from "react";
 
 export type QuestionFormProps = {
     readonly initialQuestion: string;
-    readonly suggestions: readonly { readonly id: string; readonly question: string }[];
+    readonly pending: boolean;
     readonly onAsk: (question: string) => void;
 };
 
-export function QuestionForm({ initialQuestion, suggestions, onAsk }: QuestionFormProps) {
+/**
+ * Submitting a question is the Workbench's primary interaction — and, alongside
+ * choosing a clarification candidate and switching views, close to its only one
+ * (CHAOS-3738). There is no product mutation here and no agent action.
+ */
+export function QuestionForm({ initialQuestion, pending, onAsk }: QuestionFormProps) {
     const [question, setQuestion] = useState(initialQuestion);
-
-    function submit(value: string) {
-        const trimmed = value.trim();
-        if (trimmed === "") return;
-        setQuestion(trimmed);
-        onAsk(trimmed);
-    }
 
     return (
         <form
             className="question-form"
             onSubmit={(event) => {
                 event.preventDefault();
-                submit(question);
+                const trimmed = question.trim();
+                if (trimmed === "" || pending) return;
+                onAsk(trimmed);
             }}
         >
-            <label className="question-form__label" htmlFor="ask-dev-question">
-                Ask a question
+            <label className="question-form__label" htmlFor="workbench-question">
+                Ask Context Fabric
             </label>
             <div className="question-form__row">
                 <input
                     className="question-form__input"
-                    id="ask-dev-question"
+                    id="workbench-question"
                     name="question"
                     type="text"
                     autoComplete="off"
+                    disabled={pending}
                     value={question}
-                    placeholder="Why is Ask Dev still not ready to ship?"
+                    placeholder="What is the actual status of the dev-health-ops project, and what are the current drivers?"
                     onChange={(event) => setQuestion(event.target.value)}
                 />
-                <button className="question-form__submit" type="submit">
-                    Investigate
+                <button className="question-form__submit" type="submit" disabled={pending}>
+                    {pending ? "Investigating…" : "Investigate"}
                 </button>
             </div>
             <p className="question-form__hint">
-                Answers come from committed mock fixtures derived from the pinned ACR contract
-                examples. Nothing here reaches a live service.
+                Every answer comes from a real ACR investigation. The Workbench never renders a mock
+                result.
             </p>
-            <ul className="suggestions">
-                {suggestions.map((suggestion) => (
-                    <li key={suggestion.id}>
-                        <button
-                            className="suggestions__button"
-                            type="button"
-                            onClick={() => submit(suggestion.question)}
-                        >
-                            {suggestion.question}
-                        </button>
-                    </li>
-                ))}
-            </ul>
         </form>
     );
 }

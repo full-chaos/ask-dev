@@ -364,3 +364,55 @@ body {
     color: var(--text-muted);
     font-size: 12px;
 }
+
+/* --- Workbench shell additions (CHAOS-3738) --- */
+
+.panel--failure {
+    /* Failure is signalled by a tinted surface and the heading, never by a
+       bright outline — the dark-theme border rule holds here too. */
+    background: color-mix(in srgb, var(--state-bad) 8%, var(--surface-1));
+}
+
+.view-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.view-switcher__tab {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.view-switcher__tab--active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.view-switcher__tab:disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.raw-payload {
+    margin: 10px 0 0;
+    padding: 12px;
+    max-height: 60vh;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
