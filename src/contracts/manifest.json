@@ -1,0 +1,34 @@
+{
+  "source_commit": "0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c",
+  "source_repository": "full-chaos/dev-health-acr",
+  "files": [
+    {
+      "path": "examples/context_fabric_investigation_request.v1.json",
+      "sha256": "b69cc1ce58c42e4bea2b12d9c0bc25c358482e6173d133d27b83c259992f7ad9"
+    },
+    {
+      "path": "examples/context_fabric_investigation_result.v1.json",
+      "sha256": "41f186ff8b59edc9141897d1592ec79dc9033c32549779432990c0e79070e6eb"
+    },
+    {
+      "path": "examples/error_context_fabric_interpretation_rejected.v1.json",
+      "sha256": "c38e96ccd0304c84be6a1ce23661a61bd3908f9b194d354fb81cbf74eeb243d6"
+    },
+    {
+      "path": "schemas/context_fabric_common.v1.schema.json",
+      "sha256": "87623a7c25351d3b85de9bff8b91c9321d80c91d200a0dda2813c96ffd75c6bf"
+    },
+    {
+      "path": "schemas/context_fabric_investigation_request.v1.schema.json",
+      "sha256": "d146b0fc47bc5ec303ffdda17024cf3225e00495d3287f0463d02d745d59e8bd"
+    },
+    {
+      "path": "schemas/context_fabric_investigation_result.v1.schema.json",
+      "sha256": "0c91a2eb6b4917c3e49d8130947e9315a496af543876af2bb2da99669de9d82b"
+    },
+    {
+      "path": "schemas/error.v1.schema.json",
+      "sha256": "e9b2b0b0de2eb66bff9f9f893e30fdf70a3ebab30a063c07141ed4d5ea4f3384"
+    }
+  ]
+}
