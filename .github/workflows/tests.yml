@@ -1,0 +1,103 @@
+name: Tests
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    merge_group:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    # Every job runs the SAME entry point a developer runs locally
+    # (ci/run_checks.sh <tier>), so a green local run means a green CI run.
+    quality:
+        name: Quality
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+              with:
+                  node-version-file: .nvmrc
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - run: bash ci/run_checks.sh format
+            # Exact-diff regeneration guard. Needs no acr checkout: it verifies
+            # the committed copies against the manifest digests and regenerates
+            # the types from them.
+            - run: bash ci/run_checks.sh contracts
+            - run: bash ci/run_checks.sh lint
+            - run: bash ci/run_checks.sh typecheck
+
+    unit:
+        name: Unit tests
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+              with:
+                  node-version-file: .nvmrc
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - run: bash ci/run_checks.sh unit
+
+    build:
+        name: Build
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+              with:
+                  node-version-file: .nvmrc
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            - run: bash ci/run_checks.sh build
+
+    e2e:
+        name: E2E smoke
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+              with:
+                  node-version-file: .nvmrc
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
+            # `e2e` builds first when dist/ is absent, then serves the built
+            # artifact through `vite preview` — so the smoke suite exercises
+            # what a deploy would ship, not the dev server.
+            - run: bash ci/run_checks.sh e2e
+            - name: Upload Playwright report
+              if: always()
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+              with:
+                  name: playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+                  path: test-results/playwright-html/
+                  if-no-files-found: warn
+                  retention-days: 30
+
+    # One stable required status check, so branch protection has a single name
+    # to require no matter how the jobs above are split later.
+    test:
+        name: test
+        needs: [quality, unit, build, e2e]
+        if: always()
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check every stage
+              run: |
+                  if [[ "${{ needs.quality.result }}" != 'success' \
+                     || "${{ needs.unit.result }}" != 'success' \
+                     || "${{ needs.build.result }}" != 'success' \
+                     || "${{ needs.e2e.result }}" != 'success' ]]; then
+                    exit 1
+                  fi
