@@ -166,11 +166,22 @@ place a rename has to be absorbed.
 Currently pinned: `0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c` (acr main,
 CHAOS-3783).
 
+### Why Next.js is pinned exactly
+
+`next` is pinned to `16.2.12`, not `^16.2.12`. A fresh caret install resolves to
+16.3.x, which `dev-health-web` is deliberately paused on over open regressions.
+This surface is meant to be promoted into that repo, so it should run what that
+repo runs. Bump it when web bumps, not before.
+
 ## ACR integration notes
 
 Things worth knowing before touching the client, learned against the live
 service rather than from documentation:
 
+- **A rejected server credential surfaces as 502, not 401.** The server hop
+  holds the ACR credential, so an ACR rejection says nothing about the browser
+  session. Proxying it as 401 would invite a client-side re-auth that cannot
+  possibly help.
 - **`repository_scopes` must not be empty.** `validWebRepositories` in acr
   `internal/auth/web_assertion_binding.go:34-37` opens with
   `if len(scopes) == 0 { return false }`, and the whole assertion then fails as
@@ -198,6 +209,16 @@ service rather than from documentation:
   model-backed investigation can exhaust the HTTP budget while the pipeline is
   still running. The Workbench reports that as `acr_timeout`, separately from
   `acr_unreachable`, because the two lead to different investigations.
+- **ACR's status codes are a deliberate classification — read them literally.**
+  `422 interpretation_rejected` / `synthesis_rejected` is ACR's own validator
+  rejecting an artifact it derived (a classified non-answer, retryable);
+  `502 upstream_invalid_output` is the provider misbehaving; `503` is a
+  dependency down; `429` is rate limiting. **`500 internal_error` is the
+  unclassified fallthrough** — `context_fabric_routes.go` says in as many words
+  that a bound violation "is not the provider misbehaving (that stays 502) and
+  not an ACR bug (that stays 500)". So a 500 here means an ACR-side fault, not a
+  model being picky, and retrying it will not help — ACR itself marks it
+  `retryable: false`.
 - **A 5xx is not an unreachable service either.** ACR deliberately keeps the
   underlying reason for an engine failure off the wire, so the Workbench reports
   `acr_investigation_failed` and surfaces **ACR's own `request_id`** — the only

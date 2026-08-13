@@ -38,6 +38,11 @@ function statusFor(failure: WorkbenchFailure): number {
             return 502;
         case "acr_rejected_request":
             return 400;
+        case "acr_answer_rejected":
+            // 422 passes through: the request was fine, the derived answer was
+            // rejected by ACR's own bounds. That is a real outcome to render,
+            // not a client error to correct.
+            return 422;
         case "acr_runtime_unavailable":
             return 503;
         case "acr_timeout":

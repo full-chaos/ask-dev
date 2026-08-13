@@ -12,6 +12,16 @@ export const workbenchFailureCodes = [
     "acr_unauthorized",
     /** ACR rejected the request payload. */
     "acr_rejected_request",
+    /**
+     * ACR's own validator rejected the answer it derived.
+     *
+     * A legitimate, classified NON-ANSWER outcome (422 `interpretation_rejected`
+     * / `synthesis_rejected`), not a malformed request and not a fault: value
+     * level closure refusing a claim it cannot bind to canonical facts is the
+     * engine working correctly. Rendering it as "your question was bad" would
+     * misattribute the outcome to the tester.
+     */
+    "acr_answer_rejected",
     /** ACR answered, but the payload does not satisfy its own contract. */
     "acr_contract_violation",
     /**

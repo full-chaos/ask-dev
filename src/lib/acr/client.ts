@@ -113,7 +113,24 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             retryable: false,
         };
     }
-    if (status === 400 || status === 413 || status === 422) {
+    if (status === 422) {
+        // ACR reserves 422 for ITS OWN derived artifact failing ITS OWN v1
+        // bounds -- deliberately not 502 (provider misbehaving) and not 500
+        // (an ACR bug). That is a classified non-answer, and ACR marks it
+        // retryable because an independent model call may produce compliant
+        // output. Folding it in with "your request was bad" would blame the
+        // tester for the engine declining to assert something it could not
+        // bind to canonical facts.
+        return {
+            ...upstreamFields,
+            code: "acr_answer_rejected",
+            message:
+                upstream.message ??
+                "ACR derived an answer and its own validator rejected it. No answer was asserted.",
+            retryable: upstream.retryable ?? true,
+        };
+    }
+    if (status === 400 || status === 413) {
         return {
             ...upstreamFields,
             code: "acr_rejected_request",

@@ -184,6 +184,37 @@ describe("investigate", () => {
     });
 
     /**
+     * ACR reserves 422 for its OWN derived artifact failing its OWN v1 bounds
+     * (`synthesis_rejected` / `interpretation_rejected`). That is the engine
+     * declining to assert a claim it cannot bind to canonical facts — a
+     * classified non-answer, not a bad request. The distinction matters:
+     * ACR's fallthrough for an unclassified fault is 500, so conflating the two
+     * would hide a real defect behind "the model was picky today".
+     */
+    it("treats a 422 as a classified non-answer, not a malformed request", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: "req_synthesis_rejected_0001",
+                error: {
+                    code: "synthesis_rejected",
+                    message: "Context Fabric's synthesized answer violated a v1 bound",
+                    http_status: 422,
+                    retryable: true,
+                },
+            },
+            422,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.code).toBe("acr_answer_rejected");
+        expect(failure.code).not.toBe("acr_rejected_request");
+        expect(failure.upstreamCode).toBe("synthesis_rejected");
+        // ACR marks these retryable: an independent model call may comply.
+        expect(failure.retryable).toBe(true);
+    });
+
+    /**
      * ACR keeps the reason for an engine failure off the wire on purpose, so
      * its request id is the only handle for matching the failure to ACR's logs.
      * Losing it would leave a tester with "it broke" and nothing to look up.
