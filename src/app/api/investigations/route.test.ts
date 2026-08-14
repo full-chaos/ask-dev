@@ -172,6 +172,44 @@ describe("a malformed receipt rejects the request instead of being filtered out"
             expect(response.status).toBe(400);
             expect((await failureOf(response)).code).toBe("acr_rejected_request");
         });
+
+        /**
+         * ASYMMETRIC fixtures, because the symmetric ones pinned the LOOP
+         * rather than each identifier.
+         *
+         * Every case above sets both ids to the same length, so `receipt_id`'s
+         * check covered for `result_id`'s: dropping result_id's length check
+         * alone left the whole suite green. Pinning granularity has to match
+         * the granularity of the thing that can independently break.
+         */
+        const asymmetric = (resultId: string, receiptId: string) =>
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    priorSubjectReceipts: [{ result_id: resultId, receipt_id: receiptId }],
+                }),
+            );
+
+        it("rejects an over-bound result_id even when receipt_id is valid", async () => {
+            const response = await POST(asymmetric(astral.repeat(257), "receipt_1234567890"));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+
+        it("rejects an over-bound receipt_id even when result_id is valid", async () => {
+            const response = await POST(asymmetric("result_1234567890", astral.repeat(257)));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+
+        it("rejects an under-bound result_id even when receipt_id is valid", async () => {
+            const response = await POST(asymmetric("short", "receipt_1234567890"));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
     });
 
     /**

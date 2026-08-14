@@ -151,10 +151,11 @@ describe("clarification flow", () => {
     it("never renders the normal answer shape for a clarification, even with no callback", () => {
         render(<DeterministicAnswerView result={clarification} />);
 
-        // The clarification content is present...
-        expect(
-            screen.getByRole("region", { name: "Which subject did you mean?" }),
-        ).toBeInTheDocument();
+        // The clarification content is present, under a DECLARATIVE heading:
+        // asking "which did you mean?" of a reader who cannot answer is
+        // promise-shaped text, and the heading is our chrome, so it adapts.
+        expect(screen.getByRole("region", { name: "Subject candidates" })).toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
         for (const candidate of clarification.subject_resolution.candidates) {
             expect(screen.getByText(candidate.subject.label)).toBeInTheDocument();
         }

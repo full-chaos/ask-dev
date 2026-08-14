@@ -176,6 +176,9 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         );
 
         expect(container.textContent).not.toMatch(/where the choice can be made/i);
+        // No interrogative heading either: the wrapper and the panel now agree
+        // that nothing here promises a choice.
+        expect(container.textContent).not.toMatch(/which subject did you mean/i);
         expect(container.textContent).toMatch(/cannot re-ask/i);
         expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
         // The candidates are still shown — inspection-only, not hidden.

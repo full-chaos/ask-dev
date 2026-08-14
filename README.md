@@ -273,6 +273,32 @@ by default with a light `prefers-color-scheme` block.
 surface elevation and low-alpha hairlines, never from a light outline on a dark
 ground.
 
+## Length bounds count Unicode code points
+
+**The invariant, stated once:** every length bound in this repo counts **Unicode
+code points**, because ACR counts runes (Go's `RuneCountInString`) and that is
+also what JSON Schema's `maxLength` means. JavaScript's `.length` counts UTF-16
+units, so an astral character counts twice — a question of exactly 8000 astral
+code points measures 16000 and would be rejected by a naive guard that ACR would
+have accepted.
+
+Three idioms enforce it, and they are deliberately **not** unified behind one
+helper — consistency of _behaviour_ is the invariant, consistency of _idiom_ is
+aesthetics:
+
+| Where                                 | Idiom                                                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/api/investigations/route.ts` | `codePointLength` (spread) — question and receipt ids                                                                           |
+| `src/lib/acr/upstream-vocabulary.ts`  | `u`-flagged regex quantifier — its `{1,128}` counts code points because of the flag, and it does charset and length in one pass |
+| `src/lib/acr/validate.ts` (Ajv)       | `ucs2length` — verified by probing the pinned dependency, not by reading docs                                                   |
+
+Byte bounds are a separate thing and are measured in bytes
+(`exceedsResponseCap`), not in either character unit.
+
+If you add a length bound, count code points, and add an **astral boundary
+test** — a correct fix with only ASCII fixtures is indistinguishable from a fix
+never made, which is how the receipt bound sat unpinned through a review round.
+
 ## Silent-discard class closure
 
 Five instances of one shape appeared during CHAOS-3738 — the Workbench

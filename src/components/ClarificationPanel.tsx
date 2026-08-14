@@ -100,8 +100,13 @@ export function ClarificationPanel({ result, onChoose, pending = false }: Clarif
 
     return (
         <section className="panel" aria-labelledby="clarification-title">
+            {/* Callback-aware, like the wrapper copy. An interrogative heading
+                over candidates the reader cannot choose is promise-shaped text,
+                and it is OUR chrome — so it adapts. ACR's clarification_prompt
+                below stays verbatim whatever the context, because that is data,
+                not chrome, and the inspection-only line covers it. */}
             <h2 className="panel__title" id="clarification-title">
-                Which subject did you mean?
+                {onChoose === undefined ? "Subject candidates" : "Which subject did you mean?"}
             </h2>
             {prompt === undefined ? (
                 <p className="answer__body">
