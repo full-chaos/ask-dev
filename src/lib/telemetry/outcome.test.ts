@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
-import { buildOutcomeEvent } from "@/lib/telemetry/outcome";
+import {
+    boundedCoverageSource,
+    buildOutcomeEvent,
+    UNRECOGNIZED_SOURCE,
+} from "@/lib/telemetry/outcome";
 
 const result = canonicalResult as unknown as InvestigationResult;
 
@@ -35,6 +39,13 @@ function prose(source: InvestigationResult): readonly string[] {
         ),
         // Model-derived: the contract bounds it only to a string.
         source.interpretation.requested_judgment,
+        // Coverage source names are unbounded on the wire. Only the ones that
+        // fall OUTSIDE the known vocabulary count as free text — a recognized
+        // name is a bounded token and is deliberately retained, exactly like a
+        // coverage state.
+        ...source.coverage.sources
+            .map((coverageSource) => coverageSource.source)
+            .filter((name) => boundedCoverageSource(name) === UNRECOGNIZED_SOURCE),
     ].filter((value) => typeof value === "string" && value.trim() !== "");
 }
 
@@ -98,6 +109,38 @@ describe("outcome telemetry — what it does record", () => {
         // requested_judgment is model-derived free text (the contract bounds it
         // only to a 256-character string), so it must not appear at all.
         expect(JSON.stringify(event)).not.toContain(result.interpretation.requested_judgment);
+    });
+
+    /**
+     * R2. The schema types `coverage.sources[].source` as a 1..128 character
+     * string, so it is free text on the wire however identifier-shaped it
+     * usually looks. The count is preserved; the string is not.
+     */
+    it("drops an unrecognized coverage source name but keeps the count", () => {
+        const smuggled = "the model said Ask Dev is ready to ship";
+        const tainted: InvestigationResult = {
+            ...result,
+            coverage: {
+                ...result.coverage,
+                sources: [
+                    { source: smuggled, state: "available" },
+                    { source: "canonical_fact:metrics", state: "stale" },
+                ],
+            },
+        };
+
+        const event = buildOutcomeEvent({ latencyMs: 1, renderSurface: "raw", result: tainted });
+
+        expect(JSON.stringify(event)).not.toContain(smuggled);
+        expect(event.coverageSources).toEqual(["canonical_fact:metrics", "other"]);
+    });
+
+    it("keeps source names that are in the known vocabulary", () => {
+        expect(boundedCoverageSource("canonical_fact:workload")).toBe("canonical_fact:workload");
+        expect(boundedCoverageSource("dev-health-ops:status")).toBe("dev-health-ops:status");
+        expect(boundedCoverageSource("context-fabric:graph")).toBe("context-fabric:graph");
+        // A plausible-looking prefix with an unknown kind is still unknown.
+        expect(boundedCoverageSource("canonical_fact:not_a_kind")).toBe("other");
     });
 
     it("records coverage as closed-vocabulary states and counts", () => {

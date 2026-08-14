@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { signWebAssertion } from "@/lib/acr/assertion";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import { boundedUpstreamCode, boundedUpstreamRequestId } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import type { InvestigationRequest, InvestigationResult } from "@/lib/contracts";
 
@@ -147,10 +148,15 @@ function parseUpstreamError(payload: unknown): UpstreamError {
  * blip, and saying so saves the next person the hour it cost to find.
  */
 function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
+    // Both upstream fields are bounded before they can be carried anywhere.
+    // "Usually an identifier" is not a guarantee, and an upstream that put a
+    // sentence in either would otherwise put it straight into the DOM.
+    const code = boundedUpstreamCode(upstream.code);
+    const upstreamRequestId = boundedUpstreamRequestId(upstream.requestId);
     const upstreamFields = {
         httpStatus: status,
-        ...(upstream.code === undefined ? {} : { upstreamCode: upstream.code }),
-        ...(upstream.requestId === undefined ? {} : { upstreamRequestId: upstream.requestId }),
+        ...(code === undefined ? {} : { upstreamCode: code }),
+        ...(upstreamRequestId === undefined ? {} : { upstreamRequestId }),
     };
     if (status === 401 || status === 403) {
         return {

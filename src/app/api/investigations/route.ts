@@ -45,14 +45,25 @@ function parseReceipts(value: unknown): readonly { result_id: string; receipt_id
     if (value === undefined) return [];
     if (!Array.isArray(value)) throw new MalformedReceiptError();
     return value.map((entry) => {
-        if (typeof entry !== "object" || entry === null) throw new MalformedReceiptError();
-        const { result_id: resultId, receipt_id: receiptId } = entry as Record<string, unknown>;
-        if (typeof resultId !== "string" || typeof receiptId !== "string") {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
             throw new MalformedReceiptError();
         }
-        // The contract's own minLength for both identifiers.
-        if (resultId.length < 8 || receiptId.length < 8) throw new MalformedReceiptError();
-        return { result_id: resultId, receipt_id: receiptId };
+        const record = entry as Record<string, unknown>;
+        // FULL contract shape, not just presence. The contract's
+        // BoundSubjectReceipt sets additionalProperties:false and bounds both
+        // ids to 8..256 — checking only type and minimum length let an
+        // over-long id through stage 1 and fail later, which is the same
+        // stage-misattribution class as validating after configuration.
+        const keys = Object.keys(record);
+        if (keys.length !== 2 || !keys.includes("result_id") || !keys.includes("receipt_id")) {
+            throw new MalformedReceiptError();
+        }
+        const { result_id: resultId, receipt_id: receiptId } = record;
+        for (const identifier of [resultId, receiptId]) {
+            if (typeof identifier !== "string") throw new MalformedReceiptError();
+            if (identifier.length < 8 || identifier.length > 256) throw new MalformedReceiptError();
+        }
+        return { result_id: resultId as string, receipt_id: receiptId as string };
     });
 }
 

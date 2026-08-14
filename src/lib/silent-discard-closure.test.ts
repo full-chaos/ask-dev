@@ -115,11 +115,10 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
     },
     {
         seam: "Renderer runtime error → fallback",
-        discard:
-            "The stage-2 runtime fallback has NO REACHABLE TRIGGER: the validator rejects every composition that could make a renderer throw, so this path is defense in depth against a future component bug, not live coverage.",
-        verdict: "accepted-gap",
+        discard: "A component that throws mid-render leaves a half-drawn answer on screen.",
+        verdict: "structurally-impossible",
         evidence:
-            "Accepted and named rather than papered over. A component-level test appeared to exercise it and was actually exercising the VALIDATION fallback; mutation testing exposed that, and the keying invariant is now pinned by a pure test instead. Revisit if a component gains a way to throw that validation cannot pre-empt.",
+            "RuntimeFallback.test.tsx registers a throwing component in a TEST-SCOPE library (asserted absent from the production registry) so a VALID composition mounts and throws; the fallback engages and no React update-during-render warning is emitted, pinning that OpenUI calls onError from componentDidCatch. No PRODUCTION component can throw today — the validator pre-empts every input that would cause it — so this is defense in depth whose mechanism is now covered rather than assumed.",
     },
     {
         seam: "Clarification → enrichment path",
@@ -143,7 +142,7 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
             "An ESLint no-restricted-imports rule bars @/test/** from src/app, src/components and src/lib; verified to fire on a non-test file.",
     },
     {
-        seam: "ACR wire → receipt disposition",
+        seam: "ACR receipt disposition → wire",
         discard:
             "ACR gives no per-receipt applied/skipped signal, so the REASON a choice was dropped is unknowable to the Workbench.",
         verdict: "accepted-gap",
@@ -161,9 +160,9 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
     {
         seam: "Model-authored composition → manifest",
         discard: "A model omits a section the manifest does not mark mandatory.",
-        verdict: "accepted-gap",
+        verdict: "structurally-impossible",
         evidence:
-            "Only Coverage and Limitations are mandatory today. A model omitting, say, drivers would render a thinner answer without failing closed. Accepted while compositions are builder-generated; revisit when a model authors them, which is also when it becomes observable via the reference-composition diff.",
+            "THE SEAM DOES NOT EXIST YET: the only producer of a composition is buildComposition, which always emits every section the result supports. No model-authoring path is wired. PRECONDITION, recorded deliberately: the moment a model authors compositions this row must be re-verdicted, because only Coverage and Limitations are mandatory and a model omitting drivers would render a thinner answer without failing closed. Re-verdict it in the same change that introduces model authoring, not afterwards.",
     },
 ];
 
@@ -179,13 +178,36 @@ describe("silent-discard class closure — the enumeration", () => {
      * fails-toward-fine shape this closure exists to close, so the honest
      * expectation is that gaps exist and are named.
      */
-    it("names real gaps rather than claiming everything is impossible", () => {
+    /**
+     * The EXACT expected gap set, not "some gap, generic match".
+     *
+     * This artifact drifted once already — it carried a different seam count
+     * and gap count from the report and the README, and three numbers in three
+     * places was itself a finding. An exact assertion makes the next drift fail
+     * loudly instead of being discovered by a reviewer counting rows.
+     */
+    it("has exactly the expected accepted gaps, by name", () => {
+        const gaps = SILENT_DISCARD_SEAMS.filter((seam) => seam.verdict === "accepted-gap").map(
+            (seam) => seam.seam,
+        );
+        expect(gaps).toEqual([
+            "ACR receipt disposition → wire",
+            "ACR stage timing → latency attribution",
+        ]);
+    });
+
+    it("keeps the gap list non-empty, and every gap owned", () => {
         const gaps = SILENT_DISCARD_SEAMS.filter((seam) => seam.verdict === "accepted-gap");
+        // A table whose every row read "impossible" would be the very shape
+        // this closure exists to close.
         expect(gaps.length).toBeGreaterThan(0);
-        // Every accepted gap needs a real owner, not a deferral.
         for (const gap of gaps) {
-            expect(gap.evidence, gap.seam).toMatch(/CHAOS-\d+|Accepted|Recorded/u);
+            expect(gap.evidence, gap.seam).toMatch(/CHAOS-\d+|exposes none/u);
         }
+    });
+
+    it("pins the seam count, so an added or dropped row is deliberate", () => {
+        expect(SILENT_DISCARD_SEAMS).toHaveLength(15);
     });
 });
 

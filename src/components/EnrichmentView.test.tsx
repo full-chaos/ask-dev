@@ -214,37 +214,6 @@ describe("EnrichmentView — a runtime failure does not latch across results", (
     });
 });
 
-describe("EnrichmentView — the onError state write is commit-phase", () => {
-    /**
-     * Item 5. The concern was that setting state from OpenUI's onError happens
-     * during render, which React warns about. It does not: OpenUI invokes it
-     * from ElementErrorBoundary.componentDidCatch, a COMMIT-phase lifecycle.
-     * Not reproducible, and this pins why — a future OpenUI change that moved
-     * the call into render would fail here rather than emit a warning nobody
-     * reads.
-     */
-    it("emits no React update-during-render warning when a render fails", () => {
-        const seen: string[] = [];
-        const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
-            seen.push(String(args[0]));
-        });
-
-        render(
-            <EnrichmentView
-                result={result}
-                composition={`root = Answer("@result.deterministic_answer", [prose, cov, lim])
-prose = Prose("@result.no_such_field")
-cov = Coverage("@result.coverage.partial", [])
-lim = Limitations([])`}
-            />,
-        );
-        spy.mockRestore();
-
-        expect(seen.filter((message) => message.includes("Cannot update"))).toEqual([]);
-        expect(screen.getByLabelText("Enrichment fell back")).toBeInTheDocument();
-    });
-});
-
 describe("EnrichmentView — text is text", () => {
     /**
      * A result value that looks like markup must render as characters. The

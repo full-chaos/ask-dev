@@ -6,10 +6,12 @@ import { CanonicalResultInspector } from "@/components/CanonicalResultInspector"
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import { QuestionForm } from "@/components/QuestionForm";
+import { ChoiceNotice } from "@/components/ChoiceNotice";
+import { ClarificationPanel } from "@/components/ClarificationPanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
-import { subjectForReceipt } from "@/lib/clarification";
+import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
 import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 
 /**
@@ -144,13 +146,28 @@ export default function WorkbenchPage() {
                             {outcome.result.status.replaceAll("_", " ")}
                         </span>
                     </div>
-                    <ViewSwitcher active={view} available={AVAILABLE_VIEWS} onSelect={setView} />
-                    {view === "raw" ? (
-                        <CanonicalResultInspector result={outcome.result} />
-                    ) : (
-                        <DeterministicAnswerView
-                            chosenSubject={chosenSubject}
-                            onChooseCandidate={(choice) => {
+                    {/* The choice-not-applied notice is likewise view-independent:
+                        a dishonoured choice must not become invisible because
+                        the tester happened to be looking at the raw inspector.
+                        Rendered here rather than inside the deterministic view,
+                        which is why that view is given no chosenSubject below —
+                        EnrichmentView still passes one through for its own
+                        fallback. */}
+                    {chosenSubject === undefined ? null : (
+                        <ChoiceNotice
+                            chosen={chosenSubject}
+                            disposition={choiceDisposition(outcome.result, chosenSubject)}
+                        />
+                    )}
+                    {/* The clarification interaction is reachable from EVERY
+                        view, not only the deterministic one. Selecting the raw
+                        inspector used to leave a clarification with no choice
+                        panel — an interaction the tester cannot reach is the
+                        same dead end C3 fixed in the enrichment path, arrived
+                        at by a different route. */}
+                    {outcome.result.status === "clarification_required" ? (
+                        <ClarificationPanel
+                            onChoose={(choice) => {
                                 // Resolve the receipt to its subject NOW, while
                                 // the issuing result is still on screen — that
                                 // is the only place the mapping exists.
@@ -163,6 +180,12 @@ export default function WorkbenchPage() {
                             pending={false}
                             result={outcome.result}
                         />
+                    ) : null}
+                    <ViewSwitcher active={view} available={AVAILABLE_VIEWS} onSelect={setView} />
+                    {view === "raw" ? (
+                        <CanonicalResultInspector result={outcome.result} />
+                    ) : (
+                        <DeterministicAnswerView pending={false} result={outcome.result} />
                     )}
                 </>
             ) : null}

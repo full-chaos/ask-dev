@@ -280,10 +280,24 @@ presenting a state as normal when something was silently discarded or
 substituted. `src/lib/silent-discard-closure.test.ts` closes the class rather
 than chasing a sixth: it enumerates every seam where a result or user input
 crosses a boundary, with a verdict of **structurally impossible** (mechanism
-named), **detected and surfaced**, or **accepted gap** (real owner). Two rows
-are accepted gaps, both owned — that is deliberate, since a table whose every
-row read "impossible" would be the same fails-toward-fine shape it exists to
-close.
+named), **detected and surfaced**, or **accepted gap** (real owner).
+
+**15 seams; 2 accepted gaps**, both owned — CHAOS-3813's missing wire signal,
+and ACR stage latency (the spec asks for it and ACR exposes none, so it is
+recorded as total and labelled rather than apportioned by guess). The gap list
+is deliberately non-empty: a table whose every row read "impossible" would be
+the same fails-toward-fine shape it exists to close.
+
+Those counts are asserted in the test, by exact gap name and exact seam count —
+the artifact once carried different numbers from the README and from a status
+report, and three numbers in three places was itself a finding. Drift now fails
+the suite instead of waiting for someone to count rows.
+
+One row carries a **precondition** rather than a gap: model-authored
+compositions do not exist yet (the only producer is `buildComposition`), so the
+seam is unreachable — but the row must be re-verdicted in the same change that
+introduces model authoring, because only Coverage and Limitations are
+mandatory.
 
 The recurring reason these hid: every one produced output that _looked_ like
 ordinary safe operation. Falling back looks safe. An empty section looks like

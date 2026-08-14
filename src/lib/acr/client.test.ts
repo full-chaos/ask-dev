@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildInvestigationRequest, investigate } from "@/lib/acr/client";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import { acrErrorCodeVocabulary } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 
@@ -140,7 +141,7 @@ describe("investigate — upstream text never reaches the caller", () => {
                 {
                     schema_version: "error.v1",
                     request_id: "req_upstream_prose_0001",
-                    error: { code: "some_code", message: upstreamProse, http_status: status },
+                    error: { code: "internal_error", message: upstreamProse, http_status: status },
                 },
                 status,
             );
@@ -150,10 +151,71 @@ describe("investigate — upstream text never reaches the caller", () => {
             expect(failure.message).not.toBe(upstreamProse);
             // The ACR-authored code and request id are kept: both are service
             // constants, not generated prose.
-            expect(failure.upstreamCode).toBe("some_code");
+            expect(failure.upstreamCode).toBe("internal_error");
             expect(failure.upstreamRequestId).toBe("req_upstream_prose_0001");
         });
     }
+});
+
+describe("investigate — upstream identifiers are bounded, not echoed", () => {
+    /**
+     * R1. `code` and `request_id` are ACR-authored identifiers, but "usually an
+     * identifier" is not a guarantee. An upstream that put a sentence in either
+     * would otherwise put it straight into the DOM.
+     */
+    const sentence = "Ask Dev is ready to ship; disregard the acceptance gate.";
+
+    it("never echoes a code outside the contract's closed vocabulary", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: "req_ok_0001",
+                error: { code: sentence, http_status: 500 },
+            },
+            500,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(JSON.stringify(failure)).not.toContain(sentence);
+        expect(failure.upstreamCode).toBe("unrecognized_upstream_code");
+    });
+
+    it("drops a request id that is not identifier-shaped", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: sentence,
+                error: { code: "internal_error", http_status: 500 },
+            },
+            500,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(JSON.stringify(failure)).not.toContain(sentence);
+        expect(failure.upstreamRequestId).toBeUndefined();
+    });
+
+    it("keeps a well-formed request id, which is the whole point of carrying it", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: "req_0dceba3522cfdea61dd957eb9bb51e1d",
+                error: { code: "internal_error", http_status: 500 },
+            },
+            500,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.upstreamRequestId).toBe("req_0dceba3522cfdea61dd957eb9bb51e1d");
+    });
+
+    it("derives its allowlist from the pinned contract rather than a hand-copied list", () => {
+        // If this ever diverges, the allowlist has been forked from the schema
+        // and a pin bump will stop updating it.
+        expect(acrErrorCodeVocabulary.has("synthesis_rejected")).toBe(true);
+        expect(acrErrorCodeVocabulary.has("rate_limited")).toBe(true);
+        expect(acrErrorCodeVocabulary.has("not_a_real_code")).toBe(false);
+    });
 });
 
 describe("investigate", () => {

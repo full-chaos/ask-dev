@@ -1,3 +1,4 @@
+import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import type { InvestigationResult } from "@/lib/contracts";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
 import type { EnrichmentPredicate } from "@/lib/enrichment/validate";
@@ -137,6 +138,42 @@ function outcomeFor(input: OutcomeInput): WorkbenchOutcome {
     return "answered";
 }
 
+/**
+ * Coverage source names are NOT bounded by the contract — the schema types
+ * `source` as a 1..128 character string, so it is free text as far as the wire
+ * is concerned, and free text in telemetry is egress however identifier-shaped
+ * it usually looks.
+ *
+ * They are therefore mapped to a known vocabulary and anything outside it
+ * becomes `"other"`. The COUNT is preserved (the source still appears, so
+ * "how many sources" and "were any unrecognized" stay answerable); only the
+ * string is dropped.
+ *
+ * The fact-kind half is derived from the pinned schema rather than hand-copied,
+ * so a pin bump that adds a kind picks it up automatically.
+ */
+const FACT_KINDS: ReadonlySet<string> = new Set(
+    (
+        commonSchema as {
+            $defs: { FactRequirement: { properties: { kind: { enum?: string[] } } } };
+        }
+    ).$defs.FactRequirement.properties.kind.enum ?? [],
+);
+
+const KNOWN_SOURCES: ReadonlySet<string> = new Set(["context-fabric:graph"]);
+
+export const UNRECOGNIZED_SOURCE = "other";
+
+export function boundedCoverageSource(source: string): string {
+    if (KNOWN_SOURCES.has(source)) return source;
+    for (const prefix of ["canonical_fact:", "dev-health-ops:"]) {
+        if (!source.startsWith(prefix)) continue;
+        const kind = source.slice(prefix.length);
+        if (FACT_KINDS.has(kind)) return source;
+    }
+    return UNRECOGNIZED_SOURCE;
+}
+
 /** Distinct values, sorted, so an event is stable and cheap to aggregate. */
 function distinct(values: readonly string[]): readonly string[] {
     return [...new Set(values)].sort();
@@ -169,7 +206,9 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         cohortTruncated: result?.cohort?.truncated,
 
         coveragePartial: coverage?.partial,
-        coverageSources: distinct((coverage?.sources ?? []).map((source) => source.source)),
+        coverageSources: distinct(
+            (coverage?.sources ?? []).map((source) => boundedCoverageSource(source.source)),
+        ),
         coverageStates: distinct((coverage?.sources ?? []).map((source) => source.state)),
         degradedReasonCount: coverage?.degraded_reasons?.length ?? 0,
         limitationCount: result?.limitations.length ?? 0,

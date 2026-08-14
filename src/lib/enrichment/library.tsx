@@ -347,25 +347,32 @@ export const Answer = defineComponent({
     ),
 });
 
+/**
+ * The production component set. Exported so a test can build a library with an
+ * EXTRA component without that component ever entering the production registry
+ * — see `enrichmentLibrary` below, which is built from this list alone.
+ */
+export const enrichmentComponents = [
+    Answer,
+    Prose,
+    EvidenceRef,
+    DriverCard,
+    FindingCard,
+    Comparison,
+    ComparisonRow,
+    Metric,
+    Timeline,
+    TimelineEntry,
+    RelationshipPathView,
+    RelationshipEdgeView,
+    Coverage,
+    CoverageSource,
+    Limitations,
+    LimitationItem,
+    DataTrustPanel,
+];
+
 export const enrichmentLibrary = createLibrary({
     root: "Answer",
-    components: [
-        Answer,
-        Prose,
-        EvidenceRef,
-        DriverCard,
-        FindingCard,
-        Comparison,
-        ComparisonRow,
-        Metric,
-        Timeline,
-        TimelineEntry,
-        RelationshipPathView,
-        RelationshipEdgeView,
-        Coverage,
-        CoverageSource,
-        Limitations,
-        LimitationItem,
-        DataTrustPanel,
-    ],
+    components: enrichmentComponents,
 });

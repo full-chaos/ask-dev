@@ -70,9 +70,17 @@ export function EnrichmentView({
     pending = false,
     chosenSubject,
 }: EnrichmentViewProps) {
+    // A clarification does NO parser or validation work. The status check has
+    // to be inside the memo rather than an early return before it, because
+    // hooks must run unconditionally — but the effect is the same: for a
+    // clarification, validateEnrichment is never called.
+    const isClarification = result.status === "clarification_required";
     const validation = useMemo(
-        () => validateEnrichment(composition, result, PRESENTATION_MANIFEST_V1),
-        [composition, result],
+        () =>
+            isClarification
+                ? undefined
+                : validateEnrichment(composition, result, PRESENTATION_MANIFEST_V1),
+        [composition, result, isClarification],
     );
 
     // A runtime failure belongs to ONE result and composition, not to the
@@ -97,7 +105,7 @@ export function EnrichmentView({
     //
     // Without this, an enrichment render of a clarification showed an empty
     // answer with no way to re-ask — a choiceless dead end.
-    if (result.status === "clarification_required") {
+    if (isClarification) {
         return (
             <div>
                 <section className="panel" aria-label="Enrichment not applicable">
@@ -117,8 +125,9 @@ export function EnrichmentView({
         );
     }
 
-    const violations: readonly EnrichmentViolation[] = validation.ok ? [] : validation.violations;
-    const fellBack = !validation.ok || runtimeFailure !== undefined;
+    const violations: readonly EnrichmentViolation[] =
+        validation === undefined || validation.ok ? [] : validation.violations;
+    const fellBack = validation === undefined || !validation.ok || runtimeFailure !== undefined;
 
     if (fellBack) {
         return (
