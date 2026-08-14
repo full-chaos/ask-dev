@@ -273,6 +273,27 @@ by default with a light `prefers-color-scheme` block.
 surface elevation and low-alpha hairlines, never from a light outline on a dark
 ground.
 
+## Clarification: the disambiguation flow
+
+When ACR cannot commit a subject it returns `clarification_required` with ranked
+candidates, and the tester chooses one. Four rules hold this path honest:
+
+1. **A clarification is not a failed answer**, and is not rendered as a thin
+   one. The choice leads; empty judgment panels do not appear above it.
+2. **The choice travels as ACR's own `receipt_id`**, through the contract's
+   `prior_subject_receipts`, never as a re-typed subject name. The Workbench
+   therefore never names or authorizes a subject on a tester's behalf, and the
+   UI can only offer candidates the result already contains.
+3. **The question is re-sent unchanged.** Rewriting it to mention the chosen
+   subject would make the Workbench author part of the question, and ACR would
+   then be answering something the tester never asked.
+4. **Candidate order is ACR's.** Re-sorting by confidence would be the
+   presentation layer quietly forming a judgment ACR did not make.
+
+Receipts are deduplicated and capped at the contract's `maxItems` of 20 before
+being sent; receipts arriving from the browser are re-validated by the route
+rather than trusted.
+
 ## Enrichment (M3, not yet wired live)
 
 `src/lib/enrichment/` holds the pieces the enriched view will sit on. The tab
