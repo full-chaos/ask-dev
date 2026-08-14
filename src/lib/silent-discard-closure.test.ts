@@ -162,7 +162,7 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
         discard: "A model omits a section the manifest does not mark mandatory.",
         verdict: "structurally-impossible",
         evidence:
-            "THE SEAM DOES NOT EXIST YET: the only producer of a composition is buildComposition, which always emits every section the result supports. No model-authoring path is wired. PRECONDITION, recorded deliberately: the moment a model authors compositions this row must be re-verdicted, because only Coverage and Limitations are mandatory and a model omitting drivers would render a thinner answer without failing closed. Re-verdict it in the same change that introduces model authoring, not afterwards.",
+            "THE SEAM DOES NOT EXIST YET: the only producer of a composition is buildComposition, which always emits every section the result supports. That inventory is ENFORCED, not asserted in prose — producer-inventory.test.ts scans the source and requires the producer set to be exactly [buildComposition], so adding a model-authored producer fails that test. PRECONDITION: this row must then be re-verdicted, because only Coverage and Limitations are mandatory and a model omitting drivers would render a thinner answer without failing closed. The failing test IS the re-verdict trigger.",
     },
 ];
 

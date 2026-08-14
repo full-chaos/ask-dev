@@ -140,13 +140,30 @@ describe("clarification flow", () => {
     });
 
     /**
-     * Without a re-ask handler there is no choice to offer, so the view must
-     * fall back to its normal rendering rather than showing dead buttons.
+     * X2. The property is INTRINSIC to the component, not an obligation on the
+     * call site.
+     *
+     * It used to be conditional on the callback, which left every composition
+     * free to render a clarification in the normal answer shape by simply not
+     * passing one — the same dead end as C3 and R3, reached a third way. Codex
+     * found it three times because it was never pinned HERE.
      */
-    it("renders normally when the surface cannot re-ask", () => {
+    it("never renders the normal answer shape for a clarification, even with no callback", () => {
         render(<DeterministicAnswerView result={clarification} />);
 
-        expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
-        expect(screen.getByRole("region", { name: "Subjects" })).toBeInTheDocument();
+        // The clarification content is present...
+        expect(
+            screen.getByRole("region", { name: "Which subject did you mean?" }),
+        ).toBeInTheDocument();
+        for (const candidate of clarification.subject_resolution.candidates) {
+            expect(screen.getByText(candidate.subject.label)).toBeInTheDocument();
+        }
+        // ...it says it cannot act here...
+        expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
+        // ...and the answer shape is absent.
+        expect(screen.queryByRole("region", { name: "Answer" })).toBeNull();
+        expect(screen.queryByRole("region", { name: "Remaining work" })).toBeNull();
+        expect(screen.queryByRole("region", { name: "Subjects" })).toBeNull();
     });
 });

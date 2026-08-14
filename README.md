@@ -295,9 +295,11 @@ the suite instead of waiting for someone to count rows.
 
 One row carries a **precondition** rather than a gap: model-authored
 compositions do not exist yet (the only producer is `buildComposition`), so the
-seam is unreachable — but the row must be re-verdicted in the same change that
-introduces model authoring, because only Coverage and Limitations are
-mandatory.
+seam is unreachable. That inventory is **enforced rather than asserted** —
+`producer-inventory.test.ts` scans the source and requires the producer set to
+be exactly `[buildComposition]`, so adding a model-authored producer fails that
+test, and the failing test _is_ the re-verdict trigger the precondition
+promises.
 
 The recurring reason these hid: every one produced output that _looked_ like
 ordinary safe operation. Falling back looks safe. An empty section looks like

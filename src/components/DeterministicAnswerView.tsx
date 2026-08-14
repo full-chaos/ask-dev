@@ -52,10 +52,14 @@ export function DeterministicAnswerView({
     // thin one. When ACR asks for a choice, the choice IS the content: it leads,
     // and the (empty) judgment panels do not appear above it competing for
     // attention.
-    const needsClarification =
-        result.status === "clarification_required" && onChooseCandidate !== undefined;
-
-    if (needsClarification) {
+    //
+    // This is INTRINSIC to the component, not conditional on a callback. It was
+    // conditional, and that left every call site free to compose a clarification
+    // into the normal answer shape by simply not passing one — the same dead end
+    // as C3 and R3, reached a third way. Without a callback the panel renders
+    // the prompt and candidates and says it cannot re-ask here; it never
+    // degrades to the answer layout.
+    if (result.status === "clarification_required") {
         return (
             <article aria-label="Deterministic answer">
                 {notice}

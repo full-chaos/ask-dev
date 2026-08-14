@@ -66,10 +66,23 @@ export type OutcomeEvent = {
     readonly cohortComplete: boolean | undefined;
     readonly cohortTruncated: boolean | undefined;
 
-    /** Coverage: source names are ACR-owned capability identifiers, not content. */
+    /**
+     * Coverage, as PAIRS rather than parallel arrays.
+     *
+     * Deduplicating sources and states independently destroyed both the pairing
+     * and the count: two unrecognized sources in different states collapsed to
+     * one `"other"` source beside two unrelated states, so neither "which state
+     * was that source in" nor "how many sources were unrecognized" survived —
+     * which is the count-preservation the mapping was supposed to guarantee.
+     *
+     * Every token here is still bounded: the source is a vocabulary member or
+     * `"other"`, and the state is a contract enum. Pairing changes what is
+     * knowable, not what is carried.
+     */
     readonly coveragePartial: boolean | undefined;
-    readonly coverageSources: readonly string[];
-    readonly coverageStates: readonly string[];
+    readonly coverageSourceStates: readonly { readonly source: string; readonly state: string }[];
+    /** How many sources fell outside the known vocabulary. */
+    readonly unknownSourceCount: number;
     readonly degradedReasonCount: number;
     readonly limitationCount: number;
     readonly warningCount: number;
@@ -206,10 +219,22 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         cohortTruncated: result?.cohort?.truncated,
 
         coveragePartial: coverage?.partial,
-        coverageSources: distinct(
-            (coverage?.sources ?? []).map((source) => boundedCoverageSource(source.source)),
-        ),
-        coverageStates: distinct((coverage?.sources ?? []).map((source) => source.state)),
+        // Per-instance and ORDER-STABLE: sorted by (source, state) so an event
+        // is comparable across runs, but never collapsed, so two unrecognized
+        // sources in different states stay two entries.
+        coverageSourceStates: (coverage?.sources ?? [])
+            .map((source) => ({
+                source: boundedCoverageSource(source.source),
+                state: source.state,
+            }))
+            .sort(
+                (left, right) =>
+                    left.source.localeCompare(right.source) ||
+                    left.state.localeCompare(right.state),
+            ),
+        unknownSourceCount: (coverage?.sources ?? []).filter(
+            (source) => boundedCoverageSource(source.source) === UNRECOGNIZED_SOURCE,
+        ).length,
         degradedReasonCount: coverage?.degraded_reasons?.length ?? 0,
         limitationCount: result?.limitations.length ?? 0,
         warningCount: result?.warnings.length ?? 0,

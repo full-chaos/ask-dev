@@ -132,7 +132,41 @@ describe("outcome telemetry — what it does record", () => {
         const event = buildOutcomeEvent({ latencyMs: 1, renderSurface: "raw", result: tainted });
 
         expect(JSON.stringify(event)).not.toContain(smuggled);
-        expect(event.coverageSources).toEqual(["canonical_fact:metrics", "other"]);
+        expect(event.coverageSourceStates).toEqual([
+            { source: "canonical_fact:metrics", state: "stale" },
+            { source: "other", state: "available" },
+        ]);
+        expect(event.unknownSourceCount).toBe(1);
+    });
+
+    /**
+     * X1. Deduplicating sources and states independently destroyed both the
+     * pairing and the count: two unrecognized sources in different states
+     * became one "other" beside two unrelated states, so neither "which state
+     * was that source in" nor "how many were unrecognized" survived — the very
+     * count-preservation the mapping was supposed to guarantee.
+     */
+    it("keeps two unrecognized sources distinguishable and countable", () => {
+        const tainted: InvestigationResult = {
+            ...result,
+            coverage: {
+                ...result.coverage,
+                sources: [
+                    { source: "mystery-one", state: "available" },
+                    { source: "mystery-two", state: "stale" },
+                ],
+            },
+        };
+
+        const event = buildOutcomeEvent({ latencyMs: 1, renderSurface: "raw", result: tainted });
+
+        // Two entries, not one: the states remain attached to their own source.
+        expect(event.coverageSourceStates).toEqual([
+            { source: "other", state: "available" },
+            { source: "other", state: "stale" },
+        ]);
+        expect(event.unknownSourceCount).toBe(2);
+        expect(JSON.stringify(event)).not.toContain("mystery");
     });
 
     it("keeps source names that are in the known vocabulary", () => {
@@ -150,8 +184,9 @@ describe("outcome telemetry — what it does record", () => {
             result,
         });
 
-        expect(event.coverageStates).toContain("pruned");
-        expect(event.coverageStates).toContain("available");
+        const states = event.coverageSourceStates.map((entry) => entry.state);
+        expect(states).toContain("pruned");
+        expect(states).toContain("available");
         expect(event.coveragePartial).toBe(result.coverage.partial);
         expect(event.limitationCount).toBe(result.limitations.length);
         expect(event.evidenceRefCount).toBe(result.evidence_ref_ids.length);

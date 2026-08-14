@@ -107,6 +107,13 @@ export default function WorkbenchPage() {
         }
     }
 
+    // Resolves the receipt to its subject at CHOICE time, while the issuing
+    // result is still on screen — the only place that mapping exists.
+    function chooseCandidate(choice: ClarificationChoice) {
+        if (outcome.kind !== "answered") return;
+        void ask(askedQuestion, [choice], subjectForReceipt(outcome.result, choice.receipt_id));
+    }
+
     return (
         <main className="workbench">
             <header className="workbench__masthead">
@@ -159,33 +166,28 @@ export default function WorkbenchPage() {
                             disposition={choiceDisposition(outcome.result, chosenSubject)}
                         />
                     )}
-                    {/* The clarification interaction is reachable from EVERY
-                        view, not only the deterministic one. Selecting the raw
-                        inspector used to leave a clarification with no choice
-                        panel — an interaction the tester cannot reach is the
-                        same dead end C3 fixed in the enrichment path, arrived
-                        at by a different route. */}
-                    {outcome.result.status === "clarification_required" ? (
-                        <ClarificationPanel
-                            onChoose={(choice) => {
-                                // Resolve the receipt to its subject NOW, while
-                                // the issuing result is still on screen — that
-                                // is the only place the mapping exists.
-                                void ask(
-                                    askedQuestion,
-                                    [choice],
-                                    subjectForReceipt(outcome.result, choice.receipt_id),
-                                );
-                            }}
-                            pending={false}
-                            result={outcome.result}
-                        />
-                    ) : null}
                     <ViewSwitcher active={view} available={AVAILABLE_VIEWS} onSelect={setView} />
                     {view === "raw" ? (
-                        <CanonicalResultInspector result={outcome.result} />
+                        <>
+                            {/* The clarification interaction is reachable from
+                                EVERY view. The raw inspector has no answer
+                                surface of its own, so the choice is rendered
+                                beside it; the deterministic view renders it
+                                intrinsically (see DeterministicAnswerView), so
+                                adding it here too would duplicate it. */}
+                            {outcome.result.status === "clarification_required" ? (
+                                <ClarificationPanel
+                                    onChoose={chooseCandidate}
+                                    result={outcome.result}
+                                />
+                            ) : null}
+                            <CanonicalResultInspector result={outcome.result} />
+                        </>
                     ) : (
-                        <DeterministicAnswerView pending={false} result={outcome.result} />
+                        <DeterministicAnswerView
+                            onChooseCandidate={chooseCandidate}
+                            result={outcome.result}
+                        />
                     )}
                 </>
             ) : null}

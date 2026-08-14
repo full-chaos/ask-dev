@@ -12,8 +12,15 @@ export type ClarificationChoice = {
 
 export type ClarificationPanelProps = {
     readonly result: InvestigationResult;
-    readonly onChoose: (choice: ClarificationChoice) => void;
-    readonly pending: boolean;
+    /**
+     * Absent when the surrounding surface cannot re-ask.
+     *
+     * The panel still renders the prompt and the candidates — a clarification
+     * must never be reduced to an ordinary answer just because this particular
+     * context cannot act on it. It says so instead.
+     */
+    readonly onChoose?: ((choice: ClarificationChoice) => void) | undefined;
+    readonly pending?: boolean | undefined;
 };
 
 /**
@@ -46,7 +53,7 @@ function CandidateRecord({
     readonly resultId: string;
     readonly rank: number;
     readonly pending: boolean;
-    readonly onChoose: (choice: ClarificationChoice) => void;
+    readonly onChoose: ((choice: ClarificationChoice) => void) | undefined;
 }) {
     return (
         <li className="record">
@@ -72,19 +79,23 @@ function CandidateRecord({
             <p className="record__meta">
                 receipt <code>{candidate.receipt_id}</code>
             </p>
-            <button
-                className="question-form__submit"
-                type="button"
-                disabled={pending}
-                onClick={() => onChoose({ result_id: resultId, receipt_id: candidate.receipt_id })}
-            >
-                Ask again about {candidate.subject.label}
-            </button>
+            {onChoose === undefined ? null : (
+                <button
+                    className="question-form__submit"
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                        onChoose({ result_id: resultId, receipt_id: candidate.receipt_id })
+                    }
+                >
+                    Ask again about {candidate.subject.label}
+                </button>
+            )}
         </li>
     );
 }
 
-export function ClarificationPanel({ result, onChoose, pending }: ClarificationPanelProps) {
+export function ClarificationPanel({ result, onChoose, pending = false }: ClarificationPanelProps) {
     const { candidates, clarification_prompt: prompt } = result.subject_resolution;
 
     return (
@@ -104,6 +115,11 @@ export function ClarificationPanel({ result, onChoose, pending }: ClarificationP
             {result.interpretation.clarification_reason === undefined ? null : (
                 <p className="record__meta">{result.interpretation.clarification_reason}</p>
             )}
+            {onChoose === undefined ? (
+                <p className="record__meta" data-testid="cannot-choose-here">
+                    This context cannot re-ask, so the candidates are shown for inspection only.
+                </p>
+            ) : null}
 
             {candidates.length === 0 ? (
                 // A clarification with nothing to choose is a dead end, and
