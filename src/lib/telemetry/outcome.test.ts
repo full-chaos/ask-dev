@@ -33,6 +33,8 @@ function prose(source: InvestigationResult): readonly string[] {
         ...source.paths.flatMap((path) =>
             path.why_relevant === undefined ? [] : [path.why_relevant],
         ),
+        // Model-derived: the contract bounds it only to a string.
+        source.interpretation.requested_judgment,
     ].filter((value) => typeof value === "string" && value.trim() !== "");
 }
 
@@ -92,8 +94,10 @@ describe("outcome telemetry — what it does record", () => {
         });
 
         expect(event.questionShape).toBe(result.interpretation.shape);
-        expect(event.requestedJudgment).toBe(result.interpretation.requested_judgment);
         expect(JSON.stringify(event)).not.toContain(result.question);
+        // requested_judgment is model-derived free text (the contract bounds it
+        // only to a 256-character string), so it must not appear at all.
+        expect(JSON.stringify(event)).not.toContain(result.interpretation.requested_judgment);
     });
 
     it("records coverage as closed-vocabulary states and counts", () => {
@@ -139,6 +143,25 @@ describe("outcome telemetry — what it does record", () => {
         // Counts must not silently read as "zero findings" when there was no
         // result at all — the outcome field is what distinguishes them.
         expect(event.driverCount).toBe(0);
+    });
+
+    it("distinguishes no-choice from an ignored choice", () => {
+        // undefined and false must not aggregate together: "there was no choice
+        // to honour" and "the choice was silently discarded" are different
+        // facts about a run.
+        expect(
+            buildOutcomeEvent({ latencyMs: 1, renderSurface: "raw", result })
+                .clarificationChoiceHonoured,
+        ).toBeUndefined();
+        expect(
+            buildOutcomeEvent({
+                latencyMs: 1,
+                renderSurface: "raw",
+                result,
+                clarificationChoiceCarried: true,
+                clarificationChoiceHonoured: false,
+            }).clarificationChoiceHonoured,
+        ).toBe(false);
     });
 
     it("records an enrichment fallback and the predicates that caused it", () => {

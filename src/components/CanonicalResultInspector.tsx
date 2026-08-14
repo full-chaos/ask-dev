@@ -252,12 +252,18 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                     Projection, query, rule, and backend versions
                 </h2>
                 <dl className="versions">
-                    {Object.entries(result.versions).map(([name, value]) => (
-                        <div key={name}>
-                            <dt>{humanizeTerm(name)}</dt>
-                            <dd>{String(value)}</dd>
-                        </div>
-                    ))}
+                    {/* Sorted, not insertion-ordered. An inspector whose field
+                        order depends on JSON key order makes two runs of the
+                        same investigation look different for no reason, and
+                        diffing them becomes unreliable. */}
+                    {Object.entries(result.versions)
+                        .sort(([left], [right]) => left.localeCompare(right))
+                        .map(([name, value]) => (
+                            <div key={name}>
+                                <dt>{humanizeTerm(name)}</dt>
+                                <dd>{String(value)}</dd>
+                            </div>
+                        ))}
                     <div>
                         <dt>result id</dt>
                         <dd>{result.result_id}</dd>

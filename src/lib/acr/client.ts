@@ -106,9 +106,17 @@ export function buildInvestigationRequest(
     } satisfies InvestigationRequest;
 }
 
+/**
+ * The parsed upstream error.
+ *
+ * `message` is deliberately ABSENT. ACR's `error.message` can carry text that
+ * originated with a model or provider, and the hard constraint is that such
+ * text never reaches the UI, an error, or a log. Omitting the field from the
+ * type — rather than parsing it and remembering not to use it — is what makes
+ * reintroducing it a compile error instead of a review catch.
+ */
 type UpstreamError = {
     readonly code?: string;
-    readonly message?: string;
     readonly retryable?: boolean;
     readonly requestId?: string;
 };
@@ -120,11 +128,11 @@ function parseUpstreamError(payload: unknown): UpstreamError {
     const error = (payload as { error?: unknown }).error;
     const base = typeof requestId === "string" ? { requestId } : {};
     if (typeof error !== "object" || error === null) return base;
-    const { code, message, retryable } = error as Record<string, unknown>;
+    // `message` is read past deliberately; see UpstreamError.
+    const { code, retryable } = error as Record<string, unknown>;
     return {
         ...base,
         ...(typeof code === "string" ? { code } : {}),
-        ...(typeof message === "string" ? { message } : {}),
         ...(typeof retryable === "boolean" ? { retryable } : {}),
     };
 }
@@ -148,8 +156,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_unauthorized",
-            message:
-                upstream.message ?? "ACR rejected the Workbench credential for this organization.",
+            message: "ACR rejected the Workbench credential for this organization.",
             retryable: false,
         };
     }
@@ -165,7 +172,6 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             ...upstreamFields,
             code: "acr_answer_rejected",
             message:
-                upstream.message ??
                 "ACR derived an answer and its own validator rejected it. No answer was asserted.",
             retryable: upstream.retryable ?? true,
         };
@@ -174,7 +180,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_rejected_request",
-            message: upstream.message ?? "ACR rejected the investigation request.",
+            message: "ACR rejected the investigation request.",
             retryable: false,
         };
     }
@@ -184,6 +190,14 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             code: "acr_runtime_unavailable",
             message:
                 "ACR is reachable but its investigation runtime is not composed. This needs graph reads enabled, a configured graph backend, and a configured model runtime.",
+            retryable: true,
+        };
+    }
+    if (status === 429) {
+        return {
+            ...upstreamFields,
+            code: "acr_rate_limited",
+            message: "ACR is rate limiting the Workbench. Back off and retry later.",
             retryable: true,
         };
     }
@@ -217,7 +231,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     return {
         ...upstreamFields,
         code: "acr_unreachable",
-        message: upstream.message ?? `ACR returned an unexpected status (${status}).`,
+        message: `ACR returned an unexpected status (${String(status)}).`,
         retryable: upstream.retryable ?? false,
     };
 }

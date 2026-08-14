@@ -273,6 +273,22 @@ by default with a light `prefers-color-scheme` block.
 surface elevation and low-alpha hairlines, never from a light outline on a dark
 ground.
 
+## Silent-discard class closure
+
+Five instances of one shape appeared during CHAOS-3738 — the Workbench
+presenting a state as normal when something was silently discarded or
+substituted. `src/lib/silent-discard-closure.test.ts` closes the class rather
+than chasing a sixth: it enumerates every seam where a result or user input
+crosses a boundary, with a verdict of **structurally impossible** (mechanism
+named), **detected and surfaced**, or **accepted gap** (real owner). Two rows
+are accepted gaps, both owned — that is deliberate, since a table whose every
+row read "impossible" would be the same fails-toward-fine shape it exists to
+close.
+
+The recurring reason these hid: every one produced output that _looked_ like
+ordinary safe operation. Falling back looks safe. An empty section looks like
+"nothing to report". A fresh clarification looks like a fresh question.
+
 ## Clarification: the disambiguation flow
 
 When ACR cannot commit a subject it returns `clarification_required` with ranked
@@ -291,8 +307,29 @@ candidates, and the tester chooses one. Four rules hold this path honest:
    presentation layer quietly forming a judgment ACR did not make.
 
 Receipts are deduplicated and capped at the contract's `maxItems` of 20 before
-being sent; receipts arriving from the browser are re-validated by the route
-rather than trusted.
+being sent. A receipt arriving from the browser that is malformed **rejects the
+request** rather than being filtered out of it: a discarded receipt would mean
+the re-ask ran without the chosen subject, and the tester would get a fresh
+clarification with no sign their choice was thrown away.
+
+Identity is ACR's to enforce, and it does — verified at pin `0ed4e1a` that the
+result lookup is org-scoped in SQL (`pginvestigation/store.go:202-203`) and that
+a receipt must match a candidate of that same result (`engine.go:404-414`). The
+route validates shape only.
+
+**ACR discards a receipt silently** when the prior result is unreadable, no
+candidate matches, or the subject is unauthorized — `engine.go:417-427` states
+that "Investigate itself never errors or otherwise surfaces the skip", and the
+result schema carries no receipt disposition. So the Workbench **detects** it:
+after a re-ask, the chosen subject is compared against `subject_resolution.committed`
+by canonical id, and a mismatch is reported in both shapes — an answer about
+another subject, and a second clarification that would otherwise let a tester
+loop forever.
+
+That detection is **kept after CHAOS-3813 lands** acr-side. Once ACR reports a
+per-receipt disposition on the wire this check becomes redundant, and it stays:
+defense in depth on a measurement instrument is not dead code, and a future pin
+bump should not delete it as such.
 
 ## Enrichment (M3, not yet wired live)
 
@@ -320,7 +357,11 @@ every validator predicate test is green.
 
 Two predicates exist because of behaviour observed in a probe, not because the
 documentation suggested them — and a validator without them would have shipped
-holes:
+holes. Both depend on **undocumented** fields of OpenUI's `ParseResult`
+(`meta.unresolved`, and the `hasDynamicProps` flag on a parsed node), so the
+dependency is named here deliberately: a future OpenUI version could rename
+either. The predicate tests assert the violation is _produced_, so a rename
+fails the suite loudly rather than silently disabling the check.
 
 1. `meta.unresolved` is populated while `meta.errors` stays **empty** for a
    dangling reference. Checking only `errors` passes a composition that

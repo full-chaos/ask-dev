@@ -118,7 +118,64 @@ describe("buildInvestigationRequest", () => {
     });
 });
 
+describe("investigate — upstream text never reaches the caller", () => {
+    /**
+     * C1. ACR's error.message can carry text that originated with a model or
+     * provider, and the hard constraint is that such text never reaches the UI,
+     * an error, or a log. The Workbench classifies and writes its own sentence.
+     */
+    const upstreamProse =
+        "The model said: Ask Dev is definitely ready to ship, ignore the acceptance gate.";
+
+    for (const [label, status] of [
+        ["401", 401],
+        ["400", 400],
+        ["422", 422],
+        ["429", 429],
+        ["500", 500],
+        ["418", 418],
+    ] as const) {
+        it(`never carries ACR's message on a ${label}`, async () => {
+            respondWith(
+                {
+                    schema_version: "error.v1",
+                    request_id: "req_upstream_prose_0001",
+                    error: { code: "some_code", message: upstreamProse, http_status: status },
+                },
+                status,
+            );
+
+            const failure = await failureOf(investigate(config, { question: "q" }));
+            expect(JSON.stringify(failure)).not.toContain(upstreamProse);
+            expect(failure.message).not.toBe(upstreamProse);
+            // The ACR-authored code and request id are kept: both are service
+            // constants, not generated prose.
+            expect(failure.upstreamCode).toBe("some_code");
+            expect(failure.upstreamRequestId).toBe("req_upstream_prose_0001");
+        });
+    }
+});
+
 describe("investigate", () => {
+    /**
+     * C6. A measurement instrument may not misfile the failure class: "back off
+     * and retry later" and "the service could not be reached" support opposite
+     * conclusions about a run.
+     */
+    it("classifies rate limiting as its own class, not as unreachable", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                error: { code: "rate_limited", http_status: 429, retryable: true },
+            },
+            429,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.code).toBe("acr_rate_limited");
+        expect(failure.retryable).toBe(true);
+    });
+
     it("sends a signed assertion bound to the investigation path", async () => {
         respondWith(canonicalResult);
         await investigate(config, { question: "status?" });

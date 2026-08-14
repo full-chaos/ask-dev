@@ -9,7 +9,8 @@ import { QuestionForm } from "@/components/QuestionForm";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
-import type { InvestigationResult } from "@/lib/contracts";
+import { subjectForReceipt } from "@/lib/clarification";
+import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 
 /**
  * Context Fabric Workbench (CHAOS-3738).
@@ -42,6 +43,10 @@ export default function WorkbenchPage() {
     const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
     const [view, setView] = useState<WorkbenchView>("deterministic");
     const [askedQuestion, setAskedQuestion] = useState("");
+    // The subject the tester chose, carried across the re-ask so the result can
+    // be checked against it. Cleared on a fresh question: a choice belongs to
+    // one re-ask, not to the session.
+    const [chosenSubject, setChosenSubject] = useState<SubjectRef | undefined>(undefined);
 
     /**
      * Asks, optionally carrying a subject the tester chose from a previous
@@ -56,8 +61,10 @@ export default function WorkbenchPage() {
     async function ask(
         question: string,
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
+        chosen?: SubjectRef,
     ) {
         setAskedQuestion(question);
+        setChosenSubject(chosen);
         setOutcome({ kind: "pending" });
         try {
             const response = await fetch("/api/investigations", {
@@ -142,8 +149,16 @@ export default function WorkbenchPage() {
                         <CanonicalResultInspector result={outcome.result} />
                     ) : (
                         <DeterministicAnswerView
+                            chosenSubject={chosenSubject}
                             onChooseCandidate={(choice) => {
-                                void ask(askedQuestion, [choice]);
+                                // Resolve the receipt to its subject NOW, while
+                                // the issuing result is still on screen — that
+                                // is the only place the mapping exists.
+                                void ask(
+                                    askedQuestion,
+                                    [choice],
+                                    subjectForReceipt(outcome.result, choice.receipt_id),
+                                );
                             }}
                             pending={false}
                             result={outcome.result}

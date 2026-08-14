@@ -10,6 +10,15 @@ export const workbenchFailureCodes = [
     "acr_runtime_unavailable",
     /** ACR rejected our credential. */
     "acr_unauthorized",
+    /**
+     * ACR is rate limiting the Workbench.
+     *
+     * Its own class, not folded into `acr_unreachable`: a measurement
+     * instrument that misfiles the failure class corrupts the measurement.
+     * "Back off and retry later" and "the service could not be reached" lead to
+     * completely different conclusions about a run.
+     */
+    "acr_rate_limited",
     /** ACR rejected the request payload. */
     "acr_rejected_request",
     /**
@@ -52,7 +61,15 @@ export type WorkbenchFailureCode = (typeof workbenchFailureCodes)[number];
 
 export type WorkbenchFailure = {
     readonly code: WorkbenchFailureCode;
-    /** Shown to the tester. Never contains credentials or key material. */
+    /**
+     * Shown to the tester. **Always Workbench-authored.**
+     *
+     * Never ACR's `error.message`, and therefore never any text that could have
+     * originated with a model or provider. The Workbench classifies a failure
+     * and writes its own sentence; upstream free text is not rendered, not
+     * logged, and not carried. `upstreamCode` and `upstreamRequestId` are kept
+     * because both are ACR-authored constants, not generated prose.
+     */
     readonly message: string;
     /** Upstream HTTP status, when there was one. */
     readonly httpStatus?: number;

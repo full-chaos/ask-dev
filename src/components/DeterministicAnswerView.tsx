@@ -1,16 +1,20 @@
 import { AnswerPanel } from "@/components/AnswerPanel";
+import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
-import type { InvestigationResult } from "@/lib/contracts";
+import { choiceDisposition } from "@/lib/clarification";
+import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
     /** Supplied when the surface can re-ask; omitted in read-only contexts. */
     readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
     readonly pending?: boolean | undefined;
+    /** The subject the tester chose, when this result came from a re-ask. */
+    readonly chosenSubject?: SubjectRef | undefined;
 };
 
 /**
@@ -31,7 +35,19 @@ export function DeterministicAnswerView({
     result,
     onChooseCandidate,
     pending = false,
+    chosenSubject,
 }: DeterministicAnswerViewProps) {
+    // Rendered in BOTH branches below. A dishonoured choice is invisible
+    // otherwise: an answer reads as being about the chosen subject, and a second
+    // clarification reads as an ordinary one.
+    const notice =
+        chosenSubject === undefined ? null : (
+            <ChoiceNotice
+                chosen={chosenSubject}
+                disposition={choiceDisposition(result, chosenSubject)}
+            />
+        );
+
     // A clarification is not a failed answer, and must not be rendered as a
     // thin one. When ACR asks for a choice, the choice IS the content: it leads,
     // and the (empty) judgment panels do not appear above it competing for
@@ -42,6 +58,7 @@ export function DeterministicAnswerView({
     if (needsClarification) {
         return (
             <article aria-label="Deterministic answer">
+                {notice}
                 <ClarificationPanel
                     onChoose={onChooseCandidate}
                     pending={pending}
@@ -70,6 +87,7 @@ export function DeterministicAnswerView({
 
     return (
         <article aria-label="Deterministic answer">
+            {notice}
             <AnswerPanel result={result} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel

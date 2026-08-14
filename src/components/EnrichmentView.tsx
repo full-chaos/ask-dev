@@ -3,17 +3,40 @@
 import { Renderer } from "@openuidev/react-lang";
 import { useMemo, useState } from "react";
 
+import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import { EnrichmentResultProvider } from "@/lib/enrichment/context";
 import { enrichmentLibrary } from "@/lib/enrichment/library";
 import { PRESENTATION_MANIFEST_V1 } from "@/lib/enrichment/manifest";
 import { validateEnrichment, type EnrichmentViolation } from "@/lib/enrichment/validate";
 
+/**
+ * A runtime failure belongs to ONE result and composition, never to the
+ * component.
+ *
+ * Exported and pure so the invariant is testable directly. It has to be: the
+ * validator rejects every composition that could make a renderer throw, so
+ * there is no reachable trigger for the runtime path today, and a test that
+ * drove it through the component would only be exercising the VALIDATION
+ * fallback while appearing to cover this. (That is exactly what an earlier
+ * version of the test did — mutation testing caught it.)
+ */
+export function renderFailureFor(
+    recorded: { readonly key: string; readonly message: string } | undefined,
+    renderKey: string,
+): string | undefined {
+    return recorded?.key === renderKey ? recorded.message : undefined;
+}
+
 export type EnrichmentViewProps = {
     readonly result: InvestigationResult;
     /** The presentation composition. Model-authored later; supplied by a caller today. */
     readonly composition: string;
+    /** Present when the surface can re-ask, so a clarification stays actionable. */
+    readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
+    readonly pending?: boolean | undefined;
+    readonly chosenSubject?: SubjectRef | undefined;
 };
 
 /**
@@ -40,12 +63,59 @@ export type EnrichmentViewProps = {
  * **The answer never changes when this falls back.** Both views render the same
  * immutable result; only the presentation differs.
  */
-export function EnrichmentView({ result, composition }: EnrichmentViewProps) {
+export function EnrichmentView({
+    result,
+    composition,
+    onChooseCandidate,
+    pending = false,
+    chosenSubject,
+}: EnrichmentViewProps) {
     const validation = useMemo(
         () => validateEnrichment(composition, result, PRESENTATION_MANIFEST_V1),
         [composition, result],
     );
-    const [runtimeFailure, setRuntimeFailure] = useState<string | undefined>(undefined);
+
+    // A runtime failure belongs to ONE result and composition, not to the
+    // component. Latching it across a new result meant a single bad render
+    // forced every later valid result into fallback for the life of the
+    // session — the fail-closed-latch sibling of onError-firing-on-success, and
+    // just as invisible, because fallback always looks like the safe outcome.
+    //
+    // Keyed state rather than an effect: clearing on a new result is per-result
+    // state, not a retry.
+    const renderKey = `${result.result_id}\u0000${composition}`;
+    const [failureFor, setFailureFor] = useState<
+        { readonly key: string; readonly message: string } | undefined
+    >(undefined);
+    const runtimeFailure = renderFailureFor(failureFor, renderKey);
+
+    // A clarification is an INTERACTION, not an answer to present. The closed
+    // component library has no candidate or choice component, and adding one
+    // would put an interactive control under model composition. So a
+    // clarification never enters the enrichment path: it routes to the
+    // deterministic panel, which can actually offer the choice.
+    //
+    // Without this, an enrichment render of a clarification showed an empty
+    // answer with no way to re-ask — a choiceless dead end.
+    if (result.status === "clarification_required") {
+        return (
+            <div>
+                <section className="panel" aria-label="Enrichment not applicable">
+                    <h2 className="panel__title">Enrichment not applicable</h2>
+                    <p className="answer__body">
+                        This result asks for a subject choice rather than presenting an answer, so
+                        it is shown in the deterministic view where the choice can be made.
+                    </p>
+                </section>
+                <DeterministicAnswerView
+                    chosenSubject={chosenSubject}
+                    onChooseCandidate={onChooseCandidate}
+                    pending={pending}
+                    result={result}
+                />
+            </div>
+        );
+    }
 
     const violations: readonly EnrichmentViolation[] = validation.ok ? [] : validation.violations;
     const fellBack = !validation.ok || runtimeFailure !== undefined;
@@ -77,7 +147,12 @@ export function EnrichmentView({ result, composition }: EnrichmentViewProps) {
                         ))}
                     </ul>
                 </section>
-                <DeterministicAnswerView result={result} />
+                <DeterministicAnswerView
+                    chosenSubject={chosenSubject}
+                    onChooseCandidate={onChooseCandidate}
+                    pending={pending}
+                    result={result}
+                />
             </div>
         );
     }
@@ -88,6 +163,14 @@ export function EnrichmentView({ result, composition }: EnrichmentViewProps) {
                 response={composition}
                 library={enrichmentLibrary}
                 toolProvider={null}
+                // Setting state from onError is SAFE, and the reason is
+                // structural rather than incidental: OpenUI invokes it from
+                // ElementErrorBoundary.componentDidCatch (react-lang
+                // Renderer.tsx:73-116), which is a COMMIT-phase lifecycle, not
+                // render. A probe capturing console.error across a
+                // runtime-failing render recorded zero calls and zero "Cannot
+                // update a component while rendering" warnings; the test below
+                // this component pins that.
                 onError={(errors) => {
                     // OpenUI calls onError with an EMPTY array on a clean
                     // render, not only when something failed. Treating any call
@@ -96,9 +179,12 @@ export function EnrichmentView({ result, composition }: EnrichmentViewProps) {
                     // still a bug, and a quiet one, because falling back always
                     // *looks* like the safe outcome.
                     if (errors.length === 0) return;
-                    setRuntimeFailure(
-                        errors.map((error) => `${error.code}: ${error.message}`).join("; "),
-                    );
+                    setFailureFor({
+                        key: renderKey,
+                        message: errors
+                            .map((error) => `${error.code}: ${error.message}`)
+                            .join("; "),
+                    });
                 }}
             />
         </EnrichmentResultProvider>

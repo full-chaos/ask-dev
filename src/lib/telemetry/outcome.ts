@@ -34,9 +34,20 @@ export type CorrectnessFeedback = "correct" | "incorrect" | "unsure";
 
 export type OutcomeEvent = {
     readonly event: "workbench_investigation";
-    /** Question family — a shape and judgment token, never the question. */
+    /**
+     * Question family.
+     *
+     * `interpretation.shape` ONLY — a closed contract enum
+     * (`single_subject` | `explicit_cohort` | `discovered_cohort` | `open`).
+     *
+     * `requested_judgment` was here and has been REMOVED: the contract
+     * constrains it only to be a string of at most 256 characters, so it is
+     * model-derived free text, and free text in telemetry is egress no matter
+     * how short. `shape` is the bounded family signal, and it is enough to
+     * answer "what kind of question was this" without carrying anything
+     * generated.
+     */
     readonly questionShape: string | undefined;
-    readonly requestedJudgment: string | undefined;
     readonly outcome: WorkbenchOutcome;
     /** Contract status when there was a result. */
     readonly resultStatus: string | undefined;
@@ -80,6 +91,17 @@ export type OutcomeEvent = {
      * never which subject was chosen, which would be content.
      */
     readonly clarificationChoiceCarried: boolean;
+    /**
+     * Whether a carried choice was actually applied by ACR.
+     *
+     * ACR discards a clarification receipt without reporting it (CHAOS-3813),
+     * so the disambiguation path can fail silently. This records THAT it
+     * happened — never which subject was chosen, which would be content.
+     * `undefined` when no choice was carried, which is distinct from `false`:
+     * "no choice to honour" and "the choice was ignored" must not aggregate
+     * together.
+     */
+    readonly clarificationChoiceHonoured: boolean | undefined;
 
     readonly usefulness: UsefulnessFeedback | undefined;
     readonly correctness: CorrectnessFeedback | undefined;
@@ -103,6 +125,7 @@ export type OutcomeInput = {
     readonly enrichmentFellBack?: boolean | undefined;
     readonly enrichmentFallbackPredicates?: readonly EnrichmentPredicate[] | undefined;
     readonly clarificationChoiceCarried?: boolean | undefined;
+    readonly clarificationChoiceHonoured?: boolean | undefined;
     readonly usefulness?: UsefulnessFeedback | undefined;
     readonly correctness?: CorrectnessFeedback | undefined;
 };
@@ -127,7 +150,6 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
     return {
         event: "workbench_investigation",
         questionShape: result?.interpretation.shape,
-        requestedJudgment: result?.interpretation.requested_judgment,
         outcome: outcomeFor(input),
         resultStatus: result?.status,
         failureCode: input.failureCode,
@@ -164,6 +186,7 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         enrichmentFallbackPredicates: input.enrichmentFallbackPredicates ?? [],
 
         clarificationChoiceCarried: input.clarificationChoiceCarried ?? false,
+        clarificationChoiceHonoured: input.clarificationChoiceHonoured,
 
         usefulness: input.usefulness,
         correctness: input.correctness,

@@ -1,11 +1,13 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import { EnrichmentView } from "@/components/EnrichmentView";
+import { EnrichmentView, renderFailureFor } from "@/components/EnrichmentView";
 import type { InvestigationResult } from "@/lib/contracts";
 import { buildComposition } from "@/lib/enrichment/compose";
 import { PRESENTATION_MANIFEST_V1 } from "@/lib/enrichment/manifest";
+import { mockScenarios } from "@/test/fixtures/investigations";
 
 const result = canonicalResult as unknown as InvestigationResult;
 
@@ -128,6 +130,118 @@ data = Query("get_metrics", {project: "ask_dev"})`}
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
         const panel = screen.getByLabelText("Enrichment fell back");
         expect(within(panel).getByText(/query_statements/)).toBeInTheDocument();
+    });
+});
+
+describe("EnrichmentView — a clarification never becomes a dead end", () => {
+    /**
+     * C3. A clarification is an INTERACTION, not an answer to present. The
+     * closed library has no candidate or choice component, so an enrichment
+     * render of one showed an empty answer with no way to re-ask. It now routes
+     * to the deterministic panel, which can actually offer the choice.
+     */
+    const clarification = mockScenarios().find((s) => s.id === "clarification")!.result;
+
+    it("routes a clarification to the choice UI instead of rendering an empty answer", () => {
+        render(
+            <EnrichmentView
+                composition={buildComposition(clarification, PRESENTATION_MANIFEST_V1)}
+                onChooseCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
+
+        expect(
+            screen.getByRole("region", { name: "Which subject did you mean?" }),
+        ).toBeInTheDocument();
+        expect(screen.getAllByRole("button", { name: /^Ask again about / }).length).toBeGreaterThan(
+            0,
+        );
+        expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
+    });
+
+    it("carries the re-ask handler through, so the choice is actionable", async () => {
+        const onChoose = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <EnrichmentView
+                composition={buildComposition(clarification, PRESENTATION_MANIFEST_V1)}
+                onChooseCandidate={onChoose}
+                result={clarification}
+            />,
+        );
+
+        const candidate = clarification.subject_resolution.candidates[0]!;
+        await user.click(
+            screen.getByRole("button", { name: `Ask again about ${candidate.subject.label}` }),
+        );
+        expect(onChoose).toHaveBeenCalledWith({
+            result_id: clarification.result_id,
+            receipt_id: candidate.receipt_id,
+        });
+    });
+});
+
+describe("EnrichmentView — a runtime failure does not latch across results", () => {
+    /**
+     * C4. A runtime failure belonged to the component rather than to the
+     * result, so one genuine renderer error forced every later valid result
+     * into fallback for the life of the session.
+     *
+     * Tested through the pure helper, deliberately. The validator rejects every
+     * composition that could make a renderer throw, so the runtime path has no
+     * reachable trigger today — an earlier version of this test drove a
+     * "broken" composition through the component and passed, but it was
+     * exercising the VALIDATION fallback while appearing to cover this one.
+     * Mutation testing caught that: reintroducing the latch left it green.
+     */
+    const failure = { key: "result_a\u0000composition_a", message: "render-error: boom" };
+
+    it("applies a failure to the render it belongs to", () => {
+        expect(renderFailureFor(failure, "result_a\u0000composition_a")).toBe("render-error: boom");
+    });
+
+    it("does not apply it to a different result", () => {
+        expect(renderFailureFor(failure, "result_b\u0000composition_a")).toBeUndefined();
+    });
+
+    it("does not apply it to a different composition for the same result", () => {
+        expect(renderFailureFor(failure, "result_a\u0000composition_b")).toBeUndefined();
+    });
+
+    it("is undefined when nothing has failed", () => {
+        expect(renderFailureFor(undefined, "result_a\u0000composition_a")).toBeUndefined();
+    });
+});
+
+describe("EnrichmentView — the onError state write is commit-phase", () => {
+    /**
+     * Item 5. The concern was that setting state from OpenUI's onError happens
+     * during render, which React warns about. It does not: OpenUI invokes it
+     * from ElementErrorBoundary.componentDidCatch, a COMMIT-phase lifecycle.
+     * Not reproducible, and this pins why — a future OpenUI change that moved
+     * the call into render would fail here rather than emit a warning nobody
+     * reads.
+     */
+    it("emits no React update-during-render warning when a render fails", () => {
+        const seen: string[] = [];
+        const spy = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+            seen.push(String(args[0]));
+        });
+
+        render(
+            <EnrichmentView
+                result={result}
+                composition={`root = Answer("@result.deterministic_answer", [prose, cov, lim])
+prose = Prose("@result.no_such_field")
+cov = Coverage("@result.coverage.partial", [])
+lim = Limitations([])`}
+            />,
+        );
+        spy.mockRestore();
+
+        expect(seen.filter((message) => message.includes("Cannot update"))).toEqual([]);
+        expect(screen.getByLabelText("Enrichment fell back")).toBeInTheDocument();
     });
 });
 
