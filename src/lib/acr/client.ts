@@ -24,8 +24,31 @@ import type { InvestigationRequest, InvestigationResult } from "@/lib/contracts"
 const INVESTIGATION_PATH = "/api/v1/context-fabric/investigations";
 const RESULT_SCHEMA = "context_fabric_investigation_result.v1.schema.json";
 
-/** Response cap. A result that exceeds it is a contract violation, not an answer. */
+/**
+ * Upper bound on a result payload, in BYTES.
+ *
+ * It was compared against `text.length`, which is UTF-16 units — not bytes, so
+ * the cap was both misnamed and looser than it read for any multibyte payload.
+ * Measured properly now.
+ *
+ * Worth being precise about what it does and does not do, because the name
+ * implies more than it delivers: the check runs AFTER `response.text()` has
+ * materialised the body, so it cannot protect against the allocation. It is a
+ * contract sanity bound — a payload this size is not an answer — not a memory
+ * guard. Making it one would mean bounding the read itself.
+ */
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Exported so the unit is testable.
+ *
+ * Left inline, the byte-vs-UTF-16 fix was unpinned: reverting it to `.length`
+ * kept the whole suite green, which makes it indistinguishable from a fix that
+ * was never made.
+ */
+export function exceedsResponseCap(text: string): boolean {
+    return Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES;
+}
 
 /**
  * A subject the tester chose from a clarification result.
@@ -327,7 +350,7 @@ export async function investigate(
     }
 
     const text = await response.text();
-    if (text.length > MAX_RESPONSE_BYTES) {
+    if (exceedsResponseCap(text)) {
         throw new AcrRequestError({
             code: "acr_contract_violation",
             message: "ACR returned a response larger than the Workbench accepts.",

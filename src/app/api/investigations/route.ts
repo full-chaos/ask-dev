@@ -21,6 +21,25 @@ export const dynamic = "force-dynamic";
 
 const MAX_QUESTION_LENGTH = 8_000;
 
+/**
+ * Counts CODE POINTS, not UTF-16 units.
+ *
+ * ACR bounds the question at 8000 runes (Go's RuneCountInString, which is also
+ * what JSON Schema's `maxLength` means, and what Ajv implements via ucs2length
+ * — verified against the pinned dependency rather than assumed). JavaScript's
+ * `.length` counts UTF-16 units, so an astral character counts twice: a
+ * question of exactly 8000 astral code points measures 16000 and was rejected
+ * here while ACR would have accepted it.
+ *
+ * That is the same class as validating before configuration — a guard that
+ * answers before the authoritative check, and answers differently — with the
+ * added harm that the Workbench blamed the tester's input for its own defect.
+ * Origin: a question from lane-3746 about Ajv; Ajv was correct, this was not.
+ */
+function codePointLength(value: string): number {
+    return [...value].length;
+}
+
 type InvestigateBody = {
     readonly question?: unknown;
     readonly priorSubjectReceipts?: unknown;
@@ -61,7 +80,12 @@ function parseReceipts(value: unknown): readonly { result_id: string; receipt_id
         const { result_id: resultId, receipt_id: receiptId } = record;
         for (const identifier of [resultId, receiptId]) {
             if (typeof identifier !== "string") throw new MalformedReceiptError();
-            if (identifier.length < 8 || identifier.length > 256) throw new MalformedReceiptError();
+            // Code points here too. Receipt ids are ACR-generated ASCII today,
+            // so this is not reachable in practice — but what makes it safe is
+            // a property of today's ACR, not of this code, and that is not a
+            // reason to measure the wrong thing.
+            const length = codePointLength(identifier);
+            if (length < 8 || length > 256) throw new MalformedReceiptError();
         }
         return { result_id: resultId as string, receipt_id: receiptId as string };
     });
@@ -137,7 +161,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const question = typeof body.question === "string" ? body.question.trim() : "";
-    if (question === "" || question.length > MAX_QUESTION_LENGTH) {
+    if (question === "" || codePointLength(question) > MAX_QUESTION_LENGTH) {
         return failureResponse(
             {
                 code: "acr_rejected_request",

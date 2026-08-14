@@ -110,9 +110,19 @@ export function EnrichmentView({
             <div>
                 <section className="panel" aria-label="Enrichment not applicable">
                     <h2 className="panel__title">Enrichment not applicable</h2>
+                    {/* Callback-aware, deliberately. This copy used to promise
+                        "where the choice can be made" unconditionally while the
+                        panel it defers to correctly said re-asking was
+                        unavailable — so a read-only caller was directed
+                        somewhere that would refuse them. A wrapper must not
+                        claim more than the component it defers to will deliver;
+                        that is the same property-lives-in-the-component rule as
+                        X2, applied to what the UI SAYS rather than what it
+                        renders. */}
                     <p className="answer__body">
-                        This result asks for a subject choice rather than presenting an answer, so
-                        it is shown in the deterministic view where the choice can be made.
+                        {onChooseCandidate === undefined
+                            ? "This result asks for a subject choice rather than presenting an answer. It is shown below for inspection; this context cannot re-ask."
+                            : "This result asks for a subject choice rather than presenting an answer, so it is shown in the deterministic view where the choice can be made."}
                     </p>
                 </section>
                 <DeterministicAnswerView

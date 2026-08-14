@@ -1,7 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { buildInvestigationRequest, investigate } from "@/lib/acr/client";
+import { buildInvestigationRequest, exceedsResponseCap, investigate } from "@/lib/acr/client";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { acrErrorCodeVocabulary } from "@/lib/acr/upstream-vocabulary";
@@ -155,6 +155,27 @@ describe("investigate — upstream text never reaches the caller", () => {
             expect(failure.upstreamRequestId).toBe("req_upstream_prose_0001");
         });
     }
+});
+
+describe("the response cap is measured in bytes", () => {
+    /**
+     * The cap is named BYTES and was compared against `text.length`, which is
+     * UTF-16 units — so for any multibyte payload it was looser than it read.
+     * A three-byte character is one UTF-16 unit, so a payload can sit well
+     * under the cap by `.length` while being half again over it in bytes.
+     */
+    it("rejects a payload over the cap in bytes but under it by .length", () => {
+        // U+4E2D is 3 bytes in UTF-8 and 1 UTF-16 unit.
+        const text = "\u4E2D".repeat(3_000_000);
+
+        expect(text.length).toBeLessThan(8 * 1024 * 1024);
+        expect(Buffer.byteLength(text, "utf8")).toBeGreaterThan(8 * 1024 * 1024);
+        expect(exceedsResponseCap(text)).toBe(true);
+    });
+
+    it("accepts an ordinary payload", () => {
+        expect(exceedsResponseCap(JSON.stringify(canonicalResult))).toBe(false);
+    });
 });
 
 describe("investigate — upstream identifiers are bounded, not echoed", () => {

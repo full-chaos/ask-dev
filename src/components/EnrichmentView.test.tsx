@@ -160,6 +160,30 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
     });
 
+    /**
+     * The wrapper must not claim more than the component it defers to will
+     * deliver. Its copy promised "where the choice can be made"
+     * unconditionally while the callback-less panel correctly said re-asking
+     * was unavailable — sending a read-only caller somewhere that would refuse
+     * them.
+     */
+    it("promises no choice anywhere when it cannot offer one", () => {
+        const { container } = render(
+            <EnrichmentView
+                composition={buildComposition(clarification, PRESENTATION_MANIFEST_V1)}
+                result={clarification}
+            />,
+        );
+
+        expect(container.textContent).not.toMatch(/where the choice can be made/i);
+        expect(container.textContent).toMatch(/cannot re-ask/i);
+        expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
+        // The candidates are still shown — inspection-only, not hidden.
+        for (const candidate of clarification.subject_resolution.candidates) {
+            expect(screen.getByText(candidate.subject.label)).toBeInTheDocument();
+        }
+    });
+
     it("carries the re-ask handler through, so the choice is actionable", async () => {
         const onChoose = vi.fn();
         const user = userEvent.setup();

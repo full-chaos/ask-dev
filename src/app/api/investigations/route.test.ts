@@ -43,6 +43,45 @@ describe("malformed request bodies are controlled failures", () => {
         });
     }
 
+    /**
+     * ACR bounds the question at 8000 RUNES. JavaScript's `.length` counts
+     * UTF-16 units, so an astral character counted twice and a question of
+     * exactly 8000 astral code points was rejected here while ACR would have
+     * accepted it — the Workbench blaming the tester's input for its own
+     * defect. Origin: a question from lane-3746 about Ajv; Ajv was correct.
+     */
+    describe("the question bound is measured in code points", () => {
+        // U+1D11E: one code point, two UTF-16 units.
+        const astral = "\u{1D11E}";
+
+        it("accepts exactly 8000 astral code points, which .length would call 16000", async () => {
+            const question = astral.repeat(8_000);
+            expect(question.length).toBe(16_000);
+            expect([...question].length).toBe(8_000);
+
+            const response = await POST(post(JSON.stringify({ question })));
+
+            // Past the bound check: it fails later for missing config, not for
+            // length. Anything else means the guard rejected a valid question.
+            expect(response.status).toBe(500);
+            expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+        });
+
+        it("still rejects 8001 code points", async () => {
+            const response = await POST(post(JSON.stringify({ question: astral.repeat(8_001) })));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+
+        it("rejects 8001 plain characters too, so the bound is not simply gone", async () => {
+            const response = await POST(post(JSON.stringify({ question: "a".repeat(8_001) })));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    });
+
     it("rejects a missing question", async () => {
         const response = await POST(post(JSON.stringify({})));
 
