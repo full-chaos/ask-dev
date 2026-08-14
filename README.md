@@ -219,6 +219,15 @@ service rather than from documentation:
   not an ACR bug (that stays 500)". So a 500 here means an ACR-side fault, not a
   model being picky, and retrying it will not help — ACR itself marks it
   `retryable: false`.
+- **An investigation is not guaranteed to answer on the first call, and the
+  Workbench deliberately does NOT auto-retry.** ACR's own operations guide is
+  explicit that `422 interpretation_rejected`, `422 synthesis_rejected`, and
+  `502 upstream_invalid_output` are expected, retryable outcomes even with the
+  fallback model configured. A product client should probably retry; this one
+  must not. Its whole purpose is measuring answer quality, and silently
+  re-rolling until something succeeds would hide the rejection rate — the exact
+  number a tester is here to see. The outcome is surfaced with its retryable
+  flag and the tester decides.
 - **A 5xx is not an unreachable service either.** ACR deliberately keeps the
   underlying reason for an engine failure off the wire, so the Workbench reports
   `acr_investigation_failed` and surfaces **ACR's own `request_id`** — the only
