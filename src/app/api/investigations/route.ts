@@ -23,7 +23,29 @@ const MAX_QUESTION_LENGTH = 8_000;
 
 type InvestigateBody = {
     readonly question?: unknown;
+    readonly priorSubjectReceipts?: unknown;
 };
+
+/**
+ * Receipts are validated, not trusted.
+ *
+ * They come from the browser, so the route re-checks their shape before they
+ * reach an ACR request. It cannot check that a receipt was really issued to
+ * this tester — ACR owns that — but a malformed one must fail here rather than
+ * as an opaque upstream 400.
+ */
+function parseReceipts(value: unknown): readonly { result_id: string; receipt_id: string }[] {
+    if (!Array.isArray(value)) return [];
+    const receipts = [];
+    for (const entry of value) {
+        if (typeof entry !== "object" || entry === null) continue;
+        const { result_id: resultId, receipt_id: receiptId } = entry as Record<string, unknown>;
+        if (typeof resultId !== "string" || typeof receiptId !== "string") continue;
+        if (resultId.length < 8 || receiptId.length < 8) continue;
+        receipts.push({ result_id: resultId, receipt_id: receiptId });
+    }
+    return receipts;
+}
 
 function failureResponse(failure: WorkbenchFailure, status: number): NextResponse {
     return NextResponse.json({ failure }, { status });
@@ -103,7 +125,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     try {
-        const result = await investigate(config, { question, signal: request.signal });
+        const result = await investigate(config, {
+            question,
+            priorSubjectReceipts: parseReceipts(body.priorSubjectReceipts),
+            signal: request.signal,
+        });
         return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
         if (error instanceof AcrRequestError) {

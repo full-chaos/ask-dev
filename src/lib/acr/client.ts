@@ -26,8 +26,23 @@ const RESULT_SCHEMA = "context_fabric_investigation_result.v1.schema.json";
 /** Response cap. A result that exceeds it is a contract violation, not an answer. */
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
+/**
+ * A subject the tester chose from a clarification result.
+ *
+ * The contract's own re-ask mechanism: `prior_subject_receipts` binds a
+ * previous result's candidate receipt to a new investigation, so the choice is
+ * carried as ACR's OWN identifier rather than as a re-typed subject name. The
+ * Workbench therefore never names a subject on the tester's behalf — it hands
+ * back a receipt ACR issued.
+ */
+export type BoundReceipt = {
+    readonly result_id: string;
+    readonly receipt_id: string;
+};
+
 export type InvestigationOptions = {
     readonly question: string;
+    readonly priorSubjectReceipts?: readonly BoundReceipt[] | undefined;
     readonly signal?: AbortSignal;
 };
 
@@ -40,13 +55,38 @@ function requestId(): string {
  * canonical contract example does, so ACR-side telemetry can attribute
  * Workbench traffic without guessing.
  */
-export function buildInvestigationRequest(question: string): InvestigationRequest {
+/** The contract's own bound on `prior_subject_receipts`. */
+const MAX_PRIOR_SUBJECT_RECEIPTS = 20;
+
+export function buildInvestigationRequest(
+    question: string,
+    priorSubjectReceipts: readonly BoundReceipt[] = [],
+): InvestigationRequest {
+    // Deduplicated (the contract requires uniqueItems) and capped at the
+    // contract's maxItems, so an over-long or repeated selection fails here
+    // rather than as an opaque ACR 400.
+    //
+    // The cast is unavoidable: json-schema-to-typescript renders `maxItems: 20`
+    // as a union of twenty-one fixed-length tuple types, which no runtime array
+    // can satisfy structurally. The slice above is what actually enforces the
+    // bound, and the request is schema-validated before it is sent.
+    const receipts = [
+        ...new Map(
+            priorSubjectReceipts.map((receipt) => [
+                `${receipt.result_id}|${receipt.receipt_id}`,
+                receipt,
+            ]),
+        ).values(),
+    ].slice(0, MAX_PRIOR_SUBJECT_RECEIPTS) as NonNullable<
+        InvestigationRequest["prior_subject_receipts"]
+    >;
+
     return {
         schema_version: "context_fabric_investigation_request.v1",
         request_id: requestId(),
         question,
         conversation: [],
-        prior_subject_receipts: [],
+        prior_subject_receipts: receipts,
         time_context: { axis: "current" },
         options: {
             max_subject_candidates: 10,
@@ -186,7 +226,7 @@ export async function investigate(
     config: AcrRuntimeConfig,
     options: InvestigationOptions,
 ): Promise<InvestigationResult> {
-    const request = buildInvestigationRequest(options.question);
+    const request = buildInvestigationRequest(options.question, options.priorSubjectReceipts ?? []);
     const body = JSON.stringify(request);
 
     // The request is validated against the pinned schema BEFORE it is sent, so

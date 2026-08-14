@@ -1,4 +1,5 @@
 import { AnswerPanel } from "@/components/AnswerPanel";
+import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FindingsPanel } from "@/components/FindingsPanel";
@@ -7,6 +8,9 @@ import type { InvestigationResult } from "@/lib/contracts";
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
+    /** Supplied when the surface can re-ask; omitted in read-only contexts. */
+    readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
+    readonly pending?: boolean | undefined;
 };
 
 /**
@@ -23,7 +27,47 @@ export type DeterministicAnswerViewProps = {
  * itself said it cannot support. Coverage and limitations are never collapsed
  * away and never shown only on failure.
  */
-export function DeterministicAnswerView({ result }: DeterministicAnswerViewProps) {
+export function DeterministicAnswerView({
+    result,
+    onChooseCandidate,
+    pending = false,
+}: DeterministicAnswerViewProps) {
+    // A clarification is not a failed answer, and must not be rendered as a
+    // thin one. When ACR asks for a choice, the choice IS the content: it leads,
+    // and the (empty) judgment panels do not appear above it competing for
+    // attention.
+    const needsClarification =
+        result.status === "clarification_required" && onChooseCandidate !== undefined;
+
+    if (needsClarification) {
+        return (
+            <article aria-label="Deterministic answer">
+                <ClarificationPanel
+                    onChoose={onChooseCandidate}
+                    pending={pending}
+                    result={result}
+                />
+                <CoveragePanel coverage={result.coverage} />
+                <section className="panel" aria-labelledby="clarification-limitations-title">
+                    <h2 className="panel__title" id="clarification-limitations-title">
+                        Limitations
+                    </h2>
+                    {result.limitations.length === 0 ? (
+                        <p className="panel__empty">The service reported no limitations.</p>
+                    ) : (
+                        <ul className="stack stack--tight">
+                            {result.limitations.map((limitation) => (
+                                <li className="record" key={limitation}>
+                                    {limitation}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
+            </article>
+        );
+    }
+
     return (
         <article aria-label="Deterministic answer">
             <AnswerPanel result={result} />

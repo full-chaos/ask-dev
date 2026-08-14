@@ -67,6 +67,48 @@ describe("buildInvestigationRequest", () => {
         expect(validation.valid, validation.errors.join("; ")).toBe(true);
     });
 
+    /**
+     * The re-ask carries the tester's clarification choice as ACR's own
+     * receipt, and leaves the question untouched. Rewriting the question to
+     * name the chosen subject would make the Workbench author part of it.
+     */
+    it("carries a clarification choice as a receipt without altering the question", () => {
+        const request = buildInvestigationRequest("Is Atlas on track?", [
+            { result_id: "result_clarify_0001", receipt_id: "receipt_atlas_project" },
+        ]);
+
+        expect(request.question).toBe("Is Atlas on track?");
+        expect(request.prior_subject_receipts).toEqual([
+            { result_id: "result_clarify_0001", receipt_id: "receipt_atlas_project" },
+        ]);
+        expect(
+            validateContract("context_fabric_investigation_request.v1.schema.json", request).valid,
+        ).toBe(true);
+    });
+
+    it("deduplicates receipts, which the contract requires to be unique", () => {
+        const receipt = { result_id: "result_clarify_0001", receipt_id: "receipt_atlas_project" };
+        const request = buildInvestigationRequest("q", [receipt, { ...receipt }]);
+
+        expect(request.prior_subject_receipts).toHaveLength(1);
+        expect(
+            validateContract("context_fabric_investigation_request.v1.schema.json", request).valid,
+        ).toBe(true);
+    });
+
+    it("caps receipts at the contract's maxItems rather than letting ACR reject them", () => {
+        const many = Array.from({ length: 25 }, (_, index) => ({
+            result_id: "result_clarify_0001",
+            receipt_id: `receipt_${String(index).padStart(4, "0")}`,
+        }));
+        const request = buildInvestigationRequest("q", many);
+
+        expect(request.prior_subject_receipts).toHaveLength(20);
+        expect(
+            validateContract("context_fabric_investigation_request.v1.schema.json", request).valid,
+        ).toBe(true);
+    });
+
     it("identifies the Workbench as the consumer so ACR can attribute the traffic", () => {
         expect(buildInvestigationRequest("q").consumer).toEqual({
             name: "context-fabric-workbench",

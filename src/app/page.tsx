@@ -6,6 +6,7 @@ import { CanonicalResultInspector } from "@/components/CanonicalResultInspector"
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import { QuestionForm } from "@/components/QuestionForm";
+import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import type { InvestigationResult } from "@/lib/contracts";
@@ -42,14 +43,27 @@ export default function WorkbenchPage() {
     const [view, setView] = useState<WorkbenchView>("deterministic");
     const [askedQuestion, setAskedQuestion] = useState("");
 
-    async function ask(question: string) {
+    /**
+     * Asks, optionally carrying a subject the tester chose from a previous
+     * clarification.
+     *
+     * The question is re-sent UNCHANGED alongside the receipt. Rewriting it to
+     * mention the chosen subject would make the Workbench author part of the
+     * question, and ACR would then be answering something the tester never
+     * asked — `prior_subject_receipts` exists precisely so the choice travels
+     * as an identifier instead.
+     */
+    async function ask(
+        question: string,
+        priorSubjectReceipts: readonly ClarificationChoice[] = [],
+    ) {
         setAskedQuestion(question);
         setOutcome({ kind: "pending" });
         try {
             const response = await fetch("/api/investigations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question }),
+                body: JSON.stringify({ question, priorSubjectReceipts }),
             });
             const payload: unknown = await response.json();
             const failure = (payload as { failure?: unknown }).failure;
@@ -127,7 +141,13 @@ export default function WorkbenchPage() {
                     {view === "raw" ? (
                         <CanonicalResultInspector result={outcome.result} />
                     ) : (
-                        <DeterministicAnswerView result={outcome.result} />
+                        <DeterministicAnswerView
+                            onChooseCandidate={(choice) => {
+                                void ask(askedQuestion, [choice]);
+                            }}
+                            pending={false}
+                            result={outcome.result}
+                        />
                     )}
                 </>
             ) : null}

@@ -72,6 +72,12 @@ export default tseslint.config(
         // accidental import from app, component, or lib code a lint error
         // rather than something a reviewer has to catch.
         files: ["src/app/**/*.{ts,tsx}", "src/components/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
+        // Colocated tests are exempt: the boundary is that PRODUCT code must
+        // never render a fixture, not that a component may never be tested
+        // against a contract-shaped one. Exercising the clarification UI
+        // against a schema-valid clarification result is a component test; it
+        // presents nothing to a tester.
+        ignores: ["src/**/*.test.{ts,tsx}"],
         rules: {
             "no-restricted-imports": [
                 "error",

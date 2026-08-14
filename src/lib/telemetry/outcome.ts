@@ -74,6 +74,13 @@ export type OutcomeEvent = {
     readonly enrichmentFellBack: boolean | undefined;
     readonly enrichmentFallbackPredicates: readonly EnrichmentPredicate[];
 
+    /**
+     * Whether this investigation carried a subject the tester chose from a
+     * previous clarification. Records that the disambiguation path was taken —
+     * never which subject was chosen, which would be content.
+     */
+    readonly clarificationChoiceCarried: boolean;
+
     readonly usefulness: UsefulnessFeedback | undefined;
     readonly correctness: CorrectnessFeedback | undefined;
 
@@ -95,6 +102,7 @@ export type OutcomeInput = {
     readonly upstreamStatus?: number | undefined;
     readonly enrichmentFellBack?: boolean | undefined;
     readonly enrichmentFallbackPredicates?: readonly EnrichmentPredicate[] | undefined;
+    readonly clarificationChoiceCarried?: boolean | undefined;
     readonly usefulness?: UsefulnessFeedback | undefined;
     readonly correctness?: CorrectnessFeedback | undefined;
 };
@@ -154,6 +162,8 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         renderSurface: input.renderSurface,
         enrichmentFellBack: input.enrichmentFellBack,
         enrichmentFallbackPredicates: input.enrichmentFallbackPredicates ?? [],
+
+        clarificationChoiceCarried: input.clarificationChoiceCarried ?? false,
 
         usefulness: input.usefulness,
         correctness: input.correctness,
