@@ -117,6 +117,64 @@ describe("a malformed receipt rejects the request instead of being filtered out"
     }
 
     /**
+     * The receipt bound is measured in CODE POINTS, like the question bound.
+     *
+     * This test exists because of the criterion the question guard's own fix
+     * established: "the suite is green after my fix" and "my fix is pinned" are
+     * different claims. Every receipt fixture above is ASCII, so a mutation of
+     * the receipt guard back to `.length` kept the whole suite green while
+     * rejecting a contract-valid 256-code-point astral id — the fix was correct
+     * and unpinned, which is indistinguishable from a fix never made.
+     *
+     * Not reachable with today's ACR, which generates ASCII ids. Pinned anyway:
+     * what makes it safe is a property of today's ACR rather than of this code.
+     */
+    describe("the receipt bound is measured in code points", () => {
+        // U+1D11E: one code point, two UTF-16 units.
+        const astral = "\u{1D11E}";
+
+        const receiptRequest = (codePoints: number) =>
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    priorSubjectReceipts: [
+                        {
+                            result_id: astral.repeat(codePoints),
+                            receipt_id: astral.repeat(codePoints),
+                        },
+                    ],
+                }),
+            );
+
+        it("accepts 256 astral code points, which .length would call 512", async () => {
+            const id = astral.repeat(256);
+            expect(id.length).toBe(512);
+            expect([...id].length).toBe(256);
+
+            const response = await POST(receiptRequest(256));
+
+            // Past receipt validation: it fails later for missing config, not
+            // for length. A 400 here means the guard rejected a valid receipt.
+            expect(response.status).toBe(500);
+            expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+        });
+
+        it("still rejects 257 code points, so the bound is not simply gone", async () => {
+            const response = await POST(receiptRequest(257));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+
+        it("still rejects 7 code points at the minimum", async () => {
+            const response = await POST(receiptRequest(7));
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    });
+
+    /**
      * The proof that the old behaviour is now unrepresentable: a request
      * carrying one good and one malformed receipt cannot proceed with just the
      * good one. It cannot proceed at all.
