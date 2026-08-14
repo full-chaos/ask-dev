@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import { EnrichmentView } from "@/components/EnrichmentView";
 import type { InvestigationResult } from "@/lib/contracts";
+import { buildComposition } from "@/lib/enrichment/compose";
+import { PRESENTATION_MANIFEST_V1 } from "@/lib/enrichment/manifest";
 
 const result = canonicalResult as unknown as InvestigationResult;
 
@@ -34,6 +36,27 @@ describe("EnrichmentView — the enriched path", () => {
         const enriched = screen.getByRole("article", { name: "Enriched answer" });
         expect(within(enriched).getByLabelText("Coverage")).toBeInTheDocument();
         expect(within(enriched).getByLabelText("Limitations")).toBeInTheDocument();
+    });
+});
+
+describe("EnrichmentView — the deterministic composition builder", () => {
+    /**
+     * Validating is not the same as rendering. This closes the last gap between
+     * the builder and the screen: a composition our own builder produced from a
+     * real result must actually reach the enriched surface, not merely satisfy
+     * the validator and then fall back for some other reason.
+     */
+    it("renders a composition built from the result", () => {
+        const composition = buildComposition(result, PRESENTATION_MANIFEST_V1);
+        render(<EnrichmentView result={result} composition={composition} />);
+
+        const enriched = screen.getByRole("article", { name: "Enriched answer" });
+        expect(within(enriched).getByText(result.deterministic_answer)).toBeInTheDocument();
+        expect(within(enriched).getByLabelText("Coverage")).toBeInTheDocument();
+        expect(within(enriched).getByLabelText("Limitations")).toBeInTheDocument();
+        expect(within(enriched).getByText(result.drivers[0]!.title)).toBeInTheDocument();
+        // Never fell back.
+        expect(screen.queryByLabelText("Enrichment fell back")).toBeNull();
     });
 });
 
