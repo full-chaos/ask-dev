@@ -6,3 +6,21 @@ allowBuilds:
     # internal, read-only tool should not phone home at install time. CI also
     # sets DO_NOT_TRACK and OPENUI_TELEMETRY_DISABLED, which the script honors.
     "@openuidev/lang-core": false
+
+overrides:
+    # Dependency-audit fix (pre-existing red, unrelated to any feature PR).
+    # `next` is deliberately pinned at 16.2.12, not bumped: README.md's own
+    # "Why Next.js is pinned exactly" section says a caret install resolves
+    # to 16.3.x, which dev-health-web is paused on over open regressions,
+    # and "bump it when web bumps, not before". next@16.2.12 pins
+    # postcss@8.4.31 (exact) and sharp@^0.34.5 (optional dep) internally,
+    # both below their patched floors, so the fix is two transitive
+    # overrides rather than a next bump: sharp >=0.35.0 fixes
+    # CVE-2026-33327/8 + 35590/1 (GHSA-f88m-g3jw-g9cj); postcss >=8.5.18
+    # fixes the sourceMappingURL arbitrary-file-read advisories
+    # (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849). Both are semver-minor/patch
+    # bumps within postcss's/sharp's own major version, so next's internal
+    # use of either is expected to keep working -- verified empirically via
+    # the full gate (build + e2e) after regenerating the lockfile.
+    sharp: ">=0.35.0"
+    postcss: ">=8.5.18"
