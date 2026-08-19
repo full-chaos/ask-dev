@@ -4,14 +4,38 @@ import { ClarificationPanel, type ClarificationChoice } from "@/components/Clari
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FindingsPanel } from "@/components/FindingsPanel";
+import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
+import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { choiceDisposition } from "@/lib/clarification";
-import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type {
+    BoundStructureReceipt,
+    PivotAwareInvestigationResult,
+    StructureNeedKind,
+    SubjectRef,
+} from "@/lib/contracts";
+import {
+    EMPTY_STRUCTURE_SELECTION_BATCH,
+    type StructureSelectionBatch,
+} from "@/lib/structure-selections";
 
 export type DeterministicAnswerViewProps = {
-    readonly result: InvestigationResult;
+    readonly result: PivotAwareInvestigationResult;
     /** Supplied when the surface can re-ask; omitted in read-only contexts. */
     readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
+    /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */
+    readonly onConfirmStructure?: ((batch: StructureSelectionBatch) => void) | undefined;
+    /**
+     * The shared selection batch (codex round 3): owned by the caller, not
+     * this view, because the SAME StructureNeedsPanel offers are also
+     * rendered in the raw inspector view — a tester switching between them
+     * must not lose their picks. Defaults to empty for callers (this
+     * repo's other DeterministicAnswerView call sites) that never offer a
+     * re-ask and so have no batch to share.
+     */
+    readonly structureBatch?: StructureSelectionBatch | undefined;
+    readonly onToggleStructure?:
+        ((member: StructureNeedKind, receipt: BoundStructureReceipt) => void) | undefined;
     readonly pending?: boolean | undefined;
     /** The subject the tester chose, when this result came from a re-ask. */
     readonly chosenSubject?: SubjectRef | undefined;
@@ -34,6 +58,13 @@ export type DeterministicAnswerViewProps = {
 export function DeterministicAnswerView({
     result,
     onChooseCandidate,
+    onConfirmStructure,
+    structureBatch = EMPTY_STRUCTURE_SELECTION_BATCH,
+    // No-op default: harmless, because the offer buttons that would call it
+    // only render when onConfirmStructure is ALSO supplied (see
+    // StructureNeedsPanel's own onConfirm-gated rendering), and any caller
+    // wiring one without the other is a call-site bug, not a runtime path.
+    onToggleStructure = () => {},
     pending = false,
     chosenSubject,
 }: DeterministicAnswerViewProps) {
@@ -59,10 +90,39 @@ export function DeterministicAnswerView({
     // as C3 and R3, reached a third way. Without a callback the panel renders
     // the prompt and candidates and says it cannot re-ask here; it never
     // degrades to the answer layout.
+    // CHAOS-3927 P2: rendered above the subject candidates, per the design
+    // brief's own elicitation-priority ordering (§2.2) — kind/anchor/handle
+    // narrow WHICH subject before a subject candidate list would even help.
+    // `structure_needs` and `confirmed_structure` render EXACTLY what the
+    // result carries; see StructureNeedsPanel/StructureConfirmationNotice for
+    // the boundary pins (never re-rank, never invent, receipts only).
+    const structureNeedsPanel =
+        result.structure_needs === undefined ? null : (
+            // Keyed by result_id (codex round 1): resets the panel's own
+            // local (non-selection) UI state — e.g. a namespace-mismatch
+            // alert — per result. `batch`/`onToggle` are lifted to the
+            // caller (codex round 3), so the SELECTION itself survives a
+            // switch to the raw view's own instance of this panel.
+            <StructureNeedsPanel
+                key={result.result_id}
+                batch={structureBatch}
+                onConfirm={onConfirmStructure}
+                onToggle={onToggleStructure}
+                pending={pending}
+                resultId={result.result_id}
+                structureNeeds={result.structure_needs}
+            />
+        );
+    const structureConfirmationNotice = (
+        <StructureConfirmationNotice entries={result.confirmed_structure} />
+    );
+
     if (result.status === "clarification_required") {
         return (
             <article aria-label="Deterministic answer">
                 {notice}
+                {structureConfirmationNotice}
+                {structureNeedsPanel}
                 <ClarificationPanel
                     onChoose={onChooseCandidate}
                     pending={pending}
@@ -92,6 +152,8 @@ export function DeterministicAnswerView({
     return (
         <article aria-label="Deterministic answer">
             {notice}
+            {structureConfirmationNotice}
+            {structureNeedsPanel}
             <AnswerPanel result={result} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel

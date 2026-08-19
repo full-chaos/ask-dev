@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { investigate } from "@/lib/acr/client";
 import { AcrConfigError, loadAcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import { STRUCTURE_RECEIPT_PREFIX, type BoundStructureReceipt } from "@/lib/contracts";
 
 /**
  * The Workbench's server hop to ACR.
@@ -43,6 +44,16 @@ function codePointLength(value: string): number {
 type InvestigateBody = {
     readonly question?: unknown;
     readonly priorSubjectReceipts?: unknown;
+    // CHAOS-3927 P2 (pivot-intent design brief §2.1/§2.2). Four NEW, PARALLEL
+    // fields, following `priorSubjectReceipts`'s own precedent exactly — each
+    // names a different offer set (StructureNeeds.kind_options/anchor_options/
+    // handle_options/window_options) and is validated against its OWN closed
+    // receipt-id namespace (kindr_/ancr_/handr_/winr_), never against
+    // priorSubjectReceipts' unconstrained shape.
+    readonly priorKindReceipts?: unknown;
+    readonly priorAnchorReceipts?: unknown;
+    readonly priorHandleReceipts?: unknown;
+    readonly priorWindowReceipts?: unknown;
 };
 
 /**
@@ -60,7 +71,15 @@ type InvestigateBody = {
  * receipt must match a candidate of that same result (`engine.go:404-414`). The
  * route's job is shape only.
  */
-function parseReceipts(value: unknown): readonly { result_id: string; receipt_id: string }[] {
+/**
+ * `expectedPrefix` extends this to the four CHAOS-3927 structure-receipt
+ * fields (kindr_/ancr_/handr_/winr_, design brief §2.1's closed namespace
+ * set): "none of the four ... may ever accept another's namespace." Absent
+ * (the `priorSubjectReceipts` call site) means no namespace constraint,
+ * matching that field's own contract shape (`BoundSubjectReceipt`) exactly —
+ * unchanged behavior for the existing path.
+ */
+function parseReceipts(value: unknown, expectedPrefix?: string): readonly BoundStructureReceipt[] {
     if (value === undefined) return [];
     if (!Array.isArray(value)) throw new MalformedReceiptError();
     return value.map((entry) => {
@@ -86,6 +105,9 @@ function parseReceipts(value: unknown): readonly { result_id: string; receipt_id
             // reason to measure the wrong thing.
             const length = codePointLength(identifier);
             if (length < 8 || length > 256) throw new MalformedReceiptError();
+        }
+        if (expectedPrefix !== undefined && !(receiptId as string).startsWith(expectedPrefix)) {
+            throw new MalformedReceiptError();
         }
         return { result_id: resultId as string, receipt_id: receiptId as string };
     });
@@ -177,7 +199,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // answering it with "the Workbench server is not configured" would
     // misattribute the fault — the same misdiagnosis as reporting a local
     // config fault as an unreachable service.
-    let priorSubjectReceipts: readonly { result_id: string; receipt_id: string }[];
+    let priorSubjectReceipts: readonly BoundStructureReceipt[];
     try {
         priorSubjectReceipts = parseReceipts(body.priorSubjectReceipts);
     } catch {
@@ -190,6 +212,35 @@ export async function POST(request: Request): Promise<NextResponse> {
             },
             400,
         );
+    }
+
+    // CHAOS-3927 P2: same discipline as priorSubjectReceipts above, extended
+    // to the four structure-receipt namespaces (§2.1) — a malformed entry
+    // rejects the WHOLE request rather than being silently dropped, because a
+    // dropped structure receipt means the re-ask runs without the tester's
+    // selection and looks exactly like it working (the same C5/Item-1 class
+    // this route already closes for subject receipts).
+    const STRUCTURE_RECEIPT_FIELDS = [
+        ["priorKindReceipts", STRUCTURE_RECEIPT_PREFIX.expected_kind, "kind"],
+        ["priorAnchorReceipts", STRUCTURE_RECEIPT_PREFIX.subject_anchor, "repository/project/team"],
+        ["priorHandleReceipts", STRUCTURE_RECEIPT_PREFIX.subject_handle, "handle"],
+        ["priorWindowReceipts", STRUCTURE_RECEIPT_PREFIX.window, "time window"],
+    ] as const;
+
+    const structureReceipts: Record<string, readonly BoundStructureReceipt[]> = {};
+    for (const [field, prefix, label] of STRUCTURE_RECEIPT_FIELDS) {
+        try {
+            structureReceipts[field] = parseReceipts(body[field], prefix);
+        } catch {
+            return failureResponse(
+                {
+                    code: "acr_rejected_request",
+                    message: `A supplied ${label} structure receipt was malformed. The request was rejected rather than run without the chosen selection.`,
+                    retryable: false,
+                },
+                400,
+            );
+        }
     }
 
     let config;
@@ -215,6 +266,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         const result = await investigate(config, {
             question,
             priorSubjectReceipts,
+            priorKindReceipts: structureReceipts.priorKindReceipts,
+            priorAnchorReceipts: structureReceipts.priorAnchorReceipts,
+            priorHandleReceipts: structureReceipts.priorHandleReceipts,
+            priorWindowReceipts: structureReceipts.priorWindowReceipts,
             signal: request.signal,
         });
         return NextResponse.json({ result }, { status: 200 });

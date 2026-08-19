@@ -4,9 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import WorkbenchPage from "@/app/page";
 import { mockScenarios } from "@/test/fixtures/investigations";
+import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 const clarification = mockScenarios().find((scenario) => scenario.id === "clarification")!.result;
 const answered = mockScenarios().find((scenario) => scenario.id === "complete")!.result;
+const structureKind = structureMockScenarios().find(
+    (scenario) => scenario.id === "structure-kind",
+)!.result;
+const structureVetoed = structureMockScenarios().find(
+    (scenario) => scenario.id === "structure-vetoed",
+)!.result;
 
 function respondWith(body: unknown): void {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -66,6 +73,105 @@ describe("the clarification choice is reachable from every view", () => {
 
         expect(await screen.findByRole("article", { name: "Deterministic answer" })).toBeVisible();
         expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
+    });
+});
+
+/**
+ * CHAOS-3927 P2: this repo has no real e2e mock path (CHAOS-3738 hard
+ * boundary — see README's "What this is, and what it is not"), so the
+ * closest thing to an end-to-end proof of the panel-hint flow is driving the
+ * REAL page component against a schema-shaped mock response, same as every
+ * test above. The fetch mock stands in for the server hop (which this test
+ * does not exercise); everything from the click through to the outgoing
+ * request body is the real component tree.
+ */
+describe("structure-needs panel hints (design brief §2.2)", () => {
+    it("renders the offers and sends the full accumulated batch in ONE re-ask", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureKind }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const user = await ask("How's the pipeline doing?");
+
+        const option = structureKind.structure_needs!.kind_options![1]!;
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: structureKind.result_id, receipt_id: option.receipt_id },
+        ]);
+        // The question travels UNCHANGED — the same rule the subject-choice
+        // flow already holds (never rewrite it to encode the pick).
+        expect(secondCallBody.question).toBe("How's the pipeline doing?");
+    });
+
+    it("surfaces a vetoed selection as a visible notice, reachable from every view", async () => {
+        respondWith({ result: structureVetoed });
+        const user = await ask("How many PRs merged?");
+
+        expect(
+            await screen.findByRole("alert", { name: "Structure confirmation" }),
+        ).toHaveTextContent("Some selections were not applied");
+
+        await user.click(await screen.findByRole("tab", { name: "Canonical result" }));
+
+        expect(screen.getByRole("alert", { name: "Structure confirmation" })).toBeInTheDocument();
+    });
+
+    /**
+     * codex round 4 (non-blocking coverage note): the component-level
+     * cross-view proof lives in StructureNeedsPanel.test.tsx's synthetic
+     * two-instance harness; this proves the SAME invariant through the
+     * real page component and its real view switch, not a stand-in.
+     */
+    it("keeps a selection made in one view visible, and confirmable, after switching views", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureKind }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const user = await ask("How's the pipeline doing?");
+        const option = structureKind.structure_needs!.kind_options![0]!;
+
+        // Selected in the default (deterministic) view.
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        await user.click(await screen.findByRole("tab", { name: "Canonical result" }));
+
+        // Visible, without re-selecting, in the raw view's own instance.
+        expect(
+            screen.getByRole("button", { name: `Unselect ${option.label}` }),
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: structureKind.result_id, receipt_id: option.receipt_id },
+        ]);
     });
 });
 

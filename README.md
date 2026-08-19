@@ -373,6 +373,52 @@ per-receipt disposition on the wire this check becomes redundant, and it stays:
 defense in depth on a measurement instrument is not dead code, and a future pin
 bump should not delete it as such.
 
+## Structure hints: the pivot-intent panel (CHAOS-3927 P2)
+
+The pivot-intent design brief (dev-health `.remember/pivot-intent-design-brief.md`,
+DESIGN-FINAL) names ask-dev the panel surface of record (DP6(c)) for a new
+disclosure block, `structure_needs`: when ACR cannot even settle which census
+to run, it can name WHICH intent-frame members are missing (kind, anchor,
+handle, window) and offer typed, receipt-bound completions for each, instead
+of a dead-end refusal. `StructureNeedsPanel` renders exactly those offers,
+`StructureConfirmationNotice` renders the `confirmed_structure` echo
+(including vetoed selections — the silent-drop closure for structure, day
+one, unlike the subject-receipt path above). Both extend the disambiguation
+flow's own rules verbatim: receipts only, never re-ranked, never invented,
+free text never becomes a discriminator.
+
+**PENDING-P1.** `structure_needs` does not exist on the pinned acr contract —
+P1 (the acr-side substrate, CHAOS-3927/CHAOS-3900) is mid-build on a separate
+branch, not yet merged to acr `main`, so there is nothing to sync via
+`scripts/sync-acr-contracts.mjs` yet. This slice is built against
+schema-derived fixtures instead: `src/lib/pivot/structure-contracts.ts`
+hand-mirrors the P1 lane's own committed Go types and JSON Schema `$defs`
+field-for-field (paths and commit cited in that file's header), and
+`src/lib/pivot/structure-needs.pending-p1.schema.json` is a staging copy of
+the relevant `$defs`, used only to validate this repo's own fixtures
+(`src/test/fixtures/structure-needs.ts`) — never a real ACR response.
+Neither file lives under `src/contracts/` and neither is touched by the sync
+script or its drift check.
+
+**The integration seam** is one function: `buildInvestigationRequest` in
+`src/lib/acr/client.ts` accepts the four new `prior_*_receipts` fields but
+attaches them to the outbound wire object **only when non-empty**. Since ACR
+never emits `structure_needs` today, `StructureNeedsPanel` can never produce
+a selection in real use, so these arrays are always empty and the wire
+payload this function builds is byte-identical to before this change —
+proven in `client.test.ts`. Once P1 (+ CHAOS-3900 W1, window) merge to acr
+`main` and this repo's pin bumps past that merge, the regenerated
+`InvestigationRequest`/`InvestigationResult` types will declare these fields
+themselves; `structure-contracts.ts`'s header ("THE SEAM") lists the small,
+mechanical set of import changes that migration is — no other file changes.
+
+Testing note: this repo has no real e2e mock path (see "What this is, and
+what it is not" above), so the closest thing to an end-to-end proof of the
+panel-hint flow is `src/app/page.test.tsx`'s `structure-needs panel hints`
+suite — the real page component driven against a schema-shaped mock `fetch`
+response, same discipline the clarification flow's own page tests already
+use.
+
 ## Enrichment (M3, not yet wired live)
 
 `src/lib/enrichment/` holds the pieces the enriched view will sit on. The tab

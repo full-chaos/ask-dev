@@ -7,7 +7,11 @@ import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { boundedUpstreamCode, boundedUpstreamRequestId } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
-import type { InvestigationRequest, InvestigationResult } from "@/lib/contracts";
+import type {
+    BoundStructureReceipt,
+    InvestigationRequest,
+    PivotAwareInvestigationResult,
+} from "@/lib/contracts";
 
 /**
  * Server-only client for ACR's Context Fabric investigation API.
@@ -67,6 +71,12 @@ export type BoundReceipt = {
 export type InvestigationOptions = {
     readonly question: string;
     readonly priorSubjectReceipts?: readonly BoundReceipt[] | undefined;
+    // CHAOS-3927 P2 (design brief §2.1/§2.2). See buildInvestigationRequest's
+    // own comment for why these do not yet reach the wire.
+    readonly priorKindReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly signal?: AbortSignal;
 };
 
@@ -81,10 +91,30 @@ function requestId(): string {
  */
 /** The contract's own bound on `prior_subject_receipts`. */
 const MAX_PRIOR_SUBJECT_RECEIPTS = 20;
+/** The contract's own bound on every `prior_*_receipts` structure field (§2.1). */
+const MAX_STRUCTURE_RECEIPTS = 20;
+
+/** Deduplicates by `(result_id, receipt_id)` and caps at `limit`, matching the contract's `uniqueItems`/`maxItems`. */
+function dedupeAndCap<T extends BoundStructureReceipt>(
+    receipts: readonly T[],
+    limit: number,
+): readonly T[] {
+    return [
+        ...new Map(
+            receipts.map((receipt) => [`${receipt.result_id}|${receipt.receipt_id}`, receipt]),
+        ).values(),
+    ].slice(0, limit);
+}
 
 export function buildInvestigationRequest(
     question: string,
     priorSubjectReceipts: readonly BoundReceipt[] = [],
+    structureReceipts: {
+        readonly priorKindReceipts?: readonly BoundStructureReceipt[] | undefined;
+        readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
+        readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
+        readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
+    } = {},
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
@@ -94,16 +124,61 @@ export function buildInvestigationRequest(
     // as a union of twenty-one fixed-length tuple types, which no runtime array
     // can satisfy structurally. The slice above is what actually enforces the
     // bound, and the request is schema-validated before it is sent.
-    const receipts = [
-        ...new Map(
-            priorSubjectReceipts.map((receipt) => [
-                `${receipt.result_id}|${receipt.receipt_id}`,
-                receipt,
-            ]),
-        ).values(),
-    ].slice(0, MAX_PRIOR_SUBJECT_RECEIPTS) as NonNullable<
+    const receipts = dedupeAndCap(priorSubjectReceipts, MAX_PRIOR_SUBJECT_RECEIPTS) as NonNullable<
         InvestigationRequest["prior_subject_receipts"]
     >;
+
+    // ============================== THE SEAM ==============================
+    // CHAOS-3927 P2 (design brief §2.1's four `prior_*_receipts` structure
+    // fields). These do NOT exist on `InvestigationRequest` (generated from
+    // the pinned acr commit, which predates P1 entirely — see
+    // `@/lib/pivot/structure-contracts`'s header) or on the pinned request
+    // JSON Schema (`additionalProperties: false`), so attaching them
+    // unconditionally would fail THIS function's own pre-send
+    // `validateContract` call below, today, for every request.
+    //
+    // Attaching them ONLY WHEN NON-EMPTY is what makes this safe rather than
+    // merely deferred: today, ACR never emits `structure_needs` (P1 hasn't
+    // landed acr-side), so `StructureNeedsPanel` can never produce a
+    // selection, so every one of these four arrays is always empty in real
+    // use, so the conditional spread below NEVER adds a key, so the wire
+    // payload this function builds is byte-identical to before this change.
+    // Once P1 (+ W1) land and the ask-dev contract pin bumps past that merge,
+    // the regenerated `InvestigationRequest` will declare these fields
+    // itself and `validateContract` will accept them — nothing else in this
+    // function needs to change; only `InvestigationRequestWithStructure`'s
+    // widening (and the `satisfies` clause below) is deleted, per
+    // `@/lib/pivot/structure-contracts`'s own "THE SEAM" note.
+    // ========================================================================
+    const structureFields: Partial<
+        Record<
+            | "prior_kind_receipts"
+            | "prior_anchor_receipts"
+            | "prior_handle_receipts"
+            | "prior_window_receipts",
+            readonly BoundStructureReceipt[]
+        >
+    > = {};
+    const kindReceipts = dedupeAndCap(
+        structureReceipts.priorKindReceipts ?? [],
+        MAX_STRUCTURE_RECEIPTS,
+    );
+    if (kindReceipts.length > 0) structureFields.prior_kind_receipts = kindReceipts;
+    const anchorReceipts = dedupeAndCap(
+        structureReceipts.priorAnchorReceipts ?? [],
+        MAX_STRUCTURE_RECEIPTS,
+    );
+    if (anchorReceipts.length > 0) structureFields.prior_anchor_receipts = anchorReceipts;
+    const handleReceipts = dedupeAndCap(
+        structureReceipts.priorHandleReceipts ?? [],
+        MAX_STRUCTURE_RECEIPTS,
+    );
+    if (handleReceipts.length > 0) structureFields.prior_handle_receipts = handleReceipts;
+    const windowReceipts = dedupeAndCap(
+        structureReceipts.priorWindowReceipts ?? [],
+        MAX_STRUCTURE_RECEIPTS,
+    );
+    if (windowReceipts.length > 0) structureFields.prior_window_receipts = windowReceipts;
 
     return {
         schema_version: "context_fabric_investigation_request.v1",
@@ -111,6 +186,7 @@ export function buildInvestigationRequest(
         question,
         conversation: [],
         prior_subject_receipts: receipts,
+        ...structureFields,
         time_context: { axis: "current" },
         options: {
             max_subject_candidates: 10,
@@ -268,8 +344,17 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
 export async function investigate(
     config: AcrRuntimeConfig,
     options: InvestigationOptions,
-): Promise<InvestigationResult> {
-    const request = buildInvestigationRequest(options.question, options.priorSubjectReceipts ?? []);
+): Promise<PivotAwareInvestigationResult> {
+    const request = buildInvestigationRequest(
+        options.question,
+        options.priorSubjectReceipts ?? [],
+        {
+            priorKindReceipts: options.priorKindReceipts,
+            priorAnchorReceipts: options.priorAnchorReceipts,
+            priorHandleReceipts: options.priorHandleReceipts,
+            priorWindowReceipts: options.priorWindowReceipts,
+        },
+    );
     const body = JSON.stringify(request);
 
     // The request is validated against the pinned schema BEFORE it is sent, so
@@ -388,5 +473,11 @@ export async function investigate(
         });
     }
 
-    return payload as InvestigationResult;
+    // The cast is honest: `validation` above proved `payload` satisfies the
+    // PINNED result schema, which is a STRICT SUBSET of `PivotAwareResult`
+    // (every P1(+W1) field is optional-only-widening — see
+    // `@/lib/pivot/structure-contracts`). Nothing here claims the payload
+    // actually carries `structure_needs`; it never will until P1 lands and
+    // the pin bumps, per that file's "THE SEAM".
+    return payload as PivotAwareInvestigationResult;
 }
