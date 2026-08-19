@@ -117,6 +117,75 @@ describe("buildInvestigationRequest", () => {
             surface: "workbench",
         });
     });
+
+    /**
+     * CHAOS-3927 P2, "THE SEAM" (@/lib/pivot/structure-contracts.ts). The
+     * pinned request schema predates P1 and has additionalProperties:false,
+     * so a request that always attached these fields would fail its OWN
+     * pre-send validation today. Proven here: build with every structure
+     * field EMPTY (real ACR never offers structure_needs yet, so this is
+     * every real request today) and the wire object carries none of the
+     * four new keys at all — not even as empty arrays.
+     */
+    describe("structure receipts (§2.1) do not reach the wire until there is something to send", () => {
+        it("omits every prior_*_receipts structure key when nothing was selected", () => {
+            const request = buildInvestigationRequest("q");
+
+            expect(request).not.toHaveProperty("prior_kind_receipts");
+            expect(request).not.toHaveProperty("prior_anchor_receipts");
+            expect(request).not.toHaveProperty("prior_handle_receipts");
+            expect(request).not.toHaveProperty("prior_window_receipts");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("omits the keys even when called with explicit empty arrays", () => {
+            const request = buildInvestigationRequest("q", [], {
+                priorKindReceipts: [],
+                priorAnchorReceipts: [],
+                priorHandleReceipts: [],
+                priorWindowReceipts: [],
+            });
+
+            expect(request).not.toHaveProperty("prior_kind_receipts");
+            expect(request).not.toHaveProperty("prior_anchor_receipts");
+            expect(request).not.toHaveProperty("prior_handle_receipts");
+            expect(request).not.toHaveProperty("prior_window_receipts");
+        });
+
+        /**
+         * Proves the SHAPE the seam produces once something IS selected —
+         * this is what activates unconditionally the moment the pin bumps
+         * past P1 and the pinned schema legalizes these keys; today this
+         * assertion is about the function's own output shape, not about
+         * what a real request ever contains (see the two tests above).
+         */
+        it("carries every selected member's receipts, deduplicated and capped, when non-empty", () => {
+            const kindReceipt = {
+                result_id: "result_structure_0001",
+                receipt_id: "kindr_pull_request_0001",
+            };
+            const many = Array.from({ length: 25 }, (_, index) => ({
+                result_id: "result_structure_0001",
+                receipt_id: `ancr_${String(index).padStart(4, "0")}`,
+            }));
+
+            const request = buildInvestigationRequest("q", [], {
+                priorKindReceipts: [kindReceipt, { ...kindReceipt }],
+                priorAnchorReceipts: many,
+            }) as unknown as {
+                readonly prior_kind_receipts?: readonly unknown[];
+                readonly prior_anchor_receipts?: readonly unknown[];
+            };
+
+            expect(request.prior_kind_receipts).toEqual([kindReceipt]);
+            expect(request.prior_anchor_receipts).toHaveLength(20);
+            expect(request).not.toHaveProperty("prior_handle_receipts");
+            expect(request).not.toHaveProperty("prior_window_receipts");
+        });
+    });
 });
 
 describe("investigate — upstream text never reaches the caller", () => {

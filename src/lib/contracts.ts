@@ -24,6 +24,52 @@ export type { ACRContextFabricInvestigationRequestV1 as InvestigationRequest } f
 
 export type { ACRErrorV1 as AcrError } from "@/contracts/generated/error";
 
+/**
+ * CHAOS-3927 P2 (pivot-intent design brief §2.1/§2.3). PENDING-P1: these
+ * come from the hand-mirrored `@/lib/pivot/structure-contracts`, not from a
+ * generated module, because the pinned acr commit predates P1/W1 entirely.
+ * See that file's header ("THE SEAM") for the one-time migration once the
+ * pin bumps past P1's acr merge — every other file imports these names from
+ * here, never from `@/lib/pivot/structure-contracts` directly, so that
+ * migration touches this block only.
+ */
+export type {
+    AcceptedGrammar,
+    AnchorOption,
+    BoundStructureReceipt,
+    ConfirmedStructureEntry,
+    HandleOption,
+    KindOption,
+    RelativeWindowID,
+    StructureAwareRequest,
+    StructureAwareResult,
+    StructureDisposition,
+    StructureNeedKind,
+    StructureNeeds,
+    StructureOfferSnapshotEntry,
+    StructureOfferSource,
+    StructureProvenance,
+    StructureSource,
+    StructureSubjectKind,
+    WindowClarification,
+    WindowOption,
+} from "@/lib/pivot/structure-contracts";
+export {
+    STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER,
+    STRUCTURE_RECEIPT_PREFIX,
+} from "@/lib/pivot/structure-contracts";
+
+/**
+ * The result shape every P2 component actually renders: the generated
+ * `InvestigationResult` widened with the P1(+W1) blocks. Once the pin bumps
+ * past P1 this collapses to plain `InvestigationResult` (see the seam note
+ * above).
+ */
+export type PivotAwareInvestigationResult =
+    import("@/lib/pivot/structure-contracts").StructureAwareResult<
+        import("@/contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1
+    >;
+
 /** One entry of `coverage.sources`; the contract declares it inline. */
 export type CoverageSource =
     import("@/contracts/generated/investigation-result").Coverage["sources"][number];

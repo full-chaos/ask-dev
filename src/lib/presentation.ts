@@ -6,7 +6,12 @@
  * the service said (CHAOS-3738 boundary). The raw contract term is always shown
  * alongside the tone, so a reader can see the vocabulary, not just the color.
  */
-import type { CoverageState, InvestigationStatus, SubjectCandidateState } from "@/lib/contracts";
+import type {
+    CoverageState,
+    InvestigationStatus,
+    StructureDisposition,
+    SubjectCandidateState,
+} from "@/lib/contracts";
 
 export type Tone = "ok" | "warn" | "bad" | "neutral";
 
@@ -54,6 +59,23 @@ export function candidateStateTone(state: SubjectCandidateState): Tone {
         case "ambiguous":
             return "warn";
         case "unresolved":
+            return "bad";
+    }
+}
+
+/**
+ * Tone for one `ConfirmedStructureEntry.disposition` (CHAOS-3927 P2, design
+ * brief §2.1's silent-drop closure). Exhaustive over the closed enum: a
+ * disposition value the raw contract term switch does not know about is a
+ * compile error here rather than a value that silently reads as "applied".
+ */
+export function structureDispositionTone(disposition: StructureDisposition): Tone {
+    switch (disposition) {
+        case "applied":
+            return "ok";
+        case "vetoed_unresolved":
+        case "vetoed_conflict":
+        case "vetoed_stale":
             return "bad";
     }
 }

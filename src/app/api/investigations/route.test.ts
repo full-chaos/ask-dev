@@ -235,6 +235,102 @@ describe("a malformed receipt rejects the request instead of being filtered out"
     });
 });
 
+/**
+ * CHAOS-3927 P2: the four structure-receipt fields extend the SAME
+ * malformed-rejects-the-whole-request discipline as priorSubjectReceipts,
+ * plus one more check subject receipts don't need — the closed
+ * kindr_/ancr_/handr_/winr_ namespace per field (design brief §2.1: "none
+ * of the four ... may ever accept another's namespace").
+ */
+describe("structure receipts are validated with the same discipline as subject receipts", () => {
+    const STRUCTURE_FIELDS = [
+        ["priorKindReceipts", "kind"],
+        ["priorAnchorReceipts", "repository/project/team"],
+        ["priorHandleReceipts", "handle"],
+        ["priorWindowReceipts", "time window"],
+    ] as const;
+
+    for (const [field, label] of STRUCTURE_FIELDS) {
+        it(`rejects a malformed ${field} entry with a 400`, async () => {
+            const response = await POST(
+                post(
+                    JSON.stringify({
+                        question: "status?",
+                        [field]: [{ result_id: "result_12345678" }],
+                    }),
+                ),
+            );
+
+            expect(response.status).toBe(400);
+            const failure = await failureOf(response);
+            expect(failure.code).toBe("acr_rejected_request");
+            expect(failure.message).toContain(label);
+        });
+
+        it(`rejects the whole request when only SOME ${field} entries are malformed`, async () => {
+            const namespaced = {
+                priorKindReceipts: "kindr_",
+                priorAnchorReceipts: "ancr_",
+                priorHandleReceipts: "handr_",
+                priorWindowReceipts: "winr_",
+            }[field];
+            const response = await POST(
+                post(
+                    JSON.stringify({
+                        question: "status?",
+                        [field]: [
+                            { result_id: "result_12345678", receipt_id: `${namespaced}12345678` },
+                            { result_id: "result_12345678" },
+                        ],
+                    }),
+                ),
+            );
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    }
+
+    /**
+     * The namespace check this field-set has and priorSubjectReceipts
+     * doesn't: a shape-valid receipt in the WRONG member's namespace is
+     * still malformed, per §2.1's closed-namespace rule.
+     */
+    it("rejects a kind receipt namespaced for anchor confirmation", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    priorKindReceipts: [
+                        { result_id: "result_12345678", receipt_id: "ancr_1234567890123" },
+                    ],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect((await failureOf(response)).code).toBe("acr_rejected_request");
+    });
+
+    it("accepts a correctly-namespaced structure receipt (past validation)", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    priorKindReceipts: [
+                        { result_id: "result_12345678", receipt_id: "kindr_1234567890123" },
+                    ],
+                }),
+            ),
+        );
+
+        // Past receipt validation: it fails later for missing config, not
+        // for the receipt shape.
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+});
+
 describe("configuration failures are reported as configuration failures", () => {
     it("reports an unconfigured server hop rather than blaming ACR", async () => {
         vi.stubEnv("ACR_API_ORIGIN", "");
