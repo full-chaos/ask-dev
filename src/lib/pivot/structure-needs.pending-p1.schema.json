@@ -81,7 +81,13 @@
                 "label": { "type": "string", "minLength": 1, "maxLength": 200 },
                 "kind": { "$ref": "#/$defs/SubjectKind" },
                 "canonical_id": { "type": "string", "minLength": 1, "maxLength": 256 },
-                "claimant_key": { "type": "string", "minLength": 1, "maxLength": 256 },
+                "matched_term_hash": {
+                    "description": "CONTRACT UPDATE (team-lead, post-P1.E): replaces the removed claimant_key. Opaque hex digest, never displayed. NOT YET landed on chaos-pivot-p1 as of this edit -- bound taken from the team-lead's description, re-verify once committed.",
+                    "type": "string",
+                    "pattern": "^[0-9a-f]+$",
+                    "minLength": 1,
+                    "maxLength": 256
+                },
                 "offer_source": { "$ref": "#/$defs/StructureOfferSource" },
                 "prior_version_id": { "type": "string", "minLength": 1, "maxLength": 256 },
                 "prior_entry_id": { "type": "string", "minLength": 1, "maxLength": 256 }
@@ -92,7 +98,7 @@
                 "label",
                 "kind",
                 "canonical_id",
-                "claimant_key",
+                "matched_term_hash",
                 "offer_source"
             ]
         },

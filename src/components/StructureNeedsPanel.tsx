@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { Badge } from "@/components/Badge";
 import type {
@@ -258,6 +258,13 @@ export function StructureNeedsPanel({
     onConfirm,
     pending = false,
 }: StructureNeedsPanelProps) {
+    // Portability (team-lead): the panel must be safe to mount more than
+    // once at a time (a future conversational surface can show this offer
+    // set across several message turns), so every heading id is instance-
+    // scoped via useId() rather than the hardcoded string ids an earlier
+    // version used — those broke `aria-labelledby` the moment two
+    // instances shared the DOM.
+    const idPrefix = useId();
     // codex round 2: a rejected click must not look like nothing happened —
     // a click that silently does nothing is indistinguishable from the UI
     // being broken. Surfaced, not just logged. This is the only state this
@@ -293,8 +300,8 @@ export function StructureNeedsPanel({
     const windowOptions = structureNeeds.window_options ?? [];
 
     return (
-        <section aria-labelledby="structure-needs-title" className="panel">
-            <h2 className="panel__title" id="structure-needs-title">
+        <section aria-labelledby={`${idPrefix}-needs-title`} className="panel">
+            <h2 className="panel__title" id={`${idPrefix}-needs-title`}>
                 More structure would narrow this
             </h2>
             <p className="record__meta">
@@ -305,8 +312,8 @@ export function StructureNeedsPanel({
             </p>
 
             {structureNeeds.missing.includes("expected_kind") ? (
-                <section aria-labelledby="structure-kind-title">
-                    <h3 className="panel__title" id="structure-kind-title">
+                <section aria-labelledby={`${idPrefix}-kind-title`}>
+                    <h3 className="panel__title" id={`${idPrefix}-kind-title`}>
                         {PROMPT_TITLE.expected_kind}
                     </h3>
                     {kindOptions.length === 0 ? (
@@ -332,8 +339,8 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("subject_anchor") ? (
-                <section aria-labelledby="structure-anchor-title">
-                    <h3 className="panel__title" id="structure-anchor-title">
+                <section aria-labelledby={`${idPrefix}-anchor-title`}>
+                    <h3 className="panel__title" id={`${idPrefix}-anchor-title`}>
                         {PROMPT_TITLE.subject_anchor}
                     </h3>
                     {anchorOptions.length === 0 ? (
@@ -359,8 +366,8 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("subject_handle") ? (
-                <section aria-labelledby="structure-handle-title">
-                    <h3 className="panel__title" id="structure-handle-title">
+                <section aria-labelledby={`${idPrefix}-handle-title`}>
+                    <h3 className="panel__title" id={`${idPrefix}-handle-title`}>
                         {PROMPT_TITLE.subject_handle}
                     </h3>
                     {handleOptions.length === 0 ? (
@@ -386,8 +393,8 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("window") ? (
-                <section aria-labelledby="structure-window-title">
-                    <h3 className="panel__title" id="structure-window-title">
+                <section aria-labelledby={`${idPrefix}-window-title`}>
+                    <h3 className="panel__title" id={`${idPrefix}-window-title`}>
                         {PROMPT_TITLE.window}
                     </h3>
                     {windowOptions.length === 0 ? (

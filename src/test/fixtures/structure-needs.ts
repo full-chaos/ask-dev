@@ -59,7 +59,7 @@ const ANCHOR_OPTIONS: readonly AnchorOption[] = [
         label: "full-chaos/atlas",
         kind: "repository",
         canonical_id: "repository:repo_atlas",
-        claimant_key: "claimant_repo_atlas_0001",
+        matched_term_hash: "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9",
         offer_source: "engine",
     },
 ];

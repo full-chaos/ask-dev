@@ -318,4 +318,30 @@ describe("StructureNeedsPanel", () => {
             expected_kind: { result_id: kindScenario.result_id, receipt_id: option.receipt_id },
         });
     });
+
+    /**
+     * Portability (team-lead): a future conversational surface may mount
+     * this panel more than once at a time (e.g. one per chat-message
+     * turn), so `aria-labelledby` must not collide across instances — two
+     * hardcoded ids sharing a DOM tree silently break the association
+     * (the browser resolves `aria-labelledby` to the FIRST matching id).
+     * `useId()` fixes this; this proves it directly rather than relying on
+     * the cross-view test above to catch it incidentally.
+     */
+    it("gives two simultaneous instances distinct heading ids (no aria-labelledby collision)", () => {
+        render(
+            <Harness
+                onConfirm={vi.fn()}
+                resultId={kindScenario.result_id}
+                structureNeeds={kindScenario.structure_needs!}
+                twoInstances
+            />,
+        );
+
+        const [headingA, headingB] = screen.getAllByRole("heading", {
+            name: "More structure would narrow this",
+        });
+        expect(headingA!.id).not.toBe("");
+        expect(headingA!.id).not.toBe(headingB!.id);
+    });
 });

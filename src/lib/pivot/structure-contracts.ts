@@ -125,10 +125,25 @@ export type KindOption = StructureOfferProvenanceFields & {
 
 /**
  * One server-offered unique-claimant anchor candidate, confirmable via an
- * `ancr_` receipt. `claimant_key` is the identity-registry v2 key
- * (org-scoped, opaque, no display text — the 3859 sink discipline applied
- * to offers) and is never shown; it exists only to round-trip in the
- * receipt.
+ * `ancr_` receipt.
+ *
+ * CONTRACT UPDATE (team-lead, post-P1.E): `ClaimantKey` — an "identity-
+ * registry v2 key" this comment originally described — is REMOVED. It
+ * asserted a mechanism that does not exist (acr commit `5aa43928`, "P1.E
+ * finding 1: drop AnchorOption.ClaimantKey"). `matched_term_hash` REPLACES
+ * it: an opaque hex digest carrying the same provenance role (redemption-
+ * time uniqueness re-verification) without the fictitious registry-key
+ * claim. Same discipline as the field it replaces — org-scoped, opaque, no
+ * display text (the 3859 sink discipline applied to offers), never shown,
+ * exists only to round-trip into the receipt unread.
+ *
+ * As of this edit the field has NOT yet landed on the chaos-pivot-p1
+ * branch (verified: `ContextFabricAnchorOption` in
+ * `internal/contracts/v1/context_fabric_structure_types.go` still ends at
+ * `PriorEntryID`) — shape taken from the team-lead's description
+ * ("opaque hex digest"), not read from a committed schema. Re-verify the
+ * exact bound/pattern against the real commit once it lands (see this
+ * file's header, "THE SEAM").
  */
 export type AnchorOption = StructureOfferProvenanceFields & {
     readonly receipt_id: string;
@@ -136,7 +151,7 @@ export type AnchorOption = StructureOfferProvenanceFields & {
     readonly label: string;
     readonly kind: StructureSubjectKind;
     readonly canonical_id: string;
-    readonly claimant_key: string;
+    readonly matched_term_hash: string;
 };
 
 /**

@@ -14,18 +14,12 @@ import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
-import type {
-    BoundStructureReceipt,
-    PivotAwareInvestigationResult,
-    StructureNeedKind,
-    SubjectRef,
-} from "@/lib/contracts";
+import type { PivotAwareInvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
-    EMPTY_STRUCTURE_SELECTION_BATCH,
     buildStructureReceiptFields,
-    toggleStructureOffer,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
+import { useStructureSelections } from "@/lib/use-structure-selections";
 
 /**
  * Context Fabric Workbench (CHAOS-3738).
@@ -62,16 +56,16 @@ export default function WorkbenchPage() {
     // be checked against it. Cleared on a fresh question: a choice belongs to
     // one re-ask, not to the session.
     const [chosenSubject, setChosenSubject] = useState<SubjectRef | undefined>(undefined);
-    // CHAOS-3927 P2, codex round 3: owned HERE, not inside StructureNeedsPanel,
-    // because the panel is rendered as two SEPARATE instances (raw view,
-    // deterministic view) and a tester switching between them mid-selection
-    // must not lose their picks — the same "reachable from every view" rule
-    // ClarificationPanel already holds for the subject choice. Reset on every
-    // fresh ask(), same as chosenSubject: a selection belongs to one result,
-    // not to the session.
-    const [structureBatch, setStructureBatch] = useState<StructureSelectionBatch>(
-        EMPTY_STRUCTURE_SELECTION_BATCH,
-    );
+    // CHAOS-3927 P2, codex round 3 + portability (team-lead): owned by a
+    // portable hook, not inline page state — `useStructureSelections` is
+    // the ENTIRE dependency a future conversational surface needs to mount
+    // StructureNeedsPanel under a chat turn. Shared across BOTH render
+    // sites below so a pick made in one view survives a switch to the
+    // other (the same "reachable from every view" rule ClarificationPanel
+    // already holds for the subject choice). Reset on every fresh ask(),
+    // same as chosenSubject: a selection belongs to one result, not to the
+    // session.
+    const structureSelections = useStructureSelections();
 
     /**
      * Asks, optionally carrying a subject the tester chose from a previous
@@ -87,11 +81,11 @@ export default function WorkbenchPage() {
         question: string,
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
-        structureSelections?: StructureSelectionBatch,
+        structureSelectionsToSend?: StructureSelectionBatch,
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
-        setStructureBatch(EMPTY_STRUCTURE_SELECTION_BATCH);
+        structureSelections.reset();
         setOutcome({ kind: "pending" });
         // CHAOS-3927 P2: accumulate-and-re-ask-ONCE (design brief §2.2) — every
         // member picked in one StructureNeedsPanel session travels in this
@@ -101,9 +95,9 @@ export default function WorkbenchPage() {
         // yet, so this batch is always empty in real use today (see
         // `src/lib/pivot/structure-contracts.ts`'s "THE SEAM").
         const structureReceiptFields =
-            structureSelections === undefined
+            structureSelectionsToSend === undefined
                 ? {}
-                : buildStructureReceiptFields(structureSelections);
+                : buildStructureReceiptFields(structureSelectionsToSend);
         try {
             const response = await fetch("/api/investigations", {
                 method: "POST",
@@ -148,13 +142,6 @@ export default function WorkbenchPage() {
     function chooseCandidate(choice: ClarificationChoice) {
         if (outcome.kind !== "answered") return;
         void ask(askedQuestion, [choice], subjectForReceipt(outcome.result, choice.receipt_id));
-    }
-
-    // CHAOS-3927 P2: records one member's pick (or withdraws it, on a
-    // repeat click of the same offer) in the SHARED batch — shared so a
-    // pick made in one view survives a switch to the other.
-    function toggleStructureSelection(member: StructureNeedKind, receipt: BoundStructureReceipt) {
-        setStructureBatch((current) => toggleStructureOffer(current, member, receipt));
     }
 
     // CHAOS-3927 P2: fires the single re-ask carrying every structure member
@@ -245,9 +232,9 @@ export default function WorkbenchPage() {
                                 // switch to the deterministic view.
                                 <StructureNeedsPanel
                                     key={outcome.result.result_id}
-                                    batch={structureBatch}
+                                    batch={structureSelections.batch}
                                     onConfirm={chooseStructure}
-                                    onToggle={toggleStructureSelection}
+                                    onToggle={structureSelections.toggle}
                                     resultId={outcome.result.result_id}
                                     structureNeeds={outcome.result.structure_needs}
                                 />
@@ -264,9 +251,9 @@ export default function WorkbenchPage() {
                         <DeterministicAnswerView
                             onChooseCandidate={chooseCandidate}
                             onConfirmStructure={chooseStructure}
-                            onToggleStructure={toggleStructureSelection}
+                            onToggleStructure={structureSelections.toggle}
                             result={outcome.result}
-                            structureBatch={structureBatch}
+                            structureBatch={structureSelections.batch}
                         />
                     )}
                 </>
