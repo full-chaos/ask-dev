@@ -130,6 +130,49 @@ describe("structure-needs panel hints (design brief §2.2)", () => {
 
         expect(screen.getByRole("alert", { name: "Structure confirmation" })).toBeInTheDocument();
     });
+
+    /**
+     * codex round 4 (non-blocking coverage note): the component-level
+     * cross-view proof lives in StructureNeedsPanel.test.tsx's synthetic
+     * two-instance harness; this proves the SAME invariant through the
+     * real page component and its real view switch, not a stand-in.
+     */
+    it("keeps a selection made in one view visible, and confirmable, after switching views", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureKind }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const user = await ask("How's the pipeline doing?");
+        const option = structureKind.structure_needs!.kind_options![0]!;
+
+        // Selected in the default (deterministic) view.
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        await user.click(await screen.findByRole("tab", { name: "Canonical result" }));
+
+        // Visible, without re-selecting, in the raw view's own instance.
+        expect(
+            screen.getByRole("button", { name: `Unselect ${option.label}` }),
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: structureKind.result_id, receipt_id: option.receipt_id },
+        ]);
+    });
 });
 
 describe("the enrichment tab stays closed", () => {
