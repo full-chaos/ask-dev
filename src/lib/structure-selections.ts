@@ -49,6 +49,25 @@ export function structureSelectionCount(batch: StructureSelectionBatch): number 
 }
 
 /**
+ * Pure reducer: select-or-replace, or deselect if the SAME offer is clicked
+ * again. The one place this toggle semantic lives, so every caller (the
+ * panel rendered in the raw view, the one rendered in the deterministic
+ * view — codex round 3: these are two SEPARATE component instances, and
+ * batch storage lives in the shared page state precisely so a tester
+ * switching views mid-selection does not lose their picks) applies it
+ * identically.
+ */
+export function toggleStructureOffer(
+    batch: StructureSelectionBatch,
+    member: StructureNeedKind,
+    receipt: BoundStructureReceipt,
+): StructureSelectionBatch {
+    return batch[member]?.receipt_id === receipt.receipt_id
+        ? deselectStructureOffer(batch, member)
+        : selectStructureOffer(batch, member, receipt);
+}
+
+/**
  * The receipt-id namespace pins each selection to the member it was picked
  * for — a `kindr_` id can only ever have come from a `KindOption`, and so
  * on. Defense in depth: `selectStructureOffer` is only ever called from a

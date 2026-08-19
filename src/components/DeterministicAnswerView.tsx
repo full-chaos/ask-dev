@@ -8,8 +8,16 @@ import { StructureConfirmationNotice } from "@/components/StructureConfirmationN
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { choiceDisposition } from "@/lib/clarification";
-import type { PivotAwareInvestigationResult, SubjectRef } from "@/lib/contracts";
-import type { StructureSelectionBatch } from "@/lib/structure-selections";
+import type {
+    BoundStructureReceipt,
+    PivotAwareInvestigationResult,
+    StructureNeedKind,
+    SubjectRef,
+} from "@/lib/contracts";
+import {
+    EMPTY_STRUCTURE_SELECTION_BATCH,
+    type StructureSelectionBatch,
+} from "@/lib/structure-selections";
 
 export type DeterministicAnswerViewProps = {
     readonly result: PivotAwareInvestigationResult;
@@ -17,6 +25,17 @@ export type DeterministicAnswerViewProps = {
     readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
     /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */
     readonly onConfirmStructure?: ((batch: StructureSelectionBatch) => void) | undefined;
+    /**
+     * The shared selection batch (codex round 3): owned by the caller, not
+     * this view, because the SAME StructureNeedsPanel offers are also
+     * rendered in the raw inspector view — a tester switching between them
+     * must not lose their picks. Defaults to empty for callers (this
+     * repo's other DeterministicAnswerView call sites) that never offer a
+     * re-ask and so have no batch to share.
+     */
+    readonly structureBatch?: StructureSelectionBatch | undefined;
+    readonly onToggleStructure?:
+        ((member: StructureNeedKind, receipt: BoundStructureReceipt) => void) | undefined;
     readonly pending?: boolean | undefined;
     /** The subject the tester chose, when this result came from a re-ask. */
     readonly chosenSubject?: SubjectRef | undefined;
@@ -40,6 +59,12 @@ export function DeterministicAnswerView({
     result,
     onChooseCandidate,
     onConfirmStructure,
+    structureBatch = EMPTY_STRUCTURE_SELECTION_BATCH,
+    // No-op default: harmless, because the offer buttons that would call it
+    // only render when onConfirmStructure is ALSO supplied (see
+    // StructureNeedsPanel's own onConfirm-gated rendering), and any caller
+    // wiring one without the other is a call-site bug, not a runtime path.
+    onToggleStructure = () => {},
     pending = false,
     chosenSubject,
 }: DeterministicAnswerViewProps) {
@@ -73,15 +98,16 @@ export function DeterministicAnswerView({
     // the boundary pins (never re-rank, never invent, receipts only).
     const structureNeedsPanel =
         result.structure_needs === undefined ? null : (
-            // Keyed by result_id (codex round 1): StructureNeedsPanel holds
-            // its accumulated selections in local state, and a re-ask that
-            // returns a NEW result must not let a stale selection from the
-            // PRIOR result's offers survive into it — the key forces a fresh
-            // component instance per result, the same fix React's own docs
-            // prescribe for "reset state when a prop changes".
+            // Keyed by result_id (codex round 1): resets the panel's own
+            // local (non-selection) UI state — e.g. a namespace-mismatch
+            // alert — per result. `batch`/`onToggle` are lifted to the
+            // caller (codex round 3), so the SELECTION itself survives a
+            // switch to the raw view's own instance of this panel.
             <StructureNeedsPanel
                 key={result.result_id}
+                batch={structureBatch}
                 onConfirm={onConfirmStructure}
+                onToggle={onToggleStructure}
                 pending={pending}
                 resultId={result.result_id}
                 structureNeeds={result.structure_needs}

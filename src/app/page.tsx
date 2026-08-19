@@ -14,9 +14,16 @@ import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
-import type { PivotAwareInvestigationResult, SubjectRef } from "@/lib/contracts";
+import type {
+    BoundStructureReceipt,
+    PivotAwareInvestigationResult,
+    StructureNeedKind,
+    SubjectRef,
+} from "@/lib/contracts";
 import {
+    EMPTY_STRUCTURE_SELECTION_BATCH,
     buildStructureReceiptFields,
+    toggleStructureOffer,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 
@@ -55,6 +62,16 @@ export default function WorkbenchPage() {
     // be checked against it. Cleared on a fresh question: a choice belongs to
     // one re-ask, not to the session.
     const [chosenSubject, setChosenSubject] = useState<SubjectRef | undefined>(undefined);
+    // CHAOS-3927 P2, codex round 3: owned HERE, not inside StructureNeedsPanel,
+    // because the panel is rendered as two SEPARATE instances (raw view,
+    // deterministic view) and a tester switching between them mid-selection
+    // must not lose their picks — the same "reachable from every view" rule
+    // ClarificationPanel already holds for the subject choice. Reset on every
+    // fresh ask(), same as chosenSubject: a selection belongs to one result,
+    // not to the session.
+    const [structureBatch, setStructureBatch] = useState<StructureSelectionBatch>(
+        EMPTY_STRUCTURE_SELECTION_BATCH,
+    );
 
     /**
      * Asks, optionally carrying a subject the tester chose from a previous
@@ -74,6 +91,7 @@ export default function WorkbenchPage() {
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
+        setStructureBatch(EMPTY_STRUCTURE_SELECTION_BATCH);
         setOutcome({ kind: "pending" });
         // CHAOS-3927 P2: accumulate-and-re-ask-ONCE (design brief §2.2) — every
         // member picked in one StructureNeedsPanel session travels in this
@@ -130,6 +148,13 @@ export default function WorkbenchPage() {
     function chooseCandidate(choice: ClarificationChoice) {
         if (outcome.kind !== "answered") return;
         void ask(askedQuestion, [choice], subjectForReceipt(outcome.result, choice.receipt_id));
+    }
+
+    // CHAOS-3927 P2: records one member's pick (or withdraws it, on a
+    // repeat click of the same offer) in the SHARED batch — shared so a
+    // pick made in one view survives a switch to the other.
+    function toggleStructureSelection(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        setStructureBatch((current) => toggleStructureOffer(current, member, receipt));
     }
 
     // CHAOS-3927 P2: fires the single re-ask carrying every structure member
@@ -214,10 +239,15 @@ export default function WorkbenchPage() {
                             />
                             {outcome.result.structure_needs === undefined ? null : (
                                 // Keyed by result_id — see DeterministicAnswerView's
-                                // own comment on the same fix.
+                                // own comment on the same fix. `batch`/`onToggle`
+                                // are the SAME shared state DeterministicAnswerView's
+                                // own instance uses, so a pick here survives a
+                                // switch to the deterministic view.
                                 <StructureNeedsPanel
                                     key={outcome.result.result_id}
+                                    batch={structureBatch}
                                     onConfirm={chooseStructure}
+                                    onToggle={toggleStructureSelection}
                                     resultId={outcome.result.result_id}
                                     structureNeeds={outcome.result.structure_needs}
                                 />
@@ -234,7 +264,9 @@ export default function WorkbenchPage() {
                         <DeterministicAnswerView
                             onChooseCandidate={chooseCandidate}
                             onConfirmStructure={chooseStructure}
+                            onToggleStructure={toggleStructureSelection}
                             result={outcome.result}
+                            structureBatch={structureBatch}
                         />
                     )}
                 </>

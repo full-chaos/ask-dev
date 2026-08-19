@@ -1,8 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { useState } from "react";
+
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
+import type { BoundStructureReceipt, StructureNeedKind, StructureNeeds } from "@/lib/contracts";
+import {
+    EMPTY_STRUCTURE_SELECTION_BATCH,
+    toggleStructureOffer,
+    type StructureSelectionBatch,
+} from "@/lib/structure-selections";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 const kindScenario = structureMockScenarios().find((s) => s.id === "structure-kind")!.result;
@@ -13,10 +21,60 @@ const aggregateScenario = structureMockScenarios().find(
     (s) => s.id === "structure-aggregate-never-elicit",
 )!.result;
 
+/**
+ * `batch` is a CONTROLLED prop (codex round 3: lifted so a selection
+ * survives a switch between the two places this panel is rendered — see
+ * StructureNeedsPanel.tsx's own header comment). This harness plays the
+ * role page.tsx actually plays: it owns the batch and the toggle reducer,
+ * and — when `twoInstances` is set — renders TWO separate panel instances
+ * sharing that SAME state, scoped by `data-testid` so tests can address
+ * either one, proving the cross-view sharing this fix exists for.
+ */
+function Harness({
+    structureNeeds,
+    resultId,
+    onConfirm,
+    twoInstances = false,
+}: {
+    readonly structureNeeds: StructureNeeds;
+    readonly resultId: string;
+    readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
+    readonly twoInstances?: boolean;
+}) {
+    const [batch, setBatch] = useState<StructureSelectionBatch>(EMPTY_STRUCTURE_SELECTION_BATCH);
+    function onToggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        setBatch((current) => toggleStructureOffer(current, member, receipt));
+    }
+    const panel = (
+        <StructureNeedsPanel
+            batch={batch}
+            onConfirm={onConfirm}
+            onToggle={onToggle}
+            resultId={resultId}
+            structureNeeds={structureNeeds}
+        />
+    );
+    if (!twoInstances) return panel;
+    return (
+        <>
+            <div data-testid="instance-a">{panel}</div>
+            <div data-testid="instance-b">
+                <StructureNeedsPanel
+                    batch={batch}
+                    onConfirm={onConfirm}
+                    onToggle={onToggle}
+                    resultId={resultId}
+                    structureNeeds={structureNeeds}
+                />
+            </div>
+        </>
+    );
+}
+
 describe("StructureNeedsPanel", () => {
     it("renders exactly the offers the result carries, in the result's own order", () => {
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={vi.fn()}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
@@ -35,7 +93,7 @@ describe("StructureNeedsPanel", () => {
 
     it("never offers anchor/handle for an aggregate-classed disclosure (NEVER-ELICIT, §1.3)", () => {
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={vi.fn()}
                 resultId={aggregateScenario.result_id}
                 structureNeeds={aggregateScenario.structure_needs!}
@@ -53,7 +111,7 @@ describe("StructureNeedsPanel", () => {
         const onConfirm = vi.fn();
         const user = userEvent.setup();
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={onConfirm}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
@@ -70,7 +128,7 @@ describe("StructureNeedsPanel", () => {
         const onConfirm = vi.fn();
         const user = userEvent.setup();
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={onConfirm}
                 resultId={anchorWindowScenario.result_id}
                 structureNeeds={anchorWindowScenario.structure_needs!}
@@ -100,7 +158,7 @@ describe("StructureNeedsPanel", () => {
         const onConfirm = vi.fn();
         const user = userEvent.setup();
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={onConfirm}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
@@ -119,7 +177,7 @@ describe("StructureNeedsPanel", () => {
 
     it("disables the confirm action until at least one selection is made", () => {
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={vi.fn()}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
@@ -131,9 +189,9 @@ describe("StructureNeedsPanel", () => {
         ).toBeDisabled();
     });
 
-    it("says it cannot re-ask when no onConfirm is supplied, and offers no confirm action", () => {
+    it("says it cannot re-ask when no onConfirm is supplied, and offers no select/confirm action", () => {
         render(
-            <StructureNeedsPanel
+            <Harness
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
             />,
@@ -143,6 +201,9 @@ describe("StructureNeedsPanel", () => {
         expect(
             screen.queryByRole("button", { name: "Ask again with these selections" }),
         ).toBeNull();
+        // Read-only mirrors ClarificationPanel's own CandidateRecord: no
+        // action affordance at all when the surface cannot act on it.
+        expect(screen.queryByRole("button", { name: /^Select / })).toBeNull();
     });
 
     /**
@@ -156,7 +217,7 @@ describe("StructureNeedsPanel", () => {
      */
     it("never renders a free-text-style 'supply it directly' affordance (receipts only, §2.2)", () => {
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={vi.fn()}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
@@ -189,7 +250,7 @@ describe("StructureNeedsPanel", () => {
             ],
         };
         render(
-            <StructureNeedsPanel
+            <Harness
                 onConfirm={onConfirm}
                 resultId={kindScenario.result_id}
                 structureNeeds={wrongNamespaceNeeds}
@@ -203,6 +264,7 @@ describe("StructureNeedsPanel", () => {
         );
 
         expect(consoleError).toHaveBeenCalled();
+        expect(onConfirm).not.toHaveBeenCalled();
         // codex round 2: a rejected click must not look like nothing
         // happened — it is surfaced as a visible alert, not left as a
         // silently-disabled confirm button with no explanation.
@@ -214,40 +276,46 @@ describe("StructureNeedsPanel", () => {
     });
 
     /**
-     * codex round 1, finding 2: without a `key`, React reuses this
-     * component's local state across a prop change, so a re-ask that
-     * returns a NEW result could carry a PRIOR result's selection forward.
-     * page.tsx/DeterministicAnswerView.tsx now key this component by
-     * `result_id` (React's own prescribed fix); this proves the component
-     * itself starts clean on remount, which is what that key relies on.
+     * codex round 3: `StructureNeedsPanel` is rendered as TWO separate
+     * component instances in the real app — one in the raw inspector view,
+     * one inside `DeterministicAnswerView` — and switching between them
+     * used to lose an in-progress selection, because the batch lived in
+     * each instance's own local state. `batch`/`onToggle` are now
+     * controlled props the caller shares across both instances; this
+     * harness plays that caller's role directly, proving a pick made in
+     * instance A is immediately visible — and confirmable — from instance B.
      */
-    it("starts with no selection on a fresh mount, even for a different result", async () => {
+    it("shares selections across two panel instances given the same batch (cross-view survival)", async () => {
+        const onConfirm = vi.fn();
         const user = userEvent.setup();
-        const { unmount } = render(
-            <StructureNeedsPanel
-                onConfirm={vi.fn()}
+        render(
+            <Harness
+                onConfirm={onConfirm}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
+                twoInstances
             />,
         );
+
         const option = kindScenario.structure_needs!.kind_options![0]!;
-        await user.click(screen.getByRole("button", { name: `Select ${option.label}` }));
-        expect(
-            screen.getByRole("button", { name: `Unselect ${option.label}` }),
-        ).toBeInTheDocument();
-        unmount();
+        const instanceA = within(screen.getByTestId("instance-a"));
+        const instanceB = within(screen.getByTestId("instance-b"));
 
-        const onConfirm = vi.fn();
-        render(
-            <StructureNeedsPanel
-                onConfirm={onConfirm}
-                resultId={anchorWindowScenario.result_id}
-                structureNeeds={anchorWindowScenario.structure_needs!}
-            />,
+        await user.click(instanceA.getByRole("button", { name: `Select ${option.label}` }));
+
+        // The pick made in A is visible in B without any re-selection.
+        expect(
+            instanceB.getByRole("button", { name: `Unselect ${option.label}` }),
+        ).toBeInTheDocument();
+
+        // And B's OWN confirm action carries it — proving the state, not
+        // just the label, is shared.
+        await user.click(
+            instanceB.getByRole("button", { name: "Ask again with these selections" }),
         );
 
-        expect(
-            screen.getByRole("button", { name: "Ask again with these selections" }),
-        ).toBeDisabled();
+        expect(onConfirm).toHaveBeenCalledWith({
+            expected_kind: { result_id: kindScenario.result_id, receipt_id: option.receipt_id },
+        });
     });
 });
