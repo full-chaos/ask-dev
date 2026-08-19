@@ -73,7 +73,14 @@ export function DeterministicAnswerView({
     // the boundary pins (never re-rank, never invent, receipts only).
     const structureNeedsPanel =
         result.structure_needs === undefined ? null : (
+            // Keyed by result_id (codex round 1): StructureNeedsPanel holds
+            // its accumulated selections in local state, and a re-ask that
+            // returns a NEW result must not let a stale selection from the
+            // PRIOR result's offers survive into it — the key forces a fresh
+            // component instance per result, the same fix React's own docs
+            // prescribe for "reset state when a prop changes".
             <StructureNeedsPanel
+                key={result.result_id}
                 onConfirm={onConfirmStructure}
                 pending={pending}
                 resultId={result.result_id}

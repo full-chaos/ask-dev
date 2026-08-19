@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Badge } from "@/components/Badge";
 import type {
-    AcceptedGrammar,
     AnchorOption,
     BoundStructureReceipt,
     HandleOption,
@@ -13,11 +12,11 @@ import type {
     StructureNeeds,
     WindowOption,
 } from "@/lib/contracts";
-import { humanizeTerm } from "@/lib/presentation";
 import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     deselectStructureOffer,
     selectStructureOffer,
+    structureReceiptHasExpectedNamespace,
     structureSelectionCount,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
@@ -223,34 +222,6 @@ const PROMPT_TITLE: Record<StructureNeedKind, string> = {
     window: "Over what period?",
 };
 
-function AcceptedGrammarsDisclosure({
-    grammars,
-}: {
-    readonly grammars: readonly AcceptedGrammar[];
-}) {
-    if (grammars.length === 0) return null;
-    return (
-        <section aria-labelledby="structure-grammars-title" className="panel">
-            <h3 className="panel__title" id="structure-grammars-title">
-                Accepted for direct supply
-            </h3>
-            <p className="record__meta">
-                ACR also accepts these typed values directly on the next question, instead of
-                picking an offer above:
-            </p>
-            <ul className="stack stack--tight">
-                {grammars.map((grammar) => (
-                    <li className="record__meta" key={`${grammar.member}-${grammar.pattern_id}`}>
-                        {humanizeTerm(grammar.member)}
-                        {grammar.kind === undefined ? "" : ` (${grammar.kind})`}:{" "}
-                        {grammar.pattern_id}
-                    </li>
-                ))}
-            </ul>
-        </section>
-    );
-}
-
 export function StructureNeedsPanel({
     resultId,
     structureNeeds,
@@ -258,8 +229,29 @@ export function StructureNeedsPanel({
     pending = false,
 }: StructureNeedsPanelProps) {
     const [batch, setBatch] = useState<StructureSelectionBatch>(EMPTY_STRUCTURE_SELECTION_BATCH);
+    // codex round 2: a rejected click must not look like nothing happened —
+    // a click that silently does nothing is indistinguishable from the UI
+    // being broken. Surfaced, not just logged.
+    const [namespaceError, setNamespaceError] = useState<string | undefined>(undefined);
 
+    /**
+     * Eagerly checked, not just documented: a receipt from the wrong
+     * member's offer list (a wiring bug this component's own call sites
+     * should make structurally unreachable, but "should" is not "is") is
+     * rejected HERE — where the mistake was made — rather than reaching the
+     * wire and being silently rejected by the engine's own validation
+     * (§2.5). See `structureReceiptHasExpectedNamespace`'s own doc comment.
+     */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        if (!structureReceiptHasExpectedNamespace(member, receipt)) {
+            const message = `That offer's receipt is not valid for ${structureMemberLabel(member)} and could not be selected. This is a Workbench bug, not something you did — please report it.`;
+            console.error(
+                `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
+            );
+            setNamespaceError(message);
+            return;
+        }
+        setNamespaceError(undefined);
         setBatch((current) =>
             current[member]?.receipt_id === receipt.receipt_id
                 ? deselectStructureOffer(current, member)
@@ -271,7 +263,6 @@ export function StructureNeedsPanel({
     const anchorOptions = structureNeeds.anchor_options ?? [];
     const handleOptions = structureNeeds.handle_options ?? [];
     const windowOptions = structureNeeds.window_options ?? [];
-    const acceptedGrammars = structureNeeds.accepted_grammars ?? [];
 
     return (
         <section aria-labelledby="structure-needs-title" className="panel">
@@ -377,7 +368,11 @@ export function StructureNeedsPanel({
                 </section>
             ) : null}
 
-            <AcceptedGrammarsDisclosure grammars={acceptedGrammars} />
+            {namespaceError === undefined ? null : (
+                <p className="record__meta" role="alert">
+                    {namespaceError}
+                </p>
+            )}
 
             {onConfirm === undefined ? (
                 <p className="record__meta" data-testid="cannot-confirm-structure-here">

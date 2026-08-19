@@ -128,6 +128,7 @@
             ]
         },
         "WindowOption": {
+            "description": "CHAOS-3900 W1: one server-offered window choice, minted onto a stored result so a later turn can confirm it via winr_ receipt redemption. Start/end are the FROZEN absolute bounds computed at offer time.",
             "type": "object",
             "additionalProperties": false,
             "properties": {
@@ -143,7 +144,35 @@
                 "start": { "type": "string", "format": "date-time" },
                 "end": { "type": "string", "format": "date-time" }
             },
-            "required": ["receipt_id", "option_id", "label"]
+            "required": ["receipt_id", "option_id", "label"],
+            "allOf": [
+                {
+                    "description": "CHAOS-3900 W1: a non-all_time relative_id's bounds are the FROZEN offer-time computation, so both must be present.",
+                    "if": {
+                        "properties": { "relative_id": { "not": { "const": "all_time" } } },
+                        "required": ["relative_id"]
+                    },
+                    "then": { "required": ["start", "end"] }
+                },
+                {
+                    "description": "CHAOS-3900 W1 (codex round 7): all_time forbids any bound. Deliberately does NOT also fire when relative_id is absent: an option with no relative_id and BOTH bounds present is a legal explicit-bounds-only shape.",
+                    "if": {
+                        "properties": { "relative_id": { "const": "all_time" } },
+                        "required": ["relative_id"]
+                    },
+                    "then": {
+                        "not": { "anyOf": [{ "required": ["start"] }, { "required": ["end"] }] }
+                    }
+                }
+            ],
+            "anyOf": [{ "required": ["relative_id"] }, { "required": ["start", "end"] }],
+            "not": {
+                "description": "CHAOS-3900 W1 (codex round 7): completeness guard -- forbids exactly-one-of-start/end unconditionally.",
+                "anyOf": [
+                    { "required": ["start"], "not": { "required": ["end"] } },
+                    { "required": ["end"], "not": { "required": ["start"] } }
+                ]
+            }
         },
         "WindowClarification": {
             "type": "object",
@@ -153,7 +182,8 @@
                     "type": "array",
                     "items": { "$ref": "#/$defs/WindowOption" },
                     "minItems": 1,
-                    "maxItems": 20
+                    "maxItems": 20,
+                    "uniqueItems": true
                 }
             },
             "required": ["options"]
@@ -222,7 +252,17 @@
                 "provenance": { "$ref": "#/$defs/StructureProvenance" },
                 "disposition": { "$ref": "#/$defs/StructureDisposition" }
             },
-            "required": ["member", "applied_value", "source", "provenance", "disposition"]
+            "required": ["member", "applied_value", "source", "provenance", "disposition"],
+            "if": {
+                "properties": { "source": { "const": "receipt" } },
+                "required": ["source"]
+            },
+            "then": { "required": ["prior_result_id", "receipt_id"] },
+            "else": {
+                "not": {
+                    "anyOf": [{ "required": ["prior_result_id"] }, { "required": ["receipt_id"] }]
+                }
+            }
         },
         "StructureOfferSnapshotEntry": {
             "type": "object",

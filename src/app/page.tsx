@@ -213,7 +213,10 @@ export default function WorkbenchPage() {
                                 entries={outcome.result.confirmed_structure}
                             />
                             {outcome.result.structure_needs === undefined ? null : (
+                                // Keyed by result_id — see DeterministicAnswerView's
+                                // own comment on the same fix.
                                 <StructureNeedsPanel
+                                    key={outcome.result.result_id}
                                     onConfirm={chooseStructure}
                                     resultId={outcome.result.result_id}
                                     structureNeeds={outcome.result.structure_needs}
