@@ -109,10 +109,21 @@ bash ci/run_checks.sh build
 bash ci/run_checks.sh e2e         # Playwright smoke over the BUILT artifact
 ```
 
-The smoke suite runs with **no** ACR configuration on purpose. The Workbench has
-no mock path, so the only honest thing it can do unconfigured is say so — and
-proving that a failure presents as a failure, never as a thin answer, is exactly
-what that suite is for.
+Most of the e2e suite (`tests/workbench.smoke.spec.ts`, and the shell/
+honest-failure specs in `tests/chat.spec.ts`) runs with **no** ACR
+configuration on purpose. Neither surface has a mock path, so the only honest
+thing either can do unconfigured is say so — and proving that a failure
+presents as a failure, never as a thin answer, is exactly what those specs are
+for.
+
+The chat surface's clarification-chip positive/negative controls
+(`tests/chat.spec.ts`'s `"clarification chips"` group) are the one exception:
+they run against a SECOND, ACR-**configured** `next start` instance, pointed at
+`tests/support/fake-acr-server.mjs` — a real, wire-level HTTP server standing
+in for ACR (not a fetch/route mock; see that file's own header for the full
+"why," including why a real ACR checkout can't be used here today). Both
+instances are started by `playwright.config.ts`'s `webServer` array; only that
+one spec group opts into the configured one.
 
 Workflows: `tests.yml` (the gates above), `codeql-analysis.yml`, and
 `security-scan.yml` (Gitleaks + `pnpm audit`). Gitleaks is a hard gate here —

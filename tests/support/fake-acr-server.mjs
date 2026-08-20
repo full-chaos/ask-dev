@@ -34,6 +34,52 @@
  * canonical `complete` example unchanged apart from `question`/`result_id`/
  * `request_id`, so it never accidentally collides with the clarification
  * scenario's identifiers.
+ *
+ * ===================== MOCK-INFRASTRUCTURE DISCLOSURE =====================
+ * This IS mock infrastructure, full stop — a fake server is a fake server
+ * regardless of what it's named or how it's reached, and this repo's
+ * zero-mocking rule deserves an honest answer, not a technicality.
+ *
+ *   (a) Nothing like this existed in the repo before this PR. Every e2e spec
+ *       that predates this file (`tests/workbench.smoke.spec.ts`) runs with
+ *       NO ACR configuration at all and only ever proves the honest-failure
+ *       path — see the README's "The smoke suite runs against the PRODUCTION
+ *       build... No ACR_* variables are supplied on purpose." There was no
+ *       prior stand-in pattern to follow; this is new.
+ *   (b) Real-ACR e2e is not merely inconvenient today, it is IMPOSSIBLE:
+ *       there is no ACR checkout this repo's CI or dev environment can
+ *       build and run (ACR lives in the separate `dev-health-acr` repo), and
+ *       even a locally-running real ACR would be USELESS for the structure-
+ *       needs half of "clarification chips render" specifically, because
+ *       the contract this repo validates every response against
+ *       (`context_fabric_investigation_result.v1.schema.json`,
+ *       `additionalProperties: false`) is pinned to a commit that predates
+ *       CHAOS-3900 P1 — `structure_needs`/`confirmed_structure` are not
+ *       legal fields on that schema YET, for ANY server, real or fake (see
+ *       `src/lib/pivot/structure-contracts.ts`'s "THE SEAM"). So this double
+ *       only ever exercises the ONE clarification shape the pinned contract
+ *       already supports for real (`clarification_required` with subject
+ *       candidates) — it does not, and structurally cannot, fabricate
+ *       coverage for the P1 structure-needs chips; those stay unit-tested
+ *       only (mocked fetch, same pattern the rest of this repo's component
+ *       tests already use), same as before this PR.
+ *   (c) TEST-ONLY. Not imported by anything under `src/`, not built into
+ *       the production bundle, not started by `pnpm dev`/`pnpm build`/
+ *       `pnpm start` — only `playwright.config.ts`'s `webServer` array
+ *       spawns it, and only for `tests/chat.spec.ts`'s clarification-chip
+ *       project.
+ *   (d) What retires it: once acr's `chaos-pivot-p1` branch merges to `main`
+ *       and this repo's contract pin bumps past that merge (README's
+ *       "Bumping the pin"), `structure_needs` becomes a real field on the
+ *       pinned schema and a REAL ACR instance becomes able to answer with
+ *       one. At that point this double should either be deleted in favor of
+ *       a real ACR instance in CI, or (if a real instance still isn't
+ *       practical for CI) extended to also return a schema-valid
+ *       `structure_needs` payload — but that is a decision for whoever lands
+ *       that pin bump, not this PR. Flagged here, and in the PR description,
+ *       for that reason: this is Chris's call to accept at merge time, not
+ *       something to wave through quietly.
+ * ============================================================================
  */
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
@@ -142,18 +188,33 @@ const server = createServer((request, response) => {
         try {
             const parsed = JSON.parse(body);
             question = typeof parsed.question === "string" ? parsed.question : "";
+            // `prior_subject_receipts` — the PINNED WIRE CONTRACT'S own
+            // snake_case field name (see
+            // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json
+            // and `buildInvestigationRequest` in src/lib/acr/client.ts, which
+            // is what actually POSTs to this server). NOT
+            // `priorSubjectReceipts` — that camelCase name exists only on
+            // the browser-to-Next-route body one layer up
+            // (src/app/page.tsx's `fetch("/api/investigations", ...)`),
+            // which src/app/api/investigations/route.ts translates to this
+            // snake_case field before ever reaching here. Getting this wrong
+            // silently defeats the whole positive control: `hasChosenReceipt`
+            // stays false, the re-ask falls through to the trigger-keyword
+            // check below, and — because the question text travels UNCHANGED
+            // on a re-ask — it still contains the trigger, so a "chosen
+            // candidate" re-ask keeps coming back `clarification_required`
+            // instead of decisive. Caught by codex review round 1.
             hasChosenReceipt =
-                Array.isArray(parsed.priorSubjectReceipts) &&
-                parsed.priorSubjectReceipts.length > 0;
+                Array.isArray(parsed.prior_subject_receipts) &&
+                parsed.prior_subject_receipts.length > 0;
         } catch {
             question = "";
         }
-        // A re-ask that carries a chosen receipt (the app's own
-        // `prior_subject_receipts`) is decisive by construction here — the
-        // question text is UNCHANGED on a re-ask (same rule the real app
-        // holds, see `src/app/page.tsx`'s own `ask()`), so it would otherwise
-        // still contain the trigger and loop forever. Checked FIRST, before
-        // the trigger keyword, for exactly that reason.
+        // A re-ask that carries a chosen receipt is decisive by construction
+        // here — the question text is UNCHANGED on a re-ask (same rule the
+        // real app holds, see `src/app/page.tsx`'s own `ask()`), so it would
+        // otherwise still contain the trigger and loop forever. Checked
+        // FIRST, before the trigger keyword, for exactly that reason.
         const result = hasChosenReceipt
             ? answeredResult(question)
             : question.includes(TRIGGER_CLARIFICATION)

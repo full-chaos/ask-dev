@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -157,6 +157,14 @@ describe("the clarification chip is live only on the most recent assistant turn"
             await screen.findByRole("region", { name: "Subject candidates" }),
         ).toBeInTheDocument();
         expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
+
+        // Discriminating, not just "an article rendered": both turns share
+        // the same `aria-label`, so `data-state` is what actually proves the
+        // FIRST turn stayed a clarification and the SECOND turn is decisive.
+        const turns = screen.getAllByRole("article", { name: "Deterministic answer" });
+        expect(turns).toHaveLength(2);
+        expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
+        expect(turns[1]).toHaveAttribute("data-state", answered.status);
     });
 });
 
@@ -194,5 +202,13 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
         // The superseded turn's panel is still visible but can no longer be
         // confirmed — inspection only, same as ClarificationPanel's own rule.
         expect(screen.getByTestId("cannot-confirm-structure-here")).toBeInTheDocument();
+
+        // codex review round 1, finding 3: the frozen turn's own echo must
+        // still show WHAT was submitted, not revert to "nothing selected"
+        // the instant a newer turn takes over the shared selection hook.
+        const frozenPanel = screen.getByRole("region", {
+            name: "More structure would narrow this",
+        });
+        expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
     });
 });

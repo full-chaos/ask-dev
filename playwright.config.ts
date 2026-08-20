@@ -13,6 +13,14 @@ const resultsDirectory = process.env["PLAYWRIGHT_RESULTS_DIR"] ?? "test-results/
 // safe); it exists purely so the chat surface's clarification-chip coverage
 // can drive a real, schema-valid `clarification_required` response, which
 // the unconfigured instance can never produce.
+// Fixed default ports, same convention as `PLAYWRIGHT_WEB_PORT`/
+// `PLAYWRIGHT_BASE_URL` above (both pre-existing): every port here is
+// independently overridable so two concurrent local runs of THIS repo can
+// avoid colliding, exactly as they already had to for the original single
+// webServer entry. Automatic collision-proofing (ephemeral port allocation)
+// would mean redesigning that pre-existing pair too, which is out of scope
+// here — flagged (codex review round 1, finding 5) rather than silently
+// left as a latent gap.
 const fakeAcrPort = Number(process.env["FAKE_ACR_PORT"] ?? "4021");
 const fakeAcrOrigin = `http://127.0.0.1:${fakeAcrPort}`;
 const configuredPort = Number(process.env["PLAYWRIGHT_CONFIGURED_WEB_PORT"] ?? "3022");
@@ -21,7 +29,12 @@ export const configuredBaseURL =
 // Written fresh by tests/support/gen-e2e-key.mjs on every run — never
 // committed (test-results/ is gitignored, and *.pem/*.key are too, belt and
 // braces). See that script's header for why a throwaway key is safe here.
-const e2eSigningKeyPath = `${resultsDirectory}/e2e-acr-key.pem`;
+// PID-suffixed (codex review round 1, finding 5) so two `playwright test`
+// invocations running concurrently on the same machine (e.g. two worktrees
+// of this repo, or a developer running e2e while CI also has a job in
+// flight) never race on the SAME file — this config's own process id is
+// stable for the whole run and unique per run.
+const e2eSigningKeyPath = `${resultsDirectory}/e2e-acr-key-${process.pid}.pem`;
 
 export default defineConfig({
     testDir: "./tests",

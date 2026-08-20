@@ -56,6 +56,17 @@ type Turn =
           readonly outcome: AssistantOutcome;
           /** The subject the tester chose, when this turn answers a re-ask that carried one. */
           readonly chosenSubject: SubjectRef | undefined;
+          /**
+           * A SNAPSHOT of the structure-need batch this turn's own "Ask
+           * again with these selections" confirmed, if it ever did —
+           * distinct from `useStructureSelections()`'s live `batch`, which
+           * this turn stops owning the instant it is no longer the latest
+           * (codex review round 1, finding 3). Without this, a frozen
+           * turn's own `StructureNeedsPanel` echo would render EMPTY rather
+           * than what was actually submitted, the moment a newer turn takes
+           * over the shared hook.
+           */
+          readonly submittedStructureBatch: StructureSelectionBatch | undefined;
       };
 
 function isFailure(value: unknown): value is WorkbenchFailure {
@@ -105,6 +116,7 @@ export default function ChatPage() {
                 id: assistantTurnId,
                 outcome: { kind: "pending" },
                 chosenSubject: chosen,
+                submittedStructureBatch: undefined,
             },
         ]);
 
@@ -181,6 +193,18 @@ export default function ChatPage() {
         ) {
             return;
         }
+        // Snapshot what was actually submitted onto the turn being
+        // superseded BEFORE `ask()` resets the shared hook and appends a
+        // new turn — otherwise this turn's own frozen echo would render as
+        // if nothing had ever been picked (codex review round 1, finding 3).
+        const supersededTurnId = latestAssistantTurn.id;
+        setTurns((current) =>
+            current.map((turn) =>
+                turn.role === "assistant" && turn.id === supersededTurnId
+                    ? { ...turn, submittedStructureBatch: batch }
+                    : turn,
+            ),
+        );
         void ask(latestAssistantTurn.outcome.result.question, [], undefined, batch);
     }
 
@@ -229,7 +253,9 @@ export default function ChatPage() {
                                         }
                                         result={turn.outcome.result}
                                         structureBatch={
-                                            isLatest ? structureSelections.batch : undefined
+                                            isLatest
+                                                ? structureSelections.batch
+                                                : turn.submittedStructureBatch
                                         }
                                     />
                                 ) : null}

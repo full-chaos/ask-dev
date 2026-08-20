@@ -119,7 +119,16 @@ export function DeterministicAnswerView({
 
     if (result.status === "clarification_required") {
         return (
-            <article aria-label="Deterministic answer">
+            // `data-state` mirrors `result.status` VERBATIM — a discriminating
+            // hook for tests, distinct from `aria-label` (which stays
+            // "Deterministic answer" in both branches below on purpose: the
+            // component's accessible identity does not change just because
+            // its content does). Without this, "the article is present" and
+            // "the article is present AND the result is actually decisive"
+            // are indistinguishable to a query, which let a chat-surface e2e
+            // regression pass vacuously — see tests/chat.spec.ts's positive
+            // clarification-chip control.
+            <article aria-label="Deterministic answer" data-state={result.status}>
                 {notice}
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
@@ -150,7 +159,7 @@ export function DeterministicAnswerView({
     }
 
     return (
-        <article aria-label="Deterministic answer">
+        <article aria-label="Deterministic answer" data-state={result.status}>
             {notice}
             {structureConfirmationNotice}
             {structureNeedsPanel}
