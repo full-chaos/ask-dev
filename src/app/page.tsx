@@ -9,7 +9,7 @@ import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { subjectForReceipt } from "@/lib/clarification";
-import type { PivotAwareInvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
     buildStructureReceiptFields,
     type StructureSelectionBatch,
@@ -45,7 +45,7 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
 
 type AssistantOutcome =
     | { readonly kind: "pending" }
-    | { readonly kind: "answered"; readonly result: PivotAwareInvestigationResult }
+    | { readonly kind: "answered"; readonly result: InvestigationResult }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 type Turn =
@@ -158,7 +158,7 @@ export default function ChatPage() {
                 });
                 return;
             }
-            settle({ kind: "answered", result: result as PivotAwareInvestigationResult });
+            settle({ kind: "answered", result: result as InvestigationResult });
         } catch (error) {
             // Never swallow: a dead server hop is itself a reportable outcome.
             console.error("investigation request failed", error);

@@ -28,8 +28,9 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-3783 (`0ed4e1a`). Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c";
+// acr main, CHAOS-3927 P1 (#159) + W1 (#158) + disclosure coverage (#160/#161)
+// (`7d275c2e`). Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "7d275c2e852247b5b9b8635085cffb98c6e04bb5";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -149,11 +150,50 @@ function readCommittedSourceFiles() {
 }
 
 /**
+ * CHAOS-3927 P1 (acr 7d275c2e): `WindowOption`'s schema carries
+ * `allOf`/`anyOf`/`not` frozen-bounds conditionals (design brief §5.1)
+ * alongside its `properties`. json-schema-to-typescript renders those as
+ * index-signature intersections it cannot merge into a plain object shape,
+ * and instantiating THAT inside a `maxItems`-bounded array
+ * (json-schema-to-typescript renders `maxItems` as a union of fixed-length
+ * tuples) exceeds TypeScript's own type-complexity budget (`TS2590`) —
+ * reliably, even for a two-element literal array.
+ *
+ * Fixed by dropping `WindowOption`'s three conditional keywords from the
+ * TYPE-GENERATION copy of the schema ONLY — never from the copy committed
+ * to `src/contracts/schemas/`, which stays byte-identical to the pinned
+ * commit's own blob (verified against it by `check --source`) and is what
+ * `validateContract` actually runs at request/response time. The frozen-
+ * bounds invariant those keywords express (a non-`all_time` option's
+ * `start`/`end` must both be present, `all_time` forbids both) was never
+ * something `json-schema-to-typescript` could express as a TS type either
+ * way (conditional validation isn't representable as a structural type) —
+ * dropping it from the TYPE only removes redundant intersection noise the
+ * compiler was already unable to use, not an invariant TypeScript was
+ * actually enforcing. `codex round 1` (an earlier version of this fix used
+ * `ignoreMinAndMaxItems` globally, which also erased real minItems-only
+ * "non-empty array" tuple types — `affected_subjects`, `match_reasons`,
+ * etc. — on fields this bug has nothing to do with; scoped to the one
+ * schema that actually needs it instead).
+ */
+function stripWindowOptionConditionalsForTypeGeneration(schemaDirectory) {
+    const commonSchemaPath = path.join(schemaDirectory, "context_fabric_common.v1.schema.json");
+    const schema = JSON.parse(fs.readFileSync(commonSchemaPath, "utf8"));
+    const windowOption = schema.$defs?.WindowOption;
+    if (windowOption === undefined) throw new Error("WindowOption $def not found — pin drifted?");
+    delete windowOption.allOf;
+    delete windowOption.anyOf;
+    delete windowOption.not;
+    fs.writeFileSync(commonSchemaPath, JSON.stringify(schema));
+}
+
+/**
  * Compiles one schema to a module. json-schema-to-typescript resolves the
  * cross-file `$ref`s against `cwd`, which is why the copies must already be on
  * disk before this runs.
  */
 async function generatedModules(schemaDirectory) {
+    stripWindowOptionConditionalsForTypeGeneration(schemaDirectory);
     const modules = {};
     for (const entry of GENERATED_MODULES) {
         const schema = JSON.parse(
