@@ -1,7 +1,16 @@
+import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 
 export type FailurePanelProps = {
     readonly failure: WorkbenchFailure;
+    /**
+     * Present only for the latest turn's own plain (no receipt/subject/
+     * structure) ask — a re-ask that carried a chosen subject or structure
+     * batch is NOT retried from here, so this component never re-derives
+     * that receipt logic. Absent elsewhere, including on frozen turns.
+     */
+    readonly onRetry?: (() => void) | undefined;
+    readonly pending?: boolean | undefined;
 };
 
 /**
@@ -12,13 +21,15 @@ export type FailurePanelProps = {
  * and, where the cause is an operator state rather than a transient blip, says
  * what has to be true for the call to succeed.
  */
-export function FailurePanel({ failure }: FailurePanelProps) {
+export function FailurePanel({ failure, onRetry, pending = false }: FailurePanelProps) {
     return (
         <section className="panel panel--failure" aria-labelledby="failure-title" role="alert">
             <h2 className="panel__title" id="failure-title">
                 No answer
             </h2>
-            <p className="answer__judgment">{failure.message}</p>
+            <p className="answer__judgment">
+                <SafeAnswerText text={failure.message} />
+            </p>
             <p className="record__meta">
                 {failure.code}
                 {failure.httpStatus === undefined ? "" : ` · HTTP ${failure.httpStatus}`}
@@ -40,6 +51,17 @@ export function FailurePanel({ failure }: FailurePanelProps) {
                     ))}
                 </ul>
             ) : null}
+            {onRetry === undefined ? null : (
+                <button
+                    className="question-form__submit"
+                    disabled={pending}
+                    onClick={onRetry}
+                    style={{ marginTop: 10 }}
+                    type="button"
+                >
+                    {pending ? "Retrying…" : "Retry"}
+                </button>
+            )}
         </section>
     );
 }

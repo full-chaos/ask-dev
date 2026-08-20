@@ -1,4 +1,5 @@
 import { EvidenceReferences } from "@/components/EvidenceReferences";
+import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { Finding } from "@/lib/contracts";
 import { humanizeTerm } from "@/lib/presentation";
 
@@ -32,7 +33,9 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                                     </span>
                                 ) : null}
                             </div>
-                            <p className="record__body">{finding.summary}</p>
+                            <p className="record__body">
+                                <SafeAnswerText text={finding.summary} />
+                            </p>
                             <EvidenceReferences
                                 evidenceRefIds={finding.evidence_ref_ids}
                                 label="Evidence"

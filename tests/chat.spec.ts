@@ -53,6 +53,161 @@ test.describe("Ask Dev chat shell", () => {
 });
 
 /**
+ * Composer ergonomics and autoscroll (UX-equivalence pass). Runs against the
+ * SAME unconfigured instance as "Ask Dev chat shell" above — every ask here
+ * fails honestly (`workbench_misconfigured`, not retryable), which is exactly
+ * what these controls need: draft-preservation and the not-retryable NEGATIVE
+ * control need a real failure, not an answer, and none of this exercises
+ * receipt/selection logic (that's covered by "clarification chips"/"structure
+ * needs chips" above).
+ */
+test.describe("composer ergonomics", () => {
+    test("Enter sends; Shift+Enter inserts a newline instead", async ({ page }) => {
+        await page.goto("/");
+        const box = page.getByLabel("Ask a question");
+
+        await box.fill("First line");
+        await box.press("Shift+Enter");
+        await box.type("Second line");
+
+        // Shift+Enter must NOT have sent anything — still zero turns, and the
+        // newline it inserted is still sitting in the box.
+        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveCount(0);
+        await expect(page.getByRole("alert", { name: "No answer" })).toHaveCount(0);
+        await expect(box).toHaveValue("First line\nSecond line");
+
+        // Plain Enter DOES send — the discriminating half of this control.
+        await box.press("Enter");
+        await expect(page.getByRole("alert", { name: "No answer" })).toBeVisible();
+    });
+
+    test("a failed ask preserves the draft, selected, for editing — never retyping", async ({
+        page,
+    }) => {
+        await page.goto("/");
+        const box = page.getByLabel("Ask a question");
+        const question = "What is the status of dev-health-ops?";
+
+        await box.fill(question);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        await expect(page.getByRole("alert", { name: "No answer" })).toBeVisible();
+        // The draft is exactly what was sent, not cleared — and it is the
+        // user turn's own text too, so the box isn't just coincidentally
+        // showing leftover state.
+        await expect(box).toHaveValue(question);
+        await expect(
+            page.getByRole("log", { name: "Conversation" }).getByText(question, { exact: true }),
+        ).toBeVisible();
+        // Selected (codex-ready to type-over), verified via the DOM selection
+        // range rather than a screenshot.
+        await expect(async () => {
+            const selection = await box.evaluate(
+                (el: HTMLTextAreaElement) => el.selectionEnd - el.selectionStart,
+            );
+            expect(selection).toBe(question.length);
+        }).toPass();
+    });
+
+    test("NEGATIVE: a not-retryable failure offers no Retry action", async ({ page }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill("What is the status of dev-health-ops?");
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const failure = page.getByRole("alert", { name: "No answer" });
+        await expect(failure).toBeVisible();
+        await expect(failure.getByText(/not retryable/)).toBeVisible();
+        await expect(failure.getByRole("button", { name: "Retry" })).toHaveCount(0);
+    });
+
+    test("POSITIVE: a retryable failure offers a Retry action that re-asks", async ({ page }) => {
+        await page.goto("/");
+        // The only way to reach `acr_unreachable` (retryable) without ACR
+        // configured is a dead server hop — a genuine network-level failure,
+        // not a fabricated answer. This is the SAME class of thing
+        // `tests/chat.spec.ts` already tests honestly (a real failure
+        // presenting as a failure); aborting the request tests that this
+        // lane's OWN retry affordance reacts to it, it does not stand in for
+        // the fake-ACR double or invent any ACR response.
+        await page.route("**/api/investigations", (route) => route.abort("failed"));
+
+        await page.getByLabel("Ask a question").fill("What is the status of dev-health-ops?");
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const failures = page.getByRole("alert", { name: "No answer" });
+        await expect(failures).toHaveCount(1);
+        await expect(failures.first().getByText(/retryable/)).toBeVisible();
+        const retry = failures.first().getByRole("button", { name: "Retry" });
+        await expect(retry).toBeVisible();
+
+        // Un-abort, then retry: the SAME question re-asks (not a re-typed
+        // one), appending a fresh turn rather than mutating the frozen one —
+        // this repo's "always append, never mutate" rule holds for a retry
+        // exactly as it does for a clarification/structure re-ask.
+        await page.unroute("**/api/investigations");
+        await retry.click();
+
+        await expect(failures).toHaveCount(2);
+        await expect(failures.first().getByText(/retryable/)).toBeVisible();
+        await expect(failures.last().getByText(/workbench_misconfigured/)).toBeVisible();
+        // The now-superseded turn's OWN Retry is gone — only the latest
+        // turn's failure can still act, same "only the latest turn is live"
+        // rule the clarification/structure chips hold.
+        await expect(failures.first().getByRole("button", { name: "Retry" })).toHaveCount(0);
+    });
+
+    test("autoscroll pins to the latest turn, and offers Jump to latest after scrolling away", async ({
+        page,
+    }) => {
+        await page.goto("/");
+        const box = page.getByLabel("Ask a question");
+        const timeline = page.getByRole("log", { name: "Conversation" });
+
+        // Enough turns to make the timeline scrollable.
+        for (let i = 0; i < 6; i += 1) {
+            await box.fill(`Question ${i}?`);
+            await page.getByRole("button", { name: "Send" }).click();
+            await expect(page.getByRole("alert", { name: "No answer" })).toHaveCount(i + 1);
+        }
+
+        // Pinned to bottom by default: the affordance is absent, and the
+        // timeline is scrolled as far down as it can go.
+        const jumpToLatest = page.getByRole("button", { name: "Jump to latest ↓" });
+        await expect(jumpToLatest).toHaveCount(0);
+        await expect(async () => {
+            const atBottom = await timeline.evaluate(
+                (el) => el.scrollHeight - el.scrollTop - el.clientHeight < 2,
+            );
+            expect(atBottom).toBe(true);
+        }).toPass();
+
+        // Scroll away, then ask again: autoscroll must NOT yank the view, and
+        // the affordance must appear instead.
+        await timeline.evaluate((el) => {
+            el.scrollTop = 0;
+        });
+        await box.fill("One more, sent while scrolled away?");
+        await page.getByRole("button", { name: "Send" }).click();
+        await expect(page.getByRole("alert", { name: "No answer" })).toHaveCount(7);
+
+        await expect(jumpToLatest).toBeVisible();
+        const scrollTopWhileAway = await timeline.evaluate((el) => el.scrollTop);
+        expect(scrollTopWhileAway).toBeLessThan(50);
+
+        // Clicking it returns to the bottom and dismisses itself.
+        await jumpToLatest.click();
+        await expect(jumpToLatest).toHaveCount(0);
+        await expect(async () => {
+            const atBottom = await timeline.evaluate(
+                (el) => el.scrollHeight - el.scrollTop - el.clientHeight < 2,
+            );
+            expect(atBottom).toBe(true);
+        }).toPass();
+    });
+});
+
+/**
  * Clarification-chip POSITIVE and NEGATIVE controls.
  *
  * Runs against the SECOND app instance (`configuredBaseURL`), configured to
