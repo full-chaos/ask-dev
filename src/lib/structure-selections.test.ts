@@ -4,6 +4,7 @@ import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     buildStructureReceiptFields,
     deselectStructureOffer,
+    pendingStructureBatchOrUndefined,
     selectStructureOffer,
     structureReceiptHasExpectedNamespace,
     structureSelectionCount,
@@ -103,5 +104,26 @@ describe("buildStructureReceiptFields", () => {
         const fields = buildStructureReceiptFields(batch);
         expect(fields.priorKindReceipts).toEqual([KIND_RECEIPT]);
         expect(fields.priorAnchorReceipts).toEqual([ANCHOR_RECEIPT]);
+    });
+});
+
+/**
+ * Mixed-receipt-family unification: the shared helper `chooseCandidate`
+ * (chat surface and Workbench alike) reads to decide whether there is a
+ * live-but-unconfirmed structure batch to carry along with a subject choice.
+ */
+describe("pendingStructureBatchOrUndefined", () => {
+    it("returns undefined for an empty batch — nothing to carry", () => {
+        expect(pendingStructureBatchOrUndefined(EMPTY_STRUCTURE_SELECTION_BATCH)).toBeUndefined();
+    });
+
+    it("returns the batch itself once at least one member has a pick", () => {
+        const batch = selectStructureOffer(
+            EMPTY_STRUCTURE_SELECTION_BATCH,
+            "expected_kind",
+            KIND_RECEIPT,
+        );
+
+        expect(pendingStructureBatchOrUndefined(batch)).toBe(batch);
     });
 });

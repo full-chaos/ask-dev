@@ -9,9 +9,11 @@ import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { subjectForReceipt } from "@/lib/clarification";
+import { buildConversationTurns } from "@/lib/conversation";
 import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
     buildStructureReceiptFields,
+    pendingStructureBatchOrUndefined,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
@@ -60,13 +62,15 @@ type Turn =
           readonly role: "user";
           readonly id: number;
           readonly question: string;
-          readonly askedAt: number;
+          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
+          readonly createdAt: string;
       }
     | {
           readonly role: "assistant";
           readonly id: number;
+          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
+          readonly createdAt: string;
           readonly outcome: AssistantOutcome;
-          readonly askedAt: number;
           /** The subject the tester chose, when this turn answers a re-ask that carried one. */
           readonly chosenSubject: SubjectRef | undefined;
           /**
@@ -100,8 +104,8 @@ function isFailure(value: unknown): value is WorkbenchFailure {
     );
 }
 
-function formatTurnTime(epochMs: number): string {
-    return new Date(epochMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function formatTurnTime(isoTimestamp: string): string {
+    return new Date(isoTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 // Treated as "at the bottom" within this many pixels — content settling
@@ -190,22 +194,24 @@ export default function ChatPage() {
     ): Promise<boolean> {
         const userTurnId = nextId.current++;
         const assistantTurnId = nextId.current++;
-        // `ask` only ever runs from a DOM event (composer submit, a chip's
-        // onClick) — this stamps that event, it is not a render-time read.
-        const askedAt = Date.now();
         const isPlainAsk =
             priorSubjectReceipts.length === 0 &&
             chosen === undefined &&
             structureSelectionsToSend === undefined;
+        // Captured from the CURRENT timeline, BEFORE the pending pair below
+        // is appended — a re-ask's own not-yet-answered turn must never be
+        // threaded as its own prior context.
+        const conversation = buildConversationTurns(turns);
         structureSelections.reset();
+        const askedAt = new Date().toISOString();
         setTurns((current) => [
             ...current,
-            { role: "user", id: userTurnId, question, askedAt },
+            { role: "user", id: userTurnId, question, createdAt: askedAt },
             {
                 role: "assistant",
                 id: assistantTurnId,
+                createdAt: askedAt,
                 outcome: { kind: "pending" },
-                askedAt,
                 chosenSubject: chosen,
                 submittedStructureBatch: undefined,
                 retryQuestion: isPlainAsk ? question : undefined,
@@ -230,7 +236,12 @@ export default function ChatPage() {
             const response = await fetch("/api/investigations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question, priorSubjectReceipts, ...structureReceiptFields }),
+                body: JSON.stringify({
+                    question,
+                    priorSubjectReceipts,
+                    conversation,
+                    ...structureReceiptFields,
+                }),
             });
             const payload: unknown = await response.json();
             const failure = (payload as { failure?: unknown }).failure;
@@ -277,7 +288,34 @@ export default function ChatPage() {
             return;
         }
         const { result } = latestAssistantTurn.outcome;
-        void ask(result.question, [choice], subjectForReceipt(result, choice.receipt_id));
+        // Mixed-receipt-family unification: a response can carry BOTH subject
+        // candidates and a structure_needs disclosure at once. Picking a
+        // candidate fires immediately (unlike structure offers, which
+        // accumulate behind an explicit confirm), so any structure picks the
+        // tester already made in this SAME turn — accumulated but not yet
+        // confirmed — must travel in this SAME re-ask, or `ask()` resetting
+        // the shared selection hook below would silently drop them.
+        const pendingStructureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
+        if (pendingStructureBatch !== undefined) {
+            // Snapshotted BEFORE `ask()` resets the shared hook and appends a
+            // new turn, same reason `chooseStructure` below does — otherwise
+            // this turn's own frozen echo would render as if nothing had
+            // ever been picked (codex review round 1, finding 3).
+            const supersededTurnId = latestAssistantTurn.id;
+            setTurns((current) =>
+                current.map((turn) =>
+                    turn.role === "assistant" && turn.id === supersededTurnId
+                        ? { ...turn, submittedStructureBatch: pendingStructureBatch }
+                        : turn,
+                ),
+            );
+        }
+        void ask(
+            result.question,
+            [choice],
+            subjectForReceipt(result, choice.receipt_id),
+            pendingStructureBatch,
+        );
     }
 
     function chooseStructure(batch: StructureSelectionBatch) {
@@ -329,7 +367,7 @@ export default function ChatPage() {
                                 return (
                                     <div className="chat__turn chat__turn--user" key={turn.id}>
                                         <p className="chat__meta chat__meta--user">
-                                            You · {formatTurnTime(turn.askedAt)}
+                                            You · {formatTurnTime(turn.createdAt)}
                                         </p>
                                         <p className="chat__bubble">{turn.question}</p>
                                     </div>
@@ -348,7 +386,7 @@ export default function ChatPage() {
                                     key={turn.id}
                                 >
                                     <p className="chat__meta">
-                                        Ask Dev · {formatTurnTime(turn.askedAt)}
+                                        Ask Dev · {formatTurnTime(turn.createdAt)}
                                     </p>
                                     {turn.outcome.kind === "pending" ? (
                                         <p className="chat__pending" role="status">

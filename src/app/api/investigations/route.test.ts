@@ -331,6 +331,142 @@ describe("structure receipts are validated with the same discipline as subject r
     });
 });
 
+/**
+ * Chat-surface conversation threading: same "reject the whole request,
+ * don't filter" discipline as the receipt tests above (Item 1) — a dropped
+ * turn would mean a follow-up runs without context the tester saw on
+ * screen, which looks exactly like threading working when it silently is
+ * not.
+ */
+describe("a malformed conversation turn rejects the request instead of being filtered out", () => {
+    for (const [label, conversation] of [
+        ["a non-array", "not-an-array"],
+        ["a null entry", [null]],
+        ["an entry missing created_at", [{ turn_id: "turn_0", role: "user", content: "hi" }]],
+        [
+            "an entry with an unrecognized role",
+            [
+                {
+                    turn_id: "turn_0",
+                    role: "system",
+                    content: "hi",
+                    created_at: "2026-01-01T00:00:00.000Z",
+                },
+            ],
+        ],
+        [
+            "an entry with empty content",
+            [
+                {
+                    turn_id: "turn_0",
+                    role: "user",
+                    content: "",
+                    created_at: "2026-01-01T00:00:00.000Z",
+                },
+            ],
+        ],
+        [
+            "an entry with an over-bound turn_id",
+            [
+                {
+                    turn_id: "t".repeat(257),
+                    role: "user",
+                    content: "hi",
+                    created_at: "2026-01-01T00:00:00.000Z",
+                },
+            ],
+        ],
+        /**
+         * The contract declares `created_at` as `format: date-time`
+         * (context_fabric_common.v1.schema.json), not a bare non-empty
+         * string. codex round 2, finding 5: an earlier version of this
+         * guard accepted anything non-empty, so a malformed timestamp rode
+         * through to the contract-wide validator deep inside `investigate()`
+         * — which only runs AFTER configuration is loaded, misattributing a
+         * caller mistake as a server misconfiguration. The date-shaped and
+         * offset-less cases below are the ones a looser check (`Date.parse`,
+         * codex round 2's own finding against an earlier version of this
+         * fix) would have let through: both parse as valid JS dates, but
+         * neither satisfies RFC 3339 `date-time`.
+         */
+        [
+            "an entry with a non-date-time created_at",
+            [{ turn_id: "turn_0", role: "user", content: "hi", created_at: "not-a-timestamp" }],
+        ],
+        [
+            "an entry with a date-only created_at (no time component)",
+            [{ turn_id: "turn_0", role: "user", content: "hi", created_at: "2026-01-01" }],
+        ],
+        [
+            "an entry with a created_at missing its UTC offset",
+            [{ turn_id: "turn_0", role: "user", content: "hi", created_at: "2026-01-01T00:00:00" }],
+        ],
+    ] as const) {
+        it(`rejects ${label}`, async () => {
+            const response = await POST(
+                post(JSON.stringify({ question: "status?", conversation })),
+            );
+
+            expect(response.status).toBe(400);
+            const failure = await failureOf(response);
+            expect(failure.code).toBe("acr_rejected_request");
+            expect(failure.message).toMatch(/conversation history was malformed/);
+        });
+    }
+
+    it("rejects the whole request when only SOME turns are malformed", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    conversation: [
+                        {
+                            turn_id: "turn_0",
+                            role: "user",
+                            content: "hi",
+                            created_at: "2026-01-01T00:00:00.000Z",
+                        },
+                        { turn_id: "turn_1", role: "assistant" },
+                    ],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        expect((await failureOf(response)).code).toBe("acr_rejected_request");
+    });
+
+    it("accepts a well-formed conversation (past validation)", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    conversation: [
+                        {
+                            turn_id: "turn_0",
+                            role: "user",
+                            content: "hi",
+                            created_at: "2026-01-01T00:00:00.000Z",
+                        },
+                    ],
+                }),
+            ),
+        );
+
+        // Past conversation validation: it fails later for missing config,
+        // not for the conversation shape.
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    it("defaults to no conversation when the field is absent", async () => {
+        const response = await POST(post(JSON.stringify({ question: "status?" })));
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+});
+
 describe("configuration failures are reported as configuration failures", () => {
     it("reports an unconfigured server hop rather than blaming ACR", async () => {
         vi.stubEnv("ACR_API_ORIGIN", "");
