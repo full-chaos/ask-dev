@@ -119,13 +119,12 @@ describe("buildInvestigationRequest", () => {
     });
 
     /**
-     * CHAOS-3927 P2, "THE SEAM" (@/lib/pivot/structure-contracts.ts). The
-     * pinned request schema predates P1 and has additionalProperties:false,
-     * so a request that always attached these fields would fail its OWN
-     * pre-send validation today. Proven here: build with every structure
-     * field EMPTY (real ACR never offers structure_needs yet, so this is
-     * every real request today) and the wire object carries none of the
-     * four new keys at all — not even as empty arrays.
+     * CHAOS-3927 P2. THE SEAM landed (acr 7d275c2e; `@/lib/contracts`'s own
+     * header): the pinned request schema now declares all four `prior_*_
+     * receipts` fields, so omitting them is wire minimization, not a
+     * validation requirement. Proven here: build with every structure field
+     * EMPTY and the wire object still carries none of the four keys — not
+     * even as empty arrays.
      */
     describe("structure receipts (§2.1) do not reach the wire until there is something to send", () => {
         it("omits every prior_*_receipts structure key when nothing was selected", () => {

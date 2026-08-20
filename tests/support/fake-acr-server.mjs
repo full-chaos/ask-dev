@@ -27,63 +27,54 @@
  *
  * Response selection is a dumb keyword router, not a scenario engine: a
  * question containing TRIGGER_CLARIFICATION returns a `clarification_required`
- * result with subject candidates (ACR's real, pinned-schema shape — NOT the
- * pivot's `structure_needs`, which the pinned schema's `additionalProperties:
- * false` would reject outright, see the file-level note in
- * `src/lib/pivot/structure-contracts.ts`). Every other question returns the
- * canonical `complete` example unchanged apart from `question`/`result_id`/
- * `request_id`, so it never accidentally collides with the clarification
- * scenario's identifiers.
+ * result with subject candidates, a question containing
+ * TRIGGER_STRUCTURE_NEEDS returns a `clarification_required` result with a
+ * `structure_needs` disclosure (kind offers) instead. Every other question
+ * returns the canonical `complete` example unchanged apart from
+ * `question`/`result_id`/`request_id`, so it never accidentally collides
+ * with either scenario's identifiers.
  *
  * ===================== MOCK-INFRASTRUCTURE DISCLOSURE =====================
  * This IS mock infrastructure, full stop — a fake server is a fake server
  * regardless of what it's named or how it's reached, and this repo's
  * zero-mocking rule deserves an honest answer, not a technicality.
  *
- *   (a) Nothing like this existed in the repo before this PR. Every e2e spec
- *       that predates this file (`tests/workbench.smoke.spec.ts`) runs with
- *       NO ACR configuration at all and only ever proves the honest-failure
- *       path (see the README's "Gates" section — the unconfigured instance
- *       is still exactly that, unconfigured). There was no prior stand-in
- *       pattern to follow; this is new.
- *   (b) Real-ACR e2e is not merely inconvenient today, it is IMPOSSIBLE:
- *       there is no ACR checkout this repo's CI or dev environment can
- *       build and run (ACR lives in the separate `dev-health-acr` repo), and
- *       even a locally-running real ACR would be USELESS for the structure-
- *       needs half of "clarification chips render" specifically, because
- *       the contract this repo validates every response against
- *       (`context_fabric_investigation_result.v1.schema.json`,
- *       `additionalProperties: false`) is pinned to a commit that predates
- *       CHAOS-3900 P1 — `structure_needs`/`confirmed_structure` are not
- *       legal fields on that schema YET, for ANY server, real or fake (see
- *       `src/lib/pivot/structure-contracts.ts`'s "THE SEAM"). So this double
- *       only ever exercises the ONE clarification shape the pinned contract
- *       already supports for real (`clarification_required` with subject
- *       candidates) — it does not, and structurally cannot, fabricate
- *       coverage for the P1 structure-needs chips; those stay unit-tested
- *       only (mocked fetch, same pattern the rest of this repo's component
- *       tests already use), same as before this PR.
+ *   (a) Nothing like this existed in the repo before the PR that introduced
+ *       this file. Every e2e spec that predates it (`tests/workbench.smoke.spec.ts`)
+ *       runs with NO ACR configuration at all and only ever proves the
+ *       honest-failure path (see the README's "Gates" section — the
+ *       unconfigured instance is still exactly that, unconfigured). There
+ *       was no prior stand-in pattern to follow; this was new.
+ *   (b) Real-ACR e2e is not merely inconvenient, it is IMPOSSIBLE in this
+ *       repo's CI or dev environment: there is no ACR checkout either can
+ *       build and run (ACR lives in the separate `dev-health-acr` repo). So
+ *       this double is what makes "clarification chips render" and
+ *       "structure-needs chips render" provable at the real-HTTP-request
+ *       level at all — not merely at the mocked-fetch, component-test level
+ *       the rest of this repo's suite otherwise relies on for both.
  *   (c) TEST-ONLY. Not imported by anything under `src/`, not built into
  *       the production bundle, not started by `pnpm dev`/`pnpm build`/
  *       `pnpm start` — only `playwright.config.ts`'s `webServer` array
  *       spawns it (alongside every OTHER e2e spec's run, since Playwright
  *       starts every `webServer` entry up front — this process just sits
  *       idle for any spec that never talks to it). Only `tests/chat.spec.ts`'s
- *       `"clarification chips"` describe block actually TALKS to it, by
- *       overriding `baseURL` to the configured app instance that points at
- *       it (codex review round 2, correcting an earlier version of this
- *       comment that implied the double itself was scoped to that spec).
- *   (d) What retires it: once acr's `chaos-pivot-p1` branch merges to `main`
- *       and this repo's contract pin bumps past that merge (README's
- *       "Bumping the pin"), `structure_needs` becomes a real field on the
- *       pinned schema and a REAL ACR instance becomes able to answer with
- *       one. At that point this double should either be deleted in favor of
- *       a real ACR instance in CI, or (if a real instance still isn't
- *       practical for CI) extended to also return a schema-valid
- *       `structure_needs` payload — but that is a decision for whoever lands
- *       that pin bump, not this PR. Flagged here, and in the PR description,
- *       for that reason: this is Chris's call to accept at merge time, not
- *       something to wave through quietly.
+ *       `"clarification chips"` and `"structure needs chips"` describe
+ *       blocks actually TALK to it, by overriding `baseURL` to the
+ *       configured app instance that points at it (codex review round 2,
+ *       correcting an earlier version of this comment that implied the
+ *       double itself was scoped to one spec).
+ *   (d) CHAOS-3927 P1 (+ CHAOS-3900 W1) merged to acr `main`, and this
+ *       repo's contract pin bumped past that merge (README's "Bumping the
+ *       pin", pin `7d275c2e`): `structure_needs`/`confirmed_structure` are
+ *       now real fields on the pinned schema this double validates every
+ *       response against, the same schema the real client validates
+ *       against. This double was EXTENDED (`structureNeedsResult` /
+ *       `TRIGGER_STRUCTURE_NEEDS` below), per this comment's own prior
+ *       version flagging that as the intended path once the pin bumped —
+ *       not retired, because a real ACR instance in CI is still not
+ *       practical (see (b)), and this double is still the only thing that
+ *       proves the wire round-trip (not just the mocked-fetch unit level)
+ *       for structure-needs chips specifically.
  * ============================================================================
  */
 import { readFileSync } from "node:fs";
@@ -94,6 +85,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FAKE_ACR_PORT ?? "4021");
 export const TRIGGER_CLARIFICATION = "e2e-clarify-me";
+export const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
 
 const canonical = JSON.parse(
     readFileSync(
@@ -168,6 +160,61 @@ function clarificationResult(question) {
     };
 }
 
+/**
+ * CHAOS-3927 P1/P2: a `structure_needs` disclosure with a single missing
+ * member (`expected_kind`) and two `kindr_`-namespaced kind offers — mirrors
+ * `src/test/fixtures/structure-needs.ts`'s own `kindDisambiguationScenario`
+ * field-for-field (same reason each judgment field is emptied: a result
+ * that has not resolved WHICH census to run has no judgment to give).
+ */
+function structureNeedsResult(question) {
+    const result = structuredClone(canonical);
+    return {
+        ...result,
+        result_id: "result_e2e_structure_0001",
+        request_id: "request_e2e_structure_0001",
+        question,
+        status: "clarification_required",
+        interpretation: {
+            ...result.interpretation,
+            clarification_needed: true,
+            clarification_reason: "The question does not name which kind of thing it is about.",
+        },
+        subject_resolution: { candidates: [], committed: [] },
+        structure_needs: {
+            missing: ["expected_kind"],
+            kind_options: [
+                {
+                    receipt_id: "kindr_e2e_pull_request_0001",
+                    option_id: "kind_pull_request",
+                    label: "Pull request",
+                    kind: "pull_request",
+                    offer_source: "engine",
+                },
+                {
+                    receipt_id: "kindr_e2e_ci_pipeline_run_0001",
+                    option_id: "kind_ci_pipeline_run",
+                    label: "CI pipeline run",
+                    kind: "ci_pipeline_run",
+                    offer_source: "engine",
+                },
+            ],
+        },
+        direct_judgment: "",
+        current_state: "",
+        strongest_pressures: [],
+        drivers: [],
+        remaining_work: [],
+        readiness_gaps: [],
+        paths: [],
+        conflicts: [],
+        claimed_facts: [],
+        limitations: ["No judgment was formed because the kind is unresolved."],
+        deterministic_answer: "The kind of thing this question is about is unresolved.",
+        warnings: [],
+    };
+}
+
 const server = createServer((request, response) => {
     // Playwright's `webServer.url` readiness probe is a plain GET / — answer
     // it distinctly from the (POST-only) investigation endpoint.
@@ -213,9 +260,19 @@ const server = createServer((request, response) => {
             // contains the trigger, so a "chosen candidate" re-ask keeps
             // coming back `clarification_required` instead of decisive.
             // Caught by codex review round 1.
+            //
+            // `prior_kind_receipts` (and its three window/anchor/handle
+            // siblings) is the SAME wire-renamed pattern, one layer up in the
+            // CHAOS-3927 P1 structure-receipt flow — `buildInvestigationRequest`
+            // renames the route's `priorKindReceipts` option the same way.
+            // Checking only `prior_kind_receipts` (not all four) is enough
+            // for this double's one structure-needs scenario, which only
+            // ever offers `kind_options`.
             hasChosenReceipt =
-                Array.isArray(parsed.prior_subject_receipts) &&
-                parsed.prior_subject_receipts.length > 0;
+                (Array.isArray(parsed.prior_subject_receipts) &&
+                    parsed.prior_subject_receipts.length > 0) ||
+                (Array.isArray(parsed.prior_kind_receipts) &&
+                    parsed.prior_kind_receipts.length > 0);
         } catch {
             question = "";
         }
@@ -223,12 +280,14 @@ const server = createServer((request, response) => {
         // here — the question text is UNCHANGED on a re-ask (same rule the
         // real app holds, see `src/app/page.tsx`'s own `ask()`), so it would
         // otherwise still contain the trigger and loop forever. Checked
-        // FIRST, before the trigger keyword, for exactly that reason.
+        // FIRST, before either trigger keyword, for exactly that reason.
         const result = hasChosenReceipt
             ? answeredResult(question)
-            : question.includes(TRIGGER_CLARIFICATION)
-              ? clarificationResult(question)
-              : answeredResult(question);
+            : question.includes(TRIGGER_STRUCTURE_NEEDS)
+              ? structureNeedsResult(question)
+              : question.includes(TRIGGER_CLARIFICATION)
+                ? clarificationResult(question)
+                : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

@@ -10,7 +10,7 @@ import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { choiceDisposition } from "@/lib/clarification";
 import type {
     BoundStructureReceipt,
-    PivotAwareInvestigationResult,
+    InvestigationResult,
     StructureNeedKind,
     SubjectRef,
 } from "@/lib/contracts";
@@ -20,7 +20,7 @@ import {
 } from "@/lib/structure-selections";
 
 export type DeterministicAnswerViewProps = {
-    readonly result: PivotAwareInvestigationResult;
+    readonly result: InvestigationResult;
     /** Supplied when the surface can re-ask; omitted in read-only contexts. */
     readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
     /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */

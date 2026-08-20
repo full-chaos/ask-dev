@@ -1,149 +1,123 @@
-import Ajv2020 from "ajv/dist/2020";
-import addFormats from "ajv-formats";
 import { describe, expect, it } from "vitest";
 
-import stagingSchema from "@/lib/pivot/structure-needs.pending-p1.schema.json";
 import { validateContract } from "@/lib/acr/validate";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
+const RESULT_SCHEMA = "context_fabric_investigation_result.v1.schema.json";
+
 /**
- * Validates the P1(+W1) fragment of every structure-needs fixture against
- * the STAGING schema (`@/lib/pivot/structure-needs.pending-p1.schema.json`
- * — a verbatim copy of the P1 lane's own committed `$defs`, not the pinned
- * contract). Mirrors `investigations.test.ts`'s own discipline: schema
- * validity plus negative controls that prove an invented vocabulary term is
- * actually rejected, not merely absent from the fixtures by omission.
- *
- * Deliberately does NOT run these fixtures through the real
- * `context_fabric_investigation_result.v1.schema.json` (the pinned
- * contract): that schema's `additionalProperties: false` would reject every
- * one of them for carrying `structure_needs`/`confirmed_structure`, which is
- * the whole reason this staging schema exists rather than reusing the real
- * one. The REST of each fixture (everything but the P1(+W1) fragment) is
- * still a real, pinned-schema-valid `investigations.ts` scenario at heart —
- * proven by the second describe block below.
+ * THE SEAM landed (acr 7d275c2e; `@/lib/contracts`'s own header):
+ * `structure_needs`/`confirmed_structure`/`structure_offer_snapshot`/
+ * `window_clarification` are now real fields on the pinned contract, so
+ * every structure-needs fixture validates directly against the SAME
+ * `context_fabric_investigation_result.v1.schema.json` `investigations.ts`'s
+ * own fixtures do — no staging schema, no fragment-stripping. Mirrors
+ * `investigations.test.ts`'s own discipline: schema validity plus negative
+ * controls that prove an invented vocabulary term (or an out-of-bound value)
+ * is actually rejected, not merely absent from the fixtures by omission.
  */
-const ajv = new Ajv2020({
-    allErrors: true,
-    strictRequired: false,
-    strictSchema: true,
-    strictTypes: false,
-});
-addFormats(ajv);
-const validateFragment = ajv.compile({
-    $ref: "#/$defs/StructureAwareResultFragment",
-    ...stagingSchema,
-});
-
-function fragmentOf(result: {
-    readonly structure_needs?: unknown;
-    readonly confirmed_structure?: unknown;
-    readonly structure_offer_snapshot?: unknown;
-    readonly window_clarification?: unknown;
-}): Record<string, unknown> {
-    const fragment: Record<string, unknown> = {};
-    if (result.structure_needs !== undefined) fragment.structure_needs = result.structure_needs;
-    if (result.confirmed_structure !== undefined)
-        fragment.confirmed_structure = result.confirmed_structure;
-    if (result.structure_offer_snapshot !== undefined)
-        fragment.structure_offer_snapshot = result.structure_offer_snapshot;
-    if (result.window_clarification !== undefined)
-        fragment.window_clarification = result.window_clarification;
-    return fragment;
-}
-
-describe("every structure-needs fixture's P1(+W1) fragment is staging-schema-valid", () => {
+describe("every structure-needs fixture round-trips against the pinned contract", () => {
     for (const scenario of structureMockScenarios()) {
         it(`${scenario.id} validates`, () => {
-            const valid = validateFragment(fragmentOf(scenario.result));
-            expect(valid, ajv.errorsText(validateFragment.errors)).toBe(true);
-        });
-    }
-});
-
-describe("every structure-needs fixture is still a pinned-contract-valid base result", () => {
-    for (const scenario of structureMockScenarios()) {
-        it(`${scenario.id} is contract-valid once the P1(+W1) fragment is stripped`, () => {
-            const {
-                structure_needs,
-                confirmed_structure,
-                structure_offer_snapshot,
-                window_clarification,
-                ...rest
-            } = scenario.result;
-            void structure_needs;
-            void confirmed_structure;
-            void structure_offer_snapshot;
-            void window_clarification;
-            const validation = validateContract(
-                "context_fabric_investigation_result.v1.schema.json",
-                rest,
-            );
+            const validation = validateContract(RESULT_SCHEMA, scenario.result);
             expect(validation.valid, validation.errors.join("; ")).toBe(true);
         });
     }
 });
 
-describe("negative controls: the staging schema actually rejects invented vocabulary", () => {
-    it("rejects an invented StructureNeedKind", () => {
-        const valid = validateFragment(
-            fragmentOf({ structure_needs: { missing: ["subject_repository"] } }),
-        );
-        expect(valid).toBe(false);
+describe("schema validation negative controls: the pinned contract actually rejects invented structure vocabulary", () => {
+    // The red half of red->green. If the validator ever stops rejecting
+    // these, the round-trip test above proves nothing.
+
+    function taintedBase(): Record<string, unknown> {
+        const base = structureMockScenarios().find((scenario) => scenario.id === "structure-kind");
+        if (base === undefined) throw new Error("missing structure-kind fixture");
+        return structuredClone(base.result);
+    }
+
+    it("rejects an invented StructureNeedKind in `missing`", () => {
+        const tainted = taintedBase();
+        (tainted["structure_needs"] as { missing: string[] }).missing = ["subject_repository"];
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
     });
 
-    it("rejects an invented StructureDisposition", () => {
-        const valid = validateFragment(
-            fragmentOf({
-                confirmed_structure: [
-                    {
-                        member: "expected_kind",
-                        applied_value: "pull_request",
-                        source: "receipt",
-                        provenance: "clarification_confirmed",
-                        disposition: "silently_dropped",
-                    },
-                ],
-            }),
-        );
-        expect(valid).toBe(false);
+    it("rejects an invented StructureDisposition on a confirmed_structure entry", () => {
+        const tainted = taintedBase();
+        tainted["confirmed_structure"] = [
+            {
+                member: "expected_kind",
+                applied_value: "pull_request",
+                source: "receipt",
+                prior_result_id: "result_structure_kind_0001",
+                receipt_id: "kindr_pull_request_0001",
+                provenance: "clarification_confirmed",
+                disposition: "silently_dropped",
+            },
+        ];
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
     });
 
     it("rejects a kind_options entry whose receipt_id is outside the kindr_ namespace", () => {
-        const valid = validateFragment(
-            fragmentOf({
-                structure_needs: {
-                    missing: ["expected_kind"],
-                    kind_options: [
-                        {
-                            receipt_id: "ancr_wrong_namespace_0001",
-                            option_id: "kind_pull_request",
-                            label: "Pull request",
-                            kind: "pull_request",
-                            offer_source: "engine",
-                        },
-                    ],
-                },
-            }),
-        );
-        expect(valid).toBe(false);
+        const tainted = taintedBase();
+        (
+            tainted["structure_needs"] as {
+                kind_options: { receipt_id: string }[];
+            }
+        ).kind_options[0]!.receipt_id = "ancr_wrong_namespace_0001";
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
     });
 
-    it("rejects an additional property on ConfirmedStructureEntry", () => {
-        const valid = validateFragment(
-            fragmentOf({
-                confirmed_structure: [
-                    {
-                        member: "expected_kind",
-                        applied_value: "pull_request",
-                        source: "receipt",
-                        provenance: "clarification_confirmed",
-                        disposition: "applied",
-                        invented_field: "should not be allowed",
-                    },
-                ],
-            }),
+    it("rejects an additional property on a confirmed_structure entry", () => {
+        const tainted = taintedBase();
+        tainted["confirmed_structure"] = [
+            {
+                member: "expected_kind",
+                applied_value: "pull_request",
+                source: "receipt",
+                prior_result_id: "result_structure_kind_0001",
+                receipt_id: "kindr_pull_request_0001",
+                provenance: "clarification_confirmed",
+                disposition: "applied",
+                invented_field: "should not be allowed",
+            },
+        ];
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * CHAOS-3927 P2 shipped `matched_term_hash` provisionally, typed as a
+     * bare `string` with no committed bound (the field had not yet landed
+     * acr-side — see the fixture's own comment on this value). THE SEAM
+     * revealed the real bound: exactly 24 lowercase hex chars
+     * (`^[0-9a-f]{24}$`). This control proves the pinned schema actually
+     * enforces that bound now — the drift this file's own fixture carried
+     * until this pin bump (a 64-char sha256 hex digest) would have passed
+     * silently before, and must not again.
+     */
+    it("rejects an AnchorOption.matched_term_hash outside the pinned 24-hex bound", () => {
+        const anchorScenario = structureMockScenarios().find(
+            (scenario) => scenario.id === "structure-anchor-window",
         );
-        expect(valid).toBe(false);
+        if (anchorScenario === undefined)
+            throw new Error("missing structure-anchor-window fixture");
+        const tainted = structuredClone(anchorScenario.result) as Record<string, unknown>;
+        (
+            tainted["structure_needs"] as {
+                anchor_options: { matched_term_hash: string }[];
+            }
+        ).anchor_options[0]!.matched_term_hash =
+            "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f9";
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toContain("matched_term_hash");
     });
 });

@@ -66,6 +66,9 @@
           "Exact canonical project label."
         ],
         "confidence": 1.0,
+        "match_mechanisms": [
+          "exact"
+        ],
         "evidence_ref_ids": [
           "evidence_project_identity"
         ]
@@ -117,7 +120,7 @@
   "remaining_work": [
     {
       "finding_id": "finding_12345678",
-      "kind": "required_acceptance",
+      "kind": "narrative",
       "summary": "Complete the real Context Fabric to product acceptance path.",
       "subjects": [
         {

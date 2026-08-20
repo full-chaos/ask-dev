@@ -11,6 +11,8 @@ import { configuredBaseURL } from "../playwright.config";
 // the e2e run itself the moment either one drifts, beats fighting the loader
 // for a constant this small.
 const TRIGGER_CLARIFICATION = "e2e-clarify-me";
+// Kept in sync by hand with `TRIGGER_STRUCTURE_NEEDS` for the same reason.
+const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -133,5 +135,85 @@ test.describe("clarification chips", () => {
         );
         await expect(page.getByRole("button", { name: /^Ask again about /u })).toHaveCount(0);
         await expect(page.getByTestId("cannot-choose-here")).toHaveCount(0);
+
+        // NEGATIVE control for the structure-needs panel too (CHAOS-3927
+        // P1/P2, "structure needs chips" describe block below): a decisive
+        // answer carries no `structure_needs`, so the panel must not render
+        // either.
+        await expect(
+            page.getByRole("region", { name: "More structure would narrow this" }),
+        ).toHaveCount(0);
+        await expect(page.getByRole("button", { name: /^Select /u })).toHaveCount(0);
+    });
+});
+
+/**
+ * Structure-needs-chip POSITIVE control (CHAOS-3927 P1/P2). Same discipline
+ * and same fake-ACR double as "clarification chips" above — see
+ * `tests/support/fake-acr-server.mjs`'s own header for why a real HTTP
+ * double is the only honest way to prove a real, schema-valid
+ * `structure_needs` disclosure renders and round-trips. The NEGATIVE control
+ * for this panel lives in "clarification chips"'s own decisive-answer test
+ * above (a decisive answer is a decisive answer regardless of which panel
+ * would have rendered for a non-decisive one), so it is not duplicated here.
+ */
+test.describe("structure needs chips", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: a question ACR cannot resolve the kind for renders kind-offer chips, and a selection resolves it", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`What's the status of this, ${TRIGGER_STRUCTURE_NEEDS}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const panel = page.getByRole("region", { name: "More structure would narrow this" });
+        await expect(panel).toBeVisible();
+        await expect(page.getByRole("button", { name: "Select Pull request" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Select CI pipeline run" })).toBeVisible();
+
+        // Discriminating, same rule as the clarification-chip control above:
+        // `data-state` mirrors the result's own `status`, so "the panel is
+        // present" cannot be conflated with "the panel is present AND the
+        // result is actually non-decisive."
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(1);
+        await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
+
+        // Picking an offer and confirming re-asks with the CHOSEN receipt —
+        // proving the chip is wired all the way through the chat surface's
+        // shared selection hook, the server hop, and the fake-ACR double's
+        // own receipt check, not decorative.
+        await page.getByRole("button", { name: "Select Pull request" }).click();
+        await page.getByRole("button", { name: "Ask again with these selections" }).click();
+
+        await expect(turns).toHaveCount(2);
+        // The first turn is frozen at its original (clarification) state...
+        await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
+        // ...and the SECOND turn is the discriminating proof: it can only be
+        // "complete" if the fake-ACR double actually recognized the chosen
+        // structure receipt and returned a decisive result, not another
+        // clarification.
+        await expect(turns.last()).toHaveAttribute("data-state", "complete");
+
+        // No NEW re-askable structure-needs panel appeared — the decisive
+        // second turn carries no `structure_needs`, so its own panel never
+        // renders at all. StructureNeedsPanel (unlike ClarificationPanel)
+        // keeps its heading even when frozen (only its footer action
+        // changes — see StructureNeedsPanel.tsx), so exactly ONE region
+        // remains: the superseded first turn's own frozen echo.
+        await expect(
+            page.getByRole("region", { name: "More structure would narrow this" }),
+        ).toHaveCount(1);
+        await expect(
+            page.getByRole("button", { name: "Ask again with these selections" }),
+        ).toHaveCount(0);
+        // The superseded turn's own panel is still on screen, but frozen:
+        // inspection only, same rule as ClarificationPanel's own
+        // `cannot-choose-here` echo.
+        await expect(page.getByTestId("cannot-confirm-structure-here")).toBeVisible();
     });
 });

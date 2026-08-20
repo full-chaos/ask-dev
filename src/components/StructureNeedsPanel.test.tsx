@@ -240,8 +240,8 @@ describe("StructureNeedsPanel", () => {
         const onConfirm = vi.fn();
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
         const user = userEvent.setup();
-        const wrongNamespaceNeeds = {
-            missing: ["expected_kind"] as const,
+        const wrongNamespaceNeeds: StructureNeeds = {
+            missing: ["expected_kind"],
             kind_options: [
                 {
                     ...kindScenario.structure_needs!.kind_options![0]!,

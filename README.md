@@ -174,8 +174,20 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c` (acr main,
-CHAOS-3783).
+Currently pinned: `7d275c2e852247b5b9b8635085cffb98c6e04bb5` (acr main,
+CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 + disclosure-coverage #160/#161).
+
+**`ignoreMinAndMaxItems`.** This pin's `WindowOption` schema (CHAOS-3900 W1
+§5.1's frozen-bounds `allOf`/`anyOf`/`not` conditionals) combines with the
+`maxItems: 20` bound on the arrays that carry it (`StructureNeeds.window_options`,
+`WindowClarification.options`) to exceed TypeScript's own type-complexity
+budget (`TS2590`, reliably, even for a two-element array) — see
+`scripts/sync-acr-contracts.mjs`'s own comment on the
+`json-schema-to-typescript` compile option that fixes it. Every generated
+array is a plain `T[]` as of this pin, not a maxItems-bounded tuple union;
+the bound was never enforced by the TS type regardless (only by
+`validateContract` at runtime), so this is a compile-time simplification,
+not a validation change.
 
 ### Why Next.js is pinned exactly
 
@@ -398,37 +410,37 @@ one, unlike the subject-receipt path above). Both extend the disambiguation
 flow's own rules verbatim: receipts only, never re-ranked, never invented,
 free text never becomes a discriminator.
 
-**PENDING-P1.** `structure_needs` does not exist on the pinned acr contract —
-P1 (the acr-side substrate, CHAOS-3927/CHAOS-3900) is mid-build on a separate
-branch, not yet merged to acr `main`, so there is nothing to sync via
-`scripts/sync-acr-contracts.mjs` yet. This slice is built against
-schema-derived fixtures instead: `src/lib/pivot/structure-contracts.ts`
-hand-mirrors the P1 lane's own committed Go types and JSON Schema `$defs`
-field-for-field (paths and commit cited in that file's header), and
-`src/lib/pivot/structure-needs.pending-p1.schema.json` is a staging copy of
-the relevant `$defs`, used only to validate this repo's own fixtures
-(`src/test/fixtures/structure-needs.ts`) — never a real ACR response.
-Neither file lives under `src/contracts/` and neither is touched by the sync
-script or its drift check.
+**THE SEAM LANDED.** P1 (CHAOS-3927 #159) and CHAOS-3900 W1 (#158) merged to
+acr `main`, and this repo's pin bumped past that merge (`7d275c2e`, "Bumping
+the pin" above) — `structure_needs`/`confirmed_structure`/
+`structure_offer_snapshot`/`window_clarification` are now real, generated
+fields (`src/contracts/generated/investigation-result.ts`), and the four
+`prior_*_receipts` request fields are real too
+(`src/contracts/generated/investigation-request.ts`). The hand-mirrored
+`src/lib/pivot/structure-contracts.ts` and its staging schema
+(`structure-needs.pending-p1.schema.json`) — this section used to describe
+them — are **deleted**; every consumer still imports these names through
+`@/lib/contracts`, which now re-points them at the generated modules (plus a
+handful of vocabulary aliases derived by indexed access, since
+`json-schema-to-typescript` inlines those five enums rather than naming them
+— see that file's own header). `src/test/fixtures/structure-needs.ts`
+validates directly against the real pinned contract now
+(`structure-needs.test.ts`), no fragment-stripping.
 
-**The integration seam** is one function: `buildInvestigationRequest` in
-`src/lib/acr/client.ts` accepts the four new `prior_*_receipts` fields but
-attaches them to the outbound wire object **only when non-empty**. Since ACR
-never emits `structure_needs` today, `StructureNeedsPanel` can never produce
-a selection in real use, so these arrays are always empty and the wire
-payload this function builds is byte-identical to before this change —
-proven in `client.test.ts`. Once P1 (+ CHAOS-3900 W1, window) merge to acr
-`main` and this repo's pin bumps past that merge, the regenerated
-`InvestigationRequest`/`InvestigationResult` types will declare these fields
-themselves; `structure-contracts.ts`'s header ("THE SEAM") lists the small,
-mechanical set of import changes that migration is — no other file changes.
+`buildInvestigationRequest` in `src/lib/acr/client.ts` still attaches the
+four `prior_*_receipts` fields **only when non-empty** — that used to be a
+correctness requirement (the pre-seam pinned schema's `additionalProperties:
+false` would reject them outright); post-seam it is wire minimization only,
+since an empty array is just as schema-valid as an absent key. `client.test.ts`
+still pins the omit-when-empty behavior.
 
-Testing note: this repo has no real e2e mock path (see "What this is, and
-what it is not" above), so the closest thing to an end-to-end proof of the
-panel-hint flow is `src/app/page.test.tsx`'s `structure-needs panel hints`
-suite — the real page component driven against a schema-shaped mock `fetch`
-response, same discipline the clarification flow's own page tests already
-use.
+Real e2e coverage for the panel-hint flow now exists too:
+`tests/support/fake-acr-server.mjs`'s `TRIGGER_STRUCTURE_NEEDS` case and
+`tests/chat.spec.ts`'s `"structure needs chips"` describe block — see that
+file's own disclosure block for what changed and why. `src/app/page.test.tsx`'s
+`structure-needs chips` suite (a schema-shaped mock `fetch` response) remains
+as the unit-level companion, same discipline the clarification flow's own
+page tests already use.
 
 ## Enrichment (M3, not yet wired live)
 

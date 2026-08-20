@@ -10,7 +10,7 @@ import { validateContract } from "@/lib/acr/validate";
 import type {
     BoundStructureReceipt,
     InvestigationRequest,
-    PivotAwareInvestigationResult,
+    InvestigationResult,
 } from "@/lib/contracts";
 
 /**
@@ -118,67 +118,71 @@ export function buildInvestigationRequest(
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
-    // rather than as an opaque ACR 400.
-    //
-    // The cast is unavoidable: json-schema-to-typescript renders `maxItems: 20`
-    // as a union of twenty-one fixed-length tuple types, which no runtime array
-    // can satisfy structurally. The slice above is what actually enforces the
-    // bound, and the request is schema-validated before it is sent.
+    // rather than as an opaque ACR 400. The slice above is what actually
+    // enforces the bound, and the request is schema-validated before it is
+    // sent — `sync-acr-contracts.mjs`'s `ignoreMinAndMaxItems` generation
+    // option means the TYPE no longer encodes the 20-item bound as a tuple
+    // union (see that script's own comment on `WindowOption`), so this cast
+    // is the ordinary `readonly T[]` → `T[]` one: `dedupeAndCap` returns a
+    // readonly array and the generated field is plainly mutable.
     const receipts = dedupeAndCap(priorSubjectReceipts, MAX_PRIOR_SUBJECT_RECEIPTS) as NonNullable<
         InvestigationRequest["prior_subject_receipts"]
     >;
 
-    // ============================== THE SEAM ==============================
     // CHAOS-3927 P2 (design brief §2.1's four `prior_*_receipts` structure
-    // fields). These do NOT exist on `InvestigationRequest` (generated from
-    // the pinned acr commit, which predates P1 entirely — see
-    // `@/lib/pivot/structure-contracts`'s header) or on the pinned request
-    // JSON Schema (`additionalProperties: false`), so attaching them
-    // unconditionally would fail THIS function's own pre-send
-    // `validateContract` call below, today, for every request.
-    //
-    // Attaching them ONLY WHEN NON-EMPTY is what makes this safe rather than
-    // merely deferred: today, ACR never emits `structure_needs` (P1 hasn't
-    // landed acr-side), so `StructureNeedsPanel` can never produce a
-    // selection, so every one of these four arrays is always empty in real
-    // use, so the conditional spread below NEVER adds a key, so the wire
-    // payload this function builds is byte-identical to before this change.
-    // Once P1 (+ W1) land and the ask-dev contract pin bumps past that merge,
-    // the regenerated `InvestigationRequest` will declare these fields
-    // itself and `validateContract` will accept them — nothing else in this
-    // function needs to change; only `InvestigationRequestWithStructure`'s
-    // widening (and the `satisfies` clause below) is deleted, per
-    // `@/lib/pivot/structure-contracts`'s own "THE SEAM" note.
-    // ========================================================================
+    // fields). THE SEAM landed (acr 7d275c2e; see `@/lib/contracts`'s own
+    // header): `InvestigationRequest` now DECLARES these four fields itself,
+    // so attaching them is legal on the wire unconditionally. Still attached
+    // ONLY WHEN NON-EMPTY, but that is wire minimization now, not a
+    // correctness requirement — an empty array is just as schema-valid as an
+    // absent key. `client.test.ts` pins this behavior.
+    // Same `readonly T[]` → `T[]` cast as `receipts` above, applied per
+    // field (each of the four generated properties is its OWN namespaced
+    // type — `KindBoundReceipt[]`/etc. — not `BoundStructureReceipt[]`).
+    // `Pick` keeps `structureFields`'s own type exactly aligned with the
+    // four request properties it spreads into, one cast per field rather
+    // than one for the whole object.
     const structureFields: Partial<
-        Record<
+        Pick<
+            InvestigationRequest,
             | "prior_kind_receipts"
             | "prior_anchor_receipts"
             | "prior_handle_receipts"
-            | "prior_window_receipts",
-            readonly BoundStructureReceipt[]
+            | "prior_window_receipts"
         >
     > = {};
     const kindReceipts = dedupeAndCap(
         structureReceipts.priorKindReceipts ?? [],
         MAX_STRUCTURE_RECEIPTS,
     );
-    if (kindReceipts.length > 0) structureFields.prior_kind_receipts = kindReceipts;
+    if (kindReceipts.length > 0)
+        structureFields.prior_kind_receipts = kindReceipts as NonNullable<
+            InvestigationRequest["prior_kind_receipts"]
+        >;
     const anchorReceipts = dedupeAndCap(
         structureReceipts.priorAnchorReceipts ?? [],
         MAX_STRUCTURE_RECEIPTS,
     );
-    if (anchorReceipts.length > 0) structureFields.prior_anchor_receipts = anchorReceipts;
+    if (anchorReceipts.length > 0)
+        structureFields.prior_anchor_receipts = anchorReceipts as NonNullable<
+            InvestigationRequest["prior_anchor_receipts"]
+        >;
     const handleReceipts = dedupeAndCap(
         structureReceipts.priorHandleReceipts ?? [],
         MAX_STRUCTURE_RECEIPTS,
     );
-    if (handleReceipts.length > 0) structureFields.prior_handle_receipts = handleReceipts;
+    if (handleReceipts.length > 0)
+        structureFields.prior_handle_receipts = handleReceipts as NonNullable<
+            InvestigationRequest["prior_handle_receipts"]
+        >;
     const windowReceipts = dedupeAndCap(
         structureReceipts.priorWindowReceipts ?? [],
         MAX_STRUCTURE_RECEIPTS,
     );
-    if (windowReceipts.length > 0) structureFields.prior_window_receipts = windowReceipts;
+    if (windowReceipts.length > 0)
+        structureFields.prior_window_receipts = windowReceipts as NonNullable<
+            InvestigationRequest["prior_window_receipts"]
+        >;
 
     return {
         schema_version: "context_fabric_investigation_request.v1",
@@ -344,7 +348,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
 export async function investigate(
     config: AcrRuntimeConfig,
     options: InvestigationOptions,
-): Promise<PivotAwareInvestigationResult> {
+): Promise<InvestigationResult> {
     const request = buildInvestigationRequest(
         options.question,
         options.priorSubjectReceipts ?? [],
@@ -474,10 +478,9 @@ export async function investigate(
     }
 
     // The cast is honest: `validation` above proved `payload` satisfies the
-    // PINNED result schema, which is a STRICT SUBSET of `PivotAwareResult`
-    // (every P1(+W1) field is optional-only-widening — see
-    // `@/lib/pivot/structure-contracts`). Nothing here claims the payload
-    // actually carries `structure_needs`; it never will until P1 lands and
-    // the pin bumps, per that file's "THE SEAM".
-    return payload as PivotAwareInvestigationResult;
+    // pinned result schema, and that schema now declares `InvestigationResult`
+    // itself (THE SEAM landed — see `@/lib/contracts`'s own header), so this
+    // is the same validated-payload cast every other contract type in this
+    // file already relies on.
+    return payload as InvestigationResult;
 }

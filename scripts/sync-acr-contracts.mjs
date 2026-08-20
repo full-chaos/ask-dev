@@ -28,8 +28,9 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-3783 (`0ed4e1a`). Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "0ed4e1ae7fdbb4e7e121b20d733f2ff8fd516e1c";
+// acr main, CHAOS-3927 P1 (#159) + W1 (#158) + disclosure coverage (#160/#161)
+// (`7d275c2e`). Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "7d275c2e852247b5b9b8635085cffb98c6e04bb5";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -164,6 +165,27 @@ async function generatedModules(schemaDirectory) {
             cwd: `${schemaDirectory}${path.sep}`,
             declareExternallyReferenced: true,
             format: false,
+            // CHAOS-3927 P1 (acr 7d275c2e): `WindowOption`'s schema carries
+            // `allOf`/`anyOf`/`not` frozen-bounds conditionals (design brief
+            // §5.1) alongside its `properties`. json-schema-to-typescript
+            // renders those as index-signature intersections it cannot merge
+            // into a plain object shape, and instantiating THAT inside a
+            // `maxItems`-bounded array (`json-schema-to-typescript` renders
+            // maxItems as a union of fixed-length tuples) is what exceeds
+            // TypeScript's own type-complexity budget (`TS2590`) — reliably,
+            // even for a two-element literal array, not merely a large one.
+            // `ignoreMinAndMaxItems` renders every bounded array as a plain
+            // `T[]` instead, which sidesteps that combinatorial blowup for
+            // every field, not just WindowOption's. This does not weaken
+            // validation: `maxItems`/`minItems`/`uniqueItems` were never
+            // enforced by the TS type in the first place (a structural type
+            // cannot express "at most 20 items" as anything other than that
+            // same union-of-tuples), only by `validateContract` at runtime —
+            // exactly the reasoning `buildInvestigationRequest`
+            // (`@/lib/acr/client.ts`) already documented for
+            // `prior_subject_receipts` before this pin bump ever introduced
+            // `WindowOption`.
+            ignoreMinAndMaxItems: true,
             strictIndexSignatures: true,
             unknownAny: false,
         });

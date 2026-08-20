@@ -15,7 +15,7 @@ import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
-import type { PivotAwareInvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
     buildStructureReceiptFields,
     type StructureSelectionBatch,
@@ -34,7 +34,7 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
 type Outcome =
     | { readonly kind: "idle" }
     | { readonly kind: "pending" }
-    | { readonly kind: "answered"; readonly result: PivotAwareInvestigationResult }
+    | { readonly kind: "answered"; readonly result: InvestigationResult }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 // `enriched` joins this list in M3, behind its fail-closed validator.
@@ -123,7 +123,7 @@ export default function WorkbenchPage() {
                 });
                 return;
             }
-            setOutcome({ kind: "answered", result: result as PivotAwareInvestigationResult });
+            setOutcome({ kind: "answered", result: result as InvestigationResult });
         } catch (error) {
             // Never swallow: a dead server hop is itself a reportable outcome.
             console.error("investigation request failed", error);
