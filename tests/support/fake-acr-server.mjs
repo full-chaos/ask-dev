@@ -283,6 +283,17 @@ const server = createServer((request, response) => {
             // kindr_-shaped id" — codex round 1: a bug that sent back the
             // wrong offer's receipt (not just the wrong wire field) would
             // otherwise still read as decisive here.
+            // codex round 2 (P3, documented rather than fixed — this double
+            // exists to prove the wire round-trip, not to be the contract's
+            // enforcement layer): the two branches are ORed, so a structure
+            // receipt that somehow landed in `prior_subject_receipts` instead
+            // of `prior_kind_receipts` would still read as decisive here.
+            // The real contract validator (`validateContract`, run by both
+            // the real client and this double's own schema conformance) is
+            // what actually rejects a receipt outside its namespace on the
+            // wire; this double's job is narrower — proving the CORRECT
+            // field carries the CORRECT receipt when everything is wired
+            // right, which the exact-id match above already does.
             const chosenKindReceiptIds = Array.isArray(parsed.prior_kind_receipts)
                 ? parsed.prior_kind_receipts.map((receipt) => receipt?.receipt_id)
                 : [];

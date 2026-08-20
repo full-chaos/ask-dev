@@ -72,7 +72,7 @@ export type InvestigationOptions = {
     readonly question: string;
     readonly priorSubjectReceipts?: readonly BoundReceipt[] | undefined;
     // CHAOS-3927 P2 (design brief §2.1/§2.2). See buildInvestigationRequest's
-    // own comment for why these do not yet reach the wire.
+    // own comment: attached to the outbound wire object when non-empty.
     readonly priorKindReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
