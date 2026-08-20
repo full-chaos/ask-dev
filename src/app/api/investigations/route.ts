@@ -254,8 +254,8 @@ export async function POST(request: Request): Promise<NextResponse> {
                 code: "workbench_misconfigured",
                 message:
                     error instanceof AcrConfigError
-                        ? `The Workbench server is not configured: ${error.message}.`
-                        : "The Workbench server is not configured.",
+                        ? `The server is not configured: ${error.message}.`
+                        : "The server is not configured.",
                 retryable: false,
             },
             500,

@@ -402,8 +402,8 @@ export async function investigate(
             code: "workbench_misconfigured",
             message:
                 error instanceof Error
-                    ? `The Workbench could not sign the ACR assertion: ${error.message}`
-                    : "The Workbench could not sign the ACR assertion.",
+                    ? `The server could not sign the ACR assertion: ${error.message}`
+                    : "The server could not sign the ACR assertion.",
             retryable: false,
         });
     }

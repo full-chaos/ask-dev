@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
-    title: "Context Fabric Workbench",
-    description: "Standalone answer test platform for the ACR Context Fabric.",
+    title: "Ask Dev",
+    description: "Ask Dev — conversational access to the ACR Context Fabric.",
     robots: { index: false, follow: false },
 };
 
