@@ -56,3 +56,17 @@ export function validateContract(schema: ContractSchemaName, value: unknown): Va
         ),
     };
 }
+
+/**
+ * Validates a single string against the SAME `format: "date-time"` rule
+ * `ajv-formats` enforces everywhere else in this file — a strict RFC 3339
+ * check, not the looser `Date.parse`, which accepts values the pinned
+ * schema rejects (`"2026-01-01"`, `"2026-01-01T00:00:00"` with no offset).
+ * Exists so `src/app/api/investigations/route.ts`'s eager conversation-turn
+ * validation matches the contract it is a proxy for, rather than an
+ * independently-drifting approximation of it (codex review round 2).
+ */
+const dateTimeValidator = ajv.compile({ type: "string", format: "date-time" });
+export function isDateTimeFormatted(value: string): boolean {
+    return dateTimeValidator(value);
+}

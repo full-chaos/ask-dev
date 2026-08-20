@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { investigate } from "@/lib/acr/client";
 import { AcrConfigError, loadAcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
-import { STRUCTURE_RECEIPT_PREFIX, type BoundStructureReceipt } from "@/lib/contracts";
+import { isDateTimeFormatted } from "@/lib/acr/validate";
+import {
+    STRUCTURE_RECEIPT_PREFIX,
+    type BoundStructureReceipt,
+    type ConversationTurn,
+} from "@/lib/contracts";
 
 /**
  * The Workbench's server hop to ACR.
@@ -54,6 +59,8 @@ type InvestigateBody = {
     readonly priorAnchorReceipts?: unknown;
     readonly priorHandleReceipts?: unknown;
     readonly priorWindowReceipts?: unknown;
+    /** Chat-surface conversation threading. See src/lib/conversation.ts's own header. */
+    readonly conversation?: unknown;
 };
 
 /**
@@ -115,6 +122,76 @@ function parseReceipts(value: unknown, expectedPrefix?: string): readonly BoundS
 
 class MalformedReceiptError extends Error {
     override readonly name = "MalformedReceiptError";
+}
+
+/**
+ * Same discipline as `parseReceipts` above: a malformed conversation turn
+ * REJECTS the whole request rather than being dropped. A silently dropped
+ * turn would mean a follow-up question runs without the context the tester
+ * saw on screen, which looks exactly like conversation threading working
+ * when it silently is not — the same C5/Item-1 class this route already
+ * closes for receipts.
+ *
+ * The chat surface builds every entry itself (`buildConversationTurns`), so
+ * a malformed one should be unreachable in practice — checked anyway,
+ * because "should be" is not "is", and this route has no other line of
+ * defense before the contract-wide `validateContract` call deep inside
+ * `investigate()`, which only runs AFTER configuration is loaded (see that
+ * function's own comment on why request validation runs before it).
+ */
+const CONVERSATION_TURN_KEYS = ["turn_id", "role", "content", "created_at"] as const;
+const MAX_CONVERSATION_TURN_ID_LENGTH = 256;
+const MAX_CONVERSATION_CONTENT_LENGTH = 12_000;
+
+function parseConversation(value: unknown): readonly ConversationTurn[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw new MalformedConversationError();
+    return value.map((entry) => {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+            throw new MalformedConversationError();
+        }
+        const record = entry as Record<string, unknown>;
+        const keys = Object.keys(record);
+        if (
+            keys.length !== CONVERSATION_TURN_KEYS.length ||
+            !CONVERSATION_TURN_KEYS.every((key) => keys.includes(key))
+        ) {
+            throw new MalformedConversationError();
+        }
+        const { turn_id: turnId, role, content, created_at: createdAt } = record;
+        if (
+            typeof turnId !== "string" ||
+            codePointLength(turnId) < 1 ||
+            codePointLength(turnId) > MAX_CONVERSATION_TURN_ID_LENGTH
+        ) {
+            throw new MalformedConversationError();
+        }
+        if (role !== "user" && role !== "assistant") throw new MalformedConversationError();
+        if (
+            typeof content !== "string" ||
+            codePointLength(content) < 1 ||
+            codePointLength(content) > MAX_CONVERSATION_CONTENT_LENGTH
+        ) {
+            throw new MalformedConversationError();
+        }
+        // The contract declares `created_at` as `format: date-time`
+        // (context_fabric_common.v1.schema.json), not a bare non-empty
+        // string. `isDateTimeFormatted` runs the SAME ajv-formats
+        // `date-time` check the contract-wide validator uses (codex review
+        // round 2: `Date.parse` was too loose — it accepts values the
+        // pinned schema rejects, e.g. `"2026-01-01"` or a timestamp with no
+        // UTC offset), eagerly, rather than letting it ride through to the
+        // contract-wide `validateContract` call inside `investigate()`,
+        // which only runs AFTER configuration is loaded.
+        if (typeof createdAt !== "string" || !isDateTimeFormatted(createdAt)) {
+            throw new MalformedConversationError();
+        }
+        return { turn_id: turnId, role, content, created_at: createdAt };
+    });
+}
+
+class MalformedConversationError extends Error {
+    override readonly name = "MalformedConversationError";
 }
 
 function failureResponse(failure: WorkbenchFailure, status: number): NextResponse {
@@ -243,6 +320,21 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
     }
 
+    let conversation: readonly ConversationTurn[];
+    try {
+        conversation = parseConversation(body.conversation);
+    } catch {
+        return failureResponse(
+            {
+                code: "acr_rejected_request",
+                message:
+                    "The supplied conversation history was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+
     let config;
     try {
         config = loadAcrRuntimeConfig();
@@ -270,6 +362,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             priorAnchorReceipts: structureReceipts.priorAnchorReceipts,
             priorHandleReceipts: structureReceipts.priorHandleReceipts,
             priorWindowReceipts: structureReceipts.priorWindowReceipts,
+            conversation,
             signal: request.signal,
         });
         return NextResponse.json({ result }, { status: 200 });

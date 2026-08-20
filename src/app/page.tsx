@@ -9,9 +9,11 @@ import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { subjectForReceipt } from "@/lib/clarification";
+import { buildConversationTurns } from "@/lib/conversation";
 import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
     buildStructureReceiptFields,
+    pendingStructureBatchOrUndefined,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
@@ -49,10 +51,18 @@ type AssistantOutcome =
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 type Turn =
-    | { readonly role: "user"; readonly id: number; readonly question: string }
+    | {
+          readonly role: "user";
+          readonly id: number;
+          readonly question: string;
+          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
+          readonly createdAt: string;
+      }
     | {
           readonly role: "assistant";
           readonly id: number;
+          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
+          readonly createdAt: string;
           readonly outcome: AssistantOutcome;
           /** The subject the tester chose, when this turn answers a re-ask that carried one. */
           readonly chosenSubject: SubjectRef | undefined;
@@ -107,13 +117,19 @@ export default function ChatPage() {
     ) {
         const userTurnId = nextId.current++;
         const assistantTurnId = nextId.current++;
+        // Captured from the CURRENT timeline, BEFORE the pending pair below
+        // is appended — a re-ask's own not-yet-answered turn must never be
+        // threaded as its own prior context.
+        const conversation = buildConversationTurns(turns);
         structureSelections.reset();
+        const askedAt = new Date().toISOString();
         setTurns((current) => [
             ...current,
-            { role: "user", id: userTurnId, question },
+            { role: "user", id: userTurnId, question, createdAt: askedAt },
             {
                 role: "assistant",
                 id: assistantTurnId,
+                createdAt: askedAt,
                 outcome: { kind: "pending" },
                 chosenSubject: chosen,
                 submittedStructureBatch: undefined,
@@ -138,7 +154,12 @@ export default function ChatPage() {
             const response = await fetch("/api/investigations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question, priorSubjectReceipts, ...structureReceiptFields }),
+                body: JSON.stringify({
+                    question,
+                    priorSubjectReceipts,
+                    conversation,
+                    ...structureReceiptFields,
+                }),
             });
             const payload: unknown = await response.json();
             const failure = (payload as { failure?: unknown }).failure;
@@ -183,7 +204,34 @@ export default function ChatPage() {
             return;
         }
         const { result } = latestAssistantTurn.outcome;
-        void ask(result.question, [choice], subjectForReceipt(result, choice.receipt_id));
+        // Mixed-receipt-family unification: a response can carry BOTH subject
+        // candidates and a structure_needs disclosure at once. Picking a
+        // candidate fires immediately (unlike structure offers, which
+        // accumulate behind an explicit confirm), so any structure picks the
+        // tester already made in this SAME turn — accumulated but not yet
+        // confirmed — must travel in this SAME re-ask, or `ask()` resetting
+        // the shared selection hook below would silently drop them.
+        const pendingStructureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
+        if (pendingStructureBatch !== undefined) {
+            // Snapshotted BEFORE `ask()` resets the shared hook and appends a
+            // new turn, same reason `chooseStructure` below does — otherwise
+            // this turn's own frozen echo would render as if nothing had
+            // ever been picked (codex review round 1, finding 3).
+            const supersededTurnId = latestAssistantTurn.id;
+            setTurns((current) =>
+                current.map((turn) =>
+                    turn.role === "assistant" && turn.id === supersededTurnId
+                        ? { ...turn, submittedStructureBatch: pendingStructureBatch }
+                        : turn,
+                ),
+            );
+        }
+        void ask(
+            result.question,
+            [choice],
+            subjectForReceipt(result, choice.receipt_id),
+            pendingStructureBatch,
+        );
     }
 
     function chooseStructure(batch: StructureSelectionBatch) {

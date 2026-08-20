@@ -7,8 +7,10 @@ import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { boundedUpstreamCode, boundedUpstreamRequestId } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
+import { MAX_CONVERSATION_TURNS_ON_WIRE } from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
+    ConversationTurn,
     InvestigationRequest,
     InvestigationResult,
 } from "@/lib/contracts";
@@ -77,6 +79,11 @@ export type InvestigationOptions = {
     readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
+    // Chat-surface conversation threading. See src/lib/conversation.ts's own
+    // header: the Workbench never supplies this (it asks one independent
+    // question at a time by design), so it defaults to empty below exactly
+    // as it always has.
+    readonly conversation?: readonly ConversationTurn[] | undefined;
     readonly signal?: AbortSignal;
 };
 
@@ -115,6 +122,7 @@ export function buildInvestigationRequest(
         readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
         readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
     } = {},
+    conversation: readonly ConversationTurn[] = [],
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
@@ -183,11 +191,20 @@ export function buildInvestigationRequest(
             InvestigationRequest["prior_window_receipts"]
         >;
 
+    // Wire-minimized the same way the four structure fields are (attached
+    // only when non-empty): `conversation` is optional on the pinned
+    // contract, and an absent key is just as valid as an empty array. Capped
+    // to the wire's own bound here too — defense in depth, since
+    // `buildConversationTurns` (the chat surface's only caller) already caps
+    // lower — so a future caller that skips that cap still cannot build a
+    // request the contract rejects.
+    const conversationTurns = conversation.slice(-MAX_CONVERSATION_TURNS_ON_WIRE);
+
     return {
         schema_version: "context_fabric_investigation_request.v1",
         request_id: requestId(),
         question,
-        conversation: [],
+        ...(conversationTurns.length > 0 ? { conversation: conversationTurns } : {}),
         prior_subject_receipts: receipts,
         ...structureFields,
         time_context: { axis: "current" },
@@ -357,6 +374,7 @@ export async function investigate(
             priorHandleReceipts: options.priorHandleReceipts,
             priorWindowReceipts: options.priorWindowReceipts,
         },
+        options.conversation ?? [],
     );
     const body = JSON.stringify(request);
 

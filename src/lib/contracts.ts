@@ -39,6 +39,7 @@ export type {
 export type {
     ACRContextFabricInvestigationRequestV1 as InvestigationRequest,
     AnchorBoundReceipt,
+    ConversationTurn,
     HandleBoundReceipt,
     KindBoundReceipt,
     WindowBoundReceipt,

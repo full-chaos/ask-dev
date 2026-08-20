@@ -10,9 +10,10 @@ const resultsDirectory = process.env["PLAYWRIGHT_RESULTS_DIR"] ?? "test-results/
 // for why this exists rather than mocking inside the browser or the app.
 // Runs against the SAME production build as the unconfigured instance above
 // (`next start` only reads `.next`, so two instances on different ports are
-// safe); it exists purely so the chat surface's clarification-chip coverage
-// can drive a real, schema-valid `clarification_required` response, which
-// the unconfigured instance can never produce.
+// safe); it exists purely so the chat surface's clarification-chip,
+// structure-needs-chip, mixed-receipt-family, and conversation-threading
+// coverage can drive real, schema-valid responses, which the unconfigured
+// instance can never produce.
 // Fixed default ports, same convention as `PLAYWRIGHT_WEB_PORT`/
 // `PLAYWRIGHT_BASE_URL` above (both pre-existing): every port here is
 // independently overridable so two concurrent local runs of THIS repo can
@@ -76,9 +77,9 @@ export default defineConfig({
             timeout: 30_000,
         },
         // A second next-start instance, configured to talk to the fake-ACR
-        // double above. Only the chat clarification-chip spec points its
-        // baseURL here (via `configuredBaseURL`); every other spec uses the
-        // unconfigured instance.
+        // double above. Only the `tests/chat.spec.ts` describe blocks that
+        // opt in via `test.use({ baseURL: configuredBaseURL })` point here;
+        // every other spec uses the unconfigured instance.
         {
             command: `bash -c "node tests/support/gen-e2e-key.mjs '${e2eSigningKeyPath}' && pnpm exec next start --hostname 127.0.0.1 --port ${configuredPort}"`,
             url: configuredBaseURL,

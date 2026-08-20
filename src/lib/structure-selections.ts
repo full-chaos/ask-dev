@@ -49,6 +49,27 @@ export function structureSelectionCount(batch: StructureSelectionBatch): number 
 }
 
 /**
+ * Mixed-receipt-family unification (CHAOS-3927 P2 follow-up).
+ *
+ * A response can legally carry BOTH a subject-candidate clarification and a
+ * `structure_needs` disclosure at once now that P1 landed (the two are
+ * independent optional fields on the same result — nothing in the pinned
+ * schema forbids their co-presence). Picking a subject candidate fires its
+ * own re-ask immediately (unlike structure offers, which accumulate behind
+ * an explicit "Ask again with these selections" confirm), so any structure
+ * picks the tester already made in the SAME turn's panel — accumulated but
+ * not yet confirmed — must travel in that SAME re-ask, or `ask()` resetting
+ * the shared selection hook would silently drop them. This is the one place
+ * both the chat surface and the Workbench read the live batch to decide
+ * whether there is anything of the OTHER family to carry along.
+ */
+export function pendingStructureBatchOrUndefined(
+    batch: StructureSelectionBatch,
+): StructureSelectionBatch | undefined {
+    return structureSelectionCount(batch) > 0 ? batch : undefined;
+}
+
+/**
  * Pure reducer: select-or-replace, or deselect if the SAME offer is clicked
  * again. The one place this toggle semantic lives, so every caller (the
  * panel rendered in the raw view, the one rendered in the deterministic

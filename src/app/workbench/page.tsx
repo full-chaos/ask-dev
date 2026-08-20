@@ -18,6 +18,7 @@ import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
 import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
 import {
     buildStructureReceiptFields,
+    pendingStructureBatchOrUndefined,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
@@ -141,9 +142,22 @@ export default function WorkbenchPage() {
 
     // Resolves the receipt to its subject at CHOICE time, while the issuing
     // result is still on screen — the only place that mapping exists.
+    //
+    // Mixed-receipt-family unification: a response can carry BOTH subject
+    // candidates and a structure_needs disclosure at once. Picking a
+    // candidate fires immediately (unlike structure offers, which accumulate
+    // behind an explicit confirm), so any structure picks the tester already
+    // made for THIS result — accumulated but not yet confirmed — must travel
+    // in this SAME re-ask, or `ask()` resetting the shared selection hook
+    // below would silently drop them.
     function chooseCandidate(choice: ClarificationChoice) {
         if (outcome.kind !== "answered") return;
-        void ask(askedQuestion, [choice], subjectForReceipt(outcome.result, choice.receipt_id));
+        void ask(
+            askedQuestion,
+            [choice],
+            subjectForReceipt(outcome.result, choice.receipt_id),
+            pendingStructureBatchOrUndefined(structureSelections.batch),
+        );
     }
 
     // CHAOS-3927 P2: fires the single re-ask carrying every structure member
