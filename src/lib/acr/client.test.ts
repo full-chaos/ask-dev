@@ -185,6 +185,71 @@ describe("buildInvestigationRequest", () => {
             expect(request).not.toHaveProperty("prior_window_receipts");
         });
     });
+
+    /**
+     * Conversation threading (chat-surface follow-up context). Same
+     * wire-minimization discipline as the four structure fields above: the
+     * key is omitted, not sent empty, and what IS sent is capped at the
+     * contract's own bound regardless of what the caller passed.
+     */
+    describe("conversation (chat-surface threading) does not reach the wire until there is something to send", () => {
+        it("omits conversation when nothing was passed", () => {
+            const request = buildInvestigationRequest("q");
+
+            expect(request).not.toHaveProperty("conversation");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("omits conversation even when called with an explicit empty array", () => {
+            const request = buildInvestigationRequest("q", [], {}, []);
+
+            expect(request).not.toHaveProperty("conversation");
+        });
+
+        it("carries every supplied turn, in order, when non-empty", () => {
+            const turns = [
+                {
+                    turn_id: "turn_0",
+                    role: "user" as const,
+                    content: "What is the status of dev-health-ops?",
+                    created_at: "2026-01-01T00:00:00.000Z",
+                },
+                {
+                    turn_id: "turn_1",
+                    role: "assistant" as const,
+                    content: "It is on track.",
+                    created_at: "2026-01-01T00:00:01.000Z",
+                },
+            ];
+            const request = buildInvestigationRequest("q", [], {}, turns);
+
+            expect(request.conversation).toEqual(turns);
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("caps conversation at the contract's maxItems (50), keeping the most recent turns", () => {
+            const many = Array.from({ length: 55 }, (_, index) => ({
+                turn_id: `turn_${String(index)}`,
+                role: "user" as const,
+                content: `q${String(index)}`,
+                created_at: "2026-01-01T00:00:00.000Z",
+            }));
+            const request = buildInvestigationRequest("q", [], {}, many);
+
+            expect(request.conversation).toHaveLength(50);
+            expect(request.conversation?.[0]?.turn_id).toBe("turn_5");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+    });
 });
 
 describe("investigate — upstream text never reaches the caller", () => {

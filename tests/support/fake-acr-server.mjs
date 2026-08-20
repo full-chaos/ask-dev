@@ -27,12 +27,14 @@
  *
  * Response selection is a dumb keyword router, not a scenario engine: a
  * question containing TRIGGER_CLARIFICATION returns a `clarification_required`
- * result with subject candidates, a question containing
- * TRIGGER_STRUCTURE_NEEDS returns a `clarification_required` result with a
- * `structure_needs` disclosure (kind offers) instead. Every other question
- * returns the canonical `complete` example unchanged apart from
- * `question`/`result_id`/`request_id`, so it never accidentally collides
- * with either scenario's identifiers.
+ * result with subject candidates, TRIGGER_STRUCTURE_NEEDS returns one with a
+ * `structure_needs` disclosure (kind offers) instead, TRIGGER_MIXED returns
+ * one with BOTH at once, and TRIGGER_CONVERSATION_ECHO returns a decisive
+ * result whose `deterministic_answer` reports back what `conversation` the
+ * request itself carried. Every other question returns the canonical
+ * `complete` example unchanged apart from `question`/`result_id`/
+ * `request_id`, so it never accidentally collides with any scenario's
+ * identifiers.
  *
  * ===================== MOCK-INFRASTRUCTURE DISCLOSURE =====================
  * This IS mock infrastructure, full stop — a fake server is a fake server
@@ -58,11 +60,13 @@
  *       spawns it (alongside every OTHER e2e spec's run, since Playwright
  *       starts every `webServer` entry up front — this process just sits
  *       idle for any spec that never talks to it). Only `tests/chat.spec.ts`'s
- *       `"clarification chips"` and `"structure needs chips"` describe
- *       blocks actually TALK to it, by overriding `baseURL` to the
- *       configured app instance that points at it (codex review round 2,
- *       correcting an earlier version of this comment that implied the
- *       double itself was scoped to one spec).
+ *       `"clarification chips"`, `"structure needs chips"`, `"mixed receipt
+ *       families"`, and `"conversation threading"` describe blocks actually
+ *       TALK to it, by overriding `baseURL` to the configured app instance
+ *       that points at it (codex review round 2, correcting an earlier
+ *       version of this comment that implied the double itself was scoped
+ *       to one spec; extended again in round 2 of the mixed-receipt-family
+ *       and conversation-threading follow-up for the same reason).
  *   (d) CHAOS-3927 P1 (+ CHAOS-3900 W1) merged to acr `main`, and this
  *       repo's contract pin bumped past that merge (README's "Bumping the
  *       pin", pin `7d275c2e`): `structure_needs`/`confirmed_structure` are
@@ -86,6 +90,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FAKE_ACR_PORT ?? "4021");
 export const TRIGGER_CLARIFICATION = "e2e-clarify-me";
 export const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
+// Mixed-receipt-family unification follow-up: a response that discloses
+// BOTH a subject-candidate clarification AND a structure_needs disclosure
+// at once — legal on the pinned schema (the two are independent optional
+// fields on the same result) and wire-legal only since P1 landed.
+export const TRIGGER_MIXED = "e2e-mixed-me";
+// Conversation threading follow-up: echoes back what `conversation` this
+// request itself carried, so an e2e spec can prove turn 2 actually threads
+// turn 1's own content rather than merely asserting the request "looks
+// fine" some other way.
+export const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 
 const canonical = JSON.parse(
     readFileSync(
@@ -108,6 +122,34 @@ function answeredResult(question) {
  * override set field-for-field: same reason each field is emptied (a result
  * that has not resolved a subject has no judgment to give).
  */
+// The exact candidate set `clarificationResult` (and `mixedResult`, which
+// reuses it) discloses — hoisted so the receipt-recognition check below can
+// validate a re-ask's chosen subject receipt against these SAME ids, never a
+// wider "any non-empty array" match. Mirrors `STRUCTURE_KIND_OPTIONS`'s own
+// reasoning exactly (codex round 2, finding 3): a bug that sent back a
+// stale or wrong candidate's receipt (not merely SOME receipt) would
+// otherwise still read as decisive here.
+const SUBJECT_CANDIDATES = [
+    {
+        receipt_id: "receipt_e2e_ask_dev",
+        subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+        state: "ambiguous",
+        matched_terms: ["Ask Dev"],
+        match_reasons: ["Exact canonical project label."],
+        confidence: 0.6,
+        evidence_ref_ids: ["evidence_project_identity"],
+    },
+    {
+        receipt_id: "receipt_e2e_atlas",
+        subject: { kind: "project", canonical_id: "project_atlas", label: "Atlas" },
+        state: "ambiguous",
+        matched_terms: ["Atlas"],
+        match_reasons: ["Fuzzy canonical project label."],
+        confidence: 0.4,
+        evidence_ref_ids: ["evidence_project_identity"],
+    },
+];
+
 function clarificationResult(question) {
     const result = structuredClone(canonical);
     return {
@@ -122,26 +164,7 @@ function clarificationResult(question) {
             clarification_reason: "The term matches more than one canonical subject.",
         },
         subject_resolution: {
-            candidates: [
-                {
-                    receipt_id: "receipt_e2e_ask_dev",
-                    subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
-                    state: "ambiguous",
-                    matched_terms: ["Ask Dev"],
-                    match_reasons: ["Exact canonical project label."],
-                    confidence: 0.6,
-                    evidence_ref_ids: ["evidence_project_identity"],
-                },
-                {
-                    receipt_id: "receipt_e2e_atlas",
-                    subject: { kind: "project", canonical_id: "project_atlas", label: "Atlas" },
-                    state: "ambiguous",
-                    matched_terms: ["Atlas"],
-                    match_reasons: ["Fuzzy canonical project label."],
-                    confidence: 0.4,
-                    evidence_ref_ids: ["evidence_project_identity"],
-                },
-            ],
+            candidates: SUBJECT_CANDIDATES,
             committed: [],
             clarification_prompt: "Did you mean Ask Dev or Atlas?",
         },
@@ -226,6 +249,70 @@ function structureNeedsResult(question) {
     };
 }
 
+/**
+ * The mixed scenario (mixed-receipt-family unification follow-up): the SAME
+ * subject candidates as `clarificationResult` AND the SAME kind offers as
+ * `structureNeedsResult`, disclosed on ONE result. Proves the co-presence
+ * this double's two single-family scenarios never exercise together, and
+ * lets the routing below require BOTH receipt families to arrive on the
+ * re-ask before it is decisive — the mutation-provable positive control:
+ * break `chooseCandidate` back to sending only the subject receipt and this
+ * scenario stops resolving.
+ */
+function mixedResult(question) {
+    const clarification = clarificationResult(question);
+    const structure = structureNeedsResult(question);
+    return {
+        ...clarification,
+        result_id: "result_e2e_mixed_0001",
+        request_id: "request_e2e_mixed_0001",
+        interpretation: {
+            ...clarification.interpretation,
+            clarification_reason:
+                "The term matches more than one canonical subject, and the question does not name which kind of thing it is about.",
+        },
+        structure_needs: structure.structure_needs,
+        limitations: [
+            "No judgment was formed because the subject and the kind are both unresolved.",
+        ],
+        deterministic_answer:
+            "The subject and the kind of thing this question is about are unresolved.",
+    };
+}
+
+/**
+ * Conversation threading follow-up: echoes back the turn count and every
+ * prior USER turn's own content it received in `conversation` (verbatim, so
+ * a spec can assert turn 1's own question text reappears in turn 2's
+ * answer) — proving the SERVER actually received what the client claims to
+ * have sent, not just that the client built something locally.
+ */
+// The pinned contract's own bound on `deterministic_answer`
+// (`maxLength: 12000` — context_fabric_investigation_result.v1.schema.json).
+// `priorUserContent` below is capped well under it: two legal
+// `conversation` turns near their own 12000-char `content` cap would
+// otherwise concatenate past this result's own bound and make the double
+// return a schema-invalid response (codex round 2, finding 4).
+const MAX_ECHOED_CONTENT_LENGTH = 4_000;
+
+function conversationEchoResult(question, conversation) {
+    const turns = Array.isArray(conversation) ? conversation : [];
+    const priorUserContent = turns
+        .filter((turn) => turn && turn.role === "user")
+        .map((turn) => turn.content)
+        .join(" | ")
+        .slice(0, MAX_ECHOED_CONTENT_LENGTH);
+    const result = structuredClone(canonical);
+    return {
+        ...result,
+        result_id: "result_e2e_conversation_0001",
+        request_id: "request_e2e_conversation_0001",
+        question,
+        status: "complete",
+        deterministic_answer: `conversation_turns=${String(turns.length)}; prior_user_content=${priorUserContent}`,
+    };
+}
+
 const server = createServer((request, response) => {
     // Playwright's `webServer.url` readiness probe is a plain GET / — answer
     // it distinctly from the (POST-only) investigation endpoint.
@@ -248,9 +335,13 @@ const server = createServer((request, response) => {
     request.on("end", () => {
         let question = "";
         let hasChosenReceipt = false;
+        let hasSubjectReceipt = false;
+        let hasKindReceipt = false;
+        let conversation;
         try {
             const parsed = JSON.parse(body);
             question = typeof parsed.question === "string" ? parsed.question : "";
+            conversation = parsed.conversation;
             // `prior_subject_receipts` — the PINNED WIRE CONTRACT'S own
             // snake_case field name (see
             // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json).
@@ -297,12 +388,26 @@ const server = createServer((request, response) => {
             const chosenKindReceiptIds = Array.isArray(parsed.prior_kind_receipts)
                 ? parsed.prior_kind_receipts.map((receipt) => receipt?.receipt_id)
                 : [];
-            hasChosenReceipt =
-                (Array.isArray(parsed.prior_subject_receipts) &&
-                    parsed.prior_subject_receipts.length > 0) ||
-                chosenKindReceiptIds.some((receiptId) =>
-                    STRUCTURE_KIND_OPTIONS.some((option) => option.receipt_id === receiptId),
-                );
+            const chosenSubjectReceiptIds = Array.isArray(parsed.prior_subject_receipts)
+                ? parsed.prior_subject_receipts.map((receipt) => receipt?.receipt_id)
+                : [];
+            // Matched against the EXACT offered candidate ids
+            // (`SUBJECT_CANDIDATES`), the same discipline as the kind-receipt
+            // check just below — codex round 2, finding 3: "any non-empty
+            // array" let a wrong or stale subject receipt read as decisive.
+            // `result_id` is NOT checked, matching the kind-receipt check's
+            // own documented (not fixed) gap two comments below: this
+            // double proves the CORRECT field carries the CORRECT offer's
+            // receipt id, not full contract enforcement — that is
+            // `validateContract`'s job, exercised by both the real client
+            // and this double's own schema conformance.
+            hasSubjectReceipt = chosenSubjectReceiptIds.some((receiptId) =>
+                SUBJECT_CANDIDATES.some((candidate) => candidate.receipt_id === receiptId),
+            );
+            hasKindReceipt = chosenKindReceiptIds.some((receiptId) =>
+                STRUCTURE_KIND_OPTIONS.some((option) => option.receipt_id === receiptId),
+            );
+            hasChosenReceipt = hasSubjectReceipt || hasKindReceipt;
         } catch {
             question = "";
         }
@@ -311,13 +416,26 @@ const server = createServer((request, response) => {
         // real app holds, see `src/app/page.tsx`'s own `ask()`), so it would
         // otherwise still contain the trigger and loop forever. Checked
         // FIRST, before either trigger keyword, for exactly that reason.
-        const result = hasChosenReceipt
-            ? answeredResult(question)
-            : question.includes(TRIGGER_STRUCTURE_NEEDS)
-              ? structureNeedsResult(question)
-              : question.includes(TRIGGER_CLARIFICATION)
-                ? clarificationResult(question)
-                : answeredResult(question);
+        //
+        // The mixed scenario is a SEPARATE branch, checked ahead of the
+        // single-family `hasChosenReceipt` check: it requires BOTH families
+        // to be present before it is decisive, which is exactly what proves
+        // `chooseCandidate` carries the tester's own unconfirmed structure
+        // picks along with the subject receipt it always sent — the mixed-
+        // receipt-family unification this scenario exists to prove.
+        const result = question.includes(TRIGGER_MIXED)
+            ? hasSubjectReceipt && hasKindReceipt
+                ? answeredResult(question)
+                : mixedResult(question)
+            : question.includes(TRIGGER_CONVERSATION_ECHO)
+              ? conversationEchoResult(question, conversation)
+              : hasChosenReceipt
+                ? answeredResult(question)
+                : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                  ? structureNeedsResult(question)
+                  : question.includes(TRIGGER_CLARIFICATION)
+                    ? clarificationResult(question)
+                    : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

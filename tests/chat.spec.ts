@@ -13,6 +13,10 @@ import { configuredBaseURL } from "../playwright.config";
 const TRIGGER_CLARIFICATION = "e2e-clarify-me";
 // Kept in sync by hand with `TRIGGER_STRUCTURE_NEEDS` for the same reason.
 const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
+// Kept in sync by hand with `TRIGGER_MIXED` for the same reason.
+const TRIGGER_MIXED = "e2e-mixed-me";
+// Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
+const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -215,5 +219,115 @@ test.describe("structure needs chips", () => {
         // inspection only, same rule as ClarificationPanel's own
         // `cannot-choose-here` echo.
         await expect(page.getByTestId("cannot-confirm-structure-here")).toBeVisible();
+    });
+});
+
+/**
+ * Mixed-receipt-family unification (CHAOS-3927 P2 follow-up, codex review on
+ * PR #3 + re-confirmed on PR #4).
+ *
+ * Co-presence of a subject-candidate clarification AND a structure_needs
+ * disclosure on the SAME result is legal on the pinned schema — the two are
+ * independent optional fields, nothing forbids both being set at once — and
+ * became wire-REACHABLE only once P1 landed (before that, `structure_needs`
+ * did not exist as a field at all). The bug this control proves fixed: a
+ * tester who accumulates structure picks (without confirming them) and THEN
+ * picks a subject candidate used to lose those picks entirely — `chooseCandidate`
+ * fired the re-ask with only the subject receipt, and `ask()` resetting the
+ * shared selection hook silently dropped the rest.
+ */
+test.describe("mixed receipt families", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: picking a subject candidate carries along an unconfirmed structure pick, mutation-proven", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_MIXED}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        // Both panels render on the SAME turn — the co-presence this
+        // scenario exists to prove is reachable and rendered, not just
+        // schema-legal in the abstract.
+        await expect(
+            page.getByRole("region", { name: "Which subject did you mean?" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("region", { name: "More structure would narrow this" }),
+        ).toBeVisible();
+
+        // Accumulate a structure pick WITHOUT confirming it — the exact
+        // state the bug dropped.
+        await page.getByRole("button", { name: "Select Pull request" }).click();
+
+        // Now resolve the subject instead of confirming structure. The
+        // fake-ACR double's mixed scenario (see fake-acr-server.mjs) only
+        // resolves decisively when BOTH `prior_subject_receipts` and a
+        // recognized `prior_kind_receipts` entry arrive on the SAME
+        // request — so this is a genuine mutation-provable positive
+        // control: revert `chooseCandidate` to sending only the subject
+        // receipt, and the second turn stays `clarification_required`
+        // instead of turning `complete`.
+        await page.getByRole("button", { name: "Ask again about Ask Dev" }).click();
+
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(2);
+        await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
+        await expect(turns.last()).toHaveAttribute("data-state", "complete");
+
+        // The superseded turn's own structure panel echoes what was
+        // actually submitted (not empty) — the codex round 1 finding 3
+        // discipline `chooseStructure` already held, now proven for
+        // `chooseCandidate`'s new carry-along path too. Asserted via the
+        // "selected" badge, not just "Pull request" being on screen —
+        // codex round 2, finding 2: every kind offer renders its own label
+        // regardless of selection state, so a bare text check would still
+        // pass even if `submittedStructureBatch` were dropped entirely.
+        const frozenStructurePanel = turns
+            .first()
+            .getByRole("region", { name: "More structure would narrow this" });
+        await expect(frozenStructurePanel.getByText("selected")).toBeVisible();
+    });
+});
+
+/**
+ * Conversation threading (chat-surface follow-up context).
+ *
+ * The pinned request contract declares `conversation?: ConversationTurn[]`;
+ * the chat surface used to hardcode `conversation: []` on every ask, so a
+ * follow-up question ran as an independent investigation with no memory of
+ * the turn before it. This proves turn 2's re-ask actually threads turn 1's
+ * own content — a real HTTP round trip through the server hop, not a
+ * client-side-only assertion.
+ */
+test.describe("conversation threading", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: turn 2 carries turn 1 as prior conversation context", async ({ page }) => {
+        await page.goto("/");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`What is Ask Dev, ${TRIGGER_CONVERSATION_ECHO}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(1);
+        // A turn's own FIRST ask carries no prior conversation.
+        await expect(turns.first()).toContainText("conversation_turns=0");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`Follow-up question, ${TRIGGER_CONVERSATION_ECHO}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        await expect(turns).toHaveCount(2);
+        // The discriminating proof: the SERVER, not just the client, saw
+        // turn 1's own user question inside `conversation` — the fake-ACR
+        // double echoes back exactly what it received (see
+        // fake-acr-server.mjs's own `conversationEchoResult`).
+        await expect(turns.last()).toContainText("conversation_turns=2");
+        await expect(turns.last()).toContainText("What is Ask Dev");
     });
 });

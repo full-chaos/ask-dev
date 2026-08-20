@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ChatPage from "@/app/page";
+import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
@@ -11,6 +12,18 @@ const answered = mockScenarios().find((scenario) => scenario.id === "complete")!
 const structureKind = structureMockScenarios().find(
     (scenario) => scenario.id === "structure-kind",
 )!.result;
+
+/**
+ * Mixed-receipt-family unification (CHAOS-3927 P2 follow-up): both a
+ * subject-candidate clarification AND a structure_needs disclosure on the
+ * SAME result — legal on the pinned schema, wire-reachable only since P1.
+ */
+const mixed: InvestigationResult = {
+    ...structuredClone(clarification),
+    result_id: "result_mixed_0001",
+    request_id: "request_mixed_0001",
+    structure_needs: structureKind.structure_needs!,
+};
 
 function respondWith(body: unknown): void {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -210,5 +223,125 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
             name: "More structure would narrow this",
         });
         expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
+    });
+});
+
+/**
+ * Mixed-receipt-family unification (CHAOS-3927 P2 follow-up, codex review
+ * round 1 + round 2). Both orders in which a tester can act on a turn that
+ * carries BOTH a subject-candidate clarification and a structure_needs
+ * disclosure at once.
+ */
+describe("mixed receipt families (subject-candidate clarification + structure_needs together)", () => {
+    it("renders both panels on the SAME turn", async () => {
+        respondWith({ result: mixed });
+        render(<ChatPage />);
+
+        await ask("Who owns this?");
+
+        expect(
+            await screen.findByRole("region", { name: "Which subject did you mean?" }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole("region", { name: "More structure would narrow this" }),
+        ).toBeInTheDocument();
+    });
+
+    it("subject-first: picking a candidate carries an unconfirmed structure pick along, not just the receipt", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: mixed }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Who owns this?");
+        const user = userEvent.setup();
+        const option = mixed.structure_needs!.kind_options![1]!;
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        const candidate = mixed.subject_resolution.candidates[0]!;
+        await user.click(
+            screen.getByRole("button", { name: `Ask again about ${candidate.subject.label}` }),
+        );
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorSubjectReceipts).toEqual([
+            { result_id: mixed.result_id, receipt_id: candidate.receipt_id },
+        ]);
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: mixed.result_id, receipt_id: option.receipt_id },
+        ]);
+
+        // codex round 2, finding 1: a request-fields-only assertion here is
+        // vacuous on its own — it can pass even if `submittedStructureBatch`
+        // were dropped from the FROZEN turn's own echo (the wire body only
+        // proves what THIS request sent, not what the superseded turn now
+        // displays). Mirrors the existing structure-only test's own
+        // "selected" badge check, and the mixed e2e's own round-2 fix.
+        const frozenPanel = screen.getByRole("region", {
+            name: "More structure would narrow this",
+        });
+        expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
+    });
+
+    /**
+     * codex round 2, finding 1: the exact reverse-order path was untested.
+     * `chooseStructure` cannot ALSO carry a subject receipt here — there is
+     * no accumulated-but-unconfirmed subject pick to carry, because
+     * `ClarificationPanel` fires immediately on click rather than
+     * accumulating one (confirmed a structural non-issue, not a gap to
+     * close with more code). What this DOES prove: confirming structure
+     * first sends only the structure family (correctly — there is nothing
+     * else pending), and freezes the SAME turn's subject chip too, exactly
+     * the existing "only the most recent turn is live" rule already applies
+     * everywhere else.
+     */
+    it("structure-first: confirming structure sends only the structure family and freezes the turn's own subject chip too", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: mixed }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Who owns this?");
+        const user = userEvent.setup();
+        const option = mixed.structure_needs!.kind_options![1]!;
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorSubjectReceipts).toEqual([]);
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: mixed.result_id, receipt_id: option.receipt_id },
+        ]);
+
+        // The superseded turn's OWN subject chip is now read-only too — the
+        // same freeze rule every other re-ask already applies, now proven
+        // specifically for a turn that carried both families.
+        expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
+        expect(screen.getByTestId("cannot-confirm-structure-here")).toBeInTheDocument();
     });
 });
