@@ -162,11 +162,37 @@ function clarificationResult(question) {
 
 /**
  * CHAOS-3927 P1/P2: a `structure_needs` disclosure with a single missing
- * member (`expected_kind`) and two `kindr_`-namespaced kind offers — mirrors
+ * member (`expected_kind`) and two `kindr_`-namespaced kind offers — same
+ * SHAPE and same reason each judgment field is emptied as
  * `src/test/fixtures/structure-needs.ts`'s own `kindDisambiguationScenario`
- * field-for-field (same reason each judgment field is emptied: a result
- * that has not resolved WHICH census to run has no judgment to give).
+ * (a result that has not resolved WHICH census to run has no judgment to
+ * give), but not a field-for-field mirror: that fixture also discloses
+ * `accepted_grammars`, which this double's one e2e scenario has no need for
+ * (nothing in the chat surface currently renders it) and so omits.
  */
+// The exact offer set `structureNeedsResult` discloses — hoisted so the
+// receipt-recognition check below (`isOfferedKindReceipt`) can validate a
+// re-ask's chosen receipt against these SAME ids, never a wider match. A
+// bug that sent the wrong offer's receipt (not merely the wrong FIELD) is
+// what this specificity catches; matching only "any kindr_-shaped id" would
+// not.
+const STRUCTURE_KIND_OPTIONS = [
+    {
+        receipt_id: "kindr_e2e_pull_request_0001",
+        option_id: "kind_pull_request",
+        label: "Pull request",
+        kind: "pull_request",
+        offer_source: "engine",
+    },
+    {
+        receipt_id: "kindr_e2e_ci_pipeline_run_0001",
+        option_id: "kind_ci_pipeline_run",
+        label: "CI pipeline run",
+        kind: "ci_pipeline_run",
+        offer_source: "engine",
+    },
+];
+
 function structureNeedsResult(question) {
     const result = structuredClone(canonical);
     return {
@@ -183,22 +209,7 @@ function structureNeedsResult(question) {
         subject_resolution: { candidates: [], committed: [] },
         structure_needs: {
             missing: ["expected_kind"],
-            kind_options: [
-                {
-                    receipt_id: "kindr_e2e_pull_request_0001",
-                    option_id: "kind_pull_request",
-                    label: "Pull request",
-                    kind: "pull_request",
-                    offer_source: "engine",
-                },
-                {
-                    receipt_id: "kindr_e2e_ci_pipeline_run_0001",
-                    option_id: "kind_ci_pipeline_run",
-                    label: "CI pipeline run",
-                    kind: "ci_pipeline_run",
-                    offer_source: "engine",
-                },
-            ],
+            kind_options: STRUCTURE_KIND_OPTIONS,
         },
         direct_judgment: "",
         current_state: "",
@@ -267,12 +278,20 @@ const server = createServer((request, response) => {
             // renames the route's `priorKindReceipts` option the same way.
             // Checking only `prior_kind_receipts` (not all four) is enough
             // for this double's one structure-needs scenario, which only
-            // ever offers `kind_options`.
+            // ever offers `kind_options`. Matched against the EXACT offered
+            // receipt ids (`STRUCTURE_KIND_OPTIONS`), not merely "some
+            // kindr_-shaped id" — codex round 1: a bug that sent back the
+            // wrong offer's receipt (not just the wrong wire field) would
+            // otherwise still read as decisive here.
+            const chosenKindReceiptIds = Array.isArray(parsed.prior_kind_receipts)
+                ? parsed.prior_kind_receipts.map((receipt) => receipt?.receipt_id)
+                : [];
             hasChosenReceipt =
                 (Array.isArray(parsed.prior_subject_receipts) &&
                     parsed.prior_subject_receipts.length > 0) ||
-                (Array.isArray(parsed.prior_kind_receipts) &&
-                    parsed.prior_kind_receipts.length > 0);
+                chosenKindReceiptIds.some((receiptId) =>
+                    STRUCTURE_KIND_OPTIONS.some((option) => option.receipt_id === receiptId),
+                );
         } catch {
             question = "";
         }

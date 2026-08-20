@@ -150,11 +150,50 @@ function readCommittedSourceFiles() {
 }
 
 /**
+ * CHAOS-3927 P1 (acr 7d275c2e): `WindowOption`'s schema carries
+ * `allOf`/`anyOf`/`not` frozen-bounds conditionals (design brief §5.1)
+ * alongside its `properties`. json-schema-to-typescript renders those as
+ * index-signature intersections it cannot merge into a plain object shape,
+ * and instantiating THAT inside a `maxItems`-bounded array
+ * (json-schema-to-typescript renders `maxItems` as a union of fixed-length
+ * tuples) exceeds TypeScript's own type-complexity budget (`TS2590`) —
+ * reliably, even for a two-element literal array.
+ *
+ * Fixed by dropping `WindowOption`'s three conditional keywords from the
+ * TYPE-GENERATION copy of the schema ONLY — never from the copy committed
+ * to `src/contracts/schemas/`, which stays byte-identical to the pinned
+ * commit's own blob (verified against it by `check --source`) and is what
+ * `validateContract` actually runs at request/response time. The frozen-
+ * bounds invariant those keywords express (a non-`all_time` option's
+ * `start`/`end` must both be present, `all_time` forbids both) was never
+ * something `json-schema-to-typescript` could express as a TS type either
+ * way (conditional validation isn't representable as a structural type) —
+ * dropping it from the TYPE only removes redundant intersection noise the
+ * compiler was already unable to use, not an invariant TypeScript was
+ * actually enforcing. `codex round 1` (an earlier version of this fix used
+ * `ignoreMinAndMaxItems` globally, which also erased real minItems-only
+ * "non-empty array" tuple types — `affected_subjects`, `match_reasons`,
+ * etc. — on fields this bug has nothing to do with; scoped to the one
+ * schema that actually needs it instead).
+ */
+function stripWindowOptionConditionalsForTypeGeneration(schemaDirectory) {
+    const commonSchemaPath = path.join(schemaDirectory, "context_fabric_common.v1.schema.json");
+    const schema = JSON.parse(fs.readFileSync(commonSchemaPath, "utf8"));
+    const windowOption = schema.$defs?.WindowOption;
+    if (windowOption === undefined) throw new Error("WindowOption $def not found — pin drifted?");
+    delete windowOption.allOf;
+    delete windowOption.anyOf;
+    delete windowOption.not;
+    fs.writeFileSync(commonSchemaPath, JSON.stringify(schema));
+}
+
+/**
  * Compiles one schema to a module. json-schema-to-typescript resolves the
  * cross-file `$ref`s against `cwd`, which is why the copies must already be on
  * disk before this runs.
  */
 async function generatedModules(schemaDirectory) {
+    stripWindowOptionConditionalsForTypeGeneration(schemaDirectory);
     const modules = {};
     for (const entry of GENERATED_MODULES) {
         const schema = JSON.parse(
@@ -165,27 +204,6 @@ async function generatedModules(schemaDirectory) {
             cwd: `${schemaDirectory}${path.sep}`,
             declareExternallyReferenced: true,
             format: false,
-            // CHAOS-3927 P1 (acr 7d275c2e): `WindowOption`'s schema carries
-            // `allOf`/`anyOf`/`not` frozen-bounds conditionals (design brief
-            // §5.1) alongside its `properties`. json-schema-to-typescript
-            // renders those as index-signature intersections it cannot merge
-            // into a plain object shape, and instantiating THAT inside a
-            // `maxItems`-bounded array (`json-schema-to-typescript` renders
-            // maxItems as a union of fixed-length tuples) is what exceeds
-            // TypeScript's own type-complexity budget (`TS2590`) — reliably,
-            // even for a two-element literal array, not merely a large one.
-            // `ignoreMinAndMaxItems` renders every bounded array as a plain
-            // `T[]` instead, which sidesteps that combinatorial blowup for
-            // every field, not just WindowOption's. This does not weaken
-            // validation: `maxItems`/`minItems`/`uniqueItems` were never
-            // enforced by the TS type in the first place (a structural type
-            // cannot express "at most 20 items" as anything other than that
-            // same union-of-tuples), only by `validateContract` at runtime —
-            // exactly the reasoning `buildInvestigationRequest`
-            // (`@/lib/acr/client.ts`) already documented for
-            // `prior_subject_receipts` before this pin bump ever introduced
-            // `WindowOption`.
-            ignoreMinAndMaxItems: true,
             strictIndexSignatures: true,
             unknownAny: false,
         });

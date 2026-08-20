@@ -91,10 +91,11 @@ export default function WorkbenchPage() {
         // CHAOS-3927 P2: accumulate-and-re-ask-ONCE (design brief §2.2) — every
         // member picked in one StructureNeedsPanel session travels in this
         // SAME request, not one round-trip per member. Omitted entirely (not
-        // sent as empty arrays) when nothing was selected, which is every
-        // request before P1 lands acr-side: ACR does not emit `structure_needs`
-        // yet, so this batch is always empty in real use today (see
-        // `src/lib/pivot/structure-contracts.ts`'s "THE SEAM").
+        // sent as empty arrays) when nothing was selected — wire minimization,
+        // not a correctness requirement now that THE SEAM has landed (acr
+        // 7d275c2e; see `@/lib/contracts`'s own header): `structure_needs`
+        // is a real field on the pinned contract, so this batch is non-empty
+        // exactly when a tester has actually made a selection.
         const structureReceiptFields =
             structureSelectionsToSend === undefined
                 ? {}

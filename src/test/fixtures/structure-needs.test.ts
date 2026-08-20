@@ -120,4 +120,29 @@ describe("schema validation negative controls: the pinned contract actually reje
         expect(validation.valid).toBe(false);
         expect(validation.errors.join("; ")).toContain("matched_term_hash");
     });
+
+    /**
+     * The length control above proves the BOUND; this proves the PATTERN
+     * (`^[0-9a-f]{24}$`) — 24 characters, but uppercase, which a
+     * length-only check would pass. Both halves of the real constraint need
+     * their own control, or a regression that dropped the `pattern` while
+     * keeping `minLength`/`maxLength` would go unnoticed.
+     */
+    it("rejects an AnchorOption.matched_term_hash with the right length but an uppercase char", () => {
+        const anchorScenario = structureMockScenarios().find(
+            (scenario) => scenario.id === "structure-anchor-window",
+        );
+        if (anchorScenario === undefined)
+            throw new Error("missing structure-anchor-window fixture");
+        const tainted = structuredClone(anchorScenario.result) as Record<string, unknown>;
+        (
+            tainted["structure_needs"] as {
+                anchor_options: { matched_term_hash: string }[];
+            }
+        ).anchor_options[0]!.matched_term_hash = "A1b2c3d4e5f6a7b8c9d0e1f2";
+
+        const validation = validateContract(RESULT_SCHEMA, tainted);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toContain("matched_term_hash");
+    });
 });

@@ -177,17 +177,21 @@ place a rename has to be absorbed.
 Currently pinned: `7d275c2e852247b5b9b8635085cffb98c6e04bb5` (acr main,
 CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 + disclosure-coverage #160/#161).
 
-**`ignoreMinAndMaxItems`.** This pin's `WindowOption` schema (CHAOS-3900 W1
-§5.1's frozen-bounds `allOf`/`anyOf`/`not` conditionals) combines with the
+**`WindowOption` type generation.** This pin's `WindowOption` schema (CHAOS-3900
+W1 §5.1's frozen-bounds `allOf`/`anyOf`/`not` conditionals) combined with the
 `maxItems: 20` bound on the arrays that carry it (`StructureNeeds.window_options`,
-`WindowClarification.options`) to exceed TypeScript's own type-complexity
-budget (`TS2590`, reliably, even for a two-element array) — see
-`scripts/sync-acr-contracts.mjs`'s own comment on the
-`json-schema-to-typescript` compile option that fixes it. Every generated
-array is a plain `T[]` as of this pin, not a maxItems-bounded tuple union;
-the bound was never enforced by the TS type regardless (only by
-`validateContract` at runtime), so this is a compile-time simplification,
-not a validation change.
+`WindowClarification.options`) exceeds TypeScript's own type-complexity
+budget (`TS2590`, reliably, even for a two-element array). Fixed by dropping
+those three conditional keywords from the schema copy `sync-acr-contracts.mjs`
+feeds to `json-schema-to-typescript` ONLY — see that script's own
+`stripWindowOptionConditionalsForTypeGeneration` comment. The copy committed
+to `src/contracts/schemas/` (and everything `validateContract` actually runs
+against at request/response time) is untouched and still byte-identical to
+the pinned commit's own blob; only the TYPE loses information TypeScript
+could never have used anyway (conditional validation isn't representable as
+a structural type). Every other field's maxItems tuple-union typing (e.g.
+`prior_subject_receipts`, already documented in `@/lib/acr/client.ts`'s
+`buildInvestigationRequest`) is unaffected.
 
 ### Why Next.js is pinned exactly
 

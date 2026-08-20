@@ -77,7 +77,17 @@ export type ACRContextFabricInvestigationResultV1 = {
     /**
      * @maxItems 4
      */
-    confirmed_structure?: ConfirmedStructureEntry[];
+    confirmed_structure?:
+        | []
+        | [ConfirmedStructureEntry]
+        | [ConfirmedStructureEntry, ConfirmedStructureEntry]
+        | [ConfirmedStructureEntry, ConfirmedStructureEntry, ConfirmedStructureEntry]
+        | [
+              ConfirmedStructureEntry,
+              ConfirmedStructureEntry,
+              ConfirmedStructureEntry,
+              ConfirmedStructureEntry,
+          ];
     /**
      * @maxItems 80
      */
@@ -100,7 +110,238 @@ export type InterpretedQuestion = {
     /**
      * @maxItems 20
      */
-    fact_requirements: FactRequirement[];
+    fact_requirements:
+        | []
+        | [FactRequirement]
+        | [FactRequirement, FactRequirement]
+        | [FactRequirement, FactRequirement, FactRequirement]
+        | [FactRequirement, FactRequirement, FactRequirement, FactRequirement]
+        | [FactRequirement, FactRequirement, FactRequirement, FactRequirement, FactRequirement]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ]
+        | [
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+              FactRequirement,
+          ];
     clarification_needed: boolean;
     clarification_reason?: string;
     /**
@@ -171,7 +412,7 @@ export type DriverJudgment = {
      * @minItems 1
      * @maxItems 250
      */
-    affected_subjects: SubjectRef[];
+    affected_subjects: [SubjectRef, ...SubjectRef[]];
     /**
      * @maxItems 250
      */
@@ -221,22 +462,6 @@ export type EffectiveEvidenceWindow = {
         "trend_assessment" | "recent_activity_lookup" | "state_snapshot" | "explicit_window";
     provenance: "inferred_default" | "question_stated" | "clarification_confirmed";
     confidence?: "high" | "low";
-};
-/**
- * CHAOS-3900 W1: one server-offered window choice, minted onto a stored result so a later turn can confirm it via winr_ receipt redemption. Start/end are the FROZEN absolute bounds computed at offer time.
- */
-export type WindowOption = {
-    [k: string]: unknown | undefined;
-} & {
-    receipt_id: string;
-    option_id: string;
-    label: string;
-    /**
-     * CHAOS-3900 W1: the closed, server-owned relative-window identifier registry (design brief v5.2 §5.1).
-     */
-    relative_id?: "trailing_30d" | "trailing_90d" | "trailing_365d" | "all_time";
-    start?: string;
-    end?: string;
 };
 
 export interface FactRequirement {
@@ -313,14 +538,44 @@ export interface SubjectCandidate {
      * @minItems 1
      * @maxItems 32
      */
-    match_reasons: string[];
+    match_reasons: [string, ...string[]];
     confidence: number;
     /**
      * @maxItems 6
      */
-    match_mechanisms?: (
-        "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent"
-    )[];
+    match_mechanisms?:
+        | []
+        | ["exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent"]
+        | [
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+          ]
+        | [
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+          ]
+        | [
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+          ]
+        | [
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+          ]
+        | [
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+              "exact" | "alias" | "provider_key" | "lexical" | "vector" | "traversal_parent",
+          ];
     /**
      * @maxItems 100
      */
@@ -362,7 +617,7 @@ export interface CohortMember {
      * @minItems 1
      * @maxItems 32
      */
-    inclusion_reasons: string[];
+    inclusion_reasons: [string, ...string[]];
     /**
      * @maxItems 100
      */
@@ -400,7 +655,7 @@ export interface Finding {
      * @minItems 1
      * @maxItems 200
      */
-    evidence_ref_ids: string[];
+    evidence_ref_ids: [string, ...string[]];
     /**
      * @maxItems 250
      */
@@ -412,18 +667,18 @@ export interface RelationshipPath {
      * @minItems 2
      * @maxItems 51
      */
-    nodes: SubjectRef[];
+    nodes: [SubjectRef, SubjectRef, ...SubjectRef[]];
     /**
      * @minItems 1
      * @maxItems 50
      */
-    edges: RelationshipEdge[];
+    edges: [RelationshipEdge, ...RelationshipEdge[]];
     why_relevant: string;
     /**
      * @minItems 1
      * @maxItems 200
      */
-    evidence_ref_ids: string[];
+    evidence_ref_ids: [string, ...string[]];
     truncated: boolean;
 }
 export interface RelationshipEdge {
@@ -457,7 +712,7 @@ export interface RelationshipEdge {
      * @minItems 1
      * @maxItems 100
      */
-    evidence_ref_ids: string[];
+    evidence_ref_ids: [string, ...string[]];
 }
 export interface ClaimedFact {
     claim_id: string;
@@ -551,7 +806,244 @@ export interface WindowClarification {
      * @minItems 1
      * @maxItems 20
      */
-    options: WindowOption[];
+    options:
+        | [WindowOption]
+        | [WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption, WindowOption, WindowOption]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ];
+}
+/**
+ * CHAOS-3900 W1: one server-offered window choice, minted onto a stored result so a later turn can confirm it via winr_ receipt redemption. Start/end are the FROZEN absolute bounds computed at offer time.
+ */
+export interface WindowOption {
+    receipt_id: string;
+    option_id: string;
+    label: string;
+    /**
+     * CHAOS-3900 W1: the closed, server-owned relative-window identifier registry (design brief v5.2 §5.1).
+     */
+    relative_id?: "trailing_30d" | "trailing_90d" | "trailing_365d" | "all_time";
+    start?: string;
+    end?: string;
 }
 /**
  * CHAOS-3900 P1: the disclosure block -- present whenever an investigation round ends short of decisive. relation_family and cohort_shape are unrepresentable here by design (design brief section 1.1's demotion).
@@ -561,27 +1053,1162 @@ export interface StructureNeeds {
      * @minItems 1
      * @maxItems 4
      */
-    missing: ("expected_kind" | "subject_anchor" | "subject_handle" | "window")[];
+    missing:
+        | ["expected_kind" | "subject_anchor" | "subject_handle" | "window"]
+        | [
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+          ]
+        | [
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+          ]
+        | [
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+              "expected_kind" | "subject_anchor" | "subject_handle" | "window",
+          ];
     /**
      * @maxItems 20
      */
-    kind_options?: KindOption[];
+    kind_options?:
+        | []
+        | [KindOption]
+        | [KindOption, KindOption]
+        | [KindOption, KindOption, KindOption]
+        | [KindOption, KindOption, KindOption, KindOption]
+        | [KindOption, KindOption, KindOption, KindOption, KindOption]
+        | [KindOption, KindOption, KindOption, KindOption, KindOption, KindOption]
+        | [KindOption, KindOption, KindOption, KindOption, KindOption, KindOption, KindOption]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ]
+        | [
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+              KindOption,
+          ];
     /**
      * @maxItems 20
      */
-    anchor_options?: AnchorOption[];
+    anchor_options?:
+        | []
+        | [AnchorOption]
+        | [AnchorOption, AnchorOption]
+        | [AnchorOption, AnchorOption, AnchorOption]
+        | [AnchorOption, AnchorOption, AnchorOption, AnchorOption]
+        | [AnchorOption, AnchorOption, AnchorOption, AnchorOption, AnchorOption]
+        | [AnchorOption, AnchorOption, AnchorOption, AnchorOption, AnchorOption, AnchorOption]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ]
+        | [
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+              AnchorOption,
+          ];
     /**
      * @maxItems 20
      */
-    handle_options?: HandleOption[];
+    handle_options?:
+        | []
+        | [HandleOption]
+        | [HandleOption, HandleOption]
+        | [HandleOption, HandleOption, HandleOption]
+        | [HandleOption, HandleOption, HandleOption, HandleOption]
+        | [HandleOption, HandleOption, HandleOption, HandleOption, HandleOption]
+        | [HandleOption, HandleOption, HandleOption, HandleOption, HandleOption, HandleOption]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ]
+        | [
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+              HandleOption,
+          ];
     /**
      * @maxItems 20
      */
-    window_options?: WindowOption[];
+    window_options?:
+        | []
+        | [WindowOption]
+        | [WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption, WindowOption]
+        | [WindowOption, WindowOption, WindowOption, WindowOption, WindowOption, WindowOption]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ]
+        | [
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+              WindowOption,
+          ];
     /**
      * @maxItems 20
      */
-    accepted_grammars?: AcceptedGrammar[];
+    accepted_grammars?:
+        | []
+        | [AcceptedGrammar]
+        | [AcceptedGrammar, AcceptedGrammar]
+        | [AcceptedGrammar, AcceptedGrammar, AcceptedGrammar]
+        | [AcceptedGrammar, AcceptedGrammar, AcceptedGrammar, AcceptedGrammar]
+        | [AcceptedGrammar, AcceptedGrammar, AcceptedGrammar, AcceptedGrammar, AcceptedGrammar]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ]
+        | [
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+              AcceptedGrammar,
+          ];
 }
 /**
  * CHAOS-3900 P1: one server-offered census-kind choice, minted onto a stored result so a later turn can confirm it via kindr_ receipt redemption.

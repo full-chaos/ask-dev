@@ -118,13 +118,12 @@ export function buildInvestigationRequest(
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
-    // rather than as an opaque ACR 400. The slice above is what actually
-    // enforces the bound, and the request is schema-validated before it is
-    // sent — `sync-acr-contracts.mjs`'s `ignoreMinAndMaxItems` generation
-    // option means the TYPE no longer encodes the 20-item bound as a tuple
-    // union (see that script's own comment on `WindowOption`), so this cast
-    // is the ordinary `readonly T[]` → `T[]` one: `dedupeAndCap` returns a
-    // readonly array and the generated field is plainly mutable.
+    // rather than as an opaque ACR 400.
+    //
+    // The cast is unavoidable: json-schema-to-typescript renders `maxItems: 20`
+    // as a union of twenty-one fixed-length tuple types, which no runtime array
+    // can satisfy structurally. The slice above is what actually enforces the
+    // bound, and the request is schema-validated before it is sent.
     const receipts = dedupeAndCap(priorSubjectReceipts, MAX_PRIOR_SUBJECT_RECEIPTS) as NonNullable<
         InvestigationRequest["prior_subject_receipts"]
     >;
@@ -136,12 +135,12 @@ export function buildInvestigationRequest(
     // ONLY WHEN NON-EMPTY, but that is wire minimization now, not a
     // correctness requirement — an empty array is just as schema-valid as an
     // absent key. `client.test.ts` pins this behavior.
-    // Same `readonly T[]` → `T[]` cast as `receipts` above, applied per
-    // field (each of the four generated properties is its OWN namespaced
-    // type — `KindBoundReceipt[]`/etc. — not `BoundStructureReceipt[]`).
-    // `Pick` keeps `structureFields`'s own type exactly aligned with the
-    // four request properties it spreads into, one cast per field rather
-    // than one for the whole object.
+    // Same "unavoidable cast" reasoning as `receipts` above, applied per
+    // field: each of the four generated properties is its OWN maxItems-20
+    // tuple-union type (`KindBoundReceipt`/etc., not a plain array). `Pick`
+    // keeps `structureFields`'s own type exactly aligned with the four
+    // request properties it spreads into, one cast per field rather than
+    // one for the whole object.
     const structureFields: Partial<
         Pick<
             InvestigationRequest,

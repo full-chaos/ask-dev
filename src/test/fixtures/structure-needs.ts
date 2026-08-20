@@ -109,9 +109,11 @@ const WINDOW_OPTIONS: readonly WindowOption[] = [
  */
 function kindDisambiguationScenario(): InvestigationResult {
     const result = baseScenario("no-match");
-    // The cast is the ordinary `readonly T[]` → `T[]` one `@/lib/acr/client.ts`
-    // documents on its own `receipts` cast: the generated field is a plain
-    // mutable array, and every option constant above is declared `readonly`.
+    // The cast is the same "unavoidable" class `@/lib/acr/client.ts`
+    // documents on its own `receipts` cast: `maxItems: 20` renders as a
+    // union of fixed-length tuples that no plain `readonly T[]` can satisfy
+    // structurally, even though every element is individually valid and
+    // the array is well within the bound.
     const structureNeeds: StructureNeeds = {
         missing: ["expected_kind"],
         kind_options: KIND_OPTIONS as NonNullable<StructureNeeds["kind_options"]>,
