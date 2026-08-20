@@ -57,6 +57,21 @@
     box-sizing: border-box;
 }
 
+/* Global keyboard-focus fallback (UX-equivalence pass). Several buttons
+   across this stylesheet (`.question-form__submit`, chip offer/candidate
+   buttons, the new jump-to-latest/retry actions) had no `:focus-visible`
+   rule of their own and relied on the browser default, which several
+   browsers suppress on buttons entirely. This is additive: any
+   class-specific `:focus-visible` rule below still wins on specificity. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 body {
     margin: 0;
     background: var(--surface-0);
@@ -444,7 +459,11 @@ body {
 .chat {
     display: flex;
     flex-direction: column;
-    min-height: 100dvh;
+    /* Fixed viewport height, not min-height: the TIMELINE scrolls
+       internally (below) so the header stays put and the composer never
+       drifts — the Claude/ChatGPT-class shell, not a page that scrolls as a
+       whole. */
+    height: 100dvh;
     margin: 0 auto;
     max-width: 760px;
 }
@@ -497,8 +516,22 @@ body {
     color: var(--accent);
 }
 
+/* Wrapper stays a fixed-size flex child; ONLY `.chat__timeline` inside it
+   scrolls. `.chat__jump-to-latest` anchors to this wrapper so it stays
+   pinned at the viewport's bottom edge instead of scrolling away with the
+   content it is offering to jump past. */
+.chat__timeline-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
 .chat__timeline {
     flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     display: flex;
     flex-direction: column;
     gap: 22px;
@@ -516,7 +549,20 @@ body {
 
 .chat__turn--user {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.chat__meta {
+    margin: 0 0 4px;
+    padding: 0 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+.chat__meta--user {
+    text-align: right;
 }
 
 .chat__bubble {
@@ -542,10 +588,51 @@ body {
     margin-top: 0;
 }
 
+/* A frozen turn's OWN answer stays fully legible — only its now-inert
+   chip offers read as quieter, via the same "cannot re-ask here" markers
+   ClarificationPanel/StructureNeedsPanel already render for a non-latest
+   turn. Nothing here depends on those components' internals beyond the
+   test-id hooks they already expose. */
+.chat__turn--frozen .panel:has([data-testid="cannot-choose-here"]) .record,
+.chat__turn--frozen .panel:has([data-testid="cannot-confirm-structure-here"]) .record {
+    opacity: 0.72;
+}
+
+.chat__turn--frozen
+    .panel:has([data-testid="cannot-choose-here"])
+    [data-testid="cannot-choose-here"],
+.chat__turn--frozen
+    .panel:has([data-testid="cannot-confirm-structure-here"])
+    [data-testid="cannot-confirm-structure-here"] {
+    opacity: 0.85;
+    font-style: italic;
+}
+
 .chat__pending {
     margin: 0;
     color: var(--text-muted);
     font-size: 13px;
+}
+
+.chat__jump-to-latest {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    padding: 6px 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.chat__jump-to-latest:hover {
+    filter: brightness(1.15);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -565,10 +652,15 @@ body {
 }
 
 .chat__composer-bar {
-    position: sticky;
-    bottom: 0;
+    /* No longer `position: sticky` over scrolled content — the timeline is
+       its own scroll region now (`.chat__timeline`), so the composer is
+       just a fixed flex item below it. A low-alpha hairline replaces the
+       old fade-to-background trick as the separator; the dark-theme
+       "no bright borders" rule holds here same as everywhere else. */
+    flex: 0 0 auto;
     padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
-    background: linear-gradient(to bottom, transparent, var(--surface-0) 28%);
+    border-top: 1px solid var(--border);
+    background: var(--surface-0);
 }
 
 .chat-composer {
@@ -608,7 +700,11 @@ body {
 .chat-composer__input {
     flex: 1 1 auto;
     min-width: 0;
+    /* Autosizes in JS up to this height (chat/ChatComposer.tsx), then
+       scrolls internally rather than growing the composer bar without
+       bound. */
     max-height: 200px;
+    overflow-y: auto;
     padding: 6px 4px;
     border: none;
     resize: none;
@@ -655,4 +751,33 @@ body {
     padding: 0 4px;
     color: var(--text-muted);
     font-size: 11px;
+}
+
+/* --- Mobile (UX-equivalence pass) ---
+   Tighter side padding and a slightly smaller masthead so the header's link
+   row and the composer keep their full content on-screen at 375px with no
+   horizontal scroll; the timeline's own `.record`/`.badge` wrapping already
+   holds at this width without a rule of its own. */
+@media (max-width: 480px) {
+    .chat__header {
+        padding: 16px 14px 12px;
+        gap: 2px 10px;
+    }
+
+    .chat__header h1 {
+        font-size: 18px;
+    }
+
+    .chat__timeline {
+        padding: 6px 14px 20px;
+        gap: 18px;
+    }
+
+    .chat__composer-bar {
+        padding: 10px 14px calc(14px + env(safe-area-inset-bottom));
+    }
+
+    .chat__bubble {
+        max-width: 85%;
+    }
 }

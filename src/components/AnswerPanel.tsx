@@ -1,5 +1,6 @@
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { Badge } from "@/components/Badge";
+import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { DriverJudgment, InvestigationResult } from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
@@ -24,9 +25,13 @@ function DriverRecord({ driver }: { readonly driver: DriverJudgment }) {
                     {formatConfidence(driver.confidence)}
                 </span>
             </div>
-            <p className="record__body">{driver.summary}</p>
+            <p className="record__body">
+                <SafeAnswerText text={driver.summary} />
+            </p>
             {driver.qualification !== undefined ? (
-                <p className="record__meta">{driver.qualification}</p>
+                <p className="record__meta">
+                    <SafeAnswerText text={driver.qualification} />
+                </p>
             ) : null}
             <EvidenceReferences evidenceRefIds={driver.evidence_ref_ids} label="Evidence" />
         </li>
@@ -48,14 +53,20 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <h2 className="panel__title" id="answer-title">
                 Answer
             </h2>
-            <p className="answer__judgment">{result.deterministic_answer}</p>
+            <p className="answer__judgment">
+                <SafeAnswerText text={result.deterministic_answer} />
+            </p>
             {hasJudgment ? (
-                <p className="answer__body">{result.direct_judgment}</p>
+                <p className="answer__body">
+                    <SafeAnswerText text={result.direct_judgment} />
+                </p>
             ) : (
                 <p className="panel__empty">The service returned no direct judgment.</p>
             )}
             {result.current_state.trim() !== "" ? (
-                <p className="answer__body">{result.current_state}</p>
+                <p className="answer__body">
+                    <SafeAnswerText text={result.current_state} />
+                </p>
             ) : null}
 
             {result.strongest_pressures.length > 0 ? (

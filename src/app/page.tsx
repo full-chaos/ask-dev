@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatComposer, type ChatComposerHandle } from "@/components/chat/ChatComposer";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
@@ -43,6 +43,13 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
  * `ClarificationPanel`/`StructureNeedsPanel` already support — the same rule
  * that keeps a frozen chat transcript from looking like it can still be
  * acted on.
+ *
+ * UX-equivalence pass adds, all presentation-only: a real timestamp/role
+ * label per turn, pin-to-bottom autoscroll with a scroll-away override and a
+ * "Jump to latest" affordance (`timelineRef`/`isPinnedToBottom`/
+ * `hasUnseenBelow` below), and a Retry action on a FAILED plain ask (never on
+ * a receipt-carrying re-ask — that stays this lane's boundary, not
+ * presentation's).
  */
 
 type AssistantOutcome =
@@ -77,6 +84,15 @@ type Turn =
            * over the shared hook.
            */
           readonly submittedStructureBatch: StructureSelectionBatch | undefined;
+          /**
+           * The exact question to retry, set ONLY when this turn came from a
+           * plain composer ask (no prior receipts, no chosen subject, no
+           * structure batch). A receipt-carrying re-ask is never retried
+           * from the failure panel — re-deriving which receipts to resend is
+           * this lane's boundary, not presentation's, so that turn's
+           * `FailurePanel` gets no retry action at all.
+           */
+          readonly retryQuestion: string | undefined;
       };
 
 function isFailure(value: unknown): value is WorkbenchFailure {
@@ -88,6 +104,15 @@ function isFailure(value: unknown): value is WorkbenchFailure {
     );
 }
 
+function formatTurnTime(isoTimestamp: string): string {
+    return new Date(isoTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+// Treated as "at the bottom" within this many pixels — content settling
+// (fonts, an answer's own height) shifts scrollHeight by a few px even while
+// a tester is genuinely pinned to the bottom.
+const BOTTOM_PIN_THRESHOLD_PX = 48;
+
 export default function ChatPage() {
     const [turns, setTurns] = useState<readonly Turn[]>([]);
     // A monotonic counter, not crypto.randomUUID(): turn identity only needs
@@ -98,9 +123,57 @@ export default function ChatPage() {
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
 
+    const timelineRef = useRef<HTMLDivElement>(null);
+    const composerRef = useRef<ChatComposerHandle>(null);
+    const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
+    const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
+    // Mirrors `turns` so the block below can tell "new content just landed"
+    // apart from an ordinary re-render, and adjust derived state DURING
+    // render rather than in an effect (react-hooks/set-state-in-effect: an
+    // effect may only SYNC WITH the DOM — the scrollTop write below — never
+    // call a state setter itself; this is React's own documented escape
+    // hatch for "adjusting state when a value changes").
+    const [syncedTurns, setSyncedTurns] = useState(turns);
+    if (turns !== syncedTurns) {
+        setSyncedTurns(turns);
+        // A settle() (pending -> answered/failed) changes this array's
+        // identity exactly like a brand new turn does, and both can grow
+        // the timeline's height — so both count as "new content" here.
+        if (!isPinnedToBottom) {
+            setHasUnseenBelow(true);
+        }
+    }
+
     const isPending = turns.some(
         (turn) => turn.role === "assistant" && turn.outcome.kind === "pending",
     );
+
+    // Autoscroll: follows the conversation while the tester is at (or near)
+    // the bottom. This effect only WRITES TO THE DOM (scrollTop) — it never
+    // calls a state setter, which is what keeps it clear of
+    // react-hooks/set-state-in-effect; `hasUnseenBelow` is adjusted above,
+    // during render, instead.
+    useEffect(() => {
+        const el = timelineRef.current;
+        if (el === null || !isPinnedToBottom) return;
+        el.scrollTop = el.scrollHeight;
+    }, [turns, isPinnedToBottom]);
+
+    function handleTimelineScroll() {
+        const el = timelineRef.current;
+        if (el === null) return;
+        const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        const pinned = distanceFromBottom <= BOTTOM_PIN_THRESHOLD_PX;
+        setIsPinnedToBottom(pinned);
+        if (pinned) setHasUnseenBelow(false);
+    }
+
+    function jumpToLatest() {
+        const el = timelineRef.current;
+        if (el !== null) el.scrollTop = el.scrollHeight;
+        setIsPinnedToBottom(true);
+        setHasUnseenBelow(false);
+    }
 
     /**
      * Appends a user turn and a pending assistant turn, then settles the
@@ -108,15 +181,23 @@ export default function ChatPage() {
      * Workbench's own `ask()` (same request shape, same failure mapping) —
      * see that component for why the question travels UNCHANGED alongside a
      * chosen receipt rather than being rewritten to mention it.
+     *
+     * Returns whether the turn answered (`true`) or failed (`false`), so the
+     * composer can decide whether to clear its draft — the only thing that
+     * return value is for.
      */
     async function ask(
         question: string,
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
         structureSelectionsToSend?: StructureSelectionBatch,
-    ) {
+    ): Promise<boolean> {
         const userTurnId = nextId.current++;
         const assistantTurnId = nextId.current++;
+        const isPlainAsk =
+            priorSubjectReceipts.length === 0 &&
+            chosen === undefined &&
+            structureSelectionsToSend === undefined;
         // Captured from the CURRENT timeline, BEFORE the pending pair below
         // is appended — a re-ask's own not-yet-answered turn must never be
         // threaded as its own prior context.
@@ -133,6 +214,7 @@ export default function ChatPage() {
                 outcome: { kind: "pending" },
                 chosenSubject: chosen,
                 submittedStructureBatch: undefined,
+                retryQuestion: isPlainAsk ? question : undefined,
             },
         ]);
 
@@ -165,7 +247,7 @@ export default function ChatPage() {
             const failure = (payload as { failure?: unknown }).failure;
             if (isFailure(failure)) {
                 settle({ kind: "failed", failure });
-                return;
+                return false;
             }
             const result = (payload as { result?: unknown }).result;
             if (result === undefined || result === null) {
@@ -177,9 +259,10 @@ export default function ChatPage() {
                         retryable: false,
                     },
                 });
-                return;
+                return false;
             }
             settle({ kind: "answered", result: result as InvestigationResult });
+            return true;
         } catch (error) {
             // Never swallow: a dead server hop is itself a reportable outcome.
             console.error("investigation request failed", error);
@@ -191,6 +274,7 @@ export default function ChatPage() {
                     retryable: true,
                 },
             });
+            return false;
         }
     }
 
@@ -266,60 +350,108 @@ export default function ChatPage() {
                 </Link>
             </header>
 
-            <div aria-label="Conversation" className="chat__timeline" role="log" aria-live="polite">
-                {turns.length === 0 ? (
-                    <p className="chat__empty">Ask a question to start an investigation.</p>
-                ) : (
-                    turns.map((turn) => {
-                        if (turn.role === "user") {
+            <div className="chat__timeline-wrap">
+                <div
+                    aria-label="Conversation"
+                    className="chat__timeline"
+                    role="log"
+                    aria-live="polite"
+                    onScroll={handleTimelineScroll}
+                    ref={timelineRef}
+                >
+                    {turns.length === 0 ? (
+                        <p className="chat__empty">Ask a question to start an investigation.</p>
+                    ) : (
+                        turns.map((turn) => {
+                            if (turn.role === "user") {
+                                return (
+                                    <div className="chat__turn chat__turn--user" key={turn.id}>
+                                        <p className="chat__meta chat__meta--user">
+                                            You · {formatTurnTime(turn.createdAt)}
+                                        </p>
+                                        <p className="chat__bubble">{turn.question}</p>
+                                    </div>
+                                );
+                            }
+
+                            const isLatest = turn.id === latestAssistantTurn?.id;
+
                             return (
-                                <div className="chat__turn chat__turn--user" key={turn.id}>
-                                    <p className="chat__bubble">{turn.question}</p>
+                                <div
+                                    className={
+                                        isLatest
+                                            ? "chat__turn chat__turn--assistant"
+                                            : "chat__turn chat__turn--assistant chat__turn--frozen"
+                                    }
+                                    key={turn.id}
+                                >
+                                    <p className="chat__meta">
+                                        Ask Dev · {formatTurnTime(turn.createdAt)}
+                                    </p>
+                                    {turn.outcome.kind === "pending" ? (
+                                        <p className="chat__pending" role="status">
+                                            Investigating…
+                                        </p>
+                                    ) : null}
+                                    {turn.outcome.kind === "failed" ? (
+                                        <FailurePanel
+                                            failure={turn.outcome.failure}
+                                            pending={isPending}
+                                            onRetry={
+                                                isLatest &&
+                                                turn.retryQuestion !== undefined &&
+                                                turn.outcome.failure.retryable
+                                                    ? () => {
+                                                          // Through the composer's OWN submit
+                                                          // path (draft-clear-on-success,
+                                                          // preserve-and-select-on-failure) —
+                                                          // never `ask()` directly, which would
+                                                          // leave the composer showing stale,
+                                                          // already-answered text after a
+                                                          // successful retry (codex review
+                                                          // round 2).
+                                                          composerRef.current?.retry(
+                                                              turn.retryQuestion!,
+                                                          );
+                                                      }
+                                                    : undefined
+                                            }
+                                        />
+                                    ) : null}
+                                    {turn.outcome.kind === "answered" ? (
+                                        <DeterministicAnswerView
+                                            chosenSubject={turn.chosenSubject}
+                                            onChooseCandidate={
+                                                isLatest ? chooseCandidate : undefined
+                                            }
+                                            onConfirmStructure={
+                                                isLatest ? chooseStructure : undefined
+                                            }
+                                            onToggleStructure={
+                                                isLatest ? structureSelections.toggle : undefined
+                                            }
+                                            result={turn.outcome.result}
+                                            structureBatch={
+                                                isLatest
+                                                    ? structureSelections.batch
+                                                    : turn.submittedStructureBatch
+                                            }
+                                        />
+                                    ) : null}
                                 </div>
                             );
-                        }
-
-                        const isLatest = turn.id === latestAssistantTurn?.id;
-
-                        return (
-                            <div className="chat__turn chat__turn--assistant" key={turn.id}>
-                                {turn.outcome.kind === "pending" ? (
-                                    <p className="chat__pending" role="status">
-                                        Investigating…
-                                    </p>
-                                ) : null}
-                                {turn.outcome.kind === "failed" ? (
-                                    <FailurePanel failure={turn.outcome.failure} />
-                                ) : null}
-                                {turn.outcome.kind === "answered" ? (
-                                    <DeterministicAnswerView
-                                        chosenSubject={turn.chosenSubject}
-                                        onChooseCandidate={isLatest ? chooseCandidate : undefined}
-                                        onConfirmStructure={isLatest ? chooseStructure : undefined}
-                                        onToggleStructure={
-                                            isLatest ? structureSelections.toggle : undefined
-                                        }
-                                        result={turn.outcome.result}
-                                        structureBatch={
-                                            isLatest
-                                                ? structureSelections.batch
-                                                : turn.submittedStructureBatch
-                                        }
-                                    />
-                                ) : null}
-                            </div>
-                        );
-                    })
-                )}
+                        })
+                    )}
+                </div>
+                {hasUnseenBelow ? (
+                    <button className="chat__jump-to-latest" onClick={jumpToLatest} type="button">
+                        Jump to latest ↓
+                    </button>
+                ) : null}
             </div>
 
             <div className="chat__composer-bar">
-                <ChatComposer
-                    pending={isPending}
-                    onAsk={(question) => {
-                        void ask(question);
-                    }}
-                />
+                <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
             </div>
         </main>
     );
