@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
  */
 test.describe("Context Fabric Workbench smoke", () => {
     test("renders the shell and its platform/test framing", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/workbench");
 
         await expect(page.getByRole("heading", { name: "Context Fabric Workbench" })).toBeVisible();
         await expect(page.getByText(/separate from the Ask Dev window and \/dev/)).toBeVisible();
@@ -19,7 +19,7 @@ test.describe("Context Fabric Workbench smoke", () => {
     });
 
     test("reports an unconfigured server hop as a failure, not an answer", async ({ page }) => {
-        await page.goto("/");
+        await page.goto("/workbench");
 
         await page.getByLabel("Ask Context Fabric").fill("What is the status of dev-health-ops?");
         await page.getByRole("button", { name: "Investigate" }).click();
