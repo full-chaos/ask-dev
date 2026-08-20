@@ -157,6 +157,40 @@ test.describe("composer ergonomics", () => {
         await expect(failures.first().getByRole("button", { name: "Retry" })).toHaveCount(0);
     });
 
+    // Configured baseURL: a SUCCESSFUL retry needs a real decisive answer to
+    // land, which the unconfigured instance can never produce. Same fake-ACR
+    // double the "clarification chips"/"structure needs chips" blocks use —
+    // an ordinary question with neither trigger keyword answers decisively
+    // (see the NEGATIVE control in "clarification chips" below).
+    test("a successful Retry clears the composer draft — no stale text left to accidentally resend", async ({
+        page,
+    }) => {
+        await page.goto(configuredBaseURL);
+        await page.route("**/api/investigations", (route) => route.abort("failed"));
+
+        const question = "What is the status of dev-health-ops?";
+        await page.getByLabel("Ask a question").fill(question);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const retry = page
+            .getByRole("alert", { name: "No answer" })
+            .getByRole("button", { name: "Retry" });
+        await expect(retry).toBeVisible();
+        await expect(page.getByLabel("Ask a question")).toHaveValue(question);
+
+        await page.unroute("**/api/investigations");
+        await retry.click();
+
+        // The retry answered decisively (codex round 2 regression check):
+        // the composer is EMPTY, not still showing the already-answered
+        // question selected and one accidental Enter away from resending it.
+        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveAttribute(
+            "data-state",
+            "complete",
+        );
+        await expect(page.getByLabel("Ask a question")).toHaveValue("");
+    });
+
     test("autoscroll pins to the latest turn, and offers Jump to latest after scrolling away", async ({
         page,
     }) => {

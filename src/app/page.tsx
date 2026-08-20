@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { ChatComposer } from "@/components/chat/ChatComposer";
+import { ChatComposer, type ChatComposerHandle } from "@/components/chat/ChatComposer";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
@@ -120,6 +120,7 @@ export default function ChatPage() {
     const structureSelections = useStructureSelections();
 
     const timelineRef = useRef<HTMLDivElement>(null);
+    const composerRef = useRef<ChatComposerHandle>(null);
     const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
     const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
     // Mirrors `turns` so the block below can tell "new content just landed"
@@ -191,7 +192,6 @@ export default function ChatPage() {
         const assistantTurnId = nextId.current++;
         // `ask` only ever runs from a DOM event (composer submit, a chip's
         // onClick) — this stamps that event, it is not a render-time read.
-        // eslint-disable-next-line react-hooks/purity -- event-driven timestamp, not a render read
         const askedAt = Date.now();
         const isPlainAsk =
             priorSubjectReceipts.length === 0 &&
@@ -364,7 +364,17 @@ export default function ChatPage() {
                                                 turn.retryQuestion !== undefined &&
                                                 turn.outcome.failure.retryable
                                                     ? () => {
-                                                          void ask(turn.retryQuestion!);
+                                                          // Through the composer's OWN submit
+                                                          // path (draft-clear-on-success,
+                                                          // preserve-and-select-on-failure) —
+                                                          // never `ask()` directly, which would
+                                                          // leave the composer showing stale,
+                                                          // already-answered text after a
+                                                          // successful retry (codex review
+                                                          // round 2).
+                                                          composerRef.current?.retry(
+                                                              turn.retryQuestion!,
+                                                          );
                                                       }
                                                     : undefined
                                             }
@@ -403,7 +413,7 @@ export default function ChatPage() {
             </div>
 
             <div className="chat__composer-bar">
-                <ChatComposer pending={isPending} onAsk={ask} />
+                <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
             </div>
         </main>
     );
