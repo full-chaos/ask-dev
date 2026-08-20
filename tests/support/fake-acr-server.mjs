@@ -43,9 +43,9 @@
  *   (a) Nothing like this existed in the repo before this PR. Every e2e spec
  *       that predates this file (`tests/workbench.smoke.spec.ts`) runs with
  *       NO ACR configuration at all and only ever proves the honest-failure
- *       path — see the README's "The smoke suite runs against the PRODUCTION
- *       build... No ACR_* variables are supplied on purpose." There was no
- *       prior stand-in pattern to follow; this is new.
+ *       path (see the README's "Gates" section — the unconfigured instance
+ *       is still exactly that, unconfigured). There was no prior stand-in
+ *       pattern to follow; this is new.
  *   (b) Real-ACR e2e is not merely inconvenient today, it is IMPOSSIBLE:
  *       there is no ACR checkout this repo's CI or dev environment can
  *       build and run (ACR lives in the separate `dev-health-acr` repo), and
@@ -66,8 +66,13 @@
  *   (c) TEST-ONLY. Not imported by anything under `src/`, not built into
  *       the production bundle, not started by `pnpm dev`/`pnpm build`/
  *       `pnpm start` — only `playwright.config.ts`'s `webServer` array
- *       spawns it, and only for `tests/chat.spec.ts`'s clarification-chip
- *       project.
+ *       spawns it (alongside every OTHER e2e spec's run, since Playwright
+ *       starts every `webServer` entry up front — this process just sits
+ *       idle for any spec that never talks to it). Only `tests/chat.spec.ts`'s
+ *       `"clarification chips"` describe block actually TALKS to it, by
+ *       overriding `baseURL` to the configured app instance that points at
+ *       it (codex review round 2, correcting an earlier version of this
+ *       comment that implied the double itself was scoped to that spec).
  *   (d) What retires it: once acr's `chaos-pivot-p1` branch merges to `main`
  *       and this repo's contract pin bumps past that merge (README's
  *       "Bumping the pin"), `structure_needs` becomes a real field on the
@@ -190,20 +195,24 @@ const server = createServer((request, response) => {
             question = typeof parsed.question === "string" ? parsed.question : "";
             // `prior_subject_receipts` — the PINNED WIRE CONTRACT'S own
             // snake_case field name (see
-            // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json
-            // and `buildInvestigationRequest` in src/lib/acr/client.ts, which
-            // is what actually POSTs to this server). NOT
-            // `priorSubjectReceipts` — that camelCase name exists only on
-            // the browser-to-Next-route body one layer up
-            // (src/app/page.tsx's `fetch("/api/investigations", ...)`),
-            // which src/app/api/investigations/route.ts translates to this
-            // snake_case field before ever reaching here. Getting this wrong
-            // silently defeats the whole positive control: `hasChosenReceipt`
-            // stays false, the re-ask falls through to the trigger-keyword
-            // check below, and — because the question text travels UNCHANGED
-            // on a re-ask — it still contains the trigger, so a "chosen
-            // candidate" re-ask keeps coming back `clarification_required`
-            // instead of decisive. Caught by codex review round 1.
+            // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json).
+            // NOT `priorSubjectReceipts` — that camelCase name is the
+            // browser-to-Next-route body's own field, one layer up
+            // (src/app/page.tsx's `fetch("/api/investigations", ...)`).
+            // src/app/api/investigations/route.ts forwards that value
+            // UNCHANGED (still camelCase, as a same-named JS option) into
+            // `investigate()`; it is `buildInvestigationRequest` in
+            // src/lib/acr/client.ts — the function that actually POSTs to
+            // THIS server — that renames it to `prior_subject_receipts` on
+            // the wire (codex review round 2, correcting an earlier version
+            // of this comment that credited the route with the rename).
+            // Getting this wrong silently defeats the whole positive
+            // control: `hasChosenReceipt` stays false, the re-ask falls
+            // through to the trigger-keyword check below, and — because the
+            // question text travels UNCHANGED on a re-ask — it still
+            // contains the trigger, so a "chosen candidate" re-ask keeps
+            // coming back `clarification_required` instead of decisive.
+            // Caught by codex review round 1.
             hasChosenReceipt =
                 Array.isArray(parsed.prior_subject_receipts) &&
                 parsed.prior_subject_receipts.length > 0;
