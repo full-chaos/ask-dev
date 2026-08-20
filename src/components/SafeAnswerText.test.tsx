@@ -51,6 +51,47 @@ describe("SafeAnswerText", () => {
         expect(screen.getByTestId("host")).toHaveTextContent("See https://example.com/report.");
     });
 
+    it("keeps a balanced parenthetical inside the URL path, not just before it (codex round 1)", () => {
+        render(
+            <p data-testid="host">
+                <SafeAnswerText text="See https://en.wikipedia.org/wiki/Function_(mathematics) for details." />
+            </p>,
+        );
+
+        expect(
+            screen.getByRole("link", {
+                name: "https://en.wikipedia.org/wiki/Function_(mathematics)",
+            }),
+        ).toHaveAttribute("href", "https://en.wikipedia.org/wiki/Function_(mathematics)");
+    });
+
+    it("strips only the UNBALANCED closing paren when the URL is itself parenthesized", () => {
+        render(
+            <p data-testid="host">
+                <SafeAnswerText text="(see https://en.wikipedia.org/wiki/Function_(mathematics))." />
+            </p>,
+        );
+
+        expect(
+            screen.getByRole("link", {
+                name: "https://en.wikipedia.org/wiki/Function_(mathematics)",
+            }),
+        ).toHaveAttribute("href", "https://en.wikipedia.org/wiki/Function_(mathematics)");
+    });
+
+    it("does not strip a trailing ! or ? — both are meaningful URL characters, not sentence marks (codex round 1)", () => {
+        render(
+            <p data-testid="host">
+                <SafeAnswerText text="Filter at https://example.com/?q=! now." />
+            </p>,
+        );
+
+        expect(screen.getByRole("link", { name: "https://example.com/?q=!" })).toHaveAttribute(
+            "href",
+            "https://example.com/?q=!",
+        );
+    });
+
     it("links every URL when a line carries more than one", () => {
         render(
             <p data-testid="host">

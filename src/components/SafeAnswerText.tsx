@@ -11,11 +11,44 @@ export type SafeAnswerTextProps = {
 // syntax appears anywhere in them, so this stays a plain-text-plus-links
 // renderer instead of a markdown parser that would be guessing at a syntax
 // the service has never emitted.
-const URL_PATTERN = /https?:\/\/[^\s<>")]+/g;
-// Trailing sentence punctuation a URL regex has no way to know isn't part of
-// the URL — "https://x.example/y." ends a sentence, not a path segment.
-// Stripped from the match and put back as ordinary trailing text.
-const TRAILING_PUNCTUATION = /[.,;:!?]+$/;
+// `)` is allowed in the match itself (stripped back out below only when it's
+// NOT balanced by a `(` inside the same match) — excluding it outright would
+// truncate a real URL like a Wikipedia "_(disambiguator)" path (codex review
+// round 1, finding 1).
+const URL_PATTERN = /https?:\/\/[^\s<>"]+/g;
+// Unambiguous sentence-enders only. `!` and `?` are deliberately EXCLUDED —
+// both are common, meaningful trailing URL characters (a query flag, a path
+// segment), and stripping them on the strength of a regex guess broke a URL
+// that legitimately ended in `!` (codex review round 1, finding 2). `.` `,`
+// `;` `:` essentially never end a real URL, so those stay safe to strip.
+const TRAILING_PUNCTUATION = /[.,;:]+$/;
+
+/**
+ * Peels sentence-level noise off the end of a matched URL: an unbalanced
+ * trailing `)` (closing a sentence's own parenthetical, not the URL's own),
+ * then unambiguous trailing punctuation — repeated, since either can expose
+ * the other (`"...(mathematics))."` needs both peeled, more than once).
+ */
+function stripTrailingNoise(matchedUrl: string): string {
+    let url = matchedUrl;
+    for (;;) {
+        if (url.endsWith(")")) {
+            const opens = (url.match(/\(/g) ?? []).length;
+            const closes = (url.match(/\)/g) ?? []).length;
+            if (closes > opens) {
+                url = url.slice(0, -1);
+                continue;
+            }
+        }
+        const trailing = TRAILING_PUNCTUATION.exec(url);
+        if (trailing !== null) {
+            url = url.slice(0, url.length - trailing[0].length);
+            continue;
+        }
+        break;
+    }
+    return url;
+}
 
 function linkifyLine(line: string, keyPrefix: string) {
     const nodes: React.ReactNode[] = [];
@@ -30,8 +63,8 @@ function linkifyLine(line: string, keyPrefix: string) {
                 </Fragment>,
             );
         }
-        const trailingPunctuation = TRAILING_PUNCTUATION.exec(match[0])?.[0] ?? "";
-        const url = match[0].slice(0, match[0].length - trailingPunctuation.length);
+        const url = stripTrailingNoise(match[0]);
+        const trailingNoise = match[0].slice(url.length);
         nodes.push(
             <a
                 href={url}
@@ -42,10 +75,8 @@ function linkifyLine(line: string, keyPrefix: string) {
                 {url}
             </a>,
         );
-        if (trailingPunctuation !== "") {
-            nodes.push(
-                <Fragment key={`${keyPrefix}-p${matchIndex}`}>{trailingPunctuation}</Fragment>,
-            );
+        if (trailingNoise !== "") {
+            nodes.push(<Fragment key={`${keyPrefix}-p${matchIndex}`}>{trailingNoise}</Fragment>);
         }
         lastIndex = start + match[0].length;
         matchIndex += 1;
