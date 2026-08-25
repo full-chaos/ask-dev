@@ -275,6 +275,7 @@ describe("StructureNeedsPanel", () => {
     it("rejects a selection whose receipt is outside the member's own namespace", async () => {
         const onConfirm = vi.fn();
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
         const user = userEvent.setup();
         const wrongNamespaceNeeds: StructureNeeds = {
             missing: ["expected_kind"],
@@ -308,7 +309,47 @@ describe("StructureNeedsPanel", () => {
         expect(
             screen.getByRole("button", { name: "Ask again with these selections" }),
         ).toBeDisabled();
+        // CHAOS-4171 standing order: the rejection is telemetered too, not
+        // just the successful path.
+        expect(consoleInfo).toHaveBeenCalledWith(
+            JSON.stringify({
+                event: "workbench_structure_offer_selection",
+                member: "expected_kind",
+                outcome: "rejected_malformed",
+            }),
+        );
         consoleError.mockRestore();
+        consoleInfo.mockRestore();
+    });
+
+    /**
+     * CHAOS-4171 standing order: telemetry baked into new logic, same PR —
+     * and, on RESUME, "wire it to the real submit path... do not mirror the
+     * dead `buildOutcomeEvent` pattern." This proves the event is actually
+     * emitted from the real click path, not just buildable in isolation.
+     */
+    it("emits a submitted selection-telemetry event on a real (namespace-valid) selection", async () => {
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={vi.fn()}
+                resultId={kindScenario.result_id}
+                structureNeeds={kindScenario.structure_needs!}
+            />,
+        );
+
+        const first = kindScenario.structure_needs!.kind_options![0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
+
+        expect(consoleInfo).toHaveBeenCalledWith(
+            JSON.stringify({
+                event: "workbench_structure_offer_selection",
+                member: "expected_kind",
+                outcome: "submitted",
+            }),
+        );
+        consoleInfo.mockRestore();
     });
 
     /**

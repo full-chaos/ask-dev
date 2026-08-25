@@ -19,6 +19,8 @@ import {
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { structureMemberLabel } from "@/lib/structure-disposition";
+import { emitTelemetryEvent } from "@/lib/telemetry/emit";
+import { buildStructureOfferSelectionEvent } from "@/lib/telemetry/outcome";
 
 /**
  * Guided structure-elicitation prompts (CHAOS-3927 P2, design brief §2.2).
@@ -317,6 +319,12 @@ export function StructureNeedsPanel({
      * rejected HERE — where the mistake was made — rather than reaching the
      * wire and being silently rejected by the engine's own validation
      * (§2.5). See `structureReceiptHasExpectedNamespace`'s own doc comment.
+     *
+     * Emits a `workbench_structure_offer_selection` event on both branches
+     * (CHAOS-4171 standing order: telemetry baked into new logic, same PR) —
+     * see `buildStructureOfferSelectionEvent`'s own doc comment for why this
+     * one member gets an actual emitted event when the other four didn't
+     * before this change.
      */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         if (!structureReceiptHasExpectedNamespace(member, receipt)) {
@@ -324,10 +332,12 @@ export function StructureNeedsPanel({
             console.error(
                 `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
             );
+            emitTelemetryEvent(buildStructureOfferSelectionEvent(member, "rejected_malformed"));
             setNamespaceError(message);
             return;
         }
         setNamespaceError(undefined);
+        emitTelemetryEvent(buildStructureOfferSelectionEvent(member, "submitted"));
         onToggle(member, receipt);
     }
 
