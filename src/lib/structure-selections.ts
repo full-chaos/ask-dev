@@ -3,6 +3,7 @@ import {
     type BoundStructureReceipt,
     type StructureNeedKind,
 } from "@/lib/contracts";
+import type { StructureOfferSelectionOutcome } from "@/lib/telemetry/outcome";
 
 /**
  * Accumulate-and-re-ask-ONCE (CHAOS-3927 P2, design brief §2.2).
@@ -142,4 +143,34 @@ export function buildStructureReceiptFields(batch: StructureSelectionBatch): {
         priorWindowReceipts: capped(batch.window),
         priorCandidateReceipts: capped(batch.subject_candidate),
     };
+}
+
+/**
+ * One client-observed selection outcome, queued for the NEXT submit
+ * (CHAOS-4171 standing order: telemetry baked into new logic, same PR).
+ *
+ * Not emitted client-side: a browser `console.info` lands only in that
+ * viewer's own devtools, collected nowhere in prod (team-lead ruling,
+ * 2026-08-24). Instead this rides the next `/api/investigations` POST body
+ * alongside the structure receipts it travels with, and the ROUTE emits it
+ * (see `src/app/api/investigations/route.ts`'s own `structureSelectionEvents`
+ * handling) — server stdout is the surface the log pipeline actually
+ * collects. `useStructureSelections` owns the accumulation; this module only
+ * holds the pure shape and reducer, matching every other batch operation
+ * here.
+ */
+export type PendingSelectionEvent = {
+    readonly member: StructureNeedKind;
+    readonly outcome: StructureOfferSelectionOutcome;
+};
+
+export const EMPTY_SELECTION_EVENTS: readonly PendingSelectionEvent[] = [];
+
+/** Pure reducer: appends one client-observed selection outcome. */
+export function recordSelectionEvent(
+    events: readonly PendingSelectionEvent[],
+    member: StructureNeedKind,
+    outcome: StructureOfferSelectionOutcome,
+): readonly PendingSelectionEvent[] {
+    return [...events, { member, outcome }];
 }

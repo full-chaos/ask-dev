@@ -335,6 +335,102 @@ describe("structure receipts are validated with the same discipline as subject r
 });
 
 /**
+ * CHAOS-4171 standing order: telemetry baked into new logic, same PR. A
+ * browser `console.info` lands only in that one viewer's own devtools and
+ * is collected nowhere in prod (team-lead ruling, 2026-08-24) — so
+ * `StructureNeedsPanel`'s selection outcomes ride this SAME request instead,
+ * and this route is the actual sink: one structured `console.info` JSON
+ * line per event, on server stdout (the log-pipeline-collected surface),
+ * independent of whether `investigate()` itself succeeds.
+ *
+ * Same "malformed rejects the whole request" discipline as the structure
+ * receipts and conversation turns above — this field is client-built, so a
+ * malformed entry should be unreachable in practice, checked anyway.
+ */
+describe("structure-selection telemetry rides the submit request and the route emits it", () => {
+    it("logs one JSON line per event, in order, before failing later for missing config", async () => {
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    structureSelectionEvents: [
+                        { member: "expected_kind", outcome: "submitted" },
+                        { member: "subject_anchor", outcome: "rejected_malformed" },
+                    ],
+                }),
+            ),
+        );
+
+        expect(consoleInfo).toHaveBeenNthCalledWith(
+            1,
+            JSON.stringify({
+                event: "workbench_structure_offer_selection",
+                member: "expected_kind",
+                outcome: "submitted",
+            }),
+        );
+        expect(consoleInfo).toHaveBeenNthCalledWith(
+            2,
+            JSON.stringify({
+                event: "workbench_structure_offer_selection",
+                member: "subject_anchor",
+                outcome: "rejected_malformed",
+            }),
+        );
+        // Same "past validation, fails later for missing config" shape the
+        // structure-receipt tests above already establish — the telemetry
+        // path runs, and does not depend on the investigation succeeding.
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+
+        consoleInfo.mockRestore();
+    });
+
+    it("logs nothing when the field is absent", async () => {
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        await POST(post(JSON.stringify({ question: "status?" })));
+
+        expect(consoleInfo).not.toHaveBeenCalled();
+        consoleInfo.mockRestore();
+    });
+
+    for (const [label, malformed] of [
+        ["not an array", "not-an-array"],
+        [
+            "an entry with an extra key",
+            [{ member: "expected_kind", outcome: "submitted", extra: 1 }],
+        ],
+        ["an entry missing outcome", [{ member: "expected_kind" }]],
+        ["an unrecognized member", [{ member: "not_a_real_member", outcome: "submitted" }]],
+        ["an unrecognized outcome", [{ member: "expected_kind", outcome: "not_a_real_outcome" }]],
+    ] as const) {
+        it(`rejects the whole request with a 400 when structureSelectionEvents is ${label}`, async () => {
+            const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+            const response = await POST(
+                post(
+                    JSON.stringify({
+                        question: "status?",
+                        structureSelectionEvents: malformed,
+                    }),
+                ),
+            );
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+            // Rejects, never partially emits: no line for a request the
+            // route is about to refuse.
+            expect(consoleInfo).not.toHaveBeenCalled();
+
+            consoleInfo.mockRestore();
+        });
+    }
+});
+
+/**
  * Chat-surface conversation threading: same "reject the whole request,
  * don't filter" discipline as the receipt tests above (Item 1) — a dropped
  * turn would mean a follow-up runs without context the tester saw on

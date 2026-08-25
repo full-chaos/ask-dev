@@ -5,10 +5,17 @@ import { AcrConfigError, loadAcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { isDateTimeFormatted } from "@/lib/acr/validate";
 import {
+    STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER,
     STRUCTURE_RECEIPT_PREFIX,
     type BoundStructureReceipt,
     type ConversationTurn,
+    type StructureNeedKind,
 } from "@/lib/contracts";
+import { emitTelemetryEvent } from "@/lib/telemetry/emit";
+import {
+    buildStructureOfferSelectionEvent,
+    type StructureOfferSelectionOutcome,
+} from "@/lib/telemetry/outcome";
 
 /**
  * The Workbench's server hop to ACR.
@@ -64,6 +71,16 @@ type InvestigateBody = {
     readonly priorCandidateReceipts?: unknown;
     /** Chat-surface conversation threading. See src/lib/conversation.ts's own header. */
     readonly conversation?: unknown;
+    /**
+     * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
+     * `useStructureSelections` builds this client-side (never hand-typed by
+     * a tester), so a malformed entry should be unreachable — checked
+     * anyway, same discipline as `conversation` above, and REJECTS the
+     * whole request rather than being silently dropped: a dropped selection
+     * event is a silently-not-working telemetry path, the same C5/Item-1
+     * class this route already closes for receipts and conversation turns.
+     */
+    readonly structureSelectionEvents?: unknown;
 };
 
 /**
@@ -195,6 +212,57 @@ function parseConversation(value: unknown): readonly ConversationTurn[] {
 
 class MalformedConversationError extends Error {
     override readonly name = "MalformedConversationError";
+}
+
+const STRUCTURE_SELECTION_EVENT_MEMBERS: ReadonlySet<string> = new Set(
+    STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER,
+);
+const STRUCTURE_SELECTION_EVENT_OUTCOMES: ReadonlySet<string> = new Set([
+    "submitted",
+    "rejected_malformed",
+]);
+
+type StructureSelectionEventInput = {
+    readonly member: StructureNeedKind;
+    readonly outcome: StructureOfferSelectionOutcome;
+};
+
+/**
+ * Same discipline as `parseConversation` above (whose own comment states
+ * the rationale this reuses): closed-vocab shape check, malformed REJECTS
+ * the whole request. `member`/`outcome` are each a closed set derived from
+ * the same sources the rest of this module already treats as canonical
+ * (`STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER`, `StructureOfferSelectionOutcome`),
+ * so there is nothing here to hand-copy out of sync with a pin bump.
+ */
+function parseSelectionEvents(value: unknown): readonly StructureSelectionEventInput[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw new MalformedSelectionEventError();
+    return value.map((entry) => {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+            throw new MalformedSelectionEventError();
+        }
+        const record = entry as Record<string, unknown>;
+        const keys = Object.keys(record);
+        if (keys.length !== 2 || !keys.includes("member") || !keys.includes("outcome")) {
+            throw new MalformedSelectionEventError();
+        }
+        const { member, outcome } = record;
+        if (typeof member !== "string" || !STRUCTURE_SELECTION_EVENT_MEMBERS.has(member)) {
+            throw new MalformedSelectionEventError();
+        }
+        if (typeof outcome !== "string" || !STRUCTURE_SELECTION_EVENT_OUTCOMES.has(outcome)) {
+            throw new MalformedSelectionEventError();
+        }
+        return {
+            member: member as StructureNeedKind,
+            outcome: outcome as StructureOfferSelectionOutcome,
+        };
+    });
+}
+
+class MalformedSelectionEventError extends Error {
+    override readonly name = "MalformedSelectionEventError";
 }
 
 function failureResponse(failure: WorkbenchFailure, status: number): NextResponse {
@@ -337,6 +405,29 @@ export async function POST(request: Request): Promise<NextResponse> {
             },
             400,
         );
+    }
+
+    // CHAOS-4171 standing order: emitted here, not where the selection was
+    // made — this route is the one place a browser click becomes a server
+    // log line (see `emitTelemetryEvent`'s own header for why). Independent
+    // of whatever `investigate()` below does: the tester's client-side
+    // selections already happened regardless of this request's outcome.
+    let selectionEvents: readonly StructureSelectionEventInput[];
+    try {
+        selectionEvents = parseSelectionEvents(body.structureSelectionEvents);
+    } catch {
+        return failureResponse(
+            {
+                code: "acr_rejected_request",
+                message:
+                    "The supplied structure-selection telemetry was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+    for (const { member, outcome } of selectionEvents) {
+        emitTelemetryEvent(buildStructureOfferSelectionEvent(member, outcome));
     }
 
     let config;

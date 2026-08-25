@@ -37,21 +37,29 @@ function Harness({
     structureNeeds,
     resultId,
     onConfirm,
+    onReject = () => {},
+    onToggle: onToggleSpy,
     twoInstances = false,
 }: {
     readonly structureNeeds: StructureNeeds;
     readonly resultId: string;
     readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
+    readonly onReject?: ((member: StructureNeedKind) => void) | undefined;
+    /** Observes every accepted toggle in addition to the harness's own batch update. */
+    readonly onToggle?:
+        ((member: StructureNeedKind, receipt: BoundStructureReceipt) => void) | undefined;
     readonly twoInstances?: boolean;
 }) {
     const [batch, setBatch] = useState<StructureSelectionBatch>(EMPTY_STRUCTURE_SELECTION_BATCH);
     function onToggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        onToggleSpy?.(member, receipt);
         setBatch((current) => toggleStructureOffer(current, member, receipt));
     }
     const panel = (
         <StructureNeedsPanel
             batch={batch}
             onConfirm={onConfirm}
+            onReject={onReject}
             onToggle={onToggle}
             resultId={resultId}
             structureNeeds={structureNeeds}
@@ -65,6 +73,7 @@ function Harness({
                 <StructureNeedsPanel
                     batch={batch}
                     onConfirm={onConfirm}
+                    onReject={onReject}
                     onToggle={onToggle}
                     resultId={resultId}
                     structureNeeds={structureNeeds}
@@ -274,8 +283,8 @@ describe("StructureNeedsPanel", () => {
      */
     it("rejects a selection whose receipt is outside the member's own namespace", async () => {
         const onConfirm = vi.fn();
+        const onReject = vi.fn();
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
         const user = userEvent.setup();
         const wrongNamespaceNeeds: StructureNeeds = {
             missing: ["expected_kind"],
@@ -289,6 +298,7 @@ describe("StructureNeedsPanel", () => {
         render(
             <Harness
                 onConfirm={onConfirm}
+                onReject={onReject}
                 resultId={kindScenario.result_id}
                 structureNeeds={wrongNamespaceNeeds}
             />,
@@ -310,30 +320,32 @@ describe("StructureNeedsPanel", () => {
             screen.getByRole("button", { name: "Ask again with these selections" }),
         ).toBeDisabled();
         // CHAOS-4171 standing order: the rejection is telemetered too, not
-        // just the successful path.
-        expect(consoleInfo).toHaveBeenCalledWith(
-            JSON.stringify({
-                event: "workbench_structure_offer_selection",
-                member: "expected_kind",
-                outcome: "rejected_malformed",
-            }),
-        );
+        // just the successful path — but not emitted HERE (team-lead
+        // ruling: a browser console.info is collected nowhere in prod).
+        // `onReject` is what the caller (`useStructureSelections`) queues
+        // for the next submit to carry and the route to emit; see
+        // `use-structure-selections.test.ts` and `route.test.ts` for the
+        // rest of that chain.
+        expect(onReject).toHaveBeenCalledWith("expected_kind");
         consoleError.mockRestore();
-        consoleInfo.mockRestore();
     });
 
     /**
-     * CHAOS-4171 standing order: telemetry baked into new logic, same PR —
-     * and, on RESUME, "wire it to the real submit path... do not mirror the
-     * dead `buildOutcomeEvent` pattern." This proves the event is actually
-     * emitted from the real click path, not just buildable in isolation.
+     * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
+     * The panel's own job is only to call `onToggle` on a namespace-valid
+     * pick — `useStructureSelections.toggle` (not this component) is what
+     * records the "submitted" outcome, and the route is what emits it
+     * (see `use-structure-selections.test.ts` / `route.test.ts`).
      */
-    it("emits a submitted selection-telemetry event on a real (namespace-valid) selection", async () => {
-        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+    it("calls onToggle, not onReject, on a real (namespace-valid) selection", async () => {
+        const onToggle = vi.fn();
+        const onReject = vi.fn();
         const user = userEvent.setup();
         render(
             <Harness
                 onConfirm={vi.fn()}
+                onReject={onReject}
+                onToggle={onToggle}
                 resultId={kindScenario.result_id}
                 structureNeeds={kindScenario.structure_needs!}
             />,
@@ -342,14 +354,11 @@ describe("StructureNeedsPanel", () => {
         const first = kindScenario.structure_needs!.kind_options![0]!;
         await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
 
-        expect(consoleInfo).toHaveBeenCalledWith(
-            JSON.stringify({
-                event: "workbench_structure_offer_selection",
-                member: "expected_kind",
-                outcome: "submitted",
-            }),
+        expect(onToggle).toHaveBeenCalledWith(
+            "expected_kind",
+            expect.objectContaining({ receipt_id: first.receipt_id }),
         );
-        consoleInfo.mockRestore();
+        expect(onReject).not.toHaveBeenCalled();
     });
 
     /**

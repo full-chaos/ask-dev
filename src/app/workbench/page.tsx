@@ -101,11 +101,25 @@ export default function WorkbenchPage() {
             structureSelectionsToSend === undefined
                 ? {}
                 : buildStructureReceiptFields(structureSelectionsToSend);
+        // CHAOS-4171: every selection outcome observed since the last
+        // reset() rides this SAME request — the route is the sink (see
+        // `useStructureSelections`'s own `pendingSelectionEvents` header).
+        // Read AFTER `structureSelections.reset()` above but still the
+        // pre-reset value: `setState` schedules a re-render, it does not
+        // mutate this closure's already-captured array.
+        const selectionEvents = structureSelections.pendingSelectionEvents;
         try {
             const response = await fetch("/api/investigations", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question, priorSubjectReceipts, ...structureReceiptFields }),
+                body: JSON.stringify({
+                    question,
+                    priorSubjectReceipts,
+                    ...structureReceiptFields,
+                    ...(selectionEvents.length > 0
+                        ? { structureSelectionEvents: selectionEvents }
+                        : {}),
+                }),
             });
             const payload: unknown = await response.json();
             const failure = (payload as { failure?: unknown }).failure;
@@ -253,6 +267,7 @@ export default function WorkbenchPage() {
                                     key={outcome.result.result_id}
                                     batch={structureSelections.batch}
                                     onConfirm={chooseStructure}
+                                    onReject={structureSelections.reject}
                                     onToggle={structureSelections.toggle}
                                     resultId={outcome.result.result_id}
                                     structureNeeds={outcome.result.structure_needs}
@@ -270,6 +285,7 @@ export default function WorkbenchPage() {
                         <DeterministicAnswerView
                             onChooseCandidate={chooseCandidate}
                             onConfirmStructure={chooseStructure}
+                            onRejectStructure={structureSelections.reject}
                             onToggleStructure={structureSelections.toggle}
                             result={outcome.result}
                             structureBatch={structureSelections.batch}

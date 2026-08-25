@@ -36,6 +36,13 @@ export type DeterministicAnswerViewProps = {
     readonly structureBatch?: StructureSelectionBatch | undefined;
     readonly onToggleStructure?:
         ((member: StructureNeedKind, receipt: BoundStructureReceipt) => void) | undefined;
+    /**
+     * CHAOS-4171: threaded the same way as `onToggleStructure` — defaults
+     * to a harmless no-op below, because the rejection branch it feeds can
+     * only fire once `StructureNeedsPanel` is mounted, which itself only
+     * happens when a caller has already supplied `onConfirmStructure`.
+     */
+    readonly onRejectStructure?: ((member: StructureNeedKind) => void) | undefined;
     readonly pending?: boolean | undefined;
     /** The subject the tester chose, when this result came from a re-ask. */
     readonly chosenSubject?: SubjectRef | undefined;
@@ -65,6 +72,7 @@ export function DeterministicAnswerView({
     // StructureNeedsPanel's own onConfirm-gated rendering), and any caller
     // wiring one without the other is a call-site bug, not a runtime path.
     onToggleStructure = () => {},
+    onRejectStructure = () => {},
     pending = false,
     chosenSubject,
 }: DeterministicAnswerViewProps) {
@@ -107,6 +115,7 @@ export function DeterministicAnswerView({
                 key={result.result_id}
                 batch={structureBatch}
                 onConfirm={onConfirmStructure}
+                onReject={onRejectStructure}
                 onToggle={onToggleStructure}
                 pending={pending}
                 resultId={result.result_id}

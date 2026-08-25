@@ -19,8 +19,6 @@ import {
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { structureMemberLabel } from "@/lib/structure-disposition";
-import { emitTelemetryEvent } from "@/lib/telemetry/emit";
-import { buildStructureOfferSelectionEvent } from "@/lib/telemetry/outcome";
 
 /**
  * Guided structure-elicitation prompts (CHAOS-3927 P2, design brief §2.2).
@@ -62,6 +60,13 @@ export type StructureNeedsPanelProps = {
     readonly batch: StructureSelectionBatch;
     /** Called after the namespace guard passes; the caller applies the toggle. */
     readonly onToggle: (member: StructureNeedKind, receipt: BoundStructureReceipt) => void;
+    /**
+     * Called when the namespace guard FAILS (CHAOS-4171 standing order):
+     * the caller records the rejection for the next submit to carry — see
+     * `useStructureSelections`'s own `reject` doc comment for why this is
+     * not emitted here directly.
+     */
+    readonly onReject: (member: StructureNeedKind) => void;
     /** Absent when the surrounding surface cannot re-ask, mirroring ClarificationPanel. */
     readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
     readonly pending?: boolean | undefined;
@@ -294,6 +299,7 @@ export function StructureNeedsPanel({
     structureNeeds,
     batch,
     onToggle,
+    onReject,
     onConfirm,
     pending = false,
 }: StructureNeedsPanelProps) {
@@ -320,11 +326,13 @@ export function StructureNeedsPanel({
      * wire and being silently rejected by the engine's own validation
      * (§2.5). See `structureReceiptHasExpectedNamespace`'s own doc comment.
      *
-     * Emits a `workbench_structure_offer_selection` event on both branches
-     * (CHAOS-4171 standing order: telemetry baked into new logic, same PR) —
-     * see `buildStructureOfferSelectionEvent`'s own doc comment for why this
-     * one member gets an actual emitted event when the other four didn't
-     * before this change.
+     * Records a `workbench_structure_offer_selection` outcome on both
+     * branches (CHAOS-4171 standing order: telemetry baked into new logic,
+     * same PR) via `onToggle`/`onReject` — the caller queues it for the
+     * next submit, which is where it is actually emitted (a browser
+     * `console.info` here would land only in this viewer's own devtools,
+     * collected nowhere in prod; see `useStructureSelections`'s own
+     * `reject` doc comment).
      */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         if (!structureReceiptHasExpectedNamespace(member, receipt)) {
@@ -332,12 +340,11 @@ export function StructureNeedsPanel({
             console.error(
                 `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
             );
-            emitTelemetryEvent(buildStructureOfferSelectionEvent(member, "rejected_malformed"));
+            onReject(member);
             setNamespaceError(message);
             return;
         }
         setNamespaceError(undefined);
-        emitTelemetryEvent(buildStructureOfferSelectionEvent(member, "submitted"));
         onToggle(member, receipt);
     }
 
