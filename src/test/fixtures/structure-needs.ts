@@ -22,6 +22,7 @@
 import { mockScenarios } from "@/test/fixtures/investigations";
 import type {
     AnchorOption,
+    CandidateOption,
     ConfirmedStructureEntry,
     HandleOption,
     InvestigationResult,
@@ -101,6 +102,25 @@ const WINDOW_OPTIONS: readonly WindowOption[] = [
     },
 ];
 
+const CANDIDATE_OPTIONS: readonly CandidateOption[] = [
+    {
+        receipt_id: "candr_work_item_0001",
+        option_id: "candidate_work_item_9001",
+        label: "WORK-9001: Investigate flaky test",
+        kind: "work_item",
+        canonical_id: "work_item:9001",
+        offer_source: "engine",
+    },
+    {
+        receipt_id: "candr_work_item_0002",
+        option_id: "candidate_work_item_9002",
+        label: "WORK-9002: Rotate signing key",
+        kind: "work_item",
+        canonical_id: "work_item:9002",
+        offer_source: "engine",
+    },
+];
+
 /**
  * Kind disambiguation (design brief §1.2 reading 1: "the cheapest,
  * highest-leverage elicitation" — 30/41 stalled pools are multi-kind).
@@ -162,6 +182,29 @@ function handleOfferScenario(): InvestigationResult {
         result_id: "result_structure_handle_0001",
         request_id: "request_structure_handle_0001",
         question: "What's the status of PR 412?",
+        status: "clarification_required",
+        structure_needs: structureNeeds,
+    };
+}
+
+/**
+ * Candidate-list offer (CHAOS-4012): nothing committed and the resolution's
+ * own top candidates are ranked and offered — "did you mean one of these?"
+ * — independent of whether a kind-pick also fires (kind-pick still takes
+ * elicitation priority in `missing`'s own ordering when both apply; this
+ * scenario isolates the candidate axis alone).
+ */
+function candidateOfferScenario(): InvestigationResult {
+    const result = baseScenario("no-match");
+    const structureNeeds: StructureNeeds = {
+        missing: ["subject_candidate"],
+        candidate_options: CANDIDATE_OPTIONS as NonNullable<StructureNeeds["candidate_options"]>,
+    };
+    return {
+        ...result,
+        result_id: "result_structure_candidate_0001",
+        request_id: "request_structure_candidate_0001",
+        question: "What's going on with the flaky test work item?",
         status: "clarification_required",
         structure_needs: structureNeeds,
     };
@@ -294,6 +337,12 @@ export function structureMockScenarios(): readonly StructureMockScenario[] {
             id: "structure-handle",
             demonstrates: "A grammar-valid handle offered back for one-turn confirmation.",
             result: handleOfferScenario(),
+        },
+        {
+            id: "structure-candidate",
+            demonstrates:
+                "Candidate-list offer (CHAOS-4012): top ranked candidates, 'did you mean one of these?'.",
+            result: candidateOfferScenario(),
         },
         {
             id: "structure-applied",

@@ -174,8 +174,10 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `7d275c2e852247b5b9b8635085cffb98c6e04bb5` (acr main,
-CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 + disclosure-coverage #160/#161).
+Currently pinned: `264efd11d5c5aeaf674245a86b6867cb4e9222d9` (acr main; adds
+CHAOS-4012's ranked-candidate-list structure offer axis, #236/#175/#242, on
+top of the CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 + disclosure-coverage
+#160/#161 baseline described below).
 
 **`WindowOption` type generation.** This pin's `WindowOption` schema (CHAOS-3900
 W1 §5.1's frozen-bounds `allOf`/`anyOf`/`not` conditionals) combined with the

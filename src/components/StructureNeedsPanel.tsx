@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import type {
     AnchorOption,
     BoundStructureReceipt,
+    CandidateOption,
     HandleOption,
     KindOption,
     StructureNeedKind,
@@ -31,7 +32,8 @@ import { structureMemberLabel } from "@/lib/structure-disposition";
  *
  *   - never re-ranks or filters offers (rendered in the result's own order,
  *     `missing`'s own elicitation-priority ordering: kind, anchor, handle,
- *     window — §1.2 reading 1);
+ *     window — §1.2 reading 1; `subject_candidate` (CHAOS-4012) is appended
+ *     last, never reordering the other four);
  *   - never mints an offer the result did not carry;
  *   - never turns free text into a discriminator — every prompt here is a
  *     tap on a typed offer, carried back as ACR's own receipt, never a
@@ -58,6 +60,13 @@ export type StructureNeedsPanelProps = {
     readonly batch: StructureSelectionBatch;
     /** Called after the namespace guard passes; the caller applies the toggle. */
     readonly onToggle: (member: StructureNeedKind, receipt: BoundStructureReceipt) => void;
+    /**
+     * Called when the namespace guard FAILS (CHAOS-4171 standing order):
+     * the caller records the rejection for the next submit to carry — see
+     * `useStructureSelections`'s own `reject` doc comment for why this is
+     * not emitted here directly.
+     */
+    readonly onReject: (member: StructureNeedKind) => void;
     /** Absent when the surrounding surface cannot re-ask, mirroring ClarificationPanel. */
     readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
     readonly pending?: boolean | undefined;
@@ -243,11 +252,46 @@ function WindowOptionsSection({
     );
 }
 
+function CandidateOptionsSection({
+    options,
+    selectedReceiptId,
+    pending,
+    onToggle,
+}: {
+    readonly options: readonly CandidateOption[];
+    readonly selectedReceiptId: string | undefined;
+    readonly pending: boolean;
+    readonly onToggle: ((option: CandidateOption) => void) | undefined;
+}) {
+    return (
+        <ul className="stack">
+            {options.map((option) => (
+                <OfferButton
+                    key={option.option_id}
+                    label={option.label}
+                    onToggle={
+                        onToggle === undefined
+                            ? undefined
+                            : () => {
+                                  onToggle(option);
+                              }
+                    }
+                    optionId={option.option_id}
+                    pending={pending}
+                    receiptId={option.receipt_id}
+                    selected={selectedReceiptId === option.receipt_id}
+                />
+            ))}
+        </ul>
+    );
+}
+
 const PROMPT_TITLE: Record<StructureNeedKind, string> = {
     expected_kind: "Which kind of thing is this about?",
     subject_anchor: "Which repository, project, or team?",
     subject_handle: "Which specific item?",
     window: "Over what period?",
+    subject_candidate: "Did you mean one of these?",
 };
 
 export function StructureNeedsPanel({
@@ -255,6 +299,7 @@ export function StructureNeedsPanel({
     structureNeeds,
     batch,
     onToggle,
+    onReject,
     onConfirm,
     pending = false,
 }: StructureNeedsPanelProps) {
@@ -280,6 +325,14 @@ export function StructureNeedsPanel({
      * rejected HERE — where the mistake was made — rather than reaching the
      * wire and being silently rejected by the engine's own validation
      * (§2.5). See `structureReceiptHasExpectedNamespace`'s own doc comment.
+     *
+     * Records a `workbench_structure_offer_selection` outcome on both
+     * branches (CHAOS-4171 standing order: telemetry baked into new logic,
+     * same PR) via `onToggle`/`onReject` — the caller queues it for the
+     * next submit, which is where it is actually emitted (a browser
+     * `console.info` here would land only in this viewer's own devtools,
+     * collected nowhere in prod; see `useStructureSelections`'s own
+     * `reject` doc comment).
      */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         if (!structureReceiptHasExpectedNamespace(member, receipt)) {
@@ -287,6 +340,7 @@ export function StructureNeedsPanel({
             console.error(
                 `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
             );
+            onReject(member);
             setNamespaceError(message);
             return;
         }
@@ -298,6 +352,7 @@ export function StructureNeedsPanel({
     const anchorOptions = structureNeeds.anchor_options ?? [];
     const handleOptions = structureNeeds.handle_options ?? [];
     const windowOptions = structureNeeds.window_options ?? [];
+    const candidateOptions = structureNeeds.candidate_options ?? [];
 
     return (
         <section aria-labelledby={`${idPrefix}-needs-title`} className="panel">
@@ -414,6 +469,33 @@ export function StructureNeedsPanel({
                             options={windowOptions}
                             pending={pending}
                             selectedReceiptId={batch.window?.receipt_id}
+                        />
+                    )}
+                </section>
+            ) : null}
+
+            {structureNeeds.missing.includes("subject_candidate") ? (
+                <section aria-labelledby={`${idPrefix}-candidate-title`}>
+                    <h3 className="panel__title" id={`${idPrefix}-candidate-title`}>
+                        {PROMPT_TITLE.subject_candidate}
+                    </h3>
+                    {candidateOptions.length === 0 ? (
+                        <p className="panel__empty">No candidate offers were provided.</p>
+                    ) : (
+                        <CandidateOptionsSection
+                            onToggle={
+                                onConfirm === undefined
+                                    ? undefined
+                                    : (option) => {
+                                          toggle("subject_candidate", {
+                                              result_id: resultId,
+                                              receipt_id: option.receipt_id,
+                                          });
+                                      }
+                            }
+                            options={candidateOptions}
+                            pending={pending}
+                            selectedReceiptId={batch.subject_candidate?.receipt_id}
                         />
                     )}
                 </section>

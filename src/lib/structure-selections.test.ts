@@ -15,6 +15,10 @@ const KIND_RECEIPT = {
     receipt_id: "kindr_pull_request_0001",
 };
 const ANCHOR_RECEIPT = { result_id: "result_0000000000000001", receipt_id: "ancr_repo_atlas_0001" };
+const CANDIDATE_RECEIPT = {
+    result_id: "result_0000000000000001",
+    receipt_id: "candr_work_item_0001",
+};
 
 describe("selectStructureOffer / deselectStructureOffer", () => {
     it("records a pick per member without disturbing other members", () => {
@@ -67,6 +71,16 @@ describe("structureReceiptHasExpectedNamespace", () => {
         expect(structureReceiptHasExpectedNamespace("subject_anchor", KIND_RECEIPT)).toBe(false);
         expect(structureReceiptHasExpectedNamespace("expected_kind", ANCHOR_RECEIPT)).toBe(false);
     });
+
+    it("accepts a candr_ receipt for subject_candidate and rejects it elsewhere (CHAOS-4012)", () => {
+        expect(structureReceiptHasExpectedNamespace("subject_candidate", CANDIDATE_RECEIPT)).toBe(
+            true,
+        );
+        expect(structureReceiptHasExpectedNamespace("expected_kind", CANDIDATE_RECEIPT)).toBe(
+            false,
+        );
+        expect(structureReceiptHasExpectedNamespace("subject_candidate", KIND_RECEIPT)).toBe(false);
+    });
 });
 
 describe("buildStructureReceiptFields", () => {
@@ -76,6 +90,7 @@ describe("buildStructureReceiptFields", () => {
             priorAnchorReceipts: [],
             priorHandleReceipts: [],
             priorWindowReceipts: [],
+            priorCandidateReceipts: [],
         });
     });
 
@@ -91,6 +106,23 @@ describe("buildStructureReceiptFields", () => {
             priorAnchorReceipts: [],
             priorHandleReceipts: [],
             priorWindowReceipts: [],
+            priorCandidateReceipts: [],
+        });
+    });
+
+    it("routes a subject_candidate pick to priorCandidateReceipts (CHAOS-4012)", () => {
+        const batch = selectStructureOffer(
+            EMPTY_STRUCTURE_SELECTION_BATCH,
+            "subject_candidate",
+            CANDIDATE_RECEIPT,
+        );
+
+        expect(buildStructureReceiptFields(batch)).toEqual({
+            priorKindReceipts: [],
+            priorAnchorReceipts: [],
+            priorHandleReceipts: [],
+            priorWindowReceipts: [],
+            priorCandidateReceipts: [CANDIDATE_RECEIPT],
         });
     });
 

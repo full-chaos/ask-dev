@@ -232,6 +232,13 @@ export default function ChatPage() {
             structureSelectionsToSend === undefined
                 ? {}
                 : buildStructureReceiptFields(structureSelectionsToSend);
+        // CHAOS-4171: every selection outcome observed since the last
+        // reset() rides this SAME request — the route is the sink (see
+        // `useStructureSelections`'s own `pendingSelectionEvents` header).
+        // Read AFTER `structureSelections.reset()` above but still the
+        // pre-reset value: `setState` schedules a re-render, it does not
+        // mutate this closure's already-captured array.
+        const selectionEvents = structureSelections.pendingSelectionEvents;
         try {
             const response = await fetch("/api/investigations", {
                 method: "POST",
@@ -241,6 +248,9 @@ export default function ChatPage() {
                     priorSubjectReceipts,
                     conversation,
                     ...structureReceiptFields,
+                    ...(selectionEvents.length > 0
+                        ? { structureSelectionEvents: selectionEvents }
+                        : {}),
                 }),
             });
             const payload: unknown = await response.json();
@@ -426,6 +436,9 @@ export default function ChatPage() {
                                             }
                                             onConfirmStructure={
                                                 isLatest ? chooseStructure : undefined
+                                            }
+                                            onRejectStructure={
+                                                isLatest ? structureSelections.reject : undefined
                                             }
                                             onToggleStructure={
                                                 isLatest ? structureSelections.toggle : undefined

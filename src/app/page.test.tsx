@@ -211,6 +211,13 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
         expect(secondCallBody.priorKindReceipts).toEqual([
             { result_id: structureKind.result_id, receipt_id: option.receipt_id },
         ]);
+        // CHAOS-4171 standing order: verify the CONSUMER, not just the
+        // producer — `use-structure-selections.test.ts` proves the hook
+        // queues the event, `route.test.ts` proves the route emits it; this
+        // is the one place that proves `ask()` actually puts it on the wire.
+        expect(secondCallBody.structureSelectionEvents).toEqual([
+            { member: "expected_kind", outcome: "submitted" },
+        ]);
 
         // The superseded turn's panel is still visible but can no longer be
         // confirmed — inspection only, same as ClarificationPanel's own rule.

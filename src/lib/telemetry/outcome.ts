@@ -1,5 +1,5 @@
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
 import type { EnrichmentPredicate } from "@/lib/enrichment/validate";
 
@@ -263,4 +263,39 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         synthesisVersion: versions?.synthesis_version,
         reused: result?.reused,
     };
+}
+
+/**
+ * Structure-offer selection outcome (CHAOS-4171 standing order: telemetry
+ * baked into new logic, same PR).
+ *
+ * `StructureNeedsPanel`'s own `toggle()` has exactly two outcomes for a tap
+ * on an offer: the namespace guard passes and the selection is applied
+ * (`submitted`), or it fails and the selection is rejected
+ * (`rejected_malformed` — `structureReceiptHasExpectedNamespace`'s own
+ * "should be unreachable, but 'should' is not 'is'" case). Symmetric across
+ * all five offer members (kind/anchor/handle/window/candidate) — the four
+ * that predate CHAOS-4012 had no selection telemetry either; this closes
+ * that gap for all five at once rather than adding it only for the new one.
+ *
+ * `member` reuses the contract's own closed `StructureNeedKind` vocabulary
+ * rather than a hand-kept parallel list, matching this module's own
+ * discipline elsewhere (fact kinds, coverage sources) of deriving closed
+ * vocabularies from the pinned schema/contract instead of copying them.
+ * Content-safe by construction: an option's id, label, or receipt is never a
+ * parameter here, so there is nothing to accidentally carry.
+ */
+export type StructureOfferSelectionOutcome = "submitted" | "rejected_malformed";
+
+export type StructureOfferSelectionEvent = {
+    readonly event: "workbench_structure_offer_selection";
+    readonly member: StructureNeedKind;
+    readonly outcome: StructureOfferSelectionOutcome;
+};
+
+export function buildStructureOfferSelectionEvent(
+    member: StructureNeedKind,
+    outcome: StructureOfferSelectionOutcome,
+): StructureOfferSelectionEvent {
+    return { event: "workbench_structure_offer_selection", member, outcome };
 }

@@ -20,6 +20,9 @@ const anchorWindowScenario = structureMockScenarios().find(
 const aggregateScenario = structureMockScenarios().find(
     (s) => s.id === "structure-aggregate-never-elicit",
 )!.result;
+const candidateScenario = structureMockScenarios().find(
+    (s) => s.id === "structure-candidate",
+)!.result;
 
 /**
  * `batch` is a CONTROLLED prop (codex round 3: lifted so a selection
@@ -34,21 +37,29 @@ function Harness({
     structureNeeds,
     resultId,
     onConfirm,
+    onReject = () => {},
+    onToggle: onToggleSpy,
     twoInstances = false,
 }: {
     readonly structureNeeds: StructureNeeds;
     readonly resultId: string;
     readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
+    readonly onReject?: ((member: StructureNeedKind) => void) | undefined;
+    /** Observes every accepted toggle in addition to the harness's own batch update. */
+    readonly onToggle?:
+        ((member: StructureNeedKind, receipt: BoundStructureReceipt) => void) | undefined;
     readonly twoInstances?: boolean;
 }) {
     const [batch, setBatch] = useState<StructureSelectionBatch>(EMPTY_STRUCTURE_SELECTION_BATCH);
     function onToggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        onToggleSpy?.(member, receipt);
         setBatch((current) => toggleStructureOffer(current, member, receipt));
     }
     const panel = (
         <StructureNeedsPanel
             batch={batch}
             onConfirm={onConfirm}
+            onReject={onReject}
             onToggle={onToggle}
             resultId={resultId}
             structureNeeds={structureNeeds}
@@ -62,6 +73,7 @@ function Harness({
                 <StructureNeedsPanel
                     batch={batch}
                     onConfirm={onConfirm}
+                    onReject={onReject}
                     onToggle={onToggle}
                     resultId={resultId}
                     structureNeeds={structureNeeds}
@@ -89,6 +101,39 @@ describe("StructureNeedsPanel", () => {
         for (const option of options) {
             expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
         }
+    });
+
+    /** CHAOS-4171: the 5th offer axis, appended after kind/anchor/handle/window. */
+    it("renders candidate offers (CHAOS-4012) and submits the candr_ receipt on confirm", async () => {
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={onConfirm}
+                resultId={candidateScenario.result_id}
+                structureNeeds={candidateScenario.structure_needs!}
+            />,
+        );
+
+        const options = candidateScenario.structure_needs!.candidate_options!;
+        const buttons = screen
+            .getAllByRole("button", { name: /^Select / })
+            .map((button) => button.textContent);
+        expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
+        for (const option of options) {
+            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
+        }
+
+        const first = options[0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(onConfirm).toHaveBeenCalledWith({
+            subject_candidate: {
+                result_id: candidateScenario.result_id,
+                receipt_id: first.receipt_id,
+            },
+        });
     });
 
     it("never offers anchor/handle for an aggregate-classed disclosure (NEVER-ELICIT, §1.3)", () => {
@@ -238,6 +283,7 @@ describe("StructureNeedsPanel", () => {
      */
     it("rejects a selection whose receipt is outside the member's own namespace", async () => {
         const onConfirm = vi.fn();
+        const onReject = vi.fn();
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
         const user = userEvent.setup();
         const wrongNamespaceNeeds: StructureNeeds = {
@@ -252,6 +298,7 @@ describe("StructureNeedsPanel", () => {
         render(
             <Harness
                 onConfirm={onConfirm}
+                onReject={onReject}
                 resultId={kindScenario.result_id}
                 structureNeeds={wrongNamespaceNeeds}
             />,
@@ -272,7 +319,46 @@ describe("StructureNeedsPanel", () => {
         expect(
             screen.getByRole("button", { name: "Ask again with these selections" }),
         ).toBeDisabled();
+        // CHAOS-4171 standing order: the rejection is telemetered too, not
+        // just the successful path — but not emitted HERE (team-lead
+        // ruling: a browser console.info is collected nowhere in prod).
+        // `onReject` is what the caller (`useStructureSelections`) queues
+        // for the next submit to carry and the route to emit; see
+        // `use-structure-selections.test.ts` and `route.test.ts` for the
+        // rest of that chain.
+        expect(onReject).toHaveBeenCalledWith("expected_kind");
         consoleError.mockRestore();
+    });
+
+    /**
+     * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
+     * The panel's own job is only to call `onToggle` on a namespace-valid
+     * pick — `useStructureSelections.toggle` (not this component) is what
+     * records the "submitted" outcome, and the route is what emits it
+     * (see `use-structure-selections.test.ts` / `route.test.ts`).
+     */
+    it("calls onToggle, not onReject, on a real (namespace-valid) selection", async () => {
+        const onToggle = vi.fn();
+        const onReject = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={vi.fn()}
+                onReject={onReject}
+                onToggle={onToggle}
+                resultId={kindScenario.result_id}
+                structureNeeds={kindScenario.structure_needs!}
+            />,
+        );
+
+        const first = kindScenario.structure_needs!.kind_options![0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
+
+        expect(onToggle).toHaveBeenCalledWith(
+            "expected_kind",
+            expect.objectContaining({ receipt_id: first.receipt_id }),
+        );
+        expect(onReject).not.toHaveBeenCalled();
     });
 
     /**

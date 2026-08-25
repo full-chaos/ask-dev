@@ -79,6 +79,8 @@ export type InvestigationOptions = {
     readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
     readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
+    // CHAOS-4012's own addition to the four above, same shape.
+    readonly priorCandidateReceipts?: readonly BoundStructureReceipt[] | undefined;
     // Chat-surface conversation threading. See src/lib/conversation.ts's own
     // header: the Workbench never supplies this (it asks one independent
     // question at a time by design), so it defaults to empty below exactly
@@ -121,6 +123,7 @@ export function buildInvestigationRequest(
         readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
         readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
         readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
+        readonly priorCandidateReceipts?: readonly BoundStructureReceipt[] | undefined;
     } = {},
     conversation: readonly ConversationTurn[] = [],
 ): InvestigationRequest {
@@ -156,6 +159,7 @@ export function buildInvestigationRequest(
             | "prior_anchor_receipts"
             | "prior_handle_receipts"
             | "prior_window_receipts"
+            | "prior_candidate_receipts"
         >
     > = {};
     const kindReceipts = dedupeAndCap(
@@ -189,6 +193,14 @@ export function buildInvestigationRequest(
     if (windowReceipts.length > 0)
         structureFields.prior_window_receipts = windowReceipts as NonNullable<
             InvestigationRequest["prior_window_receipts"]
+        >;
+    const candidateReceipts = dedupeAndCap(
+        structureReceipts.priorCandidateReceipts ?? [],
+        MAX_STRUCTURE_RECEIPTS,
+    );
+    if (candidateReceipts.length > 0)
+        structureFields.prior_candidate_receipts = candidateReceipts as NonNullable<
+            InvestigationRequest["prior_candidate_receipts"]
         >;
 
     // Wire-minimized the same way the four structure fields are (attached
@@ -373,6 +385,7 @@ export async function investigate(
             priorAnchorReceipts: options.priorAnchorReceipts,
             priorHandleReceipts: options.priorHandleReceipts,
             priorWindowReceipts: options.priorWindowReceipts,
+            priorCandidateReceipts: options.priorCandidateReceipts,
         },
         options.conversation ?? [],
     );
