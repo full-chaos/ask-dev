@@ -116,6 +116,13 @@ describe("structure-needs panel hints (design brief §2.2)", () => {
         // The question travels UNCHANGED — the same rule the subject-choice
         // flow already holds (never rewrite it to encode the pick).
         expect(secondCallBody.question).toBe("How's the pipeline doing?");
+        // CHAOS-4171 standing order: verify the CONSUMER, not just the
+        // producer — `use-structure-selections.test.ts` proves the hook
+        // queues the event, `route.test.ts` proves the route emits it; this
+        // is the one place that proves `ask()` actually puts it on the wire.
+        expect(secondCallBody.structureSelectionEvents).toEqual([
+            { member: "expected_kind", outcome: "submitted" },
+        ]);
     });
 
     it("surfaces a vetoed selection as a visible notice, reachable from every view", async () => {
