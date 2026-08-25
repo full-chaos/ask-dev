@@ -28,13 +28,14 @@
  * Response selection is a dumb keyword router, not a scenario engine: a
  * question containing TRIGGER_CLARIFICATION returns a `clarification_required`
  * result with subject candidates, TRIGGER_STRUCTURE_NEEDS returns one with a
- * `structure_needs` disclosure (kind offers) instead, TRIGGER_MIXED returns
- * one with BOTH at once, and TRIGGER_CONVERSATION_ECHO returns a decisive
- * result whose `deterministic_answer` reports back what `conversation` the
- * request itself carried. Every other question returns the canonical
- * `complete` example unchanged apart from `question`/`result_id`/
- * `request_id`, so it never accidentally collides with any scenario's
- * identifiers.
+ * `structure_needs` disclosure (kind offers) instead, TRIGGER_CANDIDATE_NEEDS
+ * (CHAOS-4012/CHAOS-4171) returns one with a candidate-list disclosure
+ * instead, TRIGGER_MIXED returns one with BOTH clarification and kind offers
+ * at once, and TRIGGER_CONVERSATION_ECHO returns a decisive result whose
+ * `deterministic_answer` reports back what `conversation` the request itself
+ * carried. Every other question returns the canonical `complete` example
+ * unchanged apart from `question`/`result_id`/`request_id`, so it never
+ * accidentally collides with any scenario's identifiers.
  *
  * ===================== MOCK-INFRASTRUCTURE DISCLOSURE =====================
  * This IS mock infrastructure, full stop — a fake server is a fake server
@@ -100,6 +101,12 @@ export const TRIGGER_MIXED = "e2e-mixed-me";
 // turn 1's own content rather than merely asserting the request "looks
 // fine" some other way.
 export const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
+// CHAOS-4171/CHAOS-4012: the candidate-list offer axis — mirrors
+// TRIGGER_STRUCTURE_NEEDS exactly, one member over (`subject_candidate`
+// instead of `expected_kind`), so the real-HTTP round trip for
+// CandidateOptionsSection gets the same proof the kind-offer path already
+// has, not just component-level coverage.
+export const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 
 const canonical = JSON.parse(
     readFileSync(
@@ -250,6 +257,65 @@ function structureNeedsResult(question) {
 }
 
 /**
+ * CHAOS-4012/CHAOS-4171: a `structure_needs` disclosure whose only missing
+ * member is `subject_candidate` — same shape as `structureNeedsResult`
+ * above, one member over. `candidateOfferMaterial` (acr-side) fires this
+ * axis independently of a kind-pick, so this scenario stays single-family
+ * on purpose (mirrors `structureNeedsResult`'s own scope note).
+ */
+const STRUCTURE_CANDIDATE_OPTIONS = [
+    {
+        receipt_id: "candr_e2e_work_item_0001",
+        option_id: "candidate_work_item_9001",
+        label: "WORK-9001: Investigate flaky test",
+        kind: "work_item",
+        canonical_id: "work_item:9001",
+        offer_source: "engine",
+    },
+    {
+        receipt_id: "candr_e2e_work_item_0002",
+        option_id: "candidate_work_item_9002",
+        label: "WORK-9002: Rotate signing key",
+        kind: "work_item",
+        canonical_id: "work_item:9002",
+        offer_source: "engine",
+    },
+];
+
+function candidateNeedsResult(question) {
+    const result = structuredClone(canonical);
+    return {
+        ...result,
+        result_id: "result_e2e_candidate_0001",
+        request_id: "request_e2e_candidate_0001",
+        question,
+        status: "clarification_required",
+        interpretation: {
+            ...result.interpretation,
+            clarification_needed: true,
+            clarification_reason: "Nothing committed, and the resolution's own pool is non-empty.",
+        },
+        subject_resolution: { candidates: [], committed: [] },
+        structure_needs: {
+            missing: ["subject_candidate"],
+            candidate_options: STRUCTURE_CANDIDATE_OPTIONS,
+        },
+        direct_judgment: "",
+        current_state: "",
+        strongest_pressures: [],
+        drivers: [],
+        remaining_work: [],
+        readiness_gaps: [],
+        paths: [],
+        conflicts: [],
+        claimed_facts: [],
+        limitations: ["No judgment was formed because no candidate was chosen."],
+        deterministic_answer: "Which candidate this question is about is unresolved.",
+        warnings: [],
+    };
+}
+
+/**
  * The mixed scenario (mixed-receipt-family unification follow-up): the SAME
  * subject candidates as `clarificationResult` AND the SAME kind offers as
  * `structureNeedsResult`, disclosed on ONE result. Proves the co-presence
@@ -337,6 +403,7 @@ const server = createServer((request, response) => {
         let hasChosenReceipt = false;
         let hasSubjectReceipt = false;
         let hasKindReceipt = false;
+        let hasCandidateReceipt = false;
         let conversation;
         try {
             const parsed = JSON.parse(body);
@@ -407,7 +474,15 @@ const server = createServer((request, response) => {
             hasKindReceipt = chosenKindReceiptIds.some((receiptId) =>
                 STRUCTURE_KIND_OPTIONS.some((option) => option.receipt_id === receiptId),
             );
-            hasChosenReceipt = hasSubjectReceipt || hasKindReceipt;
+            // `prior_candidate_receipts` (CHAOS-4012): same wire-renamed
+            // pattern as `prior_kind_receipts` above, one layer up.
+            const chosenCandidateReceiptIds = Array.isArray(parsed.prior_candidate_receipts)
+                ? parsed.prior_candidate_receipts.map((receipt) => receipt?.receipt_id)
+                : [];
+            hasCandidateReceipt = chosenCandidateReceiptIds.some((receiptId) =>
+                STRUCTURE_CANDIDATE_OPTIONS.some((option) => option.receipt_id === receiptId),
+            );
+            hasChosenReceipt = hasSubjectReceipt || hasKindReceipt || hasCandidateReceipt;
         } catch {
             question = "";
         }
@@ -433,9 +508,11 @@ const server = createServer((request, response) => {
                 ? answeredResult(question)
                 : question.includes(TRIGGER_STRUCTURE_NEEDS)
                   ? structureNeedsResult(question)
-                  : question.includes(TRIGGER_CLARIFICATION)
-                    ? clarificationResult(question)
-                    : answeredResult(question);
+                  : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                    ? candidateNeedsResult(question)
+                    : question.includes(TRIGGER_CLARIFICATION)
+                      ? clarificationResult(question)
+                      : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

@@ -18,6 +18,7 @@ export type {
     ACRContextFabricInvestigationResultV1 as InvestigationResult,
     AcceptedGrammar,
     AnchorOption,
+    CandidateOption,
     ConfirmedStructureEntry,
     Coverage,
     DriverJudgment,
@@ -113,14 +114,23 @@ export const STRUCTURE_RECEIPT_PREFIX = {
     subject_anchor: "ancr_",
     subject_handle: "handr_",
     window: "winr_",
+    // CHAOS-4012's own receipt namespace (ContextFabricCandidateOptionReceiptPrefix).
+    subject_candidate: "candr_",
 } as const satisfies Record<StructureNeedKind, string>;
 
-/** Every member the panel can render an offer for, in elicitation-priority order. */
+/**
+ * Every member the panel can render an offer for, in elicitation-priority
+ * order. `subject_candidate` (CHAOS-4012) is appended last, never
+ * reordering the existing four — acr's own
+ * ContextFabricStructureNeedSubjectCandidate doc comment: "Appended at the
+ * end of the vocabulary, never reordering the existing three."
+ */
 export const STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER: readonly StructureNeedKind[] = [
     "expected_kind",
     "subject_anchor",
     "subject_handle",
     "window",
+    "subject_candidate",
 ];
 
 /** One entry of `coverage.sources`; the contract declares it inline. */

@@ -236,11 +236,12 @@ describe("a malformed receipt rejects the request instead of being filtered out"
 });
 
 /**
- * CHAOS-3927 P2: the four structure-receipt fields extend the SAME
+ * CHAOS-3927 P2: the structure-receipt fields extend the SAME
  * malformed-rejects-the-whole-request discipline as priorSubjectReceipts,
  * plus one more check subject receipts don't need — the closed
- * kindr_/ancr_/handr_/winr_ namespace per field (design brief §2.1: "none
- * of the four ... may ever accept another's namespace").
+ * kindr_/ancr_/handr_/winr_/candr_ namespace per field (design brief §2.1:
+ * "none of the four ... may ever accept another's namespace"; CHAOS-4012
+ * extends this to a fifth, `priorCandidateReceipts`/`candr_`).
  */
 describe("structure receipts are validated with the same discipline as subject receipts", () => {
     const STRUCTURE_FIELDS = [
@@ -248,6 +249,7 @@ describe("structure receipts are validated with the same discipline as subject r
         ["priorAnchorReceipts", "repository/project/team"],
         ["priorHandleReceipts", "handle"],
         ["priorWindowReceipts", "time window"],
+        ["priorCandidateReceipts", "candidate"],
     ] as const;
 
     for (const [field, label] of STRUCTURE_FIELDS) {
@@ -273,6 +275,7 @@ describe("structure receipts are validated with the same discipline as subject r
                 priorAnchorReceipts: "ancr_",
                 priorHandleReceipts: "handr_",
                 priorWindowReceipts: "winr_",
+                priorCandidateReceipts: "candr_",
             }[field];
             const response = await POST(
                 post(

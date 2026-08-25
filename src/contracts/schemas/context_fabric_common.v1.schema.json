@@ -790,6 +790,28 @@
         "receipt_id"
       ]
     },
+    "CandidateBoundReceipt": {
+      "description": "CHAOS-4012: same shape as BoundSubjectReceipt, but receipt_id is additionally constrained to the closed candr_ namespace -- mirrors WindowBoundReceipt's own reasoning exactly.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 256
+        },
+        "receipt_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 256,
+          "pattern": "^candr_"
+        }
+      },
+      "required": [
+        "result_id",
+        "receipt_id"
+      ]
+    },
     "StructureNeedKind": {
       "description": "CHAOS-3900 P1: the closed enum for which intent-frame member is missing or ambiguous (pivot-intent design brief section 2.1).",
       "type": "string",
@@ -797,7 +819,8 @@
         "expected_kind",
         "subject_anchor",
         "subject_handle",
-        "window"
+        "window",
+        "subject_candidate"
       ]
     },
     "StructureOfferSource": {
@@ -856,6 +879,117 @@
     },
     "AnchorOption": {
       "description": "CHAOS-3900 P1: one server-offered unique-claimant anchor candidate, minted onto a stored result so a later turn can confirm it via ancr_ receipt redemption. Re-verification identity is (kind, canonical_id, matched_term_hash) -- see internal/contextfabric's verifyAnchorClaimantUnique. matched_term_hash is the SHA-256 digest of the normalized matched term, never the raw term.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 256,
+          "pattern": "^ancr_"
+        },
+        "option_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "canonical_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "matched_term_hash": {
+          "type": "string",
+          "minLength": 24,
+          "maxLength": 24,
+          "pattern": "^[0-9a-f]{24}$"
+        },
+        "offer_source": {
+          "$ref": "#/$defs/StructureOfferSource"
+        },
+        "prior_version_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "prior_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "receipt_id",
+        "option_id",
+        "label",
+        "kind",
+        "canonical_id",
+        "matched_term_hash",
+        "offer_source"
+      ]
+    },
+    "CandidateOption": {
+      "description": "CHAOS-4012: one server-offered top-ranked SubjectCandidate from the resolution's own pool, minted onto a stored result so a later turn can confirm it via candr_ receipt redemption. Fires independently of KindOption above -- offered whenever nothing committed and the pool is non-empty, regardless of how many distinct kinds it spans. Field shape mirrors AnchorOption minus matched_term_hash: a candidate claims no per-term uniqueness, so there is no hash to re-verify.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 256,
+          "pattern": "^candr_"
+        },
+        "option_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "canonical_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "offer_source": {
+          "$ref": "#/$defs/StructureOfferSource"
+        },
+        "prior_version_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "prior_entry_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "receipt_id",
+        "option_id",
+        "label",
+        "kind",
+        "canonical_id",
+        "offer_source"
+      ]
+    },
+    "AnchorOptionV2": {
+      "description": "CHAOS-4042 (sol-max ruling): one server-offered anchor candidate under MEMBERSHIP-VERIFY semantics -- the claimant set is NOT required to be unique. Redemption re-verifies that (kind, canonical_id) remains a member of the term's complete claimant set at the pinned ResolvedGraphBinding epoch, matched by (matched_term_hash, kind, canonical_id) together, never id or hash alone. Wire shape is identical to v1 AnchorOption; only the meaning differs, which is why this is a distinct, permanently-separate contract rather than a v1 revision. Only ever carried on a result whose schema_version is context_fabric_investigation_result.v2 -- a v1 result (context_fabric_investigation_result.v1) uses AnchorOption and stays unique-claimant permanently.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -1010,7 +1144,7 @@
             "$ref": "#/$defs/StructureNeedKind"
           },
           "minItems": 1,
-          "maxItems": 4,
+          "maxItems": 5,
           "uniqueItems": true
         },
         "kind_options": {
@@ -1047,6 +1181,74 @@
             "$ref": "#/$defs/AcceptedGrammar"
           },
           "maxItems": 20
+        },
+        "candidate_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CandidateOption"
+          },
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "missing"
+      ]
+    },
+    "StructureNeedsV2": {
+      "description": "CHAOS-4042: the disclosure block carried on a context_fabric_investigation_result.v2 result -- identical to StructureNeeds except anchor_options items are AnchorOptionV2 (membership-verify semantics) rather than AnchorOption (unique-claimant). kind_options/handle_options/window_options/accepted_grammars are unchanged from v1.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "missing": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/StructureNeedKind"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
+        },
+        "kind_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KindOption"
+          },
+          "maxItems": 20
+        },
+        "anchor_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AnchorOptionV2"
+          },
+          "maxItems": 20
+        },
+        "handle_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HandleOption"
+          },
+          "maxItems": 20
+        },
+        "window_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WindowOption"
+          },
+          "maxItems": 20
+        },
+        "accepted_grammars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AcceptedGrammar"
+          },
+          "maxItems": 20
+        },
+        "candidate_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CandidateOption"
+          },
+          "maxItems": 20
         }
       },
       "required": [
@@ -1060,6 +1262,40 @@
         "receipt",
         "explicit",
         "explicit_unattributed"
+      ]
+    },
+    "WindowConfirmationMode": {
+      "description": "CHAOS-3900 W2, design brief section 4/DW3: closed vocabulary for how a caller wants an INFERRED (non-confirmed) evidence window disclosed. Both modes carry the same WindowClarification/EffectiveEvidenceWindow data; the mode only controls whether the disclosure is also nudged through Warnings. The empty string is the caller's own 'not set' state, mapped to headless by the engine. CHAOS-4040 (sol-max ruling 2026-08-21): every inferred window is gated out of decisive terminals regardless of this field, so the mode selects the nudge sentence on that confirmation-required terminal, not between a nudge and an otherwise-decisive answer.",
+      "type": "string",
+      "enum": [
+        "",
+        "headless",
+        "nudge"
+      ]
+    },
+    "RequestedHandle": {
+      "description": "CHAOS-3972 P3, design brief section 2.3: one caller-supplied explicit subject_handle value -- a typed (kind, pattern_id, value) triple the engine grammar-validates before it may become a receipt-bound HandleOption offer.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "pattern_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "kind",
+        "pattern_id",
+        "value"
       ]
     },
     "StructureProvenance": {
@@ -1287,6 +1523,9 @@
         },
         "include_debug": {
           "type": "boolean"
+        },
+        "window_confirmation_mode": {
+          "$ref": "#/$defs/WindowConfirmationMode"
         }
       },
       "required": [
@@ -1432,11 +1671,56 @@
         },
         "retrieval_degraded": {
           "type": "boolean"
+        },
+        "graph_not_projected": {
+          "type": "boolean"
+        },
+        "commit_decision_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CommitDecisionDigest"
+          },
+          "maxItems": 250
         }
       },
       "required": [
         "candidates",
         "committed"
+      ]
+    },
+    "CommitDecisionDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "subject": {
+          "$ref": "#/$defs/SubjectRef"
+        },
+        "commit_gate": {
+          "type": "string",
+          "enum": [
+            "",
+            "caller_hint_short_circuit",
+            "pre_committed_exact_hint",
+            "exact_index",
+            "identity_fast_path",
+            "lone_floor",
+            "top_of_two",
+            "vector_margin_rescue",
+            "evidence_census"
+          ]
+        },
+        "identity_proven": {
+          "type": "boolean"
+        },
+        "search_truncated": {
+          "type": "boolean"
+        },
+        "alias_lookup_complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "subject"
       ]
     },
     "Cohort": {

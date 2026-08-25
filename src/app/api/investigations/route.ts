@@ -59,6 +59,9 @@ type InvestigateBody = {
     readonly priorAnchorReceipts?: unknown;
     readonly priorHandleReceipts?: unknown;
     readonly priorWindowReceipts?: unknown;
+    // CHAOS-4012's own addition, same shape/discipline as the four above
+    // (validated against its own candr_ namespace, never filtered).
+    readonly priorCandidateReceipts?: unknown;
     /** Chat-surface conversation threading. See src/lib/conversation.ts's own header. */
     readonly conversation?: unknown;
 };
@@ -302,6 +305,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         ["priorAnchorReceipts", STRUCTURE_RECEIPT_PREFIX.subject_anchor, "repository/project/team"],
         ["priorHandleReceipts", STRUCTURE_RECEIPT_PREFIX.subject_handle, "handle"],
         ["priorWindowReceipts", STRUCTURE_RECEIPT_PREFIX.window, "time window"],
+        ["priorCandidateReceipts", STRUCTURE_RECEIPT_PREFIX.subject_candidate, "candidate"],
     ] as const;
 
     const structureReceipts: Record<string, readonly BoundStructureReceipt[]> = {};
@@ -362,6 +366,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             priorAnchorReceipts: structureReceipts.priorAnchorReceipts,
             priorHandleReceipts: structureReceipts.priorHandleReceipts,
             priorWindowReceipts: structureReceipts.priorWindowReceipts,
+            priorCandidateReceipts: structureReceipts.priorCandidateReceipts,
             conversation,
             signal: request.signal,
         });

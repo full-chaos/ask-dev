@@ -13,6 +13,8 @@ import { configuredBaseURL } from "../playwright.config";
 const TRIGGER_CLARIFICATION = "e2e-clarify-me";
 // Kept in sync by hand with `TRIGGER_STRUCTURE_NEEDS` for the same reason.
 const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
+// Kept in sync by hand with `TRIGGER_CANDIDATE_NEEDS` for the same reason.
+const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 // Kept in sync by hand with `TRIGGER_MIXED` for the same reason.
 const TRIGGER_MIXED = "e2e-mixed-me";
 // Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
@@ -408,6 +410,47 @@ test.describe("structure needs chips", () => {
         // inspection only, same rule as ClarificationPanel's own
         // `cannot-choose-here` echo.
         await expect(page.getByTestId("cannot-confirm-structure-here")).toBeVisible();
+    });
+
+    /**
+     * CHAOS-4171/CHAOS-4012: the candidate-list axis, real-HTTP round trip —
+     * same proof shape as the kind-offer test above, one member over
+     * (`subject_candidate` instead of `expected_kind`).
+     */
+    test("POSITIVE: a question ACR cannot commit a subject for renders candidate-offer chips, and a selection resolves it", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`What's the status of this, ${TRIGGER_CANDIDATE_NEEDS}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const panel = page.getByRole("region", { name: "More structure would narrow this" });
+        await expect(panel).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Select WORK-9001: Investigate flaky test" }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("button", { name: "Select WORK-9002: Rotate signing key" }),
+        ).toBeVisible();
+
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(1);
+        await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
+
+        await page
+            .getByRole("button", { name: "Select WORK-9001: Investigate flaky test" })
+            .click();
+        await page.getByRole("button", { name: "Ask again with these selections" }).click();
+
+        await expect(turns).toHaveCount(2);
+        await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
+        // The discriminating proof: the second turn can only be "complete"
+        // if the fake-ACR double actually recognized the chosen candr_
+        // receipt and returned a decisive result.
+        await expect(turns.last()).toHaveAttribute("data-state", "complete");
     });
 });
 

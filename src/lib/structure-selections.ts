@@ -109,10 +109,12 @@ export function structureReceiptHasExpectedNamespace(
 const MAX_RECEIPTS_PER_MEMBER = 20;
 
 /**
- * Builds the four `prior_*_receipts` request bodies from an accumulated
+ * Builds the five `prior_*_receipts` request bodies from an accumulated
  * batch — camelCase, matching the `/api/investigations` POST body's own
  * `priorSubjectReceipts` naming (the route translates to the contract's
  * snake_case fields, exactly as it already does for subject receipts).
+ * `priorCandidateReceipts` is CHAOS-4012's own addition, same shape as the
+ * other four.
  *
  * Each array holds at most one entry today (one selection per member), but
  * is built as a deduplicated, capped array — not a bare optional — so the
@@ -126,6 +128,7 @@ export function buildStructureReceiptFields(batch: StructureSelectionBatch): {
     readonly priorAnchorReceipts: readonly BoundStructureReceipt[];
     readonly priorHandleReceipts: readonly BoundStructureReceipt[];
     readonly priorWindowReceipts: readonly BoundStructureReceipt[];
+    readonly priorCandidateReceipts: readonly BoundStructureReceipt[];
 } {
     const capped = (
         receipt: BoundStructureReceipt | undefined,
@@ -137,5 +140,6 @@ export function buildStructureReceiptFields(batch: StructureSelectionBatch): {
         priorAnchorReceipts: capped(batch.subject_anchor),
         priorHandleReceipts: capped(batch.subject_handle),
         priorWindowReceipts: capped(batch.window),
+        priorCandidateReceipts: capped(batch.subject_candidate),
     };
 }

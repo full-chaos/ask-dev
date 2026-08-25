@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import {
     boundedCoverageSource,
     buildOutcomeEvent,
+    buildStructureOfferSelectionEvent,
     UNRECOGNIZED_SOURCE,
 } from "@/lib/telemetry/outcome";
 
@@ -268,5 +269,44 @@ describe("outcome telemetry — what it does record", () => {
         expect(
             buildOutcomeEvent({ latencyMs: 1, renderSurface: "raw", result: noMatch }).outcome,
         ).toBe("no_match");
+    });
+});
+
+/**
+ * CHAOS-4171 standing order: structure-offer selection telemetry, symmetric
+ * across all five offer members (the four that predate CHAOS-4012 had none
+ * either — this closes that gap for all five, not just the new one).
+ */
+describe("buildStructureOfferSelectionEvent", () => {
+    const MEMBERS: readonly StructureNeedKind[] = [
+        "expected_kind",
+        "subject_anchor",
+        "subject_handle",
+        "window",
+        "subject_candidate",
+    ];
+
+    for (const member of MEMBERS) {
+        it(`records a submitted outcome for ${member}`, () => {
+            expect(buildStructureOfferSelectionEvent(member, "submitted")).toEqual({
+                event: "workbench_structure_offer_selection",
+                member,
+                outcome: "submitted",
+            });
+        });
+
+        it(`records a rejected_malformed outcome for ${member}`, () => {
+            expect(buildStructureOfferSelectionEvent(member, "rejected_malformed")).toEqual({
+                event: "workbench_structure_offer_selection",
+                member,
+                outcome: "rejected_malformed",
+            });
+        });
+    }
+
+    it("carries only the closed member/outcome vocabulary — no option id, label, or receipt", () => {
+        const event = buildStructureOfferSelectionEvent("subject_candidate", "submitted");
+
+        expect(Object.keys(event).sort()).toEqual(["event", "member", "outcome"]);
     });
 });

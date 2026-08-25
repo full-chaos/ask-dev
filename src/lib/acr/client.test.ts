@@ -134,6 +134,7 @@ describe("buildInvestigationRequest", () => {
             expect(request).not.toHaveProperty("prior_anchor_receipts");
             expect(request).not.toHaveProperty("prior_handle_receipts");
             expect(request).not.toHaveProperty("prior_window_receipts");
+            expect(request).not.toHaveProperty("prior_candidate_receipts");
             expect(
                 validateContract("context_fabric_investigation_request.v1.schema.json", request)
                     .valid,
@@ -146,12 +147,28 @@ describe("buildInvestigationRequest", () => {
                 priorAnchorReceipts: [],
                 priorHandleReceipts: [],
                 priorWindowReceipts: [],
+                priorCandidateReceipts: [],
             });
 
             expect(request).not.toHaveProperty("prior_kind_receipts");
             expect(request).not.toHaveProperty("prior_anchor_receipts");
             expect(request).not.toHaveProperty("prior_handle_receipts");
             expect(request).not.toHaveProperty("prior_window_receipts");
+            expect(request).not.toHaveProperty("prior_candidate_receipts");
+        });
+
+        it("carries a selected candidate receipt (CHAOS-4012), deduplicated and capped, when non-empty", () => {
+            const candidateReceipt = {
+                result_id: "result_structure_0001",
+                receipt_id: "candr_work_item_0001",
+            };
+            const request = buildInvestigationRequest("q", [], {
+                priorCandidateReceipts: [candidateReceipt, { ...candidateReceipt }],
+            }) as unknown as {
+                readonly prior_candidate_receipts?: readonly unknown[];
+            };
+
+            expect(request.prior_candidate_receipts).toEqual([candidateReceipt]);
         });
 
         /**

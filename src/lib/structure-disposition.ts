@@ -20,6 +20,7 @@ const MEMBER_LABEL: Record<StructureNeedKind, string> = {
     subject_anchor: "repository/project/team",
     subject_handle: "handle",
     window: "time window",
+    subject_candidate: "candidate",
 };
 
 export function structureMemberLabel(member: StructureNeedKind): string {

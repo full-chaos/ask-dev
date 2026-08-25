@@ -20,6 +20,9 @@ const anchorWindowScenario = structureMockScenarios().find(
 const aggregateScenario = structureMockScenarios().find(
     (s) => s.id === "structure-aggregate-never-elicit",
 )!.result;
+const candidateScenario = structureMockScenarios().find(
+    (s) => s.id === "structure-candidate",
+)!.result;
 
 /**
  * `batch` is a CONTROLLED prop (codex round 3: lifted so a selection
@@ -89,6 +92,39 @@ describe("StructureNeedsPanel", () => {
         for (const option of options) {
             expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
         }
+    });
+
+    /** CHAOS-4171: the 5th offer axis, appended after kind/anchor/handle/window. */
+    it("renders candidate offers (CHAOS-4012) and submits the candr_ receipt on confirm", async () => {
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={onConfirm}
+                resultId={candidateScenario.result_id}
+                structureNeeds={candidateScenario.structure_needs!}
+            />,
+        );
+
+        const options = candidateScenario.structure_needs!.candidate_options!;
+        const buttons = screen
+            .getAllByRole("button", { name: /^Select / })
+            .map((button) => button.textContent);
+        expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
+        for (const option of options) {
+            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
+        }
+
+        const first = options[0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(onConfirm).toHaveBeenCalledWith({
+            subject_candidate: {
+                result_id: candidateScenario.result_id,
+                receipt_id: first.receipt_id,
+            },
+        });
     });
 
     it("never offers anchor/handle for an aggregate-classed disclosure (NEVER-ELICIT, §1.3)", () => {
