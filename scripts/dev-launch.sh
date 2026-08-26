@@ -64,8 +64,14 @@ ACR_TARGET="${ACR_TARGET:-kiac}"
 KIAC_NAMESPACE="${ACR_KIAC_NAMESPACE:-acr-pilot}"
 KIAC_SERVICE="${ACR_KIAC_SERVICE:-acr-pilot}"
 KIAC_SERVICE_PORT="${ACR_KIAC_SERVICE_PORT:-8080}"
+KIAC_LOCAL_PORT=18080
 PF_PIDFILE="${TMPDIR:-/tmp}/ask-dev-acr-pilot-portforward.pid"
+PF_KUBECTL_PIDFILE="${TMPDIR:-/tmp}/ask-dev-acr-pilot-portforward.kubectl.pid"
 PF_LOG="${TMPDIR:-/tmp}/ask-dev-acr-pilot-portforward.log"
+PF_LOCKDIR="${TMPDIR:-/tmp}/ask-dev-acr-pilot-portforward.lock"
+# Embedded (as an extra argv entry, not a shell-expanded string) in the
+# supervisor's own invocation below so `ps` can identify it unambiguously.
+PF_MARKER="ask-dev-kiac-portforward:$KIAC_NAMESPACE/$KIAC_SERVICE"
 
 note() { printf '[ask-dev-launch] %s\n' "$*" >&2; }
 
@@ -104,14 +110,62 @@ stop_if_ours() {
   fi
 }
 
-if [[ "$ACR_TARGET" == kiac ]]; then
-  # The docker-path acr-api binds host port 18080 directly; free it before
-  # the port-forward below tries to bind the same port.
-  note "ACR_TARGET=kiac: stopping any local docker-path containers first (port 18080 is shared)."
-  stop_if_ours acr-dev-acr-api dev-health-acr:dev
-  stop_if_ours acr-dev-acr-projector dev-health-acr:dev
-  stop_if_ours acr-dev-falkordb falkordb/falkordb@sha256:ad09d5051bbda1cfee8cef9d7f41ffe1bcb1c5327b82c442c989e84ab8cc33d3
+# `kill -0` alone accepts ANY live pid, including one recycled by an unrelated
+# process since the pidfile was written -- codex review on this diff caught
+# that. An anonymous `( ... ) &` subshell shows up in `ps` as just its
+# parent's own command line (not distinguishable), so the supervisor below is
+# spawned as a real `bash -c` with $PF_MARKER as an extra argv entry: `ps`'s
+# command string for a genuine supervisor always contains it.
+pf_supervisor_alive() {
+  local pid="$1"
+  [[ -n "$pid" ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  ps -ww -p "$pid" -o command= 2>/dev/null | grep -qF "$PF_MARKER"
+}
 
+port_in_use() {
+  lsof -ti "tcp:$1" >/dev/null 2>&1
+}
+
+# mkdir is atomic -- guards the read-check-write pidfile sequence below
+# against two concurrent launches racing each other (codex: "one becoming
+# untracked"). Not held across the whole script, just the start/stop of the
+# port-forward itself; a wedged stale lock is not fatal, just logged.
+acquire_pf_lock() {
+  for _ in $(seq 1 20); do
+    mkdir "$PF_LOCKDIR" 2>/dev/null && return 0
+    sleep 0.5
+  done
+  note "Warning: port-forward lock ($PF_LOCKDIR) still held after 10s; proceeding anyway."
+}
+release_pf_lock() { rmdir "$PF_LOCKDIR" 2>/dev/null || true; }
+
+stop_kiac_portforward() {
+  acquire_pf_lock
+  if [[ -f "$PF_PIDFILE" ]]; then
+    old_pid="$(cat "$PF_PIDFILE" 2>/dev/null || true)"
+    if pf_supervisor_alive "$old_pid"; then
+      note "Stopping the kiac port-forward supervisor (pid $old_pid) to free port $KIAC_LOCAL_PORT."
+      # Supervisor first, so it can't restart the child below out from under
+      # us; the child (tracked in its own pidfile, rewritten every loop) is
+      # killed directly rather than via a `pkill -f` regex built from
+      # env-controlled values -- codex flagged that regex as both mismatched
+      # (wrong local/remote port order) and metacharacter-injectable.
+      kill "$old_pid" 2>/dev/null || true
+      if [[ -f "$PF_KUBECTL_PIDFILE" ]]; then
+        kubectl_pid="$(cat "$PF_KUBECTL_PIDFILE" 2>/dev/null || true)"
+        [[ -n "$kubectl_pid" ]] && kill "$kubectl_pid" 2>/dev/null || true
+      fi
+    fi
+    rm -f "$PF_PIDFILE" "$PF_KUBECTL_PIDFILE"
+  fi
+  release_pf_lock
+}
+
+if [[ "$ACR_TARGET" == kiac ]]; then
+  # Preflight BEFORE touching anything else's resources -- codex: tearing
+  # down the docker path first and only then discovering kubectl/the service
+  # aren't reachable would leave neither backend available.
   if ! command -v kubectl >/dev/null; then
     note "ACR_TARGET=kiac needs kubectl on PATH."
     exit 1
@@ -122,41 +176,56 @@ if [[ "$ACR_TARGET" == kiac ]]; then
     exit 1
   fi
 
+  # The docker-path acr-api binds host port 18080 directly; free it before
+  # the port-forward below tries to bind the same port.
+  note "ACR_TARGET=kiac: stopping any local docker-path containers (port $KIAC_LOCAL_PORT is shared)."
+  stop_if_ours acr-dev-acr-api dev-health-acr:dev
+  stop_if_ours acr-dev-acr-projector dev-health-acr:dev
+  stop_if_ours acr-dev-falkordb falkordb/falkordb@sha256:ad09d5051bbda1cfee8cef9d7f41ffe1bcb1c5327b82c442c989e84ab8cc33d3
+
+  acquire_pf_lock
   pf_alive=false
   if [[ -f "$PF_PIDFILE" ]]; then
     old_pid="$(cat "$PF_PIDFILE" 2>/dev/null || true)"
-    if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
+    if pf_supervisor_alive "$old_pid"; then
       pf_alive=true
       note "Reusing existing supervised port-forward (pid $old_pid)."
     fi
   fi
   if [[ "$pf_alive" != "true" ]]; then
-    note "Starting supervised port-forward: 127.0.0.1:18080 -> svc/$KIAC_SERVICE:$KIAC_SERVICE_PORT ($KIAC_NAMESPACE)."
+    # `stop_if_ours` only refuses to touch a container it doesn't recognize --
+    # it does not guarantee the port is actually free (codex: "fails open").
+    # A foreign listener left on this port must be a hard error, not silently
+    # treated as our own acr-api by the readiness wait below.
+    if port_in_use "$KIAC_LOCAL_PORT"; then
+      release_pf_lock
+      note "Port $KIAC_LOCAL_PORT is already in use by something this script doesn't own."
+      note "  Free it yourself (lsof -ti tcp:$KIAC_LOCAL_PORT) and rerun."
+      exit 1
+    fi
+    note "Starting supervised port-forward: 127.0.0.1:$KIAC_LOCAL_PORT -> svc/$KIAC_SERVICE:$KIAC_SERVICE_PORT ($KIAC_NAMESPACE)."
     # kubectl port-forward dies silently on the first dropped connection --
     # this loop restarts it forever instead of leaving the Workbench pointed
     # at a dead forward with no visible symptom until the next request fails.
-    (
+    # Params travel as positional args ($1.. ), not string-interpolated into
+    # the script body, so nothing here needs escaping; $0 carries $PF_MARKER
+    # for the identity check above.
+    nohup bash -c '
+      namespace="$1" service="$2" local_port="$3" remote_port="$4" log="$5" kubectl_pidfile="$6"
       while true; do
-        kubectl -n "$KIAC_NAMESPACE" port-forward "svc/$KIAC_SERVICE" "18080:$KIAC_SERVICE_PORT" >>"$PF_LOG" 2>&1
-        printf '%s port-forward exited, restarting in 2s\n' "$(date -u +%FT%TZ 2>/dev/null || true)" >>"$PF_LOG"
+        kubectl -n "$namespace" port-forward "svc/$service" "$local_port:$remote_port" >>"$log" 2>&1 &
+        echo $! > "$kubectl_pidfile"
+        wait $!
+        printf "%s port-forward exited, restarting in 2s\n" "$(date -u +%FT%TZ 2>/dev/null || true)" >>"$log"
         sleep 2
       done
-    ) &
+    ' "$PF_MARKER" "$KIAC_NAMESPACE" "$KIAC_SERVICE" "$KIAC_LOCAL_PORT" "$KIAC_SERVICE_PORT" "$PF_LOG" "$PF_KUBECTL_PIDFILE" \
+      >>"$PF_LOG" 2>&1 &
     disown
     echo $! > "$PF_PIDFILE"
   fi
+  release_pf_lock
 else
-  # ACR_TARGET=docker: free the port from a running kiac port-forward first.
-  if [[ -f "$PF_PIDFILE" ]]; then
-    old_pid="$(cat "$PF_PIDFILE" 2>/dev/null || true)"
-    if [[ -n "$old_pid" ]] && kill -0 "$old_pid" 2>/dev/null; then
-      note "ACR_TARGET=docker: stopping the kiac port-forward supervisor (pid $old_pid) to free port 18080."
-      kill "$old_pid" 2>/dev/null || true
-      pkill -f "port-forward svc/$KIAC_SERVICE $KIAC_SERVICE_PORT:" 2>/dev/null || true
-    fi
-    rm -f "$PF_PIDFILE"
-  fi
-
   for c in postgres clickhouse; do
     cid="$(docker ps -q --filter "name=^dev-health-${c}-1$")"
     if [[ -z "$cid" ]]; then
@@ -170,6 +239,15 @@ else
     note "OPENAI_API_KEY is not set. ACR's model provider is openai; without a key"
     note "  acr-api starts but every investigation 503s. Export it and rerun:"
     note "  OPENAI_API_KEY=sk-... bash scripts/dev-launch.sh"
+    exit 1
+  fi
+
+  # Preflight passed -- now it's safe to free the port from a running kiac
+  # port-forward (same ordering rationale as the kiac branch above).
+  stop_kiac_portforward
+  if port_in_use "$KIAC_LOCAL_PORT"; then
+    note "Port $KIAC_LOCAL_PORT is still in use after stopping the kiac port-forward."
+    note "  Free it yourself (lsof -ti tcp:$KIAC_LOCAL_PORT) and rerun."
     exit 1
   fi
 
