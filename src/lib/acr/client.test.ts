@@ -433,10 +433,21 @@ describe("investigate", () => {
     });
 
     /**
-     * The live 503 this milestone actually hit. It is an operator state, not a
-     * blip, so the message has to say what must be true rather than "try again".
+     * CHAOS-4333: ACR's own 503/upstream_unavailable code is ONE wire signal
+     * for `contextfabric.ErrUnavailable`/`ErrModelUnavailable` covering
+     * SEVERAL causes ACR's ErrorEnvelope never distinguishes on the wire --
+     * confirmed live: the exact same code+status fired both for a genuinely
+     * uncomposed graph/model runtime AND for an unrelated Postgres CHECK-
+     * constraint violation during result persistence (`failure_stage=
+     * persistence`, never sent to the client -- see acr's own
+     * `pginvestigation.sanitizeError` doc comment). A message that asserts
+     * ONE specific cause ("needs graph reads enabled...") is confidently
+     * wrong for the other. The message must state what's actually known
+     * (ACR answered, something behind it is down) and point at the request
+     * id for the rest -- the same discipline `acr_investigation_failed`'s
+     * own message already uses one branch below this one.
      */
-    it("maps ACR's static 503 to acr_runtime_unavailable with an actionable message", async () => {
+    it("maps ACR's static 503 to acr_runtime_unavailable without asserting a specific cause", async () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -453,7 +464,12 @@ describe("investigate", () => {
         const failure = await failureOf(investigate(config, { question: "status?" }));
         expect(failure.code).toBe("acr_runtime_unavailable");
         expect(failure.upstreamCode).toBe("upstream_unavailable");
-        expect(failure.message).toMatch(/graph reads enabled/);
+        // Listing "graph store, model runtime, or persistence" as three
+        // POSSIBLE causes is fine; asserting a specific one is required is
+        // not -- this only guards against the old confident, singular claim.
+        expect(failure.message).not.toMatch(/needs graph reads enabled/i);
+        expect(failure.message).not.toMatch(/needs a configured model runtime/i);
+        expect(failure.message).toMatch(/request id/i);
         expect(failure.retryable).toBe(true);
     });
 

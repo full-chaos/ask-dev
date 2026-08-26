@@ -322,11 +322,23 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         };
     }
     if (status === 503) {
+        // CHAOS-4333: this one wire signal (503 + upstream_unavailable) covers
+        // EVERY contextfabric.ErrUnavailable/ErrModelUnavailable cause ACR's
+        // own ErrorEnvelope has no room to distinguish -- confirmed live: the
+        // exact same code+status fired both for a genuinely uncomposed
+        // graph/model runtime AND for an unrelated Postgres CHECK-constraint
+        // violation during result persistence (failure_stage=persistence,
+        // never sent to the client -- ACR's own pginvestigation.sanitizeError
+        // deliberately keeps it off the wire). A message naming ONE specific
+        // cause is confidently wrong for the others; the honest thing is the
+        // same discipline acr_investigation_failed already uses below --
+        // state what's known (ACR answered, a dependency behind it is down)
+        // and point at the request id for the rest.
         return {
             ...upstreamFields,
             code: "acr_runtime_unavailable",
             message:
-                "ACR is reachable but its investigation runtime is not composed. This needs graph reads enabled, a configured graph backend, and a configured model runtime.",
+                "ACR is reachable, but a dependency it needs (its graph store, model runtime, or its own persistence) is currently unavailable. Match the ACR request id below against ACR's logs for which one and why.",
             retryable: true,
         };
     }
