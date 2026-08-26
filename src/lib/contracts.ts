@@ -12,6 +12,7 @@ import type {
     ConfirmedStructureEntry,
     EffectiveEvidenceWindow,
     KindOption,
+    PriorSubjectReceiptDispositionEntry,
 } from "@/contracts/generated/investigation-result";
 
 export type {
@@ -26,6 +27,7 @@ export type {
     HandleOption,
     InterpretedQuestion,
     KindOption,
+    PriorSubjectReceiptDispositionEntry,
     RelationshipPath,
     StructureNeeds,
     StructureOfferSnapshotEntry,
@@ -73,6 +75,16 @@ export type StructureSource = ConfirmedStructureEntry["source"];
 export type StructureProvenance = ConfirmedStructureEntry["provenance"];
 export type StructureDisposition = ConfirmedStructureEntry["disposition"];
 export type StructureSubjectKind = KindOption["kind"];
+/**
+ * CHAOS-3478/CHAOS-3813 (acr PR #265, e946ad90): the wire-visible disposition
+ * for one `prior_subject_receipts` entry the caller sent. Unlike
+ * `StructureDisposition`, a skip here never vetoes the investigation — see
+ * `PriorSubjectReceiptDispositionEntry`'s own schema doc comment — so it is
+ * disclosed on `SubjectResolution.prior_subject_receipt_dispositions`
+ * instead. Derived the same way `StructureDisposition` is above: one source
+ * of truth, no hand-copied literal list.
+ */
+export type PriorSubjectReceiptDisposition = PriorSubjectReceiptDispositionEntry["disposition"];
 /**
  * Derived from `EffectiveEvidenceWindow`, NOT `WindowOption` — `WindowOption`'s
  * schema carries `allOf`/`anyOf`/`not` conditionals (the frozen-bounds

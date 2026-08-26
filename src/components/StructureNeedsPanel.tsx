@@ -76,6 +76,7 @@ function OfferButton({
     optionId,
     receiptId,
     label,
+    phrasing,
     selected,
     pending,
     /** Absent when the surrounding surface cannot re-ask, mirroring ClarificationPanel's own CandidateRecord. */
@@ -84,20 +85,34 @@ function OfferButton({
     readonly optionId: string;
     readonly receiptId: string;
     readonly label: string;
+    /**
+     * CHAOS-4171 PR3: the model-generated presentation wording for this
+     * option (acr PR2, #263), absent on `WindowOption` (not in that PR's
+     * scope) and whenever the phrasing call timed out, failed, or was
+     * rejected by acr's own closed-vocabulary guard — fail-open to `label`.
+     */
+    readonly phrasing?: string | undefined;
     readonly selected: boolean;
     readonly pending: boolean;
     readonly onToggle: (() => void) | undefined;
 }) {
+    // Offer VALUES stay structural (§ chris 2026-08-24 10:04): `label` is what
+    // is actually bound to `receiptId`. `phrasing` is presentation-only text
+    // for the same offer, so it is what's DISPLAYED — but `label` is always
+    // shown too (same rule `@/lib/presentation.ts` holds for tone maps: the
+    // raw contract term is never hidden behind generated wording).
+    const displayText = phrasing ?? label;
     return (
         <li className="record" key={optionId}>
             <div className="record__head">
-                <span className="record__title">{label}</span>
+                <span className="record__title">{displayText}</span>
                 {selected ? (
                     <Badge tone="ok" title="selected">
                         selected
                     </Badge>
                 ) : null}
             </div>
+            {phrasing === undefined ? null : <p className="record__meta">structural: {label}</p>}
             <p className="record__meta">
                 receipt <code>{receiptId}</code>
             </p>
@@ -109,7 +124,7 @@ function OfferButton({
                     onClick={onToggle}
                     type="button"
                 >
-                    {selected ? `Unselect ${label}` : `Select ${label}`}
+                    {selected ? `Unselect ${displayText}` : `Select ${displayText}`}
                 </button>
             )}
         </li>
@@ -142,6 +157,7 @@ function KindOptionsSection({
                     }
                     optionId={option.option_id}
                     pending={pending}
+                    phrasing={option.phrasing}
                     receiptId={option.receipt_id}
                     selected={selectedReceiptId === option.receipt_id}
                 />
@@ -176,6 +192,7 @@ function AnchorOptionsSection({
                     }
                     optionId={option.option_id}
                     pending={pending}
+                    phrasing={option.phrasing}
                     receiptId={option.receipt_id}
                     selected={selectedReceiptId === option.receipt_id}
                 />
@@ -210,6 +227,7 @@ function HandleOptionsSection({
                     }
                     optionId={option.option_id}
                     pending={pending}
+                    phrasing={option.phrasing}
                     receiptId={option.receipt_id}
                     selected={selectedReceiptId === option.receipt_id}
                 />
@@ -278,6 +296,7 @@ function CandidateOptionsSection({
                     }
                     optionId={option.option_id}
                     pending={pending}
+                    phrasing={option.phrasing}
                     receiptId={option.receipt_id}
                     selected={selectedReceiptId === option.receipt_id}
                 />

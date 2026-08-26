@@ -23,6 +23,12 @@ const aggregateScenario = structureMockScenarios().find(
 const candidateScenario = structureMockScenarios().find(
     (s) => s.id === "structure-candidate",
 )!.result;
+const kindPhrasingScenario = structureMockScenarios().find(
+    (s) => s.id === "structure-kind-phrasing",
+)!.result;
+const anchorHandleCandidatePhrasingScenario = structureMockScenarios().find(
+    (s) => s.id === "structure-anchor-handle-candidate-phrasing",
+)!.result;
 
 /**
  * `batch` is a CONTROLLED prop (codex round 3: lifted so a selection
@@ -134,6 +140,100 @@ describe("StructureNeedsPanel", () => {
                 receipt_id: first.receipt_id,
             },
         });
+    });
+
+    /**
+     * CHAOS-4171 PR3 (acr PR2, #263): `phrasing` is presentation-only wording
+     * for an offer the model generated; the VALUE stays structural. This
+     * proves both halves of "offer values stay structural, phrasing is
+     * presentation-only" (chris 2026-08-24 10:04) in one scenario: the
+     * phrased option displays the model's wording as its button/title text
+     * while the structural `label` stays visible for inspection (same rule
+     * `@/lib/presentation.ts` holds for tone maps — the raw term is never
+     * hidden behind generated wording); the unphrased sibling in the SAME
+     * list falls open to its structural `label`, exactly as it did before
+     * this pin brought `phrasing` in at all.
+     */
+    it("renders model phrasing when acr supplied it, and falls open to the structural label when it did not", () => {
+        render(
+            <Harness
+                onConfirm={vi.fn()}
+                resultId={kindPhrasingScenario.result_id}
+                structureNeeds={kindPhrasingScenario.structure_needs!}
+            />,
+        );
+
+        const [phrased, unphrased] = kindPhrasingScenario.structure_needs!.kind_options!;
+        expect(phrased!.phrasing).toBeDefined();
+        expect(unphrased!.phrasing).toBeUndefined();
+
+        // The phrased option: displayed text is the phrasing, not the label...
+        expect(
+            screen.getByRole("button", { name: `Select ${phrased!.phrasing}` }),
+        ).toBeInTheDocument();
+        // ...but the structural label is still shown, for inspection.
+        expect(screen.getByText(`structural: ${phrased!.label}`)).toBeInTheDocument();
+        // The unphrased sibling: no change from the pre-phrasing behavior.
+        expect(
+            screen.getByRole("button", { name: `Select ${unphrased!.label}` }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(`structural: ${unphrased!.label}`)).toBeNull();
+    });
+
+    /**
+     * The phrasing text is cosmetic only — selecting via the phrased
+     * button must still submit the STRUCTURAL receipt, unchanged.
+     */
+    it("submits the structural receipt_id for a phrased selection, not the phrasing text", async () => {
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={onConfirm}
+                resultId={kindPhrasingScenario.result_id}
+                structureNeeds={kindPhrasingScenario.structure_needs!}
+            />,
+        );
+
+        const phrased = kindPhrasingScenario.structure_needs!.kind_options![0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${phrased.phrasing}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(onConfirm).toHaveBeenCalledWith({
+            expected_kind: {
+                result_id: kindPhrasingScenario.result_id,
+                receipt_id: phrased.receipt_id,
+            },
+        });
+    });
+
+    /**
+     * codex finding (chaos4171pr3-codex-r1): the phrasing test above only
+     * exercised `KindOption` — removing `phrasing={option.phrasing}` from
+     * the Anchor/Handle/Candidate sections would have left every test
+     * green. One phrased offer per remaining axis closes that.
+     */
+    it("renders model phrasing on anchor, handle, and candidate offers too", () => {
+        render(
+            <Harness
+                onConfirm={vi.fn()}
+                resultId={anchorHandleCandidatePhrasingScenario.result_id}
+                structureNeeds={anchorHandleCandidatePhrasingScenario.structure_needs!}
+            />,
+        );
+
+        const needs = anchorHandleCandidatePhrasingScenario.structure_needs!;
+        const anchor = needs.anchor_options![0]!;
+        const handle = needs.handle_options![0]!;
+        const candidate = needs.candidate_options![0]!;
+
+        for (const option of [anchor, handle, candidate]) {
+            expect(option.phrasing).toBeDefined();
+            expect(
+                screen.getByRole("button", { name: `Select ${option.phrasing}` }),
+            ).toBeInTheDocument();
+            expect(screen.getByText(`structural: ${option.label}`)).toBeInTheDocument();
+        }
     });
 
     it("never offers anchor/handle for an aggregate-classed disclosure (NEVER-ELICIT, §1.3)", () => {

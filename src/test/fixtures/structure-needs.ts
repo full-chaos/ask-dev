@@ -122,6 +122,82 @@ const CANDIDATE_OPTIONS: readonly CandidateOption[] = [
 ];
 
 /**
+ * CHAOS-4171 PR3 (acr PR2, #263): a `phrasing` field on each option type
+ * except `WindowOption` (not in that PR's scope). Deliberately its own
+ * fixture set, isolated from `KIND_OPTIONS`/`HANDLE_OPTIONS`/
+ * `CANDIDATE_OPTIONS` above, so this scenario is the only one that changes
+ * when a phrasing-rendering regression needs a red test — those other
+ * fixtures stay phrasing-free so their own scenarios keep proving the
+ * fail-open-to-`label` path never regresses into requiring phrasing.
+ * Mixed on purpose: one phrased kind option beside one unphrased kind
+ * option, in the SAME offer list, so both branches render side by side.
+ */
+const PHRASED_KIND_OPTIONS: readonly KindOption[] = [
+    {
+        receipt_id: "kindr_ci_pipeline_run_0002",
+        option_id: "kind_ci_pipeline_run",
+        label: "CI pipeline run",
+        phrasing: "How a CI pipeline run went",
+        kind: "ci_pipeline_run",
+        offer_source: "engine",
+    },
+    {
+        receipt_id: "kindr_pull_request_0002",
+        option_id: "kind_pull_request",
+        label: "Pull request",
+        kind: "pull_request",
+        offer_source: "engine",
+    },
+];
+
+/**
+ * codex finding (chaos4171pr3-codex-r1): the isolated fixture above only
+ * proved phrasing on `KindOption` — removing `phrasing={option.phrasing}`
+ * from the Anchor/Handle/Candidate sections in `StructureNeedsPanel` would
+ * have left every test green. These three single-entry lists close that:
+ * one phrased option per remaining axis that got `phrasing` (acr PR2,
+ * #263). `WindowOption` is not in that PR's scope and stays untouched.
+ */
+const PHRASED_ANCHOR_OPTIONS: readonly AnchorOption[] = [
+    {
+        receipt_id: "ancr_repo_atlas_0002",
+        option_id: "anchor_repo_atlas",
+        label: "full-chaos/atlas",
+        phrasing: "The atlas repository",
+        kind: "repository",
+        canonical_id: "repository:repo_atlas",
+        matched_term_hash: "a1b2c3d4e5f6a7b8c9d0e1f2",
+        offer_source: "engine",
+    },
+];
+
+const PHRASED_HANDLE_OPTIONS: readonly HandleOption[] = [
+    {
+        receipt_id: "handr_pr_number_0002",
+        option_id: "handle_pr_412",
+        label: "PR #412",
+        phrasing: "Pull request #412",
+        kind: "pull_request",
+        pattern_id: "pr_number",
+        value: "412",
+        source_column: "pull_requests.number",
+        offer_source: "engine",
+    },
+];
+
+const PHRASED_CANDIDATE_OPTIONS: readonly CandidateOption[] = [
+    {
+        receipt_id: "candr_work_item_0003",
+        option_id: "candidate_work_item_9001",
+        label: "WORK-9001: Investigate flaky test",
+        phrasing: "The flaky-test investigation work item",
+        kind: "work_item",
+        canonical_id: "work_item:9001",
+        offer_source: "engine",
+    },
+];
+
+/**
  * Kind disambiguation (design brief §1.2 reading 1: "the cheapest,
  * highest-leverage elicitation" — 30/41 stalled pools are multi-kind).
  * `no_discriminators` refusal, no subject candidates: interpretation could
@@ -144,6 +220,55 @@ function kindDisambiguationScenario(): InvestigationResult {
         result_id: "result_structure_kind_0001",
         request_id: "request_structure_kind_0001",
         question: "How's the pipeline doing?",
+        status: "clarification_required",
+        structure_needs: structureNeeds,
+    };
+}
+
+/**
+ * Kind disambiguation with `phrasing` present on one option and absent on
+ * its sibling (CHAOS-4171 PR3, acr PR2 #263): proves the panel renders the
+ * model's presentation wording when acr supplied it, and falls open to the
+ * structural `label` when it did not (timeout, guard rejection, or a pin
+ * that predates the field) — same list, same member, both branches.
+ */
+function kindPhrasingScenario(): InvestigationResult {
+    const result = baseScenario("no-match");
+    const structureNeeds: StructureNeeds = {
+        missing: ["expected_kind"],
+        kind_options: PHRASED_KIND_OPTIONS as NonNullable<StructureNeeds["kind_options"]>,
+    };
+    return {
+        ...result,
+        result_id: "result_structure_kind_phrased_0001",
+        request_id: "request_structure_kind_phrased_0001",
+        question: "How's the pipeline doing?",
+        status: "clarification_required",
+        structure_needs: structureNeeds,
+    };
+}
+
+/**
+ * codex finding (chaos4171pr3-codex-r1): a phrased option on every axis that
+ * got `phrasing` (acr PR2, #263) except `expected_kind`, which
+ * `kindPhrasingScenario` above already covers. Not `WindowOption` — out of
+ * that PR's scope.
+ */
+function anchorHandleCandidatePhrasingScenario(): InvestigationResult {
+    const result = baseScenario("no-match");
+    const structureNeeds: StructureNeeds = {
+        missing: ["subject_anchor", "subject_handle", "subject_candidate"],
+        anchor_options: PHRASED_ANCHOR_OPTIONS as NonNullable<StructureNeeds["anchor_options"]>,
+        handle_options: PHRASED_HANDLE_OPTIONS as NonNullable<StructureNeeds["handle_options"]>,
+        candidate_options: PHRASED_CANDIDATE_OPTIONS as NonNullable<
+            StructureNeeds["candidate_options"]
+        >,
+    };
+    return {
+        ...result,
+        result_id: "result_structure_anchor_handle_candidate_phrased_0001",
+        request_id: "request_structure_anchor_handle_candidate_phrased_0001",
+        question: "What's going on with the atlas repo, PR 412, and the flaky test work item?",
         status: "clarification_required",
         structure_needs: structureNeeds,
     };
@@ -327,6 +452,17 @@ export function structureMockScenarios(): readonly StructureMockScenario[] {
             id: "structure-kind",
             demonstrates: "Kind disambiguation: the cheapest, highest-leverage elicitation.",
             result: kindDisambiguationScenario(),
+        },
+        {
+            id: "structure-kind-phrasing",
+            demonstrates:
+                "Kind disambiguation with model phrasing on one option, fail-open on its sibling.",
+            result: kindPhrasingScenario(),
+        },
+        {
+            id: "structure-anchor-handle-candidate-phrasing",
+            demonstrates: "Model phrasing on an anchor, handle, and candidate offer.",
+            result: anchorHandleCandidatePhrasingScenario(),
         },
         {
             id: "structure-anchor-window",
