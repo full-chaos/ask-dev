@@ -443,6 +443,7 @@ export async function investigate(
     }
 
     let response: Response;
+    const fetchStartedAt = Date.now();
     try {
         response = await fetch(`${config.apiOrigin}${INVESTIGATION_PATH}`, {
             method: "POST",
@@ -457,13 +458,33 @@ export async function investigate(
             signal,
             cache: "no-store",
         });
-    } catch (error) {
+    } catch (_error) {
+        // `timeout.aborted` (the LOCAL AbortSignal.timeout instance, not
+        // `error.name`) is the gate: `signal` above is `AbortSignal.any([
+        // options.signal, timeout])` when a caller supplies its own signal
+        // (the chat route forwards the incoming request's), and an external
+        // abort can surface with the same "TimeoutError" name without our
+        // own budget ever having fired -- checking the name alone would
+        // misclassify that as a local timeout it was not (codex review).
+        // A real `timeout.aborted` means no response ever arrived, which is
+        // a DIFFERENT fact from the network being unreachable (a DNS/TCP
+        // failure) and from ACR's own 504 (a real response saying the
+        // pipeline was still running, handled separately below via
+        // `parseUpstreamFailure`). Collapsing all three into
+        // `acr_unreachable` is exactly what `acr_timeout`'s own doc comment
+        // (errors.ts) warns against: a tester cannot tell "the Workbench
+        // gave up waiting" from "the service could not be reached at all"
+        // without this distinction.
+        if (timeout.aborted) {
+            throw new AcrRequestError({
+                code: "acr_timeout",
+                message: `ACR did not answer within the Workbench's ${String(config.timeoutMs)}ms budget (waited ${String(Date.now() - fetchStartedAt)}ms).`,
+                retryable: true,
+            });
+        }
         throw new AcrRequestError({
             code: "acr_unreachable",
-            message:
-                error instanceof Error && error.name === "TimeoutError"
-                    ? "ACR did not answer before the Workbench timeout."
-                    : "ACR could not be reached.",
+            message: "ACR could not be reached.",
             retryable: true,
         });
     }

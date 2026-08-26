@@ -34,11 +34,16 @@ export const workbenchFailureCodes = [
     /** ACR answered, but the payload does not satisfy its own contract. */
     "acr_contract_violation",
     /**
-     * ACR accepted the investigation but did not finish it in time.
+     * ACR did not answer within a request's time budget.
      *
-     * Distinct from `acr_unreachable` on purpose: the pipeline RAN. Collapsing
-     * the two sends whoever is debugging to the network when the real question
-     * is which stage was too slow.
+     * Distinct from `acr_unreachable` on purpose, but covers TWO different
+     * waiting-too-long shapes, not just one: (1) ACR answered with its own
+     * 504/408 -- the pipeline definitely RAN, just too slowly -- and (2) the
+     * Workbench's own local `AbortSignal.timeout(ACR_TIMEOUT_MS)` fired with
+     * no response ever arriving at all, which proves nothing about whether
+     * ACR's pipeline ran. Either way, collapsing this into `acr_unreachable`
+     * sends whoever is debugging to the network/DNS when the real question is
+     * which budget ran out and on which side.
      */
     "acr_timeout",
     /**
