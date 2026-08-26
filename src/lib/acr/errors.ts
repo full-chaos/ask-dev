@@ -6,7 +6,19 @@
  * enabled" and "no subject matched" are different facts and read differently.
  */
 export const workbenchFailureCodes = [
-    /** ACR is reachable but the investigation runtime is not composed. */
+    /**
+     * ACR is reachable, but a dependency behind the investigation (its
+     * graph store, model runtime, or its own persistence) is currently
+     * unavailable.
+     *
+     * ACR's own 503/`upstream_unavailable` wire signal is ONE code for all
+     * of these -- confirmed live (CHAOS-4333): the exact same code fired
+     * both for a genuinely uncomposed graph/model runtime AND for an
+     * unrelated Postgres CHECK-constraint violation during result
+     * persistence, a failure ACR's own sanitizer deliberately never puts on
+     * the wire. Never assert which one in the message; the request id is
+     * the only honest handle for that.
+     */
     "acr_runtime_unavailable",
     /** ACR rejected our credential. */
     "acr_unauthorized",
