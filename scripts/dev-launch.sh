@@ -21,18 +21,19 @@
 # Requires OPENAI_API_KEY in the environment (ACR's model provider is
 # openai; without it acr-api starts but every investigation 503s).
 #
-# Known issue (2026-08-26): under the WRONG model config
-# (ACR_CONTEXT_FABRIC_MODEL=gpt-5-nano, the stale pre-CHAOS-3855 default --
-# see CHAOS-4136), investigations took 30-90s and intermittently came back
-# as "ACR could not be reached" / acr_unreachable even though ACR itself had
-# completed the work. Retested with the CORRECT model (gpt-5.6-luna, chris
-# ruling 08-23) this script now sets by default: 10/10 investigations
-# succeeded in 2-8s each, both through the Workbench and via a direct probe
-# of acr-api. Not fully closed out (only fast requests were retested), but
-# no longer reproduces at normal latency. If "ACR could not be reached"
-# recurs, check `docker logs acr-dev-acr-api` for the actual duration before
-# assuming the connection dropped -- and confirm ACR_CONTEXT_FABRIC_MODEL is
-# still gpt-5.6-luna.
+# Fixed 2026-08-26: investigations were intermittently coming back as
+# "ACR could not be reached" / acr_unreachable even though ACR itself had
+# completed the work (`docker logs acr-dev-acr-api` showed a real 200).
+# Two compounding causes, both fixed below:
+#   1. ACR_WRITE_TIMEOUT (Go's http.Server.WriteTimeout) defaults to 20s.
+#      Any investigation whose response takes longer than that to WRITE gets
+#      its connection forcibly closed mid-handler -- confirmed live: 6/6
+#      deliberately-slow (30-90s) investigations succeeded once this was
+#      raised to match ACR_REQUEST_TIMEOUT (490s), set on acr-api below.
+#   2. The stale pre-CHAOS-3855 model (gpt-5-nano, CHAOS-4136) made every
+#      investigation slow enough (30-90s) to hit issue 1 constantly. The
+#      correct model (gpt-5.6-luna, chris ruling 08-23) answers in 2-8s,
+#      well under even the OLD 20s ceiling, and is what this script sets.
 #
 # Usage: OPENAI_API_KEY=sk-... bash scripts/dev-launch.sh
 set -euo pipefail
@@ -61,7 +62,7 @@ for f in web-assertion.key evidence-kid evidence-keys web-jwks.json; do
   fi
 done
 
-if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+if [[ -z "$(printf '%s' "${OPENAI_API_KEY:-}" | tr -d '[:space:]')" ]]; then
   note "OPENAI_API_KEY is not set. ACR's model provider is openai; without a key"
   note "  acr-api starts but every investigation 503s. Export it and rerun:"
   note "  OPENAI_API_KEY=sk-... bash scripts/dev-launch.sh"
@@ -113,84 +114,105 @@ if ! docker ps -q --filter "name=^acr-dev-falkordb$" | grep -q .; then
 fi
 
 # --- acr-projector (projects real dev-health-ops data into the graph) ---
-if ! docker ps -q --filter "name=^acr-dev-acr-projector$" | grep -q .; then
-  # Ownership check: only remove a stopped container by this name if it was
-  # actually built from OUR image -- never blind-remove a same-named
-  # container something else created (dev-launch.sh's own containers are the
-  # only thing that should ever be named acr-dev-*, but "should be" isn't
-  # "is").
-  existing_image="$(docker inspect acr-dev-acr-projector --format '{{.Config.Image}}' 2>/dev/null || true)"
-  if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
-    note "acr-dev-acr-projector exists but is not our image ($existing_image) -- not touching it."
-    note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-projector"
-    exit 1
-  fi
-  docker rm -f acr-dev-acr-projector >/dev/null 2>&1 || true
-  note "Starting acr-dev-acr-projector for org $ORG_ID..."
-  docker run -d --name acr-dev-acr-projector --network "$NETWORK" \
-    -e ACR_ENVIRONMENT=development \
-    -e ACR_REQUIRE_BACKING_STORES=true \
-    -e ACR_POSTGRES_CONNECTION_KIND=direct \
-    -e ACR_POSTGRES_DSN="postgresql://devhealth:devhealth@postgres:5432/acr?sslmode=disable" \
-    -e ACR_CLICKHOUSE_DSN="clickhouse://ch:ch@clickhouse:9000/default" \
-    -e ACR_CONTEXT_FABRIC_PROJECTION_ENABLED=true \
-    -e ACR_CONTEXT_FABRIC_PROJECTOR_ORG_IDS="$ORG_ID" \
-    -e ACR_CONTEXT_FABRIC_PROJECTION_POLL_INTERVAL=5s \
-    -e ACR_CONTEXT_FABRIC_FALKOR_ADDR=acr-dev-falkordb:6379 \
-    -e ACR_CONTEXT_FABRIC_FALKOR_TLS=false \
-    -e ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE=true \
-    -e ACR_CONTEXT_FABRIC_FALKOR_GRAPH_PREFIX=acr-cf \
-    --entrypoint /usr/local/bin/acr-projector \
-    dev-health-acr:dev serve >/dev/null
+# Always stopped and recreated fresh, rather than reused: an already-running
+# container from a PRIOR version of this script (a different model, a
+# different secret mount, a different env var set entirely) would otherwise
+# silently keep serving its stale config forever -- codex round 2 finding.
+# Ownership check first: only remove a container by this name if it was
+# actually built from OUR image -- never blind-remove a same-named container
+# something else created (dev-launch.sh's own containers are the only thing
+# that should ever be named acr-dev-*, but "should be" isn't "is").
+existing_image="$(docker inspect acr-dev-acr-projector --format '{{.Config.Image}}' 2>/dev/null || true)"
+if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
+  note "acr-dev-acr-projector exists but is not our image ($existing_image) -- not touching it."
+  note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-projector"
+  exit 1
 fi
+if [[ -n "$existing_image" ]]; then
+  docker rm -f acr-dev-acr-projector >/dev/null
+  note "Recreating acr-dev-acr-projector for org $ORG_ID (picks up this run's config)..."
+else
+  note "Creating acr-dev-acr-projector for org $ORG_ID..."
+fi
+docker run -d --name acr-dev-acr-projector --network "$NETWORK" \
+  -e ACR_ENVIRONMENT=development \
+  -e ACR_REQUIRE_BACKING_STORES=true \
+  -e ACR_POSTGRES_CONNECTION_KIND=direct \
+  -e ACR_POSTGRES_DSN="postgresql://devhealth:devhealth@postgres:5432/acr?sslmode=disable" \
+  -e ACR_CLICKHOUSE_DSN="clickhouse://ch:ch@clickhouse:9000/default" \
+  -e ACR_CONTEXT_FABRIC_PROJECTION_ENABLED=true \
+  -e ACR_CONTEXT_FABRIC_PROJECTOR_ORG_IDS="$ORG_ID" \
+  -e ACR_CONTEXT_FABRIC_PROJECTION_POLL_INTERVAL=5s \
+  -e ACR_CONTEXT_FABRIC_FALKOR_ADDR=acr-dev-falkordb:6379 \
+  -e ACR_CONTEXT_FABRIC_FALKOR_TLS=false \
+  -e ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE=true \
+  -e ACR_CONTEXT_FABRIC_FALKOR_GRAPH_PREFIX=acr-cf \
+  --entrypoint /usr/local/bin/acr-projector \
+  dev-health-acr:dev serve >/dev/null
 
 # --- acr-api (the Workbench's server hop talks to this) ---
-if ! docker ps -q --filter "name=^acr-dev-acr-api$" | grep -q .; then
-  existing_image="$(docker inspect acr-dev-acr-api --format '{{.Config.Image}}' 2>/dev/null || true)"
-  if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
-    note "acr-dev-acr-api exists but is not our image ($existing_image) -- not touching it."
-    note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-api"
-    exit 1
-  fi
-  if [[ -n "$existing_image" ]]; then
-    note "Starting existing acr-dev-acr-api..."
-    docker start acr-dev-acr-api >/dev/null
-  else
-    note "Creating acr-dev-acr-api..."
-    # Individual secret mounts, not the whole .acr-dev directory: acr-api
-    # only needs the evidence files and the PUBLIC jwks, not every file that
-    # happens to live alongside them (this dir also holds ca.key etc.).
-    docker run -d --name acr-dev-acr-api --network "$NETWORK" \
-      -p 127.0.0.1:18080:8080 \
-      -v "$ACR_DEV_SECRETS/evidence-kid:/secrets/evidence-kid:ro" \
-      -v "$ACR_DEV_SECRETS/evidence-keys:/secrets/evidence-keys:ro" \
-      -v "$ACR_DEV_SECRETS/web-jwks.json:/secrets/web-jwks.json:ro" \
-      -e ACR_ENVIRONMENT=development \
-      -e ACR_ADDR=:8080 \
-      -e ACR_REQUIRE_BACKING_STORES=true \
-      -e ACR_POSTGRES_CONNECTION_KIND=direct \
-      -e ACR_POSTGRES_DSN="postgresql://devhealth:devhealth@postgres:5432/acr?sslmode=disable" \
-      -e ACR_CLICKHOUSE_DSN="clickhouse://ch:ch@clickhouse:9000/default" \
-      -e ACR_EVIDENCE_ID_ACTIVE_KID_FILE=/secrets/evidence-kid \
-      -e ACR_EVIDENCE_ID_KEYS_FILE=/secrets/evidence-keys \
-      -e ACR_WEB_ASSERTION_ISSUER=dev-health-web \
-      -e ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr \
-      -e ACR_WEB_ASSERTION_JWKS_FILE=/secrets/web-jwks.json \
-      -e ACR_DEVICE_VERIFICATION_URL=http://localhost:3000/acr/device \
-      -e ACR_REQUEST_TIMEOUT=490s \
-      -e ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED=true \
-      -e ACR_CONTEXT_FABRIC_GRAPH_LIFECYCLE_ENABLED=false \
-      -e ACR_CONTEXT_FABRIC_FALKOR_ADDR=acr-dev-falkordb:6379 \
-      -e ACR_CONTEXT_FABRIC_FALKOR_TLS=false \
-      -e ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE=true \
-      -e ACR_CONTEXT_FABRIC_FALKOR_GRAPH_PREFIX=acr-cf \
-      -e ACR_CONTEXT_FABRIC_MODEL_PROVIDER=openai \
-      -e ACR_CONTEXT_FABRIC_MODEL=gpt-5.6-luna \
-      -e ACR_CONTEXT_FABRIC_MODEL_FALLBACK=gpt-5.6-luna \
-      -e ACR_CONTEXT_FABRIC_MODEL_API_KEY="${OPENAI_API_KEY:-}" \
-      dev-health-acr:dev serve >/dev/null
-  fi
+# Same always-recreate discipline as acr-projector above: an already-running
+# container from a PRIOR version of this script would otherwise silently
+# keep serving a stale model/mount/env forever (codex round 2 finding).
+existing_image="$(docker inspect acr-dev-acr-api --format '{{.Config.Image}}' 2>/dev/null || true)"
+if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
+  note "acr-dev-acr-api exists but is not our image ($existing_image) -- not touching it."
+  note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-api"
+  exit 1
 fi
+if [[ -n "$existing_image" ]]; then
+  docker rm -f acr-dev-acr-api >/dev/null
+  note "Recreating acr-dev-acr-api (picks up this run's config)..."
+else
+  note "Creating acr-dev-acr-api..."
+fi
+# Individual secret mounts, not the whole .acr-dev directory: acr-api only
+# needs the evidence files and the PUBLIC jwks, not every file that happens
+# to live alongside them (this dir also holds ca.key etc.).
+#
+# ACR_CONTEXT_FABRIC_MODEL_FALLBACK is deliberately UNSET: ACR rejects a
+# fallback identical to the primary model (modelprovider config.go's own
+# validate()), which a fresh acr-api would hit at startup and never become
+# ready -- codex round 2 caught this. gpt-5.6-luna is the correct primary
+# with no fallback post-CHAOS-3855 (see the model's own rejection message).
+#
+# ACR_WRITE_TIMEOUT=490s matches ACR_REQUEST_TIMEOUT below. Go's
+# http.Server.WriteTimeout (this env var) defaults to 20s -- confirmed live
+# 2026-08-26 as the actual mechanism behind "ACR could not be reached" on a
+# slow (nano-era, 30-90s) investigation: the server forcibly closes the
+# response write at 20s, mid-handler, while ACR's own app-level log still
+# claims success (it measures handler duration, not the wire write outcome).
+# Raising this let 6/6 deliberately-slow (nano) investigations succeed past
+# the old 20s ceiling in the same session that found it.
+docker run -d --name acr-dev-acr-api --network "$NETWORK" \
+  -p 127.0.0.1:18080:8080 \
+  -v "$ACR_DEV_SECRETS/evidence-kid:/secrets/evidence-kid:ro" \
+  -v "$ACR_DEV_SECRETS/evidence-keys:/secrets/evidence-keys:ro" \
+  -v "$ACR_DEV_SECRETS/web-jwks.json:/secrets/web-jwks.json:ro" \
+  -e ACR_ENVIRONMENT=development \
+  -e ACR_ADDR=:8080 \
+  -e ACR_WRITE_TIMEOUT=490s \
+  -e ACR_REQUIRE_BACKING_STORES=true \
+  -e ACR_POSTGRES_CONNECTION_KIND=direct \
+  -e ACR_POSTGRES_DSN="postgresql://devhealth:devhealth@postgres:5432/acr?sslmode=disable" \
+  -e ACR_CLICKHOUSE_DSN="clickhouse://ch:ch@clickhouse:9000/default" \
+  -e ACR_EVIDENCE_ID_ACTIVE_KID_FILE=/secrets/evidence-kid \
+  -e ACR_EVIDENCE_ID_KEYS_FILE=/secrets/evidence-keys \
+  -e ACR_WEB_ASSERTION_ISSUER=dev-health-web \
+  -e ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr \
+  -e ACR_WEB_ASSERTION_JWKS_FILE=/secrets/web-jwks.json \
+  -e ACR_DEVICE_VERIFICATION_URL=http://localhost:3000/acr/device \
+  -e ACR_REQUEST_TIMEOUT=490s \
+  -e ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED=true \
+  -e ACR_CONTEXT_FABRIC_GRAPH_LIFECYCLE_ENABLED=false \
+  -e ACR_CONTEXT_FABRIC_FALKOR_ADDR=acr-dev-falkordb:6379 \
+  -e ACR_CONTEXT_FABRIC_FALKOR_TLS=false \
+  -e ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE=true \
+  -e ACR_CONTEXT_FABRIC_FALKOR_GRAPH_PREFIX=acr-cf \
+  -e ACR_CONTEXT_FABRIC_MODEL_PROVIDER=openai \
+  -e ACR_CONTEXT_FABRIC_MODEL=gpt-5.6-luna \
+  -e ACR_CONTEXT_FABRIC_MODEL_API_KEY="${OPENAI_API_KEY:-}" \
+  dev-health-acr:dev serve >/dev/null
 
 note "Waiting for acr-api readiness on http://127.0.0.1:18080 ..."
 acr_ready=false
@@ -214,19 +236,24 @@ if [[ -L "$ENV_LOCAL" ]]; then
   exit 1
 fi
 ENV_LOCAL_TMP="$(mktemp "${ENV_LOCAL}.XXXXXX")"
-cat > "$ENV_LOCAL_TMP" <<EOF
-ACR_API_ORIGIN=http://127.0.0.1:18080
-ACR_ORG_ID=$ORG_ID
-ACR_WEB_ASSERTION_KEY_FILE=$ACR_DEV_SECRETS/web-assertion.key
-ACR_REPOSITORY_SCOPES=$REPO_SCOPES
-ACR_WEB_ASSERTION_ISSUER=dev-health-web
-ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr
-ACR_WEB_ASSERTION_KID=acr-dev-web
-# Matches the server's ACR_REQUEST_TIMEOUT=490s below -- without this the
-# Workbench's own 120s default can report "timeout" while ACR is still
-# genuinely working.
-ACR_TIMEOUT_MS=490000
-EOF
+# printf, not a heredoc: Homebrew's bash 5.3.15 (whatever `env bash` resolves
+# to on this host) deadlocks on small heredocs/here-strings -- reproduced
+# live 2026-08-26, this exact step hung indefinitely. A previously-known
+# issue on this host (see repo memory), not specific to this script, but a
+# heredoc here would hit it every single launch.
+{
+  printf 'ACR_API_ORIGIN=http://127.0.0.1:18080\n'
+  printf 'ACR_ORG_ID=%s\n' "$ORG_ID"
+  printf 'ACR_WEB_ASSERTION_KEY_FILE=%s/web-assertion.key\n' "$ACR_DEV_SECRETS"
+  printf 'ACR_REPOSITORY_SCOPES=%s\n' "$REPO_SCOPES"
+  printf 'ACR_WEB_ASSERTION_ISSUER=dev-health-web\n'
+  printf 'ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr\n'
+  printf 'ACR_WEB_ASSERTION_KID=acr-dev-web\n'
+  # Matches the server's ACR_REQUEST_TIMEOUT=490s below -- without this the
+  # Workbench's own 120s default can report "timeout" while ACR is still
+  # genuinely working.
+  printf 'ACR_TIMEOUT_MS=490000\n'
+} > "$ENV_LOCAL_TMP"
 mv "$ENV_LOCAL_TMP" "$ENV_LOCAL"
 
 # Port 3000 is held by the dev-health stack's own traefik (dev-health-web).
