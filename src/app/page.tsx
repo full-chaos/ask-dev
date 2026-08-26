@@ -8,14 +8,19 @@ import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
+import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
 import { subjectForReceipt } from "@/lib/clarification";
 import { buildConversationTurns } from "@/lib/conversation";
-import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { ConversationTurn, InvestigationResult, SubjectRef } from "@/lib/contracts";
+import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
+    EMPTY_SELECTION_EVENTS,
     pendingStructureBatchOrUndefined,
+    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
+import { useCandidateSelections } from "@/lib/use-candidate-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
 
 /**
@@ -50,6 +55,24 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
  * `hasUnseenBelow` below), and a Retry action on a FAILED plain ask (never on
  * a receipt-carrying re-ask — that stays this lane's boundary, not
  * presentation's).
+ *
+ * CHAOS-4343 adds two more, both selection-first:
+ *
+ *  1. Selecting a candidate no longer fires immediately. `ClarificationPanel`
+ *     accumulates picks (mirroring `StructureNeedsPanel`'s own "select, then
+ *     confirm" discipline) and the confirm action — the thing that actually
+ *     composes and sends the next request — follows the selection, never the
+ *     other way around.
+ *  2. Confirming N selected candidates fires N INDEPENDENT turn-2 requests,
+ *     each landing as its own stacked assistant turn with its own
+ *     pending/answered/failed status (`askMany` below) — not one request
+ *     carrying several candidate receipts.
+ *
+ * Item 3 (literal kind nouns bind as an explicit receipt) needs no timeline
+ * change: `literalKindNounsInQuestion` runs on every outgoing `question`
+ * (fresh asks and unchanged-text re-asks alike) and rides the request as
+ * `expectedKinds` — see `@/lib/kind-nouns`'s own header for why this needs no
+ * ACR change.
  */
 
 type AssistantOutcome =
@@ -81,7 +104,7 @@ type Turn =
            * (codex review round 1, finding 3). Without this, a frozen
            * turn's own `StructureNeedsPanel` echo would render EMPTY rather
            * than what was actually submitted, the moment a newer turn takes
-           * over the shared hook.
+           * over the shared selection hook.
            */
           readonly submittedStructureBatch: StructureSelectionBatch | undefined;
           /**
@@ -113,6 +136,76 @@ function formatTurnTime(isoTimestamp: string): string {
 // a tester is genuinely pinned to the bottom.
 const BOTTOM_PIN_THRESHOLD_PX = 48;
 
+/**
+ * The one place a request actually goes out over the wire, shared by `ask`
+ * (one request) and `askMany` (N independent requests, CHAOS-4343 item 2) —
+ * both build the SAME body shape and interpret the SAME response shape, and
+ * duplicating that between them would be the two-branches-one-tested trap:
+ * a fix to one would silently not apply to the other.
+ *
+ * Takes no turn ids and touches no timeline state: the caller owns settling
+ * whichever turn(s) this outcome belongs to, which is what lets `askMany`
+ * fire several of these concurrently and settle each independently as it
+ * resolves, rather than waiting for the slowest.
+ */
+async function fireInvestigation(params: {
+    readonly question: string;
+    readonly priorSubjectReceipts: readonly ClarificationChoice[];
+    readonly conversation: readonly ConversationTurn[];
+    readonly structureReceiptFields: Record<string, unknown>;
+    readonly selectionEvents: readonly PendingSelectionEvent[];
+}): Promise<AssistantOutcome> {
+    // CHAOS-4343 item 3: derived from the SAME `question` text this request
+    // sends, every time — a fresh ask and a receipt-carrying re-ask (which
+    // resends the ORIGINAL question unchanged) both get the literal-noun
+    // hint consistently, with no separate call site to keep in sync.
+    const expectedKinds = literalKindNounsInQuestion(params.question);
+    try {
+        const response = await fetch("/api/investigations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                question: params.question,
+                priorSubjectReceipts: params.priorSubjectReceipts,
+                conversation: params.conversation,
+                ...params.structureReceiptFields,
+                ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
+                ...(params.selectionEvents.length > 0
+                    ? { structureSelectionEvents: params.selectionEvents }
+                    : {}),
+            }),
+        });
+        const payload: unknown = await response.json();
+        const failure = (payload as { failure?: unknown }).failure;
+        if (isFailure(failure)) {
+            return { kind: "failed", failure };
+        }
+        const result = (payload as { result?: unknown }).result;
+        if (result === undefined || result === null) {
+            return {
+                kind: "failed",
+                failure: {
+                    code: "acr_contract_violation",
+                    message: "Ask Dev's server returned neither a result nor a failure.",
+                    retryable: false,
+                },
+            };
+        }
+        return { kind: "answered", result: result as InvestigationResult };
+    } catch (error) {
+        // Never swallow: a dead server hop is itself a reportable outcome.
+        console.error("investigation request failed", error);
+        return {
+            kind: "failed",
+            failure: {
+                code: "acr_unreachable",
+                message: "Ask Dev's server could not be reached.",
+                retryable: true,
+            },
+        };
+    }
+}
+
 export default function ChatPage() {
     const [turns, setTurns] = useState<readonly Turn[]>([]);
     // A monotonic counter, not crypto.randomUUID(): turn identity only needs
@@ -122,6 +215,11 @@ export default function ChatPage() {
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
+    // CHAOS-4343 items 1/2: a SEPARATE accumulator from `structureSelections`
+    // above — a tester may select several distinct candidates at once, each
+    // becoming its own turn-2 request, which is not the "one pick per
+    // member" shape `StructureSelectionBatch` models.
+    const candidateSelections = useCandidateSelections();
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<ChatComposerHandle>(null);
@@ -175,6 +273,16 @@ export default function ChatPage() {
         setHasUnseenBelow(false);
     }
 
+    function settleTurn(assistantTurnId: number, outcome: AssistantOutcome) {
+        setTurns((current) =>
+            current.map((turn) =>
+                turn.role === "assistant" && turn.id === assistantTurnId
+                    ? { ...turn, outcome }
+                    : turn,
+            ),
+        );
+    }
+
     /**
      * Appends a user turn and a pending assistant turn, then settles the
      * assistant turn in place once the server hop answers. Mirrors the
@@ -203,6 +311,11 @@ export default function ChatPage() {
         // threaded as its own prior context.
         const conversation = buildConversationTurns(turns);
         structureSelections.reset();
+        // A plain new ask (the common composer path) must clear any
+        // unconfirmed candidate picks left over from the turn it supersedes
+        // too — otherwise the NEXT result's candidate panel would open with
+        // stale selections from a different result's candidates.
+        candidateSelections.reset();
         const askedAt = new Date().toISOString();
         setTurns((current) => [
             ...current,
@@ -218,16 +331,6 @@ export default function ChatPage() {
             },
         ]);
 
-        function settle(outcome: AssistantOutcome) {
-            setTurns((current) =>
-                current.map((turn) =>
-                    turn.role === "assistant" && turn.id === assistantTurnId
-                        ? { ...turn, outcome }
-                        : turn,
-                ),
-            );
-        }
-
         const structureReceiptFields =
             structureSelectionsToSend === undefined
                 ? {}
@@ -239,78 +342,113 @@ export default function ChatPage() {
         // pre-reset value: `setState` schedules a re-render, it does not
         // mutate this closure's already-captured array.
         const selectionEvents = structureSelections.pendingSelectionEvents;
-        try {
-            const response = await fetch("/api/investigations", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    question,
-                    priorSubjectReceipts,
-                    conversation,
-                    ...structureReceiptFields,
-                    ...(selectionEvents.length > 0
-                        ? { structureSelectionEvents: selectionEvents }
-                        : {}),
-                }),
+        const outcome = await fireInvestigation({
+            question,
+            priorSubjectReceipts,
+            conversation,
+            structureReceiptFields,
+            selectionEvents,
+        });
+        settleTurn(assistantTurnId, outcome);
+        return outcome.kind === "answered";
+    }
+
+    /**
+     * CHAOS-4343 item 2: fires N independent turn-2 requests, one per
+     * confirmed candidate selection, each landing as its OWN stacked
+     * assistant turn with its own pending/answered/failed status — never one
+     * request carrying several candidate receipts, and never blocked on the
+     * others (each settles the moment ITS OWN response arrives).
+     *
+     * The question is appended as a SINGLE user turn shared by every fired
+     * request below it — it is the identical, unchanged text on every one of
+     * them (same "the question travels unchanged" rule `ask()` holds), so
+     * repeating it once per candidate would only look like N separate things
+     * were asked when exactly one was.
+     */
+    function askMany(
+        question: string,
+        choices: readonly ClarificationChoice[],
+        chosenSubjects: readonly (SubjectRef | undefined)[],
+        structureSelectionsToSend?: StructureSelectionBatch,
+    ): void {
+        if (choices.length === 0) return;
+        const conversation = buildConversationTurns(turns);
+        structureSelections.reset();
+        candidateSelections.reset();
+        const askedAt = new Date().toISOString();
+
+        const structureReceiptFields =
+            structureSelectionsToSend === undefined
+                ? {}
+                : buildStructureReceiptFields(structureSelectionsToSend);
+        // Both selection hooks' queued outcomes belong to this ONE tester
+        // action (picking N candidates, optionally alongside a structure
+        // pick) — emitted once, on the first of the N fired requests below,
+        // never once per request: N identical telemetry events would
+        // overcount one action as N (see the per-request comment below).
+        const selectionEvents = [
+            ...structureSelections.pendingSelectionEvents,
+            ...candidateSelections.pendingSelectionEvents,
+        ];
+
+        const userTurnId = nextId.current++;
+        const assistantTurns = choices.map((choice, index) => ({
+            id: nextId.current++,
+            choice,
+            chosenSubject: chosenSubjects[index],
+        }));
+
+        setTurns((current) => [
+            ...current,
+            { role: "user", id: userTurnId, question, createdAt: askedAt },
+            ...assistantTurns.map(({ id, chosenSubject }) => ({
+                role: "assistant" as const,
+                id,
+                createdAt: askedAt,
+                outcome: { kind: "pending" as const },
+                chosenSubject,
+                submittedStructureBatch: undefined,
+                retryQuestion: undefined,
+            })),
+        ]);
+
+        assistantTurns.forEach(({ id, choice }, index) => {
+            void fireInvestigation({
+                question,
+                priorSubjectReceipts: [choice],
+                conversation,
+                structureReceiptFields,
+                selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+            }).then((outcome) => {
+                settleTurn(id, outcome);
             });
-            const payload: unknown = await response.json();
-            const failure = (payload as { failure?: unknown }).failure;
-            if (isFailure(failure)) {
-                settle({ kind: "failed", failure });
-                return false;
-            }
-            const result = (payload as { result?: unknown }).result;
-            if (result === undefined || result === null) {
-                settle({
-                    kind: "failed",
-                    failure: {
-                        code: "acr_contract_violation",
-                        message: "Ask Dev's server returned neither a result nor a failure.",
-                        retryable: false,
-                    },
-                });
-                return false;
-            }
-            settle({ kind: "answered", result: result as InvestigationResult });
-            return true;
-        } catch (error) {
-            // Never swallow: a dead server hop is itself a reportable outcome.
-            console.error("investigation request failed", error);
-            settle({
-                kind: "failed",
-                failure: {
-                    code: "acr_unreachable",
-                    message: "Ask Dev's server could not be reached.",
-                    retryable: true,
-                },
-            });
-            return false;
-        }
+        });
     }
 
     const latestAssistantTurn = [...turns].reverse().find((turn) => turn.role === "assistant");
 
-    function chooseCandidate(choice: ClarificationChoice) {
+    function chooseCandidates(choices: readonly ClarificationChoice[]) {
         if (
             latestAssistantTurn?.role !== "assistant" ||
-            latestAssistantTurn.outcome.kind !== "answered"
+            latestAssistantTurn.outcome.kind !== "answered" ||
+            choices.length === 0
         ) {
             return;
         }
         const { result } = latestAssistantTurn.outcome;
         // Mixed-receipt-family unification: a response can carry BOTH subject
-        // candidates and a structure_needs disclosure at once. Picking a
-        // candidate fires immediately (unlike structure offers, which
-        // accumulate behind an explicit confirm), so any structure picks the
-        // tester already made in this SAME turn — accumulated but not yet
-        // confirmed — must travel in this SAME re-ask, or `ask()` resetting
-        // the shared selection hook below would silently drop them.
+        // candidates and a structure_needs disclosure at once. Any structure
+        // picks the tester already made in this SAME turn — accumulated but
+        // not yet confirmed — must travel alongside EVERY fired candidate
+        // request, or `askMany()` resetting the shared selection hook below
+        // would silently drop them.
         const pendingStructureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
         if (pendingStructureBatch !== undefined) {
-            // Snapshotted BEFORE `ask()` resets the shared hook and appends a
-            // new turn, same reason `chooseStructure` below does — otherwise
-            // this turn's own frozen echo would render as if nothing had
-            // ever been picked (codex review round 1, finding 3).
+            // Snapshotted BEFORE `askMany()` resets the shared hook and
+            // appends new turns, same reason `chooseStructure` below does —
+            // otherwise this turn's own frozen echo would render as if
+            // nothing had ever been picked (codex review round 1, finding 3).
             const supersededTurnId = latestAssistantTurn.id;
             setTurns((current) =>
                 current.map((turn) =>
@@ -320,12 +458,10 @@ export default function ChatPage() {
                 ),
             );
         }
-        void ask(
-            result.question,
-            [choice],
+        const chosenSubjects = choices.map((choice) =>
             subjectForReceipt(result, choice.receipt_id),
-            pendingStructureBatch,
         );
+        askMany(result.question, choices, chosenSubjects, pendingStructureBatch);
     }
 
     function chooseStructure(batch: StructureSelectionBatch) {
@@ -431,8 +567,8 @@ export default function ChatPage() {
                                     {turn.outcome.kind === "answered" ? (
                                         <DeterministicAnswerView
                                             chosenSubject={turn.chosenSubject}
-                                            onChooseCandidate={
-                                                isLatest ? chooseCandidate : undefined
+                                            onConfirmCandidates={
+                                                isLatest ? chooseCandidates : undefined
                                             }
                                             onConfirmStructure={
                                                 isLatest ? chooseStructure : undefined
@@ -440,10 +576,18 @@ export default function ChatPage() {
                                             onRejectStructure={
                                                 isLatest ? structureSelections.reject : undefined
                                             }
+                                            onToggleCandidate={
+                                                isLatest ? candidateSelections.toggle : undefined
+                                            }
                                             onToggleStructure={
                                                 isLatest ? structureSelections.toggle : undefined
                                             }
                                             result={turn.outcome.result}
+                                            selectedCandidateReceiptIds={
+                                                isLatest
+                                                    ? candidateSelections.batch
+                                                    : EMPTY_CANDIDATE_SELECTION_BATCH
+                                            }
                                             structureBatch={
                                                 isLatest
                                                     ? structureSelections.batch

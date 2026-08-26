@@ -6,6 +6,7 @@ import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { acrErrorCodeVocabulary } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
+import type { StructureSubjectKind } from "@/lib/contracts";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 
 const { privateKey } = generateKeyPairSync("ed25519");
@@ -200,6 +201,70 @@ describe("buildInvestigationRequest", () => {
             expect(request.prior_anchor_receipts).toHaveLength(20);
             expect(request).not.toHaveProperty("prior_handle_receipts");
             expect(request).not.toHaveProperty("prior_window_receipts");
+        });
+    });
+
+    /**
+     * CHAOS-4343 item 3: `expected_kinds` (CHAOS-3972 P3) is a plain request
+     * field, not a receipt — legal on a fresh question with no prior result.
+     * Same wire-minimization discipline as every other array field here: the
+     * key is omitted (not sent empty), and what IS sent is deduplicated and
+     * capped at the contract's own `maxItems: 15`.
+     */
+    describe("expected_kinds (CHAOS-4343 item 3) does not reach the wire until there is something to send", () => {
+        it("omits expected_kinds when nothing was derived from the question", () => {
+            const request = buildInvestigationRequest("q");
+
+            expect(request).not.toHaveProperty("expected_kinds");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("omits expected_kinds even when called with an explicit empty array", () => {
+            const request = buildInvestigationRequest("q", [], {}, [], []);
+
+            expect(request).not.toHaveProperty("expected_kinds");
+        });
+
+        it("carries every supplied kind, deduplicated, when non-empty", () => {
+            const request = buildInvestigationRequest(
+                "What project owns this?",
+                [],
+                {},
+                [],
+                ["project", "team", "project"],
+            ) as unknown as { readonly expected_kinds?: readonly string[] };
+
+            expect(request.expected_kinds).toEqual(["project", "team"]);
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        /**
+         * The whole closed vocabulary is only 15 kinds, so a real caller can
+         * never exceed the bound by supplying distinct real values — dedup
+         * alone would already satisfy it. Proving the SLICE itself needs 16
+         * distinct entries, which only exists as a fabricated input; the
+         * literal-noun caller (`@/lib/kind-nouns`) can never produce one.
+         */
+        it("caps expected_kinds at the contract's maxItems (15) rather than letting ACR reject them", () => {
+            const sixteenDistinctValues = Array.from(
+                { length: 16 },
+                (_, index) => `kind_${String(index)}`,
+            ) as unknown as readonly StructureSubjectKind[];
+            const request = buildInvestigationRequest(
+                "q",
+                [],
+                {},
+                [],
+                sixteenDistinctValues,
+            ) as unknown as { readonly expected_kinds?: readonly string[] };
+
+            expect(request.expected_kinds).toHaveLength(15);
         });
     });
 

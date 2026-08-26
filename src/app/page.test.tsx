@@ -123,11 +123,14 @@ describe("the clarification chip is live only on the most recent assistant turn"
         expect(
             await screen.findByRole("region", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
-        expect(screen.getAllByRole("button", { name: /^Ask again about / }).length).toBeGreaterThan(
-            0,
-        );
+        expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
     });
 
+    /**
+     * CHAOS-4343 items 1/2: selection leads (a toggle, not an immediate
+     * fire), confirming follows. A single confirmed selection still
+     * re-asks with exactly that candidate's receipt, unchanged from before.
+     */
     it("re-asks with the chosen receipt and freezes the older turn's chip", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
@@ -148,9 +151,10 @@ describe("the clarification chip is live only on the most recent assistant turn"
         const candidate = clarification.subject_resolution.candidates[0]!;
         await user.click(
             await screen.findByRole("button", {
-                name: `Ask again about ${candidate.subject.label}`,
+                name: `Select ${candidate.subject.label}`,
             }),
         );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -178,6 +182,136 @@ describe("the clarification chip is live only on the most recent assistant turn"
         expect(turns).toHaveLength(2);
         expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
         expect(turns[1]).toHaveAttribute("data-state", answered.status);
+    });
+
+    /**
+     * CHAOS-4343 item 2, the ticket's own acceptance scenario: N selected
+     * candidates fire N INDEPENDENT turn-2 requests and land as N stacked
+     * assistant turns, each with its own status — never one request
+     * carrying several candidate receipts.
+     */
+    it("confirming 2 selected candidates fires 2 independent requests and renders 2 stacked panels", async () => {
+        const [first, second] = clarification.subject_resolution.candidates;
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+
+        expect(
+            await screen.findAllByRole("article", { name: "Deterministic answer" }),
+        ).toHaveLength(3);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorSubjectReceipts).toEqual([
+            { result_id: clarification.result_id, receipt_id: first!.receipt_id },
+        ]);
+        expect(thirdCallBody.priorSubjectReceipts).toEqual([
+            { result_id: clarification.result_id, receipt_id: second!.receipt_id },
+        ]);
+        // Both fired requests resend the SAME unchanged question.
+        expect(secondCallBody.question).toBe(clarification.question);
+        expect(thirdCallBody.question).toBe(clarification.question);
+
+        // Exactly ONE new user bubble for the whole batch action (not one per
+        // fired request) — plus the ORIGINAL ask's own bubble, which happens
+        // to carry the identical text here since the fixture's `question`
+        // matches what was typed.
+        expect(screen.getAllByText(clarification.question)).toHaveLength(2);
+
+        // Each panel's own choice notice proves it resolved to the RIGHT
+        // candidate independently, since both requests share one question.
+        expect(
+            await screen.findByText(new RegExp(`about ${first!.subject.label}`, "i")),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText(new RegExp(`about ${second!.subject.label}`, "i")),
+        ).toBeInTheDocument();
+
+        // Only the LATEST of the 3 turns is live; the first two are frozen.
+        const turns = screen.getAllByRole("article", { name: "Deterministic answer" });
+        expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
+        expect(turns[1]).toHaveAttribute("data-state", answered.status);
+        expect(turns[2]).toHaveAttribute("data-state", answered.status);
+    });
+
+    /**
+     * Item 2's status independence: one candidate's request can fail while
+     * the other succeeds, and each panel shows its own outcome.
+     */
+    it("each fired request settles its own panel independently, including a mixed success/failure pair", async () => {
+        const [first, second] = clarification.subject_resolution.candidates;
+        vi.spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(
+                    JSON.stringify({
+                        failure: {
+                            code: "acr_unreachable",
+                            message: "ACR could not be reached.",
+                            retryable: true,
+                        },
+                    }),
+                    { headers: { "Content-Type": "application/json" } },
+                ),
+            );
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+
+        // The failed panel settles (proving independence — it does not wait
+        // on the successful one), and the successful one still shows its own
+        // answer article alongside it rather than being replaced or hidden.
+        expect(await screen.findByRole("alert", { name: "No answer" })).toBeInTheDocument();
+        const articles = screen.getAllByRole("article", { name: "Deterministic answer" });
+        // The original clarification turn, plus the one candidate that
+        // answered successfully — the failed candidate has no article at all.
+        expect(articles).toHaveLength(2);
+        expect(articles[1]).toHaveAttribute("data-state", answered.status);
     });
 });
 
@@ -274,9 +408,8 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
         const option = mixed.structure_needs!.kind_options![1]!;
         await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
         const candidate = mixed.subject_resolution.candidates[0]!;
-        await user.click(
-            screen.getByRole("button", { name: `Ask again about ${candidate.subject.label}` }),
-        );
+        await user.click(screen.getByRole("button", { name: `Select ${candidate.subject.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -305,14 +438,13 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
     /**
      * codex round 2, finding 1: the exact reverse-order path was untested.
      * `chooseStructure` cannot ALSO carry a subject receipt here — there is
-     * no accumulated-but-unconfirmed subject pick to carry, because
-     * `ClarificationPanel` fires immediately on click rather than
-     * accumulating one (confirmed a structural non-issue, not a gap to
-     * close with more code). What this DOES prove: confirming structure
-     * first sends only the structure family (correctly — there is nothing
-     * else pending), and freezes the SAME turn's subject chip too, exactly
-     * the existing "only the most recent turn is live" rule already applies
-     * everywhere else.
+     * no candidate selected in this test, so there is nothing accumulated
+     * to carry (CHAOS-4343: `ClarificationPanel` now accumulates candidate
+     * picks too, but only picks that were actually made). What this DOES
+     * prove: confirming structure first sends only the structure family
+     * (correctly — there is nothing else pending), and freezes the SAME
+     * turn's subject chip too, exactly the existing "only the most recent
+     * turn is live" rule already applies everywhere else.
      */
     it("structure-first: confirming structure sends only the structure family and freezes the turn's own subject chip too", async () => {
         const fetchSpy = vi
@@ -350,5 +482,98 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
         // specifically for a turn that carried both families.
         expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
         expect(screen.getByTestId("cannot-confirm-structure-here")).toBeInTheDocument();
+    });
+});
+
+/**
+ * CHAOS-4343 item 3: verifies the CONSUMER, not just the producer —
+ * `kind-nouns.test.ts` proves `literalKindNounsInQuestion` itself,
+ * `client.test.ts` proves `buildInvestigationRequest` attaches it,
+ * `route.test.ts` proves the route parses it — this is the one place that
+ * proves the chat surface's own `ask()` actually puts it on the wire, for a
+ * FRESH question with no prior receipt at all (CHAOS-4171 standing order).
+ */
+describe("literal kind nouns bind as an explicit expectedKinds hint (CHAOS-4343 item 3)", () => {
+    it("sends expectedKinds derived from a literal kind noun in a brand-new question", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(JSON.stringify({ result: answered }), {
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+        render(<ChatPage />);
+
+        await ask("What is the status of the dev-health-ops project?");
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(body.expectedKinds).toEqual(["project"]);
+    });
+
+    it("omits expectedKinds when the question names no literal kind noun", async () => {
+        const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(JSON.stringify({ result: answered }), {
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+
+        const body = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(body).not.toHaveProperty("expectedKinds");
+    });
+
+    /**
+     * A re-ask resends the RESULT's own `question` field unchanged (see
+     * "re-asks with the chosen receipt..." above, which pins
+     * `secondCallBody.question` to `clarification.question` — NOT the text
+     * originally typed). So the hint on the re-ask is derived from THAT
+     * text, independently of the first request's — proving `fireInvestigation`
+     * re-derives it per request rather than caching the first ask's hint.
+     * `clarification.question` ("Is Atlas on track?", the fixture's own
+     * field) carries no literal kind noun, so the re-ask correctly omits it
+     * even though the ORIGINAL typed question did carry one.
+     */
+    it("re-derives the hint per request rather than caching the first ask's", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Which team owns this project?");
+        const user = userEvent.setup();
+        const candidate = clarification.subject_resolution.candidates[0]!;
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const firstBody = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        const secondBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(firstBody.expectedKinds).toEqual(["project", "team"]);
+        expect(secondBody.question).toBe(clarification.question);
+        expect(secondBody).not.toHaveProperty("expectedKinds");
     });
 });

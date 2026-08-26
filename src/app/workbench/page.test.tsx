@@ -62,9 +62,7 @@ describe("the clarification choice is reachable from every view", () => {
         expect(
             screen.getByRole("region", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
-        expect(screen.getAllByRole("button", { name: /^Ask again about / }).length).toBeGreaterThan(
-            0,
-        );
+        expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
     });
 
     it("shows no choice panel when the result is an answer", async () => {

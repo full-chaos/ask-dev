@@ -16,11 +16,15 @@ import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
 import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
+    EMPTY_SELECTION_EVENTS,
     pendingStructureBatchOrUndefined,
+    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
+import { useCandidateSelections } from "@/lib/use-candidate-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
 
 /**
@@ -68,6 +72,16 @@ export default function WorkbenchPage() {
     // same as chosenSubject: a selection belongs to one result, not to the
     // session.
     const structureSelections = useStructureSelections();
+    // CHAOS-4343 items 1/2: multi-select accumulator for candidate picks.
+    // The Workbench keeps only ONE `outcome` slot (unlike the chat surface's
+    // growing timeline), so it cannot show N stacked result panels — that is
+    // the chat surface's job, the one this ticket calls "the target UX" and
+    // page.tsx's own doc comment already declares this shell TEMPORARY.
+    // Confirming N selections here fires one request per selection,
+    // sequentially, and displays only whichever answers last; it is an
+    // honest limitation of this single-outcome shell, not a silent drop —
+    // multi-select fan-out belongs to the chat surface (`src/app/page.tsx`).
+    const candidateSelections = useCandidateSelections();
 
     /**
      * Asks, optionally carrying a subject the tester chose from a previous
@@ -84,10 +98,20 @@ export default function WorkbenchPage() {
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
         structureSelectionsToSend?: StructureSelectionBatch,
+        // CHAOS-4343: lets `chooseCandidates` fold `candidateSelections`'s
+        // own queued outcomes in on the FIRST of its N sequential asks,
+        // without this function needing to know about that hook itself.
+        extraSelectionEvents: readonly PendingSelectionEvent[] = EMPTY_SELECTION_EVENTS,
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
         structureSelections.reset();
+        // Same reason `structureSelections.reset()` runs on every ask(): a
+        // plain new question (or a structure-only re-ask) must not leave a
+        // stale candidate selection open against a result it no longer
+        // matches. `chooseCandidates` already reset this hook itself before
+        // calling `ask()` in its own loop, so this is a no-op there.
+        candidateSelections.reset();
         setOutcome({ kind: "pending" });
         // CHAOS-3927 P2: accumulate-and-re-ask-ONCE (design brief §2.2) — every
         // member picked in one StructureNeedsPanel session travels in this
@@ -107,7 +131,14 @@ export default function WorkbenchPage() {
         // Read AFTER `structureSelections.reset()` above but still the
         // pre-reset value: `setState` schedules a re-render, it does not
         // mutate this closure's already-captured array.
-        const selectionEvents = structureSelections.pendingSelectionEvents;
+        const selectionEvents = [
+            ...structureSelections.pendingSelectionEvents,
+            ...extraSelectionEvents,
+        ];
+        // CHAOS-4343 item 3: derived from the SAME `question` this request
+        // sends — a re-ask resends the ORIGINAL question unchanged, so this
+        // stays consistent with whatever hint fired on the first ask.
+        const expectedKinds = literalKindNounsInQuestion(question);
         try {
             const response = await fetch("/api/investigations", {
                 method: "POST",
@@ -116,6 +147,7 @@ export default function WorkbenchPage() {
                     question,
                     priorSubjectReceipts,
                     ...structureReceiptFields,
+                    ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
                     ...(selectionEvents.length > 0
                         ? { structureSelectionEvents: selectionEvents }
                         : {}),
@@ -154,24 +186,35 @@ export default function WorkbenchPage() {
         }
     }
 
-    // Resolves the receipt to its subject at CHOICE time, while the issuing
+    // Resolves the receipt to its subject at CONFIRM time, while the issuing
     // result is still on screen — the only place that mapping exists.
     //
     // Mixed-receipt-family unification: a response can carry BOTH subject
-    // candidates and a structure_needs disclosure at once. Picking a
-    // candidate fires immediately (unlike structure offers, which accumulate
-    // behind an explicit confirm), so any structure picks the tester already
-    // made for THIS result — accumulated but not yet confirmed — must travel
-    // in this SAME re-ask, or `ask()` resetting the shared selection hook
-    // below would silently drop them.
-    function chooseCandidate(choice: ClarificationChoice) {
-        if (outcome.kind !== "answered") return;
-        void ask(
-            askedQuestion,
-            [choice],
-            subjectForReceipt(outcome.result, choice.receipt_id),
-            pendingStructureBatchOrUndefined(structureSelections.batch),
-        );
+    // candidates and a structure_needs disclosure at once. Any structure
+    // picks the tester already made for THIS result — accumulated but not
+    // yet confirmed — must travel along, or `ask()` resetting the shared
+    // selection hook below would silently drop them.
+    //
+    // CHAOS-4343 items 1/2: confirming fires one request PER selected
+    // candidate, sequentially (awaited in order, so the LAST one settles
+    // last and is what ends up on screen) — see this page's own
+    // `candidateSelections` doc comment for why the Workbench does not fan
+    // these out into side-by-side panels the way the chat surface does.
+    async function chooseCandidates(choices: readonly ClarificationChoice[]) {
+        if (outcome.kind !== "answered" || choices.length === 0) return;
+        const { result } = outcome;
+        const structureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
+        const selectionEvents = candidateSelections.pendingSelectionEvents;
+        candidateSelections.reset();
+        for (const [index, choice] of choices.entries()) {
+            await ask(
+                askedQuestion,
+                [choice],
+                subjectForReceipt(result, choice.receipt_id),
+                structureBatch,
+                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+            );
+        }
     }
 
     // CHAOS-3927 P2: fires the single re-ask carrying every structure member
@@ -275,19 +318,27 @@ export default function WorkbenchPage() {
                             )}
                             {outcome.result.status === "clarification_required" ? (
                                 <ClarificationPanel
-                                    onChoose={chooseCandidate}
+                                    onConfirm={(choices) => {
+                                        void chooseCandidates(choices);
+                                    }}
+                                    onToggle={candidateSelections.toggle}
                                     result={outcome.result}
+                                    selectedReceiptIds={candidateSelections.batch}
                                 />
                             ) : null}
                             <CanonicalResultInspector result={outcome.result} />
                         </>
                     ) : (
                         <DeterministicAnswerView
-                            onChooseCandidate={chooseCandidate}
+                            onConfirmCandidates={(choices) => {
+                                void chooseCandidates(choices);
+                            }}
                             onConfirmStructure={chooseStructure}
                             onRejectStructure={structureSelections.reject}
+                            onToggleCandidate={candidateSelections.toggle}
                             onToggleStructure={structureSelections.toggle}
                             result={outcome.result}
+                            selectedCandidateReceiptIds={candidateSelections.batch}
                             structureBatch={structureSelections.batch}
                         />
                     )}

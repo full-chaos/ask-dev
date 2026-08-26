@@ -10,29 +10,45 @@ export type ClarificationChoice = {
     readonly receipt_id: string;
 };
 
+const EMPTY_SELECTED_RECEIPT_IDS: ReadonlySet<string> = new Set();
+
 export type ClarificationPanelProps = {
     readonly result: InvestigationResult;
+    /** The candidate receipt ids selected so far, owned by the caller (mirrors `StructureNeedsPanel`'s `batch`). */
+    readonly selectedReceiptIds?: ReadonlySet<string> | undefined;
     /**
+     * Called when a candidate's own Select/Unselect control is toggled.
      * Absent when the surrounding surface cannot re-ask.
      *
      * The panel still renders the prompt and the candidates — a clarification
      * must never be reduced to an ordinary answer just because this particular
      * context cannot act on it. It says so instead.
      */
-    readonly onChoose?: ((choice: ClarificationChoice) => void) | undefined;
+    readonly onToggle?: ((receiptId: string) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: accumulate-and-re-ask-PER-PICK, the same UX
+     * discipline `StructureNeedsPanel`'s own "Ask again with these
+     * selections" already holds — selecting leads, confirming follows.
+     * Unlike a structure member (one pick, one shared re-ask), each selected
+     * candidate becomes its OWN independent turn-2 request: `choices` is
+     * every currently-selected candidate, in ACR's own ranked order, and the
+     * caller fires one request PER entry, each getting its own result panel
+     * and its own pending/answered/failed status.
+     */
+    readonly onConfirm?: ((choices: readonly ClarificationChoice[]) => void) | undefined;
     readonly pending?: boolean | undefined;
 };
 
 /**
- * The disambiguation flow (CHAOS-3738).
+ * The disambiguation flow (CHAOS-3738; multi-select CHAOS-4343).
  *
  * When ACR cannot commit a subject it returns `clarification_required` with
- * ranked candidates, and the tester picks one. This is one of the Workbench's
- * few authorized interactions — and, until CHAOS-3810 lands, it is expected to
- * be the FIRST real non-error result the Workbench ever renders, so it is built
- * to be read as carefully as an answer.
+ * ranked candidates, and the tester picks one or more. This is one of the
+ * Workbench's few authorized interactions — and, until CHAOS-3810 lands, it is
+ * expected to be the FIRST real non-error result the Workbench ever renders,
+ * so it is built to be read as carefully as an answer.
  *
- * The choice is carried back as ACR's own `receipt_id`, not as a re-typed
+ * Each choice is carried back as ACR's own `receipt_id`, not as a re-typed
  * subject name. That matters for the read-only boundary: the Workbench never
  * names or authorizes a subject on the tester's behalf, it hands back an
  * identifier ACR issued. Candidates outside the result cannot be chosen because
@@ -44,16 +60,16 @@ export type ClarificationPanelProps = {
  */
 function CandidateRecord({
     candidate,
-    resultId,
     rank,
     pending,
-    onChoose,
+    selected,
+    onToggle,
 }: {
     readonly candidate: SubjectCandidate;
-    readonly resultId: string;
     readonly rank: number;
     readonly pending: boolean;
-    readonly onChoose: ((choice: ClarificationChoice) => void) | undefined;
+    readonly selected: boolean;
+    readonly onToggle: (() => void) | undefined;
 }) {
     return (
         <li className="record">
@@ -63,6 +79,11 @@ function CandidateRecord({
                 <Badge tone={candidateStateTone(candidate.state)} title={candidate.state}>
                     {humanizeTerm(candidate.state)}
                 </Badge>
+                {selected ? (
+                    <Badge tone="ok" title="selected">
+                        selected
+                    </Badge>
+                ) : null}
                 <span className="record__meta">
                     {candidate.subject.kind} · {candidate.subject.canonical_id} · confidence{" "}
                     {formatConfidence(candidate.confidence)}
@@ -79,24 +100,34 @@ function CandidateRecord({
             <p className="record__meta">
                 receipt <code>{candidate.receipt_id}</code>
             </p>
-            {onChoose === undefined ? null : (
+            {onToggle === undefined ? null : (
                 <button
+                    aria-pressed={selected}
                     className="question-form__submit"
                     type="button"
                     disabled={pending}
-                    onClick={() =>
-                        onChoose({ result_id: resultId, receipt_id: candidate.receipt_id })
-                    }
+                    onClick={onToggle}
                 >
-                    Ask again about {candidate.subject.label}
+                    {selected
+                        ? `Unselect ${candidate.subject.label}`
+                        : `Select ${candidate.subject.label}`}
                 </button>
             )}
         </li>
     );
 }
 
-export function ClarificationPanel({ result, onChoose, pending = false }: ClarificationPanelProps) {
+export function ClarificationPanel({
+    result,
+    selectedReceiptIds = EMPTY_SELECTED_RECEIPT_IDS,
+    onToggle,
+    onConfirm,
+    pending = false,
+}: ClarificationPanelProps) {
     const { candidates, clarification_prompt: prompt } = result.subject_resolution;
+    const selectedCount = candidates.filter((candidate) =>
+        selectedReceiptIds.has(candidate.receipt_id),
+    ).length;
 
     return (
         <section className="panel" aria-labelledby="clarification-title">
@@ -106,7 +137,7 @@ export function ClarificationPanel({ result, onChoose, pending = false }: Clarif
                 below stays verbatim whatever the context, because that is data,
                 not chrome, and the inspection-only line covers it. */}
             <h2 className="panel__title" id="clarification-title">
-                {onChoose === undefined ? "Subject candidates" : "Which subject did you mean?"}
+                {onConfirm === undefined ? "Subject candidates" : "Which subject did you mean?"}
             </h2>
             {prompt === undefined ? (
                 <p className="answer__body">
@@ -120,7 +151,7 @@ export function ClarificationPanel({ result, onChoose, pending = false }: Clarif
             {result.interpretation.clarification_reason === undefined ? null : (
                 <p className="record__meta">{result.interpretation.clarification_reason}</p>
             )}
-            {onChoose === undefined ? (
+            {onConfirm === undefined ? (
                 <p className="record__meta" data-testid="cannot-choose-here">
                     This context cannot re-ask, so the candidates are shown for inspection only.
                 </p>
@@ -140,13 +171,44 @@ export function ClarificationPanel({ result, onChoose, pending = false }: Clarif
                         <CandidateRecord
                             candidate={candidate}
                             key={candidate.receipt_id}
-                            onChoose={onChoose}
+                            onToggle={
+                                onToggle === undefined
+                                    ? undefined
+                                    : () => {
+                                          onToggle(candidate.receipt_id);
+                                      }
+                            }
                             pending={pending}
                             rank={index + 1}
-                            resultId={result.result_id}
+                            selected={selectedReceiptIds.has(candidate.receipt_id)}
                         />
                     ))}
                 </ul>
+            )}
+
+            {candidates.length === 0 || onConfirm === undefined ? null : (
+                <button
+                    className="question-form__submit"
+                    disabled={pending || selectedCount === 0}
+                    onClick={() => {
+                        // Built from `candidates` in ACR's OWN order (never
+                        // selection-click order — the same "never re-sort"
+                        // rule this panel already holds for rendering).
+                        onConfirm(
+                            candidates
+                                .filter((candidate) => selectedReceiptIds.has(candidate.receipt_id))
+                                .map((candidate) => ({
+                                    result_id: result.result_id,
+                                    receipt_id: candidate.receipt_id,
+                                })),
+                        );
+                    }}
+                    type="button"
+                >
+                    {selectedCount === 0
+                        ? "Ask about the selected candidates"
+                        : `Ask about ${String(selectedCount)} selected candidate${selectedCount === 1 ? "" : "s"}`}
+                </button>
             )}
         </section>
     );

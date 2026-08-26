@@ -72,7 +72,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         render(
             <DeterministicAnswerView
                 chosenSubject={chosen}
-                onChooseCandidate={vi.fn()}
+                onConfirmCandidates={vi.fn()}
                 result={aboutSomethingElse}
             />,
         );
@@ -93,7 +93,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         render(
             <DeterministicAnswerView
                 chosenSubject={chosen}
-                onChooseCandidate={vi.fn()}
+                onConfirmCandidates={vi.fn()}
                 result={clarification}
             />,
         );
@@ -117,7 +117,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         render(
             <DeterministicAnswerView
                 chosenSubject={chosen}
-                onChooseCandidate={vi.fn()}
+                onConfirmCandidates={vi.fn()}
                 result={applied}
             />,
         );
@@ -126,7 +126,7 @@ describe("a dishonoured choice is never presented as normal", () => {
     });
 
     it("stays silent when no choice was made at all", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={answered} />);
+        render(<DeterministicAnswerView onConfirmCandidates={vi.fn()} result={answered} />);
 
         expect(screen.queryByRole("alert", { name: "Choice not applied" })).toBeNull();
     });
@@ -136,7 +136,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         render(
             <DeterministicAnswerView
                 chosenSubject={chosen}
-                onChooseCandidate={vi.fn()}
+                onConfirmCandidates={vi.fn()}
                 result={answered}
             />,
         );

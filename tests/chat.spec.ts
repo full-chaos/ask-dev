@@ -273,8 +273,8 @@ test.describe("clarification chips", () => {
         await expect(
             page.getByRole("region", { name: "Which subject did you mean?" }),
         ).toBeVisible();
-        await expect(page.getByRole("button", { name: "Ask again about Ask Dev" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Ask again about Atlas" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Select Ask Dev" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Select Atlas" })).toBeVisible();
 
         // Every DeterministicAnswerView turn shares the SAME `aria-label`
         // ("Deterministic answer") whether the result is a clarification or
@@ -287,9 +287,12 @@ test.describe("clarification chips", () => {
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
-        // Picking a chip re-asks with the CHOSEN receipt — proving the chip
-        // is wired, not decorative.
-        await page.getByRole("button", { name: "Ask again about Ask Dev" }).click();
+        // Selecting leads, confirming follows (CHAOS-4343): the toggle alone
+        // must not fire a request — only the confirm below does, proving the
+        // chip is wired, not decorative.
+        await page.getByRole("button", { name: "Select Ask Dev" }).click();
+        await expect(turns).toHaveCount(1);
+        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
 
         await expect(turns).toHaveCount(2);
         // The first turn is frozen at its original (clarification) state...
@@ -328,7 +331,7 @@ test.describe("clarification chips", () => {
         await expect(page.getByRole("region", { name: "Which subject did you mean?" })).toHaveCount(
             0,
         );
-        await expect(page.getByRole("button", { name: /^Ask again about /u })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: /^Select /u })).toHaveCount(0);
         await expect(page.getByTestId("cannot-choose-here")).toHaveCount(0);
 
         // NEGATIVE control for the structure-needs panel too (CHAOS-3927
@@ -498,10 +501,11 @@ test.describe("mixed receipt families", () => {
         // resolves decisively when BOTH `prior_subject_receipts` and a
         // recognized `prior_kind_receipts` entry arrive on the SAME
         // request — so this is a genuine mutation-provable positive
-        // control: revert `chooseCandidate` to sending only the subject
+        // control: revert `chooseCandidates` to sending only the subject
         // receipt, and the second turn stays `clarification_required`
         // instead of turning `complete`.
-        await page.getByRole("button", { name: "Ask again about Ask Dev" }).click();
+        await page.getByRole("button", { name: "Select Ask Dev" }).click();
+        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
 
         const turns = page.getByRole("article", { name: "Deterministic answer" });
         await expect(turns).toHaveCount(2);

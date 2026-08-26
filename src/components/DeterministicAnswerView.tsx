@@ -22,8 +22,20 @@ import {
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
-    /** Supplied when the surface can re-ask; omitted in read-only contexts. */
-    readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: the candidate receipt ids selected so far on
+     * THIS result, owned by the caller — same "shared across every
+     * simultaneous rendering" rule `structureBatch` already holds below.
+     */
+    readonly selectedCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    /** Toggles one candidate's selection. Supplied when the surface can re-ask. */
+    readonly onToggleCandidate?: ((receiptId: string) => void) | undefined;
+    /**
+     * Fires once per confirmed selection (see `ClarificationPanel`'s own
+     * `onConfirm` doc comment): the caller re-asks about EVERY entry in
+     * `choices`, each as its own independent turn-2 request.
+     */
+    readonly onConfirmCandidates?: ((choices: readonly ClarificationChoice[]) => void) | undefined;
     /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */
     readonly onConfirmStructure?: ((batch: StructureSelectionBatch) => void) | undefined;
     /**
@@ -63,9 +75,13 @@ export type DeterministicAnswerViewProps = {
  * itself said it cannot support. Coverage and limitations are never collapsed
  * away and never shown only on failure.
  */
+const EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS: ReadonlySet<string> = new Set();
+
 export function DeterministicAnswerView({
     result,
-    onChooseCandidate,
+    selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
+    onToggleCandidate,
+    onConfirmCandidates,
     onConfirmStructure,
     structureBatch = EMPTY_STRUCTURE_SELECTION_BATCH,
     // No-op default: harmless, because the offer buttons that would call it
@@ -156,9 +172,11 @@ export function DeterministicAnswerView({
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
                 <ClarificationPanel
-                    onChoose={onChooseCandidate}
+                    onConfirm={onConfirmCandidates}
+                    onToggle={onToggleCandidate}
                     pending={pending}
                     result={result}
+                    selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
                 <section className="panel" aria-labelledby="clarification-limitations-title">

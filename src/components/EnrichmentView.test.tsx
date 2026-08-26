@@ -146,7 +146,8 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         render(
             <EnrichmentView
                 composition={buildComposition(clarification, PRESENTATION_MANIFEST_V1)}
-                onChooseCandidate={vi.fn()}
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
                 result={clarification}
             />,
         );
@@ -154,9 +155,7 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         expect(
             screen.getByRole("region", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
-        expect(screen.getAllByRole("button", { name: /^Ask again about / }).length).toBeGreaterThan(
-            0,
-        );
+        expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
     });
 
@@ -180,32 +179,29 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         // that nothing here promises a choice.
         expect(container.textContent).not.toMatch(/which subject did you mean/i);
         expect(container.textContent).toMatch(/cannot re-ask/i);
-        expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Select / })).toBeNull();
         // The candidates are still shown — inspection-only, not hidden.
         for (const candidate of clarification.subject_resolution.candidates) {
             expect(screen.getByText(candidate.subject.label)).toBeInTheDocument();
         }
     });
 
-    it("carries the re-ask handler through, so the choice is actionable", async () => {
-        const onChoose = vi.fn();
+    it("carries the re-ask handlers through, so the choice is actionable", async () => {
+        const onToggle = vi.fn();
+        const onConfirm = vi.fn();
         const user = userEvent.setup();
         render(
             <EnrichmentView
                 composition={buildComposition(clarification, PRESENTATION_MANIFEST_V1)}
-                onChooseCandidate={onChoose}
+                onConfirmCandidates={onConfirm}
+                onToggleCandidate={onToggle}
                 result={clarification}
             />,
         );
 
         const candidate = clarification.subject_resolution.candidates[0]!;
-        await user.click(
-            screen.getByRole("button", { name: `Ask again about ${candidate.subject.label}` }),
-        );
-        expect(onChoose).toHaveBeenCalledWith({
-            result_id: clarification.result_id,
-            receipt_id: candidate.receipt_id,
-        });
+        await user.click(screen.getByRole("button", { name: `Select ${candidate.subject.label}` }));
+        expect(onToggle).toHaveBeenCalledWith(candidate.receipt_id);
     });
 });
 

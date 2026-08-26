@@ -33,8 +33,11 @@ export type EnrichmentViewProps = {
     readonly result: InvestigationResult;
     /** The presentation composition. Model-authored later; supplied by a caller today. */
     readonly composition: string;
+    /** CHAOS-4343: forwarded verbatim to `DeterministicAnswerView`'s own props of the same names. */
+    readonly selectedCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    readonly onToggleCandidate?: ((receiptId: string) => void) | undefined;
     /** Present when the surface can re-ask, so a clarification stays actionable. */
-    readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
+    readonly onConfirmCandidates?: ((choices: readonly ClarificationChoice[]) => void) | undefined;
     readonly pending?: boolean | undefined;
     readonly chosenSubject?: SubjectRef | undefined;
 };
@@ -66,7 +69,9 @@ export type EnrichmentViewProps = {
 export function EnrichmentView({
     result,
     composition,
-    onChooseCandidate,
+    selectedCandidateReceiptIds,
+    onToggleCandidate,
+    onConfirmCandidates,
     pending = false,
     chosenSubject,
 }: EnrichmentViewProps) {
@@ -120,16 +125,18 @@ export function EnrichmentView({
                         X2, applied to what the UI SAYS rather than what it
                         renders. */}
                     <p className="answer__body">
-                        {onChooseCandidate === undefined
+                        {onConfirmCandidates === undefined
                             ? "This result asks for a subject choice rather than presenting an answer. It is shown below for inspection; this context cannot re-ask."
                             : "This result asks for a subject choice rather than presenting an answer, so it is shown in the deterministic view where the choice can be made."}
                     </p>
                 </section>
                 <DeterministicAnswerView
                     chosenSubject={chosenSubject}
-                    onChooseCandidate={onChooseCandidate}
+                    onConfirmCandidates={onConfirmCandidates}
+                    onToggleCandidate={onToggleCandidate}
                     pending={pending}
                     result={result}
+                    selectedCandidateReceiptIds={selectedCandidateReceiptIds}
                 />
             </div>
         );
@@ -168,9 +175,11 @@ export function EnrichmentView({
                 </section>
                 <DeterministicAnswerView
                     chosenSubject={chosenSubject}
-                    onChooseCandidate={onChooseCandidate}
+                    onConfirmCandidates={onConfirmCandidates}
+                    onToggleCandidate={onToggleCandidate}
                     pending={pending}
                     result={result}
+                    selectedCandidateReceiptIds={selectedCandidateReceiptIds}
                 />
             </div>
         );
