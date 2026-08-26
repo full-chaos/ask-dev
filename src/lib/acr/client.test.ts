@@ -581,6 +581,99 @@ describe("investigate", () => {
     });
 
     /**
+     * `AbortSignal.timeout(config.timeoutMs)` firing locally (no response
+     * ever arrived) is a DIFFERENT fact than the network being unreachable,
+     * and a different fact than ACR's own 504 (a real response saying the
+     * pipeline was still running) already covered above. Collapsing this
+     * one into `acr_unreachable` too is exactly the class of mistake
+     * `acr_timeout`'s own doc comment (errors.ts) warns against: a tester
+     * cannot tell "the Workbench never even got a response" from "DNS/TCP
+     * failed" without this distinction, and both currently read the same
+     * (observed live 2026-08-26: a real >120s investigation surfaced as
+     * "ACR could not be reached").
+     */
+    it("distinguishes a local Workbench timeout from an unreachable service", async () => {
+        // Drives the REAL AbortSignal.timeout(config.timeoutMs) rather than
+        // fabricating a same-named error, so this proves the gate is the
+        // local timer firing (`timeout.aborted`), not just an error name a
+        // completely different signal could also carry (codex review round
+        // 1, finding 1). A plain Error, not DOMException: under jsdom (this
+        // suite's test environment), `new DOMException(...) instanceof
+        // Error` is FALSE, which would make the OLD buggy `error instanceof
+        // Error && error.name === ...` gate silently fall through to
+        // `acr_unreachable` regardless of `error.name` -- passing this test
+        // for the wrong reason instead of proving the fix (codex review
+        // round 2, finding 1/2). A real fetch throws a plain `Error` here in
+        // every runtime that matters (browser and Node), so this is also
+        // the more representative shape.
+        const shortTimeoutConfig: AcrRuntimeConfig = { ...config, timeoutMs: 20 };
+        vi.spyOn(globalThis, "fetch").mockImplementation(
+            (_input, init) =>
+                new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => {
+                        reject(
+                            Object.assign(new Error("The operation was aborted due to timeout"), {
+                                name: "TimeoutError",
+                            }),
+                        );
+                    });
+                }),
+        );
+
+        const before = Date.now();
+        const failure = await failureOf(investigate(shortTimeoutConfig, { question: "q" }));
+        const elapsedUpperBoundMs = Date.now() - before;
+
+        expect(failure.code).toBe("acr_timeout");
+        expect(failure.retryable).toBe(true);
+        expect(failure.message).toContain(String(shortTimeoutConfig.timeoutMs));
+        // Pins the message to an ACTUAL elapsed reading, not just a regex
+        // shape a hard-coded string could also satisfy (codex review round
+        // 2, finding 2): the reported "waited Nms" must be a real number no
+        // larger than how long this whole test body took to run.
+        const waitedMatch = /waited (\d+)ms/.exec(failure.message);
+        expect(waitedMatch).not.toBeNull();
+        const waitedMs = Number(waitedMatch?.[1]);
+        expect(waitedMs).toBeGreaterThanOrEqual(0);
+        expect(waitedMs).toBeLessThanOrEqual(elapsedUpperBoundMs);
+    });
+
+    /**
+     * The chat route forwards the INCOMING request's own signal, combined
+     * with the local timer via `AbortSignal.any`. An external abort can
+     * carry a "TimeoutError"-named reason without the Workbench's own
+     * budget ever having fired -- this proves that case is NOT misfiled as
+     * `acr_timeout` (codex review round 1, finding 1: the old gate checked
+     * `error.name` alone, which cannot tell the two apart). Plain Error, not
+     * DOMException, for the same jsdom `instanceof Error` reason as the test
+     * above -- with DOMException this test could not distinguish the fix
+     * from the bug it is meant to catch (codex review round 2, finding 1).
+     */
+    it("does not classify an external abort as the Workbench's own timeout", async () => {
+        const controller = new AbortController();
+        vi.spyOn(globalThis, "fetch").mockImplementation(
+            (_input, init) =>
+                new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => {
+                        reject(
+                            Object.assign(new Error("The operation was aborted"), {
+                                name: "TimeoutError",
+                            }),
+                        );
+                    });
+                }),
+        );
+
+        // config's own timeoutMs (5s) never fires here; only the caller-
+        // supplied signal does, immediately.
+        const pending = investigate(config, { question: "q", signal: controller.signal });
+        controller.abort();
+
+        const failure = await failureOf(pending);
+        expect(failure.code).toBe("acr_unreachable");
+    });
+
+    /**
      * A local configuration fault must be reported as one. Signing used to sit
      * inside the transport try/catch, so this surfaced as "ACR could not be
      * reached" — pointing whoever is debugging at the network when the call had
