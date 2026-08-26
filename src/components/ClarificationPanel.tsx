@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import type { InvestigationResult, SubjectCandidate } from "@/lib/contracts";
@@ -124,19 +126,26 @@ export function ClarificationPanel({
     onConfirm,
     pending = false,
 }: ClarificationPanelProps) {
+    // Portability/multi-instance safety (CHAOS-4343: item 2 makes several
+    // simultaneous ClarificationPanel instances — one per stacked turn — the
+    // COMMON case, not a rare edge case): a hardcoded heading id broke
+    // `aria-labelledby` the moment two instances shared the DOM, the same
+    // class of bug `StructureNeedsPanel` already fixed with `useId()` (see
+    // that component's own header comment for why).
+    const idPrefix = useId();
     const { candidates, clarification_prompt: prompt } = result.subject_resolution;
     const selectedCount = candidates.filter((candidate) =>
         selectedReceiptIds.has(candidate.receipt_id),
     ).length;
 
     return (
-        <section className="panel" aria-labelledby="clarification-title">
+        <section className="panel" aria-labelledby={`${idPrefix}-clarification-title`}>
             {/* Callback-aware, like the wrapper copy. An interrogative heading
                 over candidates the reader cannot choose is promise-shaped text,
                 and it is OUR chrome — so it adapts. ACR's clarification_prompt
                 below stays verbatim whatever the context, because that is data,
                 not chrome, and the inspection-only line covers it. */}
-            <h2 className="panel__title" id="clarification-title">
+            <h2 className="panel__title" id={`${idPrefix}-clarification-title`}>
                 {onConfirm === undefined ? "Subject candidates" : "Which subject did you mean?"}
             </h2>
             {prompt === undefined ? (

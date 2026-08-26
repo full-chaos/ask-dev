@@ -5,6 +5,11 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
+import {
+    EMPTY_CANDIDATE_SELECTION_BATCH,
+    toggleCandidateSelection,
+    type CandidateSelectionBatch,
+} from "@/lib/candidate-selections";
 import type { BoundStructureReceipt, StructureNeedKind, StructureNeeds } from "@/lib/contracts";
 import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
@@ -49,7 +54,12 @@ function Harness({
 }: {
     readonly structureNeeds: StructureNeeds;
     readonly resultId: string;
-    readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
+    readonly onConfirm?:
+        | ((
+              batch: StructureSelectionBatch,
+              candidateReceipts: readonly BoundStructureReceipt[],
+          ) => void)
+        | undefined;
     readonly onReject?: ((member: StructureNeedKind) => void) | undefined;
     /** Observes every accepted toggle in addition to the harness's own batch update. */
     readonly onToggle?:
@@ -57,9 +67,15 @@ function Harness({
     readonly twoInstances?: boolean;
 }) {
     const [batch, setBatch] = useState<StructureSelectionBatch>(EMPTY_STRUCTURE_SELECTION_BATCH);
+    const [candidateBatch, setCandidateBatch] = useState<CandidateSelectionBatch>(
+        EMPTY_CANDIDATE_SELECTION_BATCH,
+    );
     function onToggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         onToggleSpy?.(member, receipt);
         setBatch((current) => toggleStructureOffer(current, member, receipt));
+    }
+    function onToggleCandidate(receiptId: string) {
+        setCandidateBatch((current) => toggleCandidateSelection(current, receiptId));
     }
     const panel = (
         <StructureNeedsPanel
@@ -67,7 +83,9 @@ function Harness({
             onConfirm={onConfirm}
             onReject={onReject}
             onToggle={onToggle}
+            onToggleCandidate={onToggleCandidate}
             resultId={resultId}
+            selectedCandidateReceiptIds={candidateBatch}
             structureNeeds={structureNeeds}
         />
     );
@@ -81,7 +99,9 @@ function Harness({
                     onConfirm={onConfirm}
                     onReject={onReject}
                     onToggle={onToggle}
+                    onToggleCandidate={onToggleCandidate}
                     resultId={resultId}
+                    selectedCandidateReceiptIds={candidateBatch}
                     structureNeeds={structureNeeds}
                 />
             </div>
@@ -109,7 +129,13 @@ describe("StructureNeedsPanel", () => {
         }
     });
 
-    /** CHAOS-4171: the 5th offer axis, appended after kind/anchor/handle/window. */
+    /**
+     * CHAOS-4171: the 5th offer axis, appended after kind/anchor/handle/window.
+     * CHAOS-4343 items 1/2: candidate is the ONE multi-select member — a
+     * single pick still produces a one-entry `candidateReceipts` array,
+     * SEPARATE from `batch` (which never carries `subject_candidate` any
+     * more; see the multi-select test below for N picks).
+     */
     it("renders candidate offers (CHAOS-4012) and submits the candr_ receipt on confirm", async () => {
         const onConfirm = vi.fn();
         const user = userEvent.setup();
@@ -134,12 +160,38 @@ describe("StructureNeedsPanel", () => {
         await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
         await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
 
-        expect(onConfirm).toHaveBeenCalledWith({
-            subject_candidate: {
-                result_id: candidateScenario.result_id,
-                receipt_id: first.receipt_id,
-            },
-        });
+        expect(onConfirm).toHaveBeenCalledWith({}, [
+            { result_id: candidateScenario.result_id, receipt_id: first.receipt_id },
+        ]);
+    });
+
+    /**
+     * CHAOS-4343 item 2: several distinct candidates selected at once
+     * produce several entries, in ACR's OWN order — never the click order —
+     * and `batch` stays empty (candidate never enters it).
+     */
+    it("multi-select: several candidate picks all ride the SAME confirm, in ACR's order", async () => {
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <Harness
+                onConfirm={onConfirm}
+                resultId={candidateScenario.result_id}
+                structureNeeds={candidateScenario.structure_needs!}
+            />,
+        );
+
+        const [first, second] = candidateScenario.structure_needs!.candidate_options!;
+        // Selected out of order (second before first) — the confirmed
+        // payload must still come back first-then-second.
+        await user.click(screen.getByRole("button", { name: `Select ${second!.label}` }));
+        await user.click(screen.getByRole("button", { name: `Select ${first!.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(onConfirm).toHaveBeenCalledWith({}, [
+            { result_id: candidateScenario.result_id, receipt_id: first!.receipt_id },
+            { result_id: candidateScenario.result_id, receipt_id: second!.receipt_id },
+        ]);
     });
 
     /**
@@ -199,12 +251,15 @@ describe("StructureNeedsPanel", () => {
         await user.click(screen.getByRole("button", { name: `Select ${phrased.phrasing}` }));
         await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
 
-        expect(onConfirm).toHaveBeenCalledWith({
-            expected_kind: {
-                result_id: kindPhrasingScenario.result_id,
-                receipt_id: phrased.receipt_id,
+        expect(onConfirm).toHaveBeenCalledWith(
+            {
+                expected_kind: {
+                    result_id: kindPhrasingScenario.result_id,
+                    receipt_id: phrased.receipt_id,
+                },
             },
-        });
+            [],
+        );
     });
 
     /**
@@ -290,13 +345,19 @@ describe("StructureNeedsPanel", () => {
         await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
 
         expect(onConfirm).toHaveBeenCalledTimes(1);
-        expect(onConfirm).toHaveBeenCalledWith({
-            subject_anchor: {
-                result_id: anchorWindowScenario.result_id,
-                receipt_id: anchor.receipt_id,
+        expect(onConfirm).toHaveBeenCalledWith(
+            {
+                subject_anchor: {
+                    result_id: anchorWindowScenario.result_id,
+                    receipt_id: anchor.receipt_id,
+                },
+                window: {
+                    result_id: anchorWindowScenario.result_id,
+                    receipt_id: window.receipt_id,
+                },
             },
-            window: { result_id: anchorWindowScenario.result_id, receipt_id: window.receipt_id },
-        });
+            [],
+        );
     });
 
     it("replaces a member's selection rather than accumulating two receipts for it", async () => {
@@ -315,9 +376,15 @@ describe("StructureNeedsPanel", () => {
         await user.click(screen.getByRole("button", { name: `Select ${second!.label}` }));
         await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
 
-        expect(onConfirm).toHaveBeenCalledWith({
-            expected_kind: { result_id: kindScenario.result_id, receipt_id: second!.receipt_id },
-        });
+        expect(onConfirm).toHaveBeenCalledWith(
+            {
+                expected_kind: {
+                    result_id: kindScenario.result_id,
+                    receipt_id: second!.receipt_id,
+                },
+            },
+            [],
+        );
     });
 
     it("disables the confirm action until at least one selection is made", () => {
@@ -500,9 +567,10 @@ describe("StructureNeedsPanel", () => {
             instanceB.getByRole("button", { name: "Ask again with these selections" }),
         );
 
-        expect(onConfirm).toHaveBeenCalledWith({
-            expected_kind: { result_id: kindScenario.result_id, receipt_id: option.receipt_id },
-        });
+        expect(onConfirm).toHaveBeenCalledWith(
+            { expected_kind: { result_id: kindScenario.result_id, receipt_id: option.receipt_id } },
+            [],
+        );
     });
 
     /**

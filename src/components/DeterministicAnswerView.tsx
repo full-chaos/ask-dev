@@ -36,8 +36,28 @@ export type DeterministicAnswerViewProps = {
      * `choices`, each as its own independent turn-2 request.
      */
     readonly onConfirmCandidates?: ((choices: readonly ClarificationChoice[]) => void) | undefined;
-    /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */
-    readonly onConfirmStructure?: ((batch: StructureSelectionBatch) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: the STRUCTURE_NEEDS candidate axis
+     * (`candidate_options`, CHAOS-4012) — a SEPARATE surface from
+     * `selectedCandidateReceiptIds` above (`subject_resolution.candidates`),
+     * with its own receipt namespace (`candr_` via `prior_candidate_receipts`
+     * vs the unconstrained `prior_subject_receipts`). Same multi-select
+     * discipline: several picks, each its own turn-2 request.
+     */
+    readonly selectedStructureCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    readonly onToggleStructureCandidate?: ((receiptId: string) => void) | undefined;
+    /**
+     * CHAOS-3927 P2: supplied when the surface can re-ask with structure
+     * receipts. `candidateReceipts` mirrors `onConfirmCandidates`'s own
+     * array — every currently-selected `candidate_options` entry, one
+     * request per entry.
+     */
+    readonly onConfirmStructure?:
+        | ((
+              batch: StructureSelectionBatch,
+              candidateReceipts: readonly BoundStructureReceipt[],
+          ) => void)
+        | undefined;
     /**
      * The shared selection batch (codex round 3): owned by the caller, not
      * this view, because the SAME StructureNeedsPanel offers are also
@@ -82,6 +102,8 @@ export function DeterministicAnswerView({
     selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
     onToggleCandidate,
     onConfirmCandidates,
+    selectedStructureCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
+    onToggleStructureCandidate,
     onConfirmStructure,
     structureBatch = EMPTY_STRUCTURE_SELECTION_BATCH,
     // No-op default: harmless, because the offer buttons that would call it
@@ -134,8 +156,10 @@ export function DeterministicAnswerView({
                 onConfirm={onConfirmStructure}
                 onReject={onRejectStructure}
                 onToggle={onToggleStructure}
+                onToggleCandidate={onToggleStructureCandidate}
                 pending={pending}
                 resultId={result.result_id}
+                selectedCandidateReceiptIds={selectedStructureCandidateReceiptIds}
                 structureNeeds={result.structure_needs}
             />
         );

@@ -15,13 +15,11 @@ import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
-import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { BoundStructureReceipt, InvestigationResult, SubjectRef } from "@/lib/contracts";
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
-    EMPTY_SELECTION_EVENTS,
     pendingStructureBatchOrUndefined,
-    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useCandidateSelections } from "@/lib/use-candidate-selections";
@@ -82,6 +80,10 @@ export default function WorkbenchPage() {
     // honest limitation of this single-outcome shell, not a silent drop —
     // multi-select fan-out belongs to the chat surface (`src/app/page.tsx`).
     const candidateSelections = useCandidateSelections();
+    // The `structure_needs.candidate_options` twin of `candidateSelections`
+    // above — a separate wire field/receipt namespace (CHAOS-4012), same
+    // sequential-fan-out limitation for this single-outcome shell.
+    const structureCandidateSelections = useCandidateSelections();
 
     /**
      * Asks, optionally carrying a subject the tester chose from a previous
@@ -98,10 +100,6 @@ export default function WorkbenchPage() {
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
         structureSelectionsToSend?: StructureSelectionBatch,
-        // CHAOS-4343: lets `chooseCandidates` fold `candidateSelections`'s
-        // own queued outcomes in on the FIRST of its N sequential asks,
-        // without this function needing to know about that hook itself.
-        extraSelectionEvents: readonly PendingSelectionEvent[] = EMPTY_SELECTION_EVENTS,
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
@@ -112,6 +110,7 @@ export default function WorkbenchPage() {
         // matches. `chooseCandidates` already reset this hook itself before
         // calling `ask()` in its own loop, so this is a no-op there.
         candidateSelections.reset();
+        structureCandidateSelections.reset();
         setOutcome({ kind: "pending" });
         // CHAOS-3927 P2: accumulate-and-re-ask-ONCE (design brief §2.2) — every
         // member picked in one StructureNeedsPanel session travels in this
@@ -128,12 +127,16 @@ export default function WorkbenchPage() {
         // CHAOS-4171: every selection outcome observed since the last
         // reset() rides this SAME request — the route is the sink (see
         // `useStructureSelections`'s own `pendingSelectionEvents` header).
-        // Read AFTER `structureSelections.reset()` above but still the
-        // pre-reset value: `setState` schedules a re-render, it does not
-        // mutate this closure's already-captured array.
+        // Read AFTER every hook's `reset()` above but still the pre-reset
+        // value: `setState` schedules a re-render, it does not mutate this
+        // closure's already-captured array. All THREE selection hooks
+        // merged (codex review, CHAOS-4343): an unconfirmed candidate
+        // toggle must not be silently dropped just because THIS action was
+        // a plain ask or a different axis's confirm.
         const selectionEvents = [
             ...structureSelections.pendingSelectionEvents,
-            ...extraSelectionEvents,
+            ...candidateSelections.pendingSelectionEvents,
+            ...structureCandidateSelections.pendingSelectionEvents,
         ];
         // CHAOS-4343 item 3: derived from the SAME `question` this request
         // sends — a re-ask resends the ORIGINAL question unchanged, so this
@@ -204,27 +207,47 @@ export default function WorkbenchPage() {
         if (outcome.kind !== "answered" || choices.length === 0) return;
         const { result } = outcome;
         const structureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
-        const selectionEvents = candidateSelections.pendingSelectionEvents;
-        candidateSelections.reset();
-        for (const [index, choice] of choices.entries()) {
+        // `ask()` itself reads-then-resets every selection hook's queued
+        // telemetry (see its own comment) — the FIRST awaited call below
+        // carries whatever this action queued; every later iteration in
+        // this SAME loop sees an already-emptied queue (React has flushed
+        // the reset by the time an `await`ed round trip returns), so no
+        // manual "only on index 0" bookkeeping is needed here.
+        for (const choice of choices) {
             await ask(
                 askedQuestion,
                 [choice],
                 subjectForReceipt(result, choice.receipt_id),
                 structureBatch,
-                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             );
         }
     }
 
-    // CHAOS-3927 P2: fires the single re-ask carrying every structure member
+    // CHAOS-3927 P2: fires the re-ask(s) carrying every structure member
     // the tester picked in this StructureNeedsPanel session. The subject
     // choice (if any) is a SEPARATE re-ask (chooseCandidate, above) — the two
     // flows target different refusal shapes (structure_needs appears when the
     // engine could not even narrow which census to run; subject candidates
     // appear once it can).
-    function chooseStructure(batch: StructureSelectionBatch) {
-        void ask(askedQuestion, [], undefined, batch);
+    //
+    // CHAOS-4343 items 1/2: `candidateReceipts` is every currently-selected
+    // `structure_needs.candidate_options` entry. Empty in the ordinary case
+    // (one re-ask carrying `batch`, unchanged from before); non-empty fires
+    // one request PER entry, sequentially — same single-outcome-shell
+    // limitation `chooseCandidates` above documents.
+    async function chooseStructure(
+        batch: StructureSelectionBatch,
+        candidateReceipts: readonly BoundStructureReceipt[] = [],
+    ) {
+        if (candidateReceipts.length === 0) {
+            await ask(askedQuestion, [], undefined, batch);
+            return;
+        }
+        // Same "ask() itself reads-then-resets" reasoning as
+        // `chooseCandidates` above.
+        for (const receipt of candidateReceipts) {
+            await ask(askedQuestion, [], undefined, { ...batch, subject_candidate: receipt });
+        }
     }
 
     return (
@@ -309,10 +332,14 @@ export default function WorkbenchPage() {
                                 <StructureNeedsPanel
                                     key={outcome.result.result_id}
                                     batch={structureSelections.batch}
-                                    onConfirm={chooseStructure}
+                                    onConfirm={(batch, candidateReceipts) => {
+                                        void chooseStructure(batch, candidateReceipts);
+                                    }}
                                     onReject={structureSelections.reject}
                                     onToggle={structureSelections.toggle}
+                                    onToggleCandidate={structureCandidateSelections.toggle}
                                     resultId={outcome.result.result_id}
+                                    selectedCandidateReceiptIds={structureCandidateSelections.batch}
                                     structureNeeds={outcome.result.structure_needs}
                                 />
                             )}
@@ -333,12 +360,18 @@ export default function WorkbenchPage() {
                             onConfirmCandidates={(choices) => {
                                 void chooseCandidates(choices);
                             }}
-                            onConfirmStructure={chooseStructure}
+                            onConfirmStructure={(batch, candidateReceipts) => {
+                                void chooseStructure(batch, candidateReceipts);
+                            }}
                             onRejectStructure={structureSelections.reject}
                             onToggleCandidate={candidateSelections.toggle}
                             onToggleStructure={structureSelections.toggle}
+                            onToggleStructureCandidate={structureCandidateSelections.toggle}
                             result={outcome.result}
                             selectedCandidateReceiptIds={candidateSelections.batch}
+                            selectedStructureCandidateReceiptIds={
+                                structureCandidateSelections.batch
+                            }
                             structureBatch={structureSelections.batch}
                         />
                     )}

@@ -40,6 +40,23 @@ describe("literalKindNounsInQuestion (CHAOS-4343 item 3)", () => {
         expect(literalKindNounsInQuestion("teamwork matters here.")).toEqual([]);
     });
 
+    /**
+     * Regression (codex review): plain `\b` is ASCII-only even under the
+     * `u` flag, so it treats an accented letter as a non-word character —
+     * "projecté"/"éproject" would each read as containing a boundary right
+     * next to "project" and wrongly match. The Unicode-aware lookaround
+     * boundary must NOT do that.
+     */
+    it("does not match across a Unicode letter boundary (accented neighbor)", () => {
+        expect(literalKindNounsInQuestion("Le projecté est en retard.")).toEqual([]);
+        expect(literalKindNounsInQuestion("Cette éproject ne compte pas.")).toEqual([]);
+        // But a genuine Unicode-adjacent match still fires: the word itself
+        // surrounded by punctuation/whitespace, not letters.
+        expect(literalKindNounsInQuestion("Le project (français) est en retard.")).toEqual([
+            "project",
+        ]);
+    });
+
     it("deduplicates a repeated noun and returns it once", () => {
         expect(literalKindNounsInQuestion("Is this project the same project as before?")).toEqual([
             "project",

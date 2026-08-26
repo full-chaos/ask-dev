@@ -26,14 +26,28 @@ import type { StructureSubjectKind } from "@/lib/contracts";
  *
  * Word-boundary matched (never a substring of a longer word — "reprojection"
  * must not match "project"), case-insensitive, singular or plural.
+ *
+ * Boundaries are Unicode-aware lookarounds (`\p{L}`/`\p{N}`), NOT the plain
+ * `\b` assertion (codex review): `\b` is defined over ASCII `[A-Za-z0-9_]`
+ * only, even under the `u` flag, so "projecté" or "éproject" would each
+ * still read as containing the ASCII-only "word" project — `\b` sees the
+ * accented letter as a non-word character and reports a boundary right next
+ * to it. The lookaround form treats any Unicode letter or digit as part of
+ * the word, so an accented neighbor correctly blocks the match instead of
+ * producing a misleading `expectedKinds` hint.
  */
+const WORD_CHAR = "\\p{L}\\p{N}_";
+function wholeWordPattern(word: string): RegExp {
+    return new RegExp(`(?<![${WORD_CHAR}])(?:${word})(?![${WORD_CHAR}])`, "iu");
+}
+
 const LITERAL_KIND_NOUN_PATTERNS: ReadonlyArray<{
     readonly pattern: RegExp;
     readonly kind: StructureSubjectKind;
 }> = [
-    { pattern: /\bprojects?\b/iu, kind: "project" },
-    { pattern: /\brepositor(?:y|ies)\b/iu, kind: "repository" },
-    { pattern: /\bteams?\b/iu, kind: "team" },
+    { pattern: wholeWordPattern("projects?"), kind: "project" },
+    { pattern: wholeWordPattern("repositor(?:y|ies)"), kind: "repository" },
+    { pattern: wholeWordPattern("teams?"), kind: "team" },
 ];
 
 /**
