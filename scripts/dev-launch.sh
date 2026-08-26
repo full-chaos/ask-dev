@@ -18,14 +18,23 @@
 #     missing; see that directory's own file shapes for the expected format
 #     (Ed25519 JWKS + matching PKCS8 private key, ACR evidence signing keys).
 #
-# Known issue (2026-08-26): investigations intermittently come back as
-# "ACR could not be reached" / acr_unreachable even though ACR itself
-# completed the work (visible in `docker logs acr-dev-acr-api`) -- a
-# connection drop between this server and acr-api across the Docker
-# port-forward, not yet root-caused. Just click Ask again; it usually
-# succeeds within a retry or two. See the UX walkthrough report for detail.
+# Requires OPENAI_API_KEY in the environment (ACR's model provider is
+# openai; without it acr-api starts but every investigation 503s).
 #
-# Usage: bash scripts/dev-launch.sh
+# Known issue (2026-08-26): under the WRONG model config
+# (ACR_CONTEXT_FABRIC_MODEL=gpt-5-nano, the stale pre-CHAOS-3855 default --
+# see CHAOS-4136), investigations took 30-90s and intermittently came back
+# as "ACR could not be reached" / acr_unreachable even though ACR itself had
+# completed the work. Retested with the CORRECT model (gpt-5.6-luna, chris
+# ruling 08-23) this script now sets by default: 10/10 investigations
+# succeeded in 2-8s each, both through the Workbench and via a direct probe
+# of acr-api. Not fully closed out (only fast requests were retested), but
+# no longer reproduces at normal latency. If "ACR could not be reached"
+# recurs, check `docker logs acr-dev-acr-api` for the actual duration before
+# assuming the connection dropped -- and confirm ACR_CONTEXT_FABRIC_MODEL is
+# still gpt-5.6-luna.
+#
+# Usage: OPENAI_API_KEY=sk-... bash scripts/dev-launch.sh
 set -euo pipefail
 
 DEV_HEALTH_ROOT="${DEV_HEALTH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../dev-health" && pwd)}"
@@ -45,8 +54,17 @@ for c in postgres clickhouse; do
   fi
 done
 
-if [[ ! -f "$ACR_DEV_SECRETS/web-assertion.key" ]]; then
-  note "Missing $ACR_DEV_SECRETS/web-assertion.key -- see this script's header comment."
+for f in web-assertion.key evidence-kid evidence-keys web-jwks.json; do
+  if [[ ! -f "$ACR_DEV_SECRETS/$f" ]]; then
+    note "Missing $ACR_DEV_SECRETS/$f -- see this script's header comment."
+    exit 1
+  fi
+done
+
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  note "OPENAI_API_KEY is not set. ACR's model provider is openai; without a key"
+  note "  acr-api starts but every investigation 503s. Export it and rerun:"
+  note "  OPENAI_API_KEY=sk-... bash scripts/dev-launch.sh"
   exit 1
 fi
 
@@ -96,6 +114,17 @@ fi
 
 # --- acr-projector (projects real dev-health-ops data into the graph) ---
 if ! docker ps -q --filter "name=^acr-dev-acr-projector$" | grep -q .; then
+  # Ownership check: only remove a stopped container by this name if it was
+  # actually built from OUR image -- never blind-remove a same-named
+  # container something else created (dev-launch.sh's own containers are the
+  # only thing that should ever be named acr-dev-*, but "should be" isn't
+  # "is").
+  existing_image="$(docker inspect acr-dev-acr-projector --format '{{.Config.Image}}' 2>/dev/null || true)"
+  if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
+    note "acr-dev-acr-projector exists but is not our image ($existing_image) -- not touching it."
+    note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-projector"
+    exit 1
+  fi
   docker rm -f acr-dev-acr-projector >/dev/null 2>&1 || true
   note "Starting acr-dev-acr-projector for org $ORG_ID..."
   docker run -d --name acr-dev-acr-projector --network "$NETWORK" \
@@ -117,14 +146,25 @@ fi
 
 # --- acr-api (the Workbench's server hop talks to this) ---
 if ! docker ps -q --filter "name=^acr-dev-acr-api$" | grep -q .; then
-  if docker ps -aq --filter "name=^acr-dev-acr-api$" | grep -q .; then
+  existing_image="$(docker inspect acr-dev-acr-api --format '{{.Config.Image}}' 2>/dev/null || true)"
+  if [[ -n "$existing_image" && "$existing_image" != "dev-health-acr:dev" ]]; then
+    note "acr-dev-acr-api exists but is not our image ($existing_image) -- not touching it."
+    note "  Remove it yourself if it's safe to: docker rm -f acr-dev-acr-api"
+    exit 1
+  fi
+  if [[ -n "$existing_image" ]]; then
     note "Starting existing acr-dev-acr-api..."
     docker start acr-dev-acr-api >/dev/null
   else
     note "Creating acr-dev-acr-api..."
+    # Individual secret mounts, not the whole .acr-dev directory: acr-api
+    # only needs the evidence files and the PUBLIC jwks, not every file that
+    # happens to live alongside them (this dir also holds ca.key etc.).
     docker run -d --name acr-dev-acr-api --network "$NETWORK" \
       -p 127.0.0.1:18080:8080 \
-      -v "$ACR_DEV_SECRETS:/secrets:ro" \
+      -v "$ACR_DEV_SECRETS/evidence-kid:/secrets/evidence-kid:ro" \
+      -v "$ACR_DEV_SECRETS/evidence-keys:/secrets/evidence-keys:ro" \
+      -v "$ACR_DEV_SECRETS/web-jwks.json:/secrets/web-jwks.json:ro" \
       -e ACR_ENVIRONMENT=development \
       -e ACR_ADDR=:8080 \
       -e ACR_REQUIRE_BACKING_STORES=true \
@@ -145,7 +185,7 @@ if ! docker ps -q --filter "name=^acr-dev-acr-api$" | grep -q .; then
       -e ACR_CONTEXT_FABRIC_FALKOR_ALLOW_INSECURE=true \
       -e ACR_CONTEXT_FABRIC_FALKOR_GRAPH_PREFIX=acr-cf \
       -e ACR_CONTEXT_FABRIC_MODEL_PROVIDER=openai \
-      -e ACR_CONTEXT_FABRIC_MODEL=gpt-5-nano \
+      -e ACR_CONTEXT_FABRIC_MODEL=gpt-5.6-luna \
       -e ACR_CONTEXT_FABRIC_MODEL_FALLBACK=gpt-5.6-luna \
       -e ACR_CONTEXT_FABRIC_MODEL_API_KEY="${OPENAI_API_KEY:-}" \
       dev-health-acr:dev serve >/dev/null
@@ -153,15 +193,28 @@ if ! docker ps -q --filter "name=^acr-dev-acr-api$" | grep -q .; then
 fi
 
 note "Waiting for acr-api readiness on http://127.0.0.1:18080 ..."
+acr_ready=false
 for _ in $(seq 1 30); do
   if curl -fsS http://127.0.0.1:18080/readyz >/dev/null 2>&1; then
     note "acr-api ready."
+    acr_ready=true
     break
   fi
   sleep 1
 done
+if [[ "$acr_ready" != "true" ]]; then
+  note "acr-api never became ready after 30s. Not launching the Workbench against a"
+  note "  dead backend. Check: docker logs acr-dev-acr-api"
+  exit 1
+fi
 
-cat > "$(dirname "${BASH_SOURCE[0]}")/../.env.local" <<EOF
+ENV_LOCAL="$(dirname "${BASH_SOURCE[0]}")/../.env.local"
+if [[ -L "$ENV_LOCAL" ]]; then
+  note "$ENV_LOCAL is a symlink -- refusing to overwrite it."
+  exit 1
+fi
+ENV_LOCAL_TMP="$(mktemp "${ENV_LOCAL}.XXXXXX")"
+cat > "$ENV_LOCAL_TMP" <<EOF
 ACR_API_ORIGIN=http://127.0.0.1:18080
 ACR_ORG_ID=$ORG_ID
 ACR_WEB_ASSERTION_KEY_FILE=$ACR_DEV_SECRETS/web-assertion.key
@@ -169,7 +222,12 @@ ACR_REPOSITORY_SCOPES=$REPO_SCOPES
 ACR_WEB_ASSERTION_ISSUER=dev-health-web
 ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr
 ACR_WEB_ASSERTION_KID=acr-dev-web
+# Matches the server's ACR_REQUEST_TIMEOUT=490s below -- without this the
+# Workbench's own 120s default can report "timeout" while ACR is still
+# genuinely working.
+ACR_TIMEOUT_MS=490000
 EOF
+mv "$ENV_LOCAL_TMP" "$ENV_LOCAL"
 
 # Port 3000 is held by the dev-health stack's own traefik (dev-health-web).
 # Run the Workbench on 3100 to avoid the collision.
@@ -186,4 +244,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 note "Building (next start needs a build)..."
 pnpm build
 note "Launching the Workbench: http://127.0.0.1:$PORT"
-exec pnpm exec next start -p "$PORT"
+# -H 127.0.0.1: `next start` defaults to 0.0.0.0 (LAN-reachable) otherwise --
+# this route holds the ACR signing key and has no auth of its own, so it
+# must not be reachable from other machines on the network.
+exec pnpm exec next start -p "$PORT" -H 127.0.0.1
