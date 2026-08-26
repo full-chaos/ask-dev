@@ -1,5 +1,6 @@
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
+import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import type { SubjectResolution } from "@/lib/contracts";
 import { candidateStateTone, formatConfidence, humanizeTerm } from "@/lib/presentation";
 
@@ -59,6 +60,9 @@ export function SubjectResolutionPanel({ resolution }: SubjectResolutionPanelPro
                     ))}
                 </ul>
             )}
+            <PriorSubjectReceiptDisclosure
+                dispositions={resolution.prior_subject_receipt_dispositions}
+            />
         </section>
     );
 }

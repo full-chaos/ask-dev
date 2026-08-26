@@ -9,6 +9,7 @@
 import type {
     CoverageState,
     InvestigationStatus,
+    PriorSubjectReceiptDisposition,
     StructureDisposition,
     SubjectCandidateState,
 } from "@/lib/contracts";
@@ -77,6 +78,27 @@ export function structureDispositionTone(disposition: StructureDisposition): Ton
         case "vetoed_conflict":
         case "vetoed_stale":
             return "bad";
+    }
+}
+
+/**
+ * Tone for one `SubjectResolution.prior_subject_receipt_dispositions[]`
+ * entry (CHAOS-3478/CHAOS-3813). Exhaustive over the closed enum, same
+ * discipline as `structureDispositionTone` above — a skip here never vetoes
+ * the investigation (it is a best-effort, plural hint list, not a gate), so
+ * every `skipped_*` reads as `warn`, not `bad`.
+ */
+export function priorSubjectReceiptDispositionTone(
+    disposition: PriorSubjectReceiptDisposition,
+): Tone {
+    switch (disposition) {
+        case "applied":
+            return "ok";
+        case "skipped_unloadable":
+        case "skipped_no_match":
+        case "skipped_stale_graph_epoch":
+        case "skipped_failed_reauth":
+            return "warn";
     }
 }
 

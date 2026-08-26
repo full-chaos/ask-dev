@@ -1,5 +1,6 @@
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
+import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import type { InvestigationResult, RelationshipPath, SubjectRef } from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
@@ -156,6 +157,18 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                         ))}
                     </ul>
                 )}
+                {
+                    // codex finding (chaos4171pr3-codex-r2): this inspector has its
+                    // own bespoke rendering of `subject_resolution` (candidates and
+                    // committed above), separate from `SubjectResolutionPanel` — so
+                    // the disclosure fix there did not cover this view. Raw JSON
+                    // elsewhere in this component is not a substitute: the whole
+                    // point of the structured panels above it is that a tester
+                    // reads THEM, not the JSON dump, for exactly this kind of signal.
+                }
+                <PriorSubjectReceiptDisclosure
+                    dispositions={result.subject_resolution.prior_subject_receipt_dispositions}
+                />
             </section>
 
             <section className="panel" aria-labelledby="cohort-title">

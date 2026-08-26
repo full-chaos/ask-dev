@@ -4,6 +4,7 @@ import { ClarificationPanel, type ClarificationChoice } from "@/components/Clari
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FindingsPanel } from "@/components/FindingsPanel";
+import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
@@ -139,6 +140,19 @@ export function DeterministicAnswerView({
             // clarification-chip control.
             <article aria-label="Deterministic answer" data-state={result.status}>
                 {notice}
+                {
+                    // codex finding (CHAOS-4171 PR3): `prior_subject_receipt_dispositions`
+                    // can be present on a `clarification_required` result too — a
+                    // prior choice can be dropped in the SAME turn a fresh
+                    // clarification is asked, which is exactly when a tester
+                    // most needs to see it. `SubjectResolutionPanel` (used
+                    // below in the decisive branch) is not rendered here — it
+                    // would duplicate ClarificationPanel's own candidate list
+                    // — so this shares the disclosure component directly.
+                }
+                <PriorSubjectReceiptDisclosure
+                    dispositions={result.subject_resolution.prior_subject_receipt_dispositions}
+                />
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
                 <ClarificationPanel

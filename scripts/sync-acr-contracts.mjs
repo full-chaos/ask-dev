@@ -28,9 +28,11 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-4171: pulls in CHAOS-4012's candidate_options offer axis
-// (`264efd11`). Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "264efd11d5c5aeaf674245a86b6867cb4e9222d9";
+// acr main, CHAOS-4171 PR3: pulls in CHAOS-4171 PR2's bounded offer phrasing
+// (`0c7b5b6c`, #263) and CHAOS-3478/CHAOS-3813's wire-visible
+// PriorSubjectReceiptDisposition (`e946ad90`, #265). Bump procedure lives in
+// README.md.
+export const SOURCE_COMMIT = "e946ad907cdfd66b45895839c7adb65f2e436808";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

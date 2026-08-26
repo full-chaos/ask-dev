@@ -174,10 +174,13 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `264efd11d5c5aeaf674245a86b6867cb4e9222d9` (acr main; adds
-CHAOS-4012's ranked-candidate-list structure offer axis, #236/#175/#242, on
-top of the CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 + disclosure-coverage
-#160/#161 baseline described below).
+Currently pinned: `e946ad907cdfd66b45895839c7adb65f2e436808` (acr main; CHAOS-4171
+PR3 — adds bounded offer `phrasing` (acr PR2, #263) on the
+`expected_kind`/`subject_anchor`/`subject_handle`/`subject_candidate` option
+types, and `SubjectResolution.prior_subject_receipt_dispositions` (CHAOS-3478/
+CHAOS-3813, #265), on top of CHAOS-4012's ranked-candidate-list structure
+offer axis, #236/#175/#242, and the CHAOS-3927 P1 #159 + CHAOS-3900 W1 #158 +
+disclosure-coverage #160/#161 baseline described below).
 
 **`WindowOption` type generation.** This pin's `WindowOption` schema (CHAOS-3900
 W1 §5.1's frozen-bounds `allOf`/`anyOf`/`not` conditionals) combined with the
@@ -388,19 +391,27 @@ result lookup is org-scoped in SQL (`pginvestigation/store.go:202-203`) and that
 a receipt must match a candidate of that same result (`engine.go:404-414`). The
 route validates shape only.
 
-**ACR discards a receipt silently** when the prior result is unreadable, no
-candidate matches, or the subject is unauthorized — `engine.go:417-427` states
-that "Investigate itself never errors or otherwise surfaces the skip", and the
-result schema carries no receipt disposition. So the Workbench **detects** it:
-after a re-ask, the chosen subject is compared against `subject_resolution.committed`
-by canonical id, and a mismatch is reported in both shapes — an answer about
-another subject, and a second clarification that would otherwise let a tester
-loop forever.
+**ACR used to discard a receipt silently** when the prior result was
+unreadable, no candidate matched, or the subject was unauthorized —
+`engine.go:417-427` states that "Investigate itself never errors or
+otherwise surfaces the skip". Before CHAOS-3813 landed, the result schema
+carried no receipt disposition at all, so the Workbench **detected** it
+instead: after a re-ask, the chosen subject is compared against
+`subject_resolution.committed` by canonical id, and a mismatch is reported
+in both shapes — an answer about another subject, and a second
+clarification that would otherwise let a tester loop forever
+(`@/lib/clarification.ts`).
 
-That detection is **kept after CHAOS-3813 lands** acr-side. Once ACR reports a
-per-receipt disposition on the wire this check becomes redundant, and it stays:
-defense in depth on a measurement instrument is not dead code, and a future pin
-bump should not delete it as such.
+**CHAOS-3813 has landed** (acr PR #265, pin `e946ad90`, CHAOS-4171 PR3):
+`SubjectResolution.prior_subject_receipt_dispositions` is now a wire-visible,
+per-receipt disclosure (`applied` or one of four `skipped_*` reasons),
+rendered by `PriorSubjectReceiptDisclosure` in both the decisive path
+(inside `SubjectResolutionPanel`) and the `clarification_required` path
+(directly in `DeterministicAnswerView`, since that branch renders
+`ClarificationPanel` instead of `SubjectResolutionPanel` and would otherwise
+duplicate its candidate list). The client-side detection above is **kept
+anyway**: defense in depth on a measurement instrument is not dead code, and
+this pin bump does not delete it as such.
 
 ## Structure hints: the pivot-intent panel (CHAOS-3927 P2)
 
@@ -408,13 +419,26 @@ The pivot-intent design brief (dev-health `.remember/pivot-intent-design-brief.m
 DESIGN-FINAL) names ask-dev the panel surface of record (DP6(c)) for a new
 disclosure block, `structure_needs`: when ACR cannot even settle which census
 to run, it can name WHICH intent-frame members are missing (kind, anchor,
-handle, window) and offer typed, receipt-bound completions for each, instead
-of a dead-end refusal. `StructureNeedsPanel` renders exactly those offers,
-`StructureConfirmationNotice` renders the `confirmed_structure` echo
+handle, window, and — CHAOS-4012's ranked-candidate-list axis —
+subject_candidate) and offer typed, receipt-bound completions for each,
+instead of a dead-end refusal. `StructureNeedsPanel` renders exactly those
+offers, `StructureConfirmationNotice` renders the `confirmed_structure` echo
 (including vetoed selections — the silent-drop closure for structure, day
 one, unlike the subject-receipt path above). Both extend the disambiguation
 flow's own rules verbatim: receipts only, never re-ranked, never invented,
 free text never becomes a discriminator.
+
+**Offer phrasing (CHAOS-4171 PR3, acr PR2 #263).** `KindOption`/`AnchorOption`/
+`HandleOption`/`CandidateOption` (not `WindowOption`) carry an optional
+`phrasing` string: model-generated presentation wording for the SAME
+structural offer, produced under acr's own closed-vocabulary guard
+(rejects/falls back to the structural value on a guard violation, timeout, or
+call failure). The offer VALUE stays structural — `receipt_id`/`option_id`
+and what gets submitted on selection are unaffected by `phrasing`.
+`StructureNeedsPanel` displays `phrasing ?? label` as each offer's title and
+button text, but always shows the structural `label` alongside it when
+`phrasing` is present (same rule `@/lib/presentation.ts` holds for its tone
+maps: the raw contract term is never hidden behind generated wording).
 
 **THE SEAM LANDED.** P1 (CHAOS-3927 #159) and CHAOS-3900 W1 (#158) merged to
 acr `main`, and this repo's pin bumped past that merge (`7d275c2e`, "Bumping
