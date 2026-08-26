@@ -464,9 +464,17 @@ describe("investigate", () => {
         const failure = await failureOf(investigate(config, { question: "status?" }));
         expect(failure.code).toBe("acr_runtime_unavailable");
         expect(failure.upstreamCode).toBe("upstream_unavailable");
-        // Listing "graph store, model runtime, or persistence" as three
-        // POSSIBLE causes is fine; asserting a specific one is required is
-        // not -- this only guards against the old confident, singular claim.
+        // Naming ONE dependency and stopping there is exactly the old
+        // confident-but-sometimes-wrong shape (codex review, CHAOS-3748:
+        // banning two exact old phrases wasn't enough -- a differently
+        // worded single-cause message, e.g. "its graph store is
+        // unavailable", would have slipped past those). Requiring at least
+        // two of the three real possible dependencies to be named proves
+        // the message is presenting POSSIBILITIES, not a diagnosis.
+        const namedDependencyCount = [/graph/i, /model/i, /persist/i].filter((pattern) =>
+            pattern.test(failure.message),
+        ).length;
+        expect(namedDependencyCount).toBeGreaterThanOrEqual(2);
         expect(failure.message).not.toMatch(/needs graph reads enabled/i);
         expect(failure.message).not.toMatch(/needs a configured model runtime/i);
         expect(failure.message).toMatch(/request id/i);

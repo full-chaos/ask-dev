@@ -231,11 +231,17 @@ service rather than from documentation:
   and dies there — presenting as a slow, generic timeout rather than a
   connection error. Set `ACR_CONTEXT_FABRIC_FALKOR_TLS=false` for a plaintext
   local backend.
-- **A 503 from the investigations route is usually an operator state, not a
-  blip.** ACR serves a static 503 when the investigator is not composed, which
-  needs three independent things: `ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED`, a
-  configured graph backend (`ACR_CONTEXT_FABRIC_FALKOR_ADDR`, with the
-  `context-fabric-graph` compose profile up), and a configured model provider.
+- **A 503 from the investigations route is one wire signal for several
+  possible causes, not a single diagnosis.** ACR's `upstream_unavailable`
+  503 covers every backend dependency its error envelope has no room to
+  distinguish: the investigator genuinely not being composed
+  (`ACR_CONTEXT_FABRIC_GRAPH_READS_ENABLED`, a configured graph backend --
+  `ACR_CONTEXT_FABRIC_FALKOR_ADDR`, with the `context-fabric-graph` compose
+  profile up -- or a configured model provider) is one cause; a failure in
+  ACR's own result persistence (e.g. a schema/CHECK-constraint mismatch,
+  CHAOS-4333) is a completely unrelated one that fires the identical
+  code+status. Match the request id against ACR's own logs rather than
+  assuming which cause this is.
 - **A 504 is not an unreachable service.** ACR's global `ACR_REQUEST_TIMEOUT`
   defaults to 15s while its model call budget defaults to 45s, so a real
   model-backed investigation can exhaust the HTTP budget while the pipeline is
