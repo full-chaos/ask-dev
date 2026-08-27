@@ -1047,4 +1047,132 @@ describe("CHAOS-4355: carried structure receipts survive a re-ask that doesn't r
         >;
         expect(thirdCallBody.priorWindowReceipts ?? []).toEqual([]);
     });
+
+    /**
+     * Codex review round 1, finding 1 (P1): a fan-out fires N independent,
+     * CONCURRENT requests, and each can settle in any order. Folding every
+     * sibling's own `confirmed_structure` echo into the ONE shared carry let
+     * response order — not which branch the conversation actually continues
+     * from — decide what the next re-ask resends: a slow-settling sibling
+     * could clobber a faster one's carry entry with a DIFFERENT candidate's
+     * receipt. Fixed by restricting the carry update to the LAST item in the
+     * fan-out (the one that becomes `latestAssistantTurn` once every
+     * response has landed, by ARRAY order, not completion order).
+     */
+    it("codex P1: a fan-out response settling out of order does not corrupt the shared carry", async () => {
+        const [firstOption, secondOption] = structureCandidate.structure_needs!.candidate_options!;
+
+        const itemAResult: InvestigationResult = {
+            ...structuredClone(answered),
+            result_id: "result_carry_race_a_0001",
+            request_id: "request_carry_race_a_0001",
+            confirmed_structure: [
+                {
+                    member: "window",
+                    applied_value: "trailing_30d",
+                    source: "receipt",
+                    prior_result_id: "result_carry_race_a_source_0001",
+                    receipt_id: "winr_carry_race_a_0001",
+                    offer_source: "engine",
+                    provenance: "clarification_confirmed",
+                    disposition: "applied",
+                },
+            ] as NonNullable<InvestigationResult["confirmed_structure"]>,
+        };
+        const itemBCandidate = clarification.subject_resolution.candidates[0]!;
+        const itemBResult: InvestigationResult = {
+            ...structuredClone(clarification),
+            result_id: "result_carry_race_b_0001",
+            request_id: "request_carry_race_b_0001",
+            confirmed_structure: [
+                {
+                    member: "window",
+                    applied_value: "trailing_60d",
+                    source: "receipt",
+                    prior_result_id: "result_carry_race_b_source_0001",
+                    receipt_id: "winr_carry_race_b_0001",
+                    offer_source: "engine",
+                    provenance: "clarification_confirmed",
+                    disposition: "applied",
+                },
+            ] as NonNullable<InvestigationResult["confirmed_structure"]>,
+        };
+
+        let resolveA!: (value: Response) => void;
+        let resolveB!: (value: Response) => void;
+        const pendingA = new Promise<Response>((resolve) => {
+            resolveA = resolve;
+        });
+        const pendingB = new Promise<Response>((resolve) => {
+            resolveB = resolve;
+        });
+
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureCandidate }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            // firstOption's own request (appended FIRST, index 0).
+            .mockImplementationOnce(() => pendingA)
+            // secondOption's own request (appended LAST — the carry-eligible branch).
+            .mockImplementationOnce(() => pendingB)
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+
+        render(<ChatPage />);
+        await ask("What's going on with the flaky test work item?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${firstOption!.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: `Select ${secondOption!.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        // Resolve the LAST-appended item (B) FIRST, then the first-appended
+        // one (A) — the out-of-order settlement the fix must survive.
+        resolveB(
+            new Response(JSON.stringify({ result: itemBResult }), {
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+        resolveA(
+            new Response(JSON.stringify({ result: itemAResult }), {
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
+                3,
+            );
+        });
+
+        // Continue the conversation from the ACTUALLY-latest turn (B, whose
+        // own request was fired last) — B's own live candidate chip.
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${itemBCandidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        await waitFor(() => {
+            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
+                4,
+            );
+        });
+
+        const fourthCallBody = JSON.parse(fetchSpy.mock.calls[3]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        // The discriminating proof: B's own window receipt carried, NOT A's
+        // — even though A settled AFTER B in real time.
+        expect(fourthCallBody.priorWindowReceipts).toEqual([
+            { result_id: "result_carry_race_b_source_0001", receipt_id: "winr_carry_race_b_0001" },
+        ]);
+    });
 });

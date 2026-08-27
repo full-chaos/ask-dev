@@ -251,6 +251,15 @@ export default function ChatPage() {
     // to be unique within this session, and a counter keeps the ask/settle
     // pairing trivially traceable in a debugger.
     const nextId = useRef(0);
+    // CHAOS-4355 stopgap (codex review round 1, finding 2): a SEPARATE
+    // counter from `nextId` — `assistantTurnId` is an internal message id
+    // shared between user AND assistant records (so it skips by 2 per
+    // exchange, and a fan-out skips further still), which read as
+    // meaningless/misleading in `CarriedStructureNotice`'s "carried from
+    // turn N" disclosure. This counts actual conversational EXCHANGES
+    // (one increment per `ask()`/`confirmSelections()` call), so the
+    // number a tester sees is the number they would count themselves.
+    const nextTurnOrdinal = useRef(1);
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
@@ -354,6 +363,7 @@ export default function ChatPage() {
     ): Promise<boolean> {
         const userTurnId = nextId.current++;
         const assistantTurnId = nextId.current++;
+        const turnOrdinal = nextTurnOrdinal.current++;
         const isPlainAsk =
             priorSubjectReceipts.length === 0 &&
             chosen === undefined &&
@@ -441,7 +451,7 @@ export default function ChatPage() {
         // riding along starting with the VERY NEXT re-ask, not one turn
         // later (fail closed, no retry loops).
         if (outcome.kind === "answered") {
-            structureCarry.recordFromResult(outcome.result.confirmed_structure, assistantTurnId);
+            structureCarry.recordFromResult(outcome.result.confirmed_structure, turnOrdinal);
         }
         settleTurn(assistantTurnId, outcome);
         return outcome.kind === "answered";
@@ -528,6 +538,7 @@ export default function ChatPage() {
         candidateSelections.reset();
         structureCandidateSelections.reset();
         const askedAt = new Date().toISOString();
+        const turnOrdinal = nextTurnOrdinal.current++;
 
         type PendingItem =
             | { readonly kind: "subject"; readonly choice: ClarificationChoice }
@@ -594,6 +605,18 @@ export default function ChatPage() {
             })),
         ]);
 
+        // CHAOS-4355 stopgap (codex review round 1, finding 1): a fan-out
+        // fires N INDEPENDENT, CONCURRENT requests, and each can settle in
+        // any order. Folding every sibling's own `confirmed_structure` echo
+        // into the ONE shared carry would let response order — not which
+        // branch the conversation actually continues from — decide what the
+        // NEXT re-ask resends, so a slow-settling sibling could silently
+        // clobber a faster one's carry entry with a DIFFERENT candidate's
+        // receipt. Only the LAST item in this fan-out becomes
+        // `latestAssistantTurn` once every response has landed (array order
+        // is fixed at append time above, not completion order), so that is
+        // the only branch whose own confirmation may update the carry.
+        const carryEligibleTurnId = assistantTurns[assistantTurns.length - 1]?.id;
         assistantTurns.forEach(
             ({ id, prepared: { item, structureReceiptFields, carriedContribution } }, index) => {
                 const priorSubjectReceipts = item.kind === "subject" ? [item.choice] : [];
@@ -609,9 +632,14 @@ export default function ChatPage() {
                     structureReceiptFields,
                     selectionEvents: itemSelectionEvents,
                 }).then((outcome) => {
-                    // CHAOS-4355: same fold-before-settle discipline as `ask()`.
-                    if (outcome.kind === "answered") {
-                        structureCarry.recordFromResult(outcome.result.confirmed_structure, id);
+                    // CHAOS-4355: same fold-before-settle discipline as
+                    // `ask()`, restricted to the one branch above that will
+                    // actually continue the conversation.
+                    if (outcome.kind === "answered" && id === carryEligibleTurnId) {
+                        structureCarry.recordFromResult(
+                            outcome.result.confirmed_structure,
+                            turnOrdinal,
+                        );
                     }
                     settleTurn(id, outcome);
                 });
