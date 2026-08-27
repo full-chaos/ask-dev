@@ -258,6 +258,10 @@ const STRUCTURE_SELECTION_EVENT_MEMBERS: ReadonlySet<string> = new Set(
 const STRUCTURE_SELECTION_EVENT_OUTCOMES: ReadonlySet<string> = new Set([
     "submitted",
     "rejected_malformed",
+    // CHAOS-4355 stopgap: a member `structure-carry.ts` injected into this
+    // request that the tester did not pick THIS turn — see
+    // `StructureOfferSelectionOutcome`'s own header.
+    "carried_forward",
 ]);
 
 type StructureSelectionEventInput = {

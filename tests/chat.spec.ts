@@ -19,6 +19,8 @@ const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 const TRIGGER_MIXED = "e2e-mixed-me";
 // Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
 const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
+// Kept in sync by hand with `TRIGGER_CARRY` for the same reason.
+const TRIGGER_CARRY = "e2e-carry-me";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -565,5 +567,65 @@ test.describe("conversation threading", () => {
         // fake-acr-server.mjs's own `conversationEchoResult`).
         await expect(turns.last()).toContainText("conversation_turns=2");
         await expect(turns.last()).toContainText("What is Ask Dev");
+    });
+});
+
+/**
+ * CHAOS-4355 stopgap (conversation memory across re-asks). Reproduces the
+ * pilot-observed shape end to end, over the REAL server hop and the fake-ACR
+ * double's own receipt checks (`TRIGGER_CARRY` in fake-acr-server.mjs):
+ * turn 2 confirms a window receipt alongside a subject-candidate pick in one
+ * request; the double applies the window and returns a FRESH clarification
+ * (never turn 1's own candidates again); turn 3 picks from that fresh list
+ * with no structure batch of its own. The double is decisive on turn 3 ONLY
+ * when `prior_window_receipts` still carries turn 1's window receipt — a
+ * mutation-provable positive control: drop `structure-carry.ts`'s merge and
+ * turn 3 stays stuck on the same fresh clarification forever.
+ */
+test.describe("CHAOS-4355: carried structure receipts survive a re-ask that doesn't repeat them", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: turn 3 lands decisively on the window turn 1 confirmed, never re-picked", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill(`Is Atlas on track, ${TRIGGER_CARRY}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        // Turn 1: both the window offer and the subject clarification render.
+        await expect(
+            page.getByRole("region", { name: "Which subject did you mean?" }),
+        ).toBeVisible();
+        await expect(page.getByRole("button", { name: "Select Last 30 days" })).toBeVisible();
+
+        // Turn 1 -> 2: confirm the window AND a subject candidate together
+        // (subject-first: picking the candidate fires the shared confirm).
+        await page.getByRole("button", { name: "Select Last 30 days" }).click();
+        await page.getByRole("button", { name: "Select Ask Dev" }).click();
+        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
+
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(2);
+        await expect(turns.last()).toHaveAttribute("data-state", "clarification_required");
+        // The double's own confirmation: the window applied.
+        await expect(turns.last()).toContainText("Your time window selection was applied.");
+
+        // Turn 2 -> 3: the FRESH clarification's own candidate, no structure
+        // pick at all — the window is not re-offered (already resolved).
+        await page.getByRole("button", { name: "Select Ask Dev" }).click();
+        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
+
+        await expect(turns).toHaveCount(3);
+        // The discriminating proof: turn 3 can only be "complete" if the
+        // double actually saw `prior_window_receipts` still carrying turn
+        // 1's own window receipt on turn 3's request — a receipt turn 3
+        // never re-picked.
+        await expect(turns.last()).toHaveAttribute("data-state", "complete");
+
+        // Disclosure: turn 3's own panel names the carry.
+        await expect(turns.last().getByTestId("carried-structure-notice")).toContainText(
+            "time window carried from turn",
+        );
     });
 });

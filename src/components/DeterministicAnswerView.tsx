@@ -1,6 +1,7 @@
 import { useId } from "react";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
+import { CarriedStructureNotice } from "@/components/CarriedStructureNotice";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
@@ -18,6 +19,7 @@ import type {
     StructureNeedKind,
     SubjectRef,
 } from "@/lib/contracts";
+import type { CarriedStructureReceipt } from "@/lib/structure-carry";
 import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     type StructureSelectionBatch,
@@ -82,6 +84,15 @@ export type DeterministicAnswerViewProps = {
     readonly pending?: boolean | undefined;
     /** The subject the tester chose, when this result came from a re-ask. */
     readonly chosenSubject?: SubjectRef | undefined;
+    /**
+     * CHAOS-4355 stopgap: the structure members carried FORWARD into this
+     * turn's own request from an earlier turn's confirmation, rather than
+     * picked by the tester this turn — see `CarriedStructureNotice`'s own
+     * header. `undefined` for callers that predate the carry (this repo's
+     * other DeterministicAnswerView call sites), same default-to-nothing
+     * discipline as every other optional prop here.
+     */
+    readonly carriedStructureEntries?: readonly CarriedStructureReceipt[] | undefined;
 };
 
 /**
@@ -117,6 +128,7 @@ export function DeterministicAnswerView({
     onRejectStructure = () => {},
     pending = false,
     chosenSubject,
+    carriedStructureEntries,
 }: DeterministicAnswerViewProps) {
     // Portability/multi-instance safety (codex review round 2, CHAOS-4343:
     // several DeterministicAnswerView instances now commonly coexist — one
@@ -176,6 +188,7 @@ export function DeterministicAnswerView({
     const structureConfirmationNotice = (
         <StructureConfirmationNotice entries={result.confirmed_structure} />
     );
+    const carriedStructureNotice = <CarriedStructureNotice entries={carriedStructureEntries} />;
 
     if (result.status === "clarification_required") {
         return (
@@ -203,6 +216,7 @@ export function DeterministicAnswerView({
                 <PriorSubjectReceiptDisclosure
                     dispositions={result.subject_resolution.prior_subject_receipt_dispositions}
                 />
+                {carriedStructureNotice}
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
                 <ClarificationPanel
@@ -239,6 +253,7 @@ export function DeterministicAnswerView({
     return (
         <article aria-label="Deterministic answer" data-state={result.status}>
             {notice}
+            {carriedStructureNotice}
             {structureConfirmationNotice}
             {structureNeedsPanel}
             <AnswerPanel result={result} />

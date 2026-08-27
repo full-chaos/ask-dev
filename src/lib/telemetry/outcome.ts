@@ -284,8 +284,17 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
  * vocabularies from the pinned schema/contract instead of copying them.
  * Content-safe by construction: an option's id, label, or receipt is never a
  * parameter here, so there is nothing to accidentally carry.
+ *
+ * `carried_forward` (CHAOS-4355 stopgap) is a THIRD outcome, distinct from
+ * both: it fires when `structure-carry.ts` injects a member into an
+ * outgoing request that the tester did not pick THIS turn — a receipt
+ * confirmed on an earlier turn, resent because ACR does not yet carry it
+ * server-side (CHAOS-4360 is the real fix). Recording it separately from
+ * `submitted` is the point: aggregating the two would hide how often the
+ * stopgap is actually load-bearing versus how often testers are picking
+ * fresh.
  */
-export type StructureOfferSelectionOutcome = "submitted" | "rejected_malformed";
+export type StructureOfferSelectionOutcome = "submitted" | "rejected_malformed" | "carried_forward";
 
 export type StructureOfferSelectionEvent = {
     readonly event: "workbench_structure_offer_selection";

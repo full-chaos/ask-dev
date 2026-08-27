@@ -15,16 +15,25 @@ import type {
     BoundStructureReceipt,
     ConversationTurn,
     InvestigationResult,
+    StructureNeedKind,
     SubjectRef,
 } from "@/lib/contracts";
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
+    type CarriedStructureReceipt,
+    mergeStructureCarryIntoBatch,
+    structureCarryContribution,
+} from "@/lib/structure-carry";
+import {
     buildStructureReceiptFields,
     EMPTY_SELECTION_EVENTS,
+    EMPTY_STRUCTURE_SELECTION_BATCH,
+    recordSelectionEvent,
     type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useCandidateSelections } from "@/lib/use-candidate-selections";
+import { useStructureCarry } from "@/lib/use-structure-carry";
 import { useStructureSelections } from "@/lib/use-structure-selections";
 
 /**
@@ -126,6 +135,16 @@ type Turn =
            */
           readonly submittedCandidateReceiptIds: ReadonlySet<string> | undefined;
           readonly submittedStructureCandidateReceiptIds: ReadonlySet<string> | undefined;
+          /**
+           * CHAOS-4355 stopgap: a SNAPSHOT of the structure-carry
+           * contribution this turn's own request actually sent — every
+           * member `structure-carry.ts` injected that this turn's own
+           * explicit picks did not already cover. Same snapshot discipline
+           * as `submittedStructureBatch` (frozen once this turn is no
+           * longer latest), and the source for `CarriedStructureNotice`'s
+           * "carried from turn N" disclosure.
+           */
+          readonly carriedStructureEntries: readonly CarriedStructureReceipt[] | undefined;
           /**
            * The exact question to retry, set ONLY when this turn came from a
            * plain composer ask (no prior receipts, no chosen subject, no
@@ -235,6 +254,12 @@ export default function ChatPage() {
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
+    // CHAOS-4355 stopgap (conversation memory): a member confirmed on an
+    // earlier turn but not part of THIS turn's own StructureSelectionBatch
+    // (which resets every ask/confirm, by design) must still ride along —
+    // ACR does not carry it forward server-side yet (CHAOS-4360 is the real
+    // fix). See `use-structure-carry.ts`/`structure-carry.ts` for why.
+    const structureCarry = useStructureCarry();
     // CHAOS-4343 items 1/2: a SEPARATE accumulator from `structureSelections`
     // above — a tester may select several distinct candidates at once, each
     // becoming its own turn-2 request, which is not the "one pick per
@@ -337,6 +362,19 @@ export default function ChatPage() {
         // is appended — a re-ask's own not-yet-answered turn must never be
         // threaded as its own prior context.
         const conversation = buildConversationTurns(turns);
+        // CHAOS-4355 stopgap: a brand-new plain question starts a fresh
+        // conversation as far as structure carry is concerned — nothing
+        // from the old one should ride along silently. A receipt-carrying
+        // re-ask (of ANY kind: chosen subject, structure batch, or both)
+        // keeps the carry alive, which is the whole point of it.
+        if (isPlainAsk) structureCarry.reset();
+        const explicitStructureBatch = structureSelectionsToSend ?? EMPTY_STRUCTURE_SELECTION_BATCH;
+        const mergedStructureBatch = isPlainAsk
+            ? EMPTY_STRUCTURE_SELECTION_BATCH
+            : mergeStructureCarryIntoBatch(structureCarry.carry, explicitStructureBatch);
+        const carriedContribution = isPlainAsk
+            ? []
+            : structureCarryContribution(structureCarry.carry, explicitStructureBatch);
         structureSelections.reset();
         // A plain new ask (the common composer path) must clear any
         // unconfirmed candidate picks left over from the turn it supersedes
@@ -357,14 +395,15 @@ export default function ChatPage() {
                 submittedStructureBatch: undefined,
                 submittedCandidateReceiptIds: undefined,
                 submittedStructureCandidateReceiptIds: undefined,
+                carriedStructureEntries: carriedContribution,
                 retryQuestion: isPlainAsk ? question : undefined,
             },
         ]);
 
         const structureReceiptFields =
-            structureSelectionsToSend === undefined
+            Object.keys(mergedStructureBatch).length === 0
                 ? {}
-                : buildStructureReceiptFields(structureSelectionsToSend);
+                : buildStructureReceiptFields(mergedStructureBatch);
         // CHAOS-4171: every selection outcome observed since the last
         // reset() rides this SAME request — the route is the sink (see
         // `useStructureSelections`'s own `pendingSelectionEvents` header).
@@ -376,10 +415,19 @@ export default function ChatPage() {
         // that candidate pick — `reset()` above would otherwise discard its
         // queued telemetry silently, since only THIS path's own request
         // would have carried it).
+        //
+        // CHAOS-4355: the carry's own contribution rides the SAME telemetry
+        // channel with its own outcome (`carried_forward`) — see
+        // `StructureOfferSelectionOutcome`'s own header for why this is a
+        // separate outcome from `submitted` rather than folded into it.
         const selectionEvents = [
             ...structureSelections.pendingSelectionEvents,
             ...candidateSelections.pendingSelectionEvents,
             ...structureCandidateSelections.pendingSelectionEvents,
+            ...carriedContribution.reduce(
+                (events, entry) => recordSelectionEvent(events, entry.member, "carried_forward"),
+                EMPTY_SELECTION_EVENTS,
+            ),
         ];
         const outcome = await fireInvestigation({
             question,
@@ -388,6 +436,13 @@ export default function ChatPage() {
             structureReceiptFields,
             selectionEvents,
         });
+        // CHAOS-4355: fold this turn's own `confirmed_structure` echo into
+        // the running carry BEFORE settling — a vetoed member must stop
+        // riding along starting with the VERY NEXT re-ask, not one turn
+        // later (fail closed, no retry loops).
+        if (outcome.kind === "answered") {
+            structureCarry.recordFromResult(outcome.result.confirmed_structure, assistantTurnId);
+        }
         settleTurn(assistantTurnId, outcome);
         return outcome.kind === "answered";
     }
@@ -474,8 +529,6 @@ export default function ChatPage() {
         structureCandidateSelections.reset();
         const askedAt = new Date().toISOString();
 
-        const structureReceiptFieldsBase = buildStructureReceiptFields(otherStructureBatch);
-
         type PendingItem =
             | { readonly kind: "subject"; readonly choice: ClarificationChoice }
             | { readonly kind: "structure"; readonly receipt: BoundStructureReceipt };
@@ -487,13 +540,41 @@ export default function ChatPage() {
             })),
         ];
 
+        // CHAOS-4355 stopgap: this call site is NEVER a plain ask — every
+        // item here already carries a receipt, so the carry always applies
+        // (unlike `ask()`, which resets it on a brand-new plain question).
+        // Computed PER ITEM: a "structure" item's own explicit
+        // `subject_candidate` pick must win over anything carried for that
+        // same member, the same "explicit always wins" rule `ask()` holds.
+        const preparedItems = items.map((item) => {
+            const explicitBatch: StructureSelectionBatch =
+                item.kind === "structure"
+                    ? { ...otherStructureBatch, subject_candidate: item.receipt }
+                    : otherStructureBatch;
+            const mergedBatch = mergeStructureCarryIntoBatch(structureCarry.carry, explicitBatch);
+            return {
+                item,
+                structureReceiptFields:
+                    Object.keys(mergedBatch).length === 0
+                        ? {}
+                        : buildStructureReceiptFields(mergedBatch),
+                carriedContribution: structureCarryContribution(
+                    structureCarry.carry,
+                    explicitBatch,
+                ),
+            };
+        });
+
         const userTurnId = nextId.current++;
-        const assistantTurns = items.map((item) => ({ id: nextId.current++, item }));
+        const assistantTurns = preparedItems.map((prepared) => ({
+            id: nextId.current++,
+            prepared,
+        }));
 
         setTurns((current) => [
             ...current,
             { role: "user", id: userTurnId, question, createdAt: askedAt },
-            ...assistantTurns.map(({ id, item }) => ({
+            ...assistantTurns.map(({ id, prepared: { item, carriedContribution } }) => ({
                 role: "assistant" as const,
                 id,
                 createdAt: askedAt,
@@ -508,31 +589,51 @@ export default function ChatPage() {
                 submittedStructureBatch: undefined,
                 submittedCandidateReceiptIds: undefined,
                 submittedStructureCandidateReceiptIds: undefined,
+                carriedStructureEntries: carriedContribution,
                 retryQuestion: undefined,
             })),
         ]);
 
-        assistantTurns.forEach(({ id, item }, index) => {
-            const priorSubjectReceipts = item.kind === "subject" ? [item.choice] : [];
-            const structureReceiptFields =
-                item.kind === "structure"
-                    ? buildStructureReceiptFields({
-                          ...otherStructureBatch,
-                          subject_candidate: item.receipt,
-                      })
-                    : structureReceiptFieldsBase;
-            void fireInvestigation({
-                question,
-                priorSubjectReceipts,
-                conversation,
-                structureReceiptFields,
-                selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            }).then((outcome) => {
-                settleTurn(id, outcome);
-            });
-        });
+        assistantTurns.forEach(
+            ({ id, prepared: { item, structureReceiptFields, carriedContribution } }, index) => {
+                const priorSubjectReceipts = item.kind === "subject" ? [item.choice] : [];
+                const itemSelectionEvents = carriedContribution.reduce(
+                    (events, entry) =>
+                        recordSelectionEvent(events, entry.member, "carried_forward"),
+                    index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+                );
+                void fireInvestigation({
+                    question,
+                    priorSubjectReceipts,
+                    conversation,
+                    structureReceiptFields,
+                    selectionEvents: itemSelectionEvents,
+                }).then((outcome) => {
+                    // CHAOS-4355: same fold-before-settle discipline as `ask()`.
+                    if (outcome.kind === "answered") {
+                        structureCarry.recordFromResult(outcome.result.confirmed_structure, id);
+                    }
+                    settleTurn(id, outcome);
+                });
+            },
+        );
     }
     const latestAssistantTurn = [...turns].reverse().find((turn) => turn.role === "assistant");
+
+    /**
+     * CHAOS-4355 stopgap: an explicit deselect must stop that member riding
+     * along silently on the NEXT re-ask too, not just drop it from the
+     * live (single-turn) batch — otherwise unchecking an offer would look
+     * like it worked while the carry kept resending the OLD pick anyway.
+     * `toggleStructureOffer` deselects exactly when the SAME receipt is
+     * clicked again (`structure-selections.ts`'s own toggle semantic), so
+     * that is the one case this checks for before delegating.
+     */
+    function toggleStructure(member: StructureNeedKind, receipt: BoundStructureReceipt) {
+        const isDeselecting = structureSelections.batch[member]?.receipt_id === receipt.receipt_id;
+        structureSelections.toggle(member, receipt);
+        if (isDeselecting) structureCarry.dropMember(member);
+    }
 
     function chooseCandidates(choices: readonly ClarificationChoice[]) {
         if (
@@ -736,7 +837,7 @@ export default function ChatPage() {
                                                 isLatest ? candidateSelections.toggle : undefined
                                             }
                                             onToggleStructure={
-                                                isLatest ? structureSelections.toggle : undefined
+                                                isLatest ? toggleStructure : undefined
                                             }
                                             onToggleStructureCandidate={
                                                 isLatest
@@ -744,6 +845,7 @@ export default function ChatPage() {
                                                     : undefined
                                             }
                                             result={turn.outcome.result}
+                                            carriedStructureEntries={turn.carriedStructureEntries}
                                             selectedCandidateReceiptIds={
                                                 isLatest
                                                     ? candidateSelections.batch

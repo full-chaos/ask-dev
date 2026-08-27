@@ -107,6 +107,16 @@ export const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 // CandidateOptionsSection gets the same proof the kind-offer path already
 // has, not just component-level coverage.
 export const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
+// CHAOS-4355 stopgap: conversation-memory carry. Models the pilot's own
+// 3-request shape at the real-HTTP level: turn 1 offers a window; turn 2
+// confirms the window ALONGSIDE a subject-candidate pick and gets back
+// `confirmed_structure` (window applied) plus a FRESH clarification (never
+// the same candidates again); turn 3 picks from THAT fresh list with no
+// structure batch of its own. This double is decisive on turn 3 ONLY when
+// `prior_window_receipts` still carries turn 1's window receipt — proving
+// the real wire round trip that the client resent it, not just that a
+// mocked-fetch unit test believes it did.
+export const TRIGGER_CARRY = "e2e-carry-me";
 
 const canonical = JSON.parse(
     readFileSync(
@@ -379,6 +389,113 @@ function conversationEchoResult(question, conversation) {
     };
 }
 
+/**
+ * CHAOS-4355 stopgap, turn 1's own offer — a single window option, distinct
+ * receipt namespace from every other scenario's own window/kind/candidate
+ * ids so a cross-scenario mismatch cannot accidentally read as decisive.
+ */
+const CARRY_WINDOW_OPTIONS = [
+    {
+        receipt_id: "winr_e2e_carry_trailing_30d_0001",
+        option_id: "window_trailing_30d",
+        label: "Last 30 days",
+        relative_id: "trailing_30d",
+        start: "2026-07-20T00:00:00Z",
+        end: "2026-08-19T00:00:00Z",
+    },
+];
+
+/**
+ * A SEPARATE candidate pool from `SUBJECT_CANDIDATES` — reachable only
+ * AFTER the window is confirmed. Using a distinct pool (not the same
+ * candidates repeated) is what makes turn 2 -> turn 3 a genuine state
+ * transition, matching what the pilot actually observed ("a fresh
+ * candidate-confirmation clarification", never the same one again).
+ */
+const CARRY_FRESH_SUBJECT_CANDIDATES = [
+    {
+        receipt_id: "receipt_e2e_carry_fresh_ask_dev",
+        subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+        state: "ambiguous",
+        matched_terms: ["Ask Dev"],
+        match_reasons: ["Exact canonical project label."],
+        confidence: 0.6,
+        evidence_ref_ids: ["evidence_project_identity"],
+    },
+    {
+        receipt_id: "receipt_e2e_carry_fresh_atlas",
+        subject: { kind: "project", canonical_id: "project_atlas", label: "Atlas" },
+        state: "ambiguous",
+        matched_terms: ["Atlas"],
+        match_reasons: ["Fuzzy canonical project label."],
+        confidence: 0.4,
+        evidence_ref_ids: ["evidence_project_identity"],
+    },
+];
+
+const CARRY_TURN1_RESULT_ID = "result_e2e_carry_turn1_0001";
+
+function carryTurn1Result(question) {
+    const clarification = clarificationResult(question);
+    return {
+        ...clarification,
+        result_id: CARRY_TURN1_RESULT_ID,
+        request_id: "request_e2e_carry_turn1_0001",
+        structure_needs: { missing: ["window"], window_options: CARRY_WINDOW_OPTIONS },
+    };
+}
+
+/**
+ * Turn 2's response: the window applied (`confirmed_structure`), and a
+ * FRESH subject clarification distinct from turn 1's own candidates — never
+ * decisive by itself, exactly the pilot's own observed shape ("a fresh
+ * candidate-confirmation clarification").
+ */
+function carryTurn2Result(question) {
+    const result = structuredClone(canonical);
+    return {
+        ...result,
+        result_id: "result_e2e_carry_turn2_0001",
+        request_id: "request_e2e_carry_turn2_0001",
+        question,
+        status: "clarification_required",
+        interpretation: {
+            ...result.interpretation,
+            clarification_needed: true,
+            clarification_reason: "A different candidate still needs to be chosen.",
+        },
+        subject_resolution: {
+            candidates: CARRY_FRESH_SUBJECT_CANDIDATES,
+            committed: [],
+            clarification_prompt: "Did you mean Ask Dev or Atlas?",
+        },
+        confirmed_structure: [
+            {
+                member: "window",
+                applied_value: "trailing_30d",
+                source: "receipt",
+                prior_result_id: CARRY_TURN1_RESULT_ID,
+                receipt_id: CARRY_WINDOW_OPTIONS[0].receipt_id,
+                offer_source: "engine",
+                provenance: "clarification_confirmed",
+                disposition: "applied",
+            },
+        ],
+        direct_judgment: "",
+        current_state: "",
+        strongest_pressures: [],
+        drivers: [],
+        remaining_work: [],
+        readiness_gaps: [],
+        paths: [],
+        conflicts: [],
+        claimed_facts: [],
+        limitations: ["No judgment was formed because the subject is unresolved."],
+        deterministic_answer: "The subject is ambiguous, so no judgment was formed.",
+        warnings: [],
+    };
+}
+
 const server = createServer((request, response) => {
     // Playwright's `webServer.url` readiness probe is a plain GET / — answer
     // it distinctly from the (POST-only) investigation endpoint.
@@ -404,6 +521,8 @@ const server = createServer((request, response) => {
         let hasSubjectReceipt = false;
         let hasKindReceipt = false;
         let hasCandidateReceipt = false;
+        let hasCarryWindowReceipt = false;
+        let hasCarryFreshSubjectReceipt = false;
         let conversation;
         try {
             const parsed = JSON.parse(body);
@@ -483,6 +602,21 @@ const server = createServer((request, response) => {
                 STRUCTURE_CANDIDATE_OPTIONS.some((option) => option.receipt_id === receiptId),
             );
             hasChosenReceipt = hasSubjectReceipt || hasKindReceipt || hasCandidateReceipt;
+            // CHAOS-4355 stopgap: `prior_window_receipts` — the wire-renamed
+            // sibling of `prior_kind_receipts` above, one layer up. Matched
+            // against the EXACT offered window id, same discipline as every
+            // other receipt check in this double.
+            const chosenWindowReceiptIds = Array.isArray(parsed.prior_window_receipts)
+                ? parsed.prior_window_receipts.map((receipt) => receipt?.receipt_id)
+                : [];
+            hasCarryWindowReceipt = chosenWindowReceiptIds.some((receiptId) =>
+                CARRY_WINDOW_OPTIONS.some((option) => option.receipt_id === receiptId),
+            );
+            hasCarryFreshSubjectReceipt = chosenSubjectReceiptIds.some((receiptId) =>
+                CARRY_FRESH_SUBJECT_CANDIDATES.some(
+                    (candidate) => candidate.receipt_id === receiptId,
+                ),
+            );
         } catch {
             question = "";
         }
@@ -504,15 +638,32 @@ const server = createServer((request, response) => {
                 : mixedResult(question)
             : question.includes(TRIGGER_CONVERSATION_ECHO)
               ? conversationEchoResult(question, conversation)
-              : hasChosenReceipt
-                ? answeredResult(question)
-                : question.includes(TRIGGER_STRUCTURE_NEEDS)
-                  ? structureNeedsResult(question)
-                  : question.includes(TRIGGER_CANDIDATE_NEEDS)
-                    ? candidateNeedsResult(question)
-                    : question.includes(TRIGGER_CLARIFICATION)
-                      ? clarificationResult(question)
-                      : answeredResult(question);
+              : question.includes(TRIGGER_CARRY)
+                ? hasCarryFreshSubjectReceipt
+                    ? hasCarryWindowReceipt
+                        ? // Turn 3, WITH the carried window: decisive. This is
+                          // the fix — turn 3 never picked a window itself.
+                          answeredResult(question)
+                        : // Turn 3, WITHOUT the carried window: reproduces the
+                          // defect's own symptom exactly — stuck on the SAME
+                          // fresh clarification rather than ever landing.
+                          carryTurn2Result(question)
+                    : hasCarryWindowReceipt
+                      ? // Turn 2: window + turn 1's subject pick arrived
+                        // together -> confirm the window, offer a FRESH
+                        // clarification (never turn 1's own candidates again).
+                        carryTurn2Result(question)
+                      : // Turn 1: the opening ask.
+                        carryTurn1Result(question)
+                : hasChosenReceipt
+                  ? answeredResult(question)
+                  : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                    ? structureNeedsResult(question)
+                    : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                      ? candidateNeedsResult(question)
+                      : question.includes(TRIGGER_CLARIFICATION)
+                        ? clarificationResult(question)
+                        : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

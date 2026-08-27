@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ChatPage from "@/app/page";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult, StructureNeeds } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
@@ -876,5 +876,175 @@ describe("fan-out correctness (codex review)", () => {
                 receipt_id: structureCandidateOption.receipt_id,
             },
         ]);
+    });
+});
+
+/**
+ * CHAOS-4355 stopgap: conversation memory across re-asks.
+ *
+ * Reproduces the pilot-observed defect exactly: turn 2 confirms a window
+ * receipt ALONGSIDE a subject-candidate pick in one request; ACR applies
+ * the window (`confirmed_structure`) and returns a FRESH candidate
+ * clarification for the subject; turn 3 picks from that fresh list with no
+ * structure batch of its own (the window was already resolved, so nothing
+ * offers it again). Before this fix, turn 3's request carried nothing for
+ * `window` at all — `StructureSelectionBatch` resets every ask/confirm by
+ * design — which is the drop this whole module exists to close.
+ */
+describe("CHAOS-4355: carried structure receipts survive a re-ask that doesn't repeat them", () => {
+    const anchorWindow = structureMockScenarios().find(
+        (scenario) => scenario.id === "structure-anchor-window",
+    )!.result;
+    const windowOption = anchorWindow.structure_needs!.window_options![0]!;
+
+    const turn1Result: InvestigationResult = {
+        ...structuredClone(clarification),
+        result_id: "result_carry_turn1_0001",
+        request_id: "request_carry_turn1_0001",
+        structure_needs: {
+            missing: ["window"],
+            window_options: anchorWindow.structure_needs!.window_options as NonNullable<
+                StructureNeeds["window_options"]
+            >,
+        },
+    };
+
+    // What ACR returns to turn 2's combined (window + candidate) request:
+    // the window applied, and a FRESH subject clarification — never
+    // repeating turn 1's own candidates, matching the pilot's own report.
+    const turn2Result: InvestigationResult = {
+        ...structuredClone(clarification),
+        result_id: "result_carry_turn2_0001",
+        request_id: "request_carry_turn2_0001",
+        confirmed_structure: [
+            {
+                member: "window",
+                applied_value: windowOption.relative_id,
+                source: "receipt",
+                prior_result_id: turn1Result.result_id,
+                receipt_id: windowOption.receipt_id,
+                offer_source: "engine",
+                provenance: "clarification_confirmed",
+                disposition: "applied",
+            },
+        ] as NonNullable<InvestigationResult["confirmed_structure"]>,
+    };
+
+    function mockThreeTurns() {
+        return vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: turn1Result }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: turn2Result }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+    }
+
+    it("turn 3's request still carries turn 1's window receipt, unrepeated by turn 3's own picks", async () => {
+        const fetchSpy = mockThreeTurns();
+        render(<ChatPage />);
+
+        // Turn 1 -> 2: confirm the window AND a subject candidate together.
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${windowOption.label}` }),
+        );
+        const turn1Candidate = clarification.subject_resolution.candidates[0]!;
+        await user.click(
+            screen.getByRole("button", { name: `Select ${turn1Candidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        // Turn 2 -> 3: the FRESH clarification's own candidate, no structure
+        // pick at all — the window is not re-offered (already resolved).
+        // Turn 1's own chip is frozen (no "Select" button — `onToggle` is
+        // only wired on the LATEST turn), so this unambiguously targets
+        // turn 2's live panel even though both share the same fixture
+        // candidates.
+        const turn2Candidate = turn2Result.subject_resolution.candidates[0]!;
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${turn2Candidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        expect(
+            await screen.findAllByRole("article", { name: "Deterministic answer" }),
+        ).toHaveLength(3);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        // The fix: turn 3 never picked a window, yet the window CONFIRMED on
+        // turn 1/applied on turn 2 still rides this request.
+        expect(thirdCallBody.priorWindowReceipts).toEqual([
+            { result_id: turn1Result.result_id, receipt_id: windowOption.receipt_id },
+        ]);
+        expect(thirdCallBody.priorSubjectReceipts).toEqual([
+            { result_id: turn2Result.result_id, receipt_id: turn2Candidate.receipt_id },
+        ]);
+        // Telemetry (same PR, CHAOS-4171 standing order extended by
+        // CHAOS-4355): the carry's own contribution is recorded distinctly
+        // from an ordinary tester pick.
+        expect(thirdCallBody.structureSelectionEvents).toEqual(
+            expect.arrayContaining([{ member: "window", outcome: "carried_forward" }]),
+        );
+
+        // Disclosure: the third turn's own panel names the carry.
+        const thirdArticle = screen.getAllByRole("article", { name: "Deterministic answer" })[2]!;
+        expect(within(thirdArticle).getByTestId("carried-structure-notice")).toHaveTextContent(
+            "time window carried from turn",
+        );
+    });
+
+    it("a fresh plain question after the carry clears it — no cross-conversation bleed", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: turn1Result }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: turn2Result }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${windowOption.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        await screen.findAllByRole("article", { name: "Deterministic answer" });
+
+        // A brand-new, unrelated question — never a re-ask.
+        await ask("What is the status of dev-health-ops?");
+
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(thirdCallBody.priorWindowReceipts ?? []).toEqual([]);
     });
 });
