@@ -79,11 +79,34 @@ function ordinalAxisPreferenceScore(column: string): number {
     return 1;
 }
 
-/** Parses an ISO date/date-time to epoch millis, or null if it does not represent a real calendar date. */
+/**
+ * Parses an ISO date/date-time to epoch millis, or null if it does not
+ * represent a real calendar date. `Date.parse` normalizes an out-of-range
+ * day instead of rejecting it (`2026-02-30` silently becomes March 2), so a
+ * date-ONLY value (no time component — every producer in this codebase
+ * emits `toString(day)` off a ClickHouse `Date`, this exact shape) is
+ * round-tripped: reformat the parsed UTC instant back to `YYYY-MM-DD` and
+ * require it to match the input verbatim (codex round 2, CHAOS-4355). A
+ * full date-TIME value is not round-tripped the same way — a non-UTC
+ * offset can legitimately land on a different UTC calendar day, so that
+ * would reject valid input; `Date.parse` already rejects a wholesale
+ * malformed date-time (e.g. month 13), which is the failure mode that
+ * actually reaches this codebase's own producers.
+ */
 function parseIsoDate(value: string): number | null {
     if (!ISO_DATE_PATTERN.test(value)) return null;
     const millis = Date.parse(value);
-    return Number.isNaN(millis) ? null : millis;
+    if (Number.isNaN(millis)) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const roundTripped = new Date(millis).toISOString().slice(0, 10);
+        if (roundTripped !== value) return null;
+    }
+    return millis;
+}
+
+/** True when `value` carries a time component (a "T" or space time separator), not just a bare date. */
+function hasTimeComponent(value: string): boolean {
+    return /[T ]\d{2}:\d{2}/.test(value);
 }
 
 function presentValues(rows: readonly ClaimedFactRow[], column: string): ScalarValue[] {
@@ -95,27 +118,50 @@ function presentValues(rows: readonly ClaimedFactRow[], column: string): ScalarV
     return values;
 }
 
-/** True when every present value in `column` is a number/integer. Empty column is not numeric. */
+/**
+ * True when every NON-NULL present value in `column` is a number/integer.
+ * Empty (or all-null) column is not numeric. An explicit `{null: true}`
+ * cell does not disqualify the column — the renderer already treats a null
+ * value as a gap (same as an absent one), so requiring every row to carry a
+ * number would force an unnecessary table fallback for a series that
+ * legitimately has a hole in it (codex round 2, CHAOS-4355).
+ */
 function isNumericColumn(rows: readonly ClaimedFactRow[], column: string): boolean {
-    const values = presentValues(rows, column);
-    return values.length > 0 && values.every((v) => typeof cellValue(v) === "number");
+    const values = presentValues(rows, column)
+        .map((v) => cellValue(v))
+        .filter((v) => v !== null);
+    return values.length > 0 && values.every((v) => typeof v === "number");
 }
 
 /**
- * True when every present value in `column` is a string that parses as a
- * real calendar date/date-time — shape alone is not enough (`2026-99-99`
- * matches the ISO pattern but is not a date), so this also rejects via
- * `Date.parse` (codex round 1, CHAOS-4355).
+ * True when EVERY row (not just every present value) carries `column` as a
+ * string that parses as a real calendar date/date-time, all in the SAME
+ * shape (all date-only, or all carrying a time component — never mixed).
+ *
+ * Both requirements exist because a time axis is POSITIONED by elapsed
+ * time, not just labeled: a row silently missing the axis value would
+ * otherwise degrade the whole chart to index spacing with no signal that
+ * happened, and mixing a date-only value with a full offset timestamp in
+ * one column makes a single elapsed-time scale ill-defined (a date-only
+ * value parses as UTC midnight; a zoned timestamp does not) — CHAOS-4355,
+ * codex round 2. Shape alone is also not enough for any one value
+ * (`2026-99-99` matches the ISO pattern but is not a date; `2026-02-30`
+ * parses but is not Feb 30), so this also rejects via `parseIsoDate`
+ * (round 1 + round 2).
  */
 function isTimeColumn(rows: readonly ClaimedFactRow[], column: string): boolean {
-    const values = presentValues(rows, column);
-    return (
-        values.length > 0 &&
-        values.every((v) => {
-            const cell = cellValue(v);
-            return typeof cell === "string" && parseIsoDate(cell) !== null;
-        })
-    );
+    if (rows.length === 0) return false;
+    let sawTimeComponent: boolean | null = null;
+    for (const r of rows) {
+        const cell = r.fields[column];
+        if (cell === undefined) return false;
+        const value = cellValue(cell);
+        if (typeof value !== "string" || parseIsoDate(value) === null) return false;
+        const rowHasTime = hasTimeComponent(value);
+        if (sawTimeComponent === null) sawTimeComponent = rowHasTime;
+        else if (sawTimeComponent !== rowHasTime) return false;
+    }
+    return true;
 }
 
 /** True when every present value in `column` is a string (time-shaped or not). */

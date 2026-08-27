@@ -132,6 +132,13 @@ function SeriesChart({
     // date, POSITIONED — by actual elapsed time, not lexical string order
     // or row index (codex round 1: index spacing implies evenly-spaced
     // samples even when the real gaps between them are not equal).
+    // `fact-rows.ts`'s `isTimeColumn` (codex round 2) already requires
+    // EVERY row to carry a valid, same-shaped time value before it ever
+    // classifies an axis as `kind: "time"` — `timeIsUsable` should
+    // therefore always be true here; it stays as defense in depth (this
+    // component never assumes the caller upheld that contract) and falls
+    // back to plain index spacing rather than crashing if it somehow did
+    // not.
     const rawTimes = axis.kind === "time" ? rows.map((r) => Date.parse(axisLabel(r, axis))) : [];
     const timeIsUsable = axis.kind === "time" && rawTimes.every((t) => !Number.isNaN(t));
 

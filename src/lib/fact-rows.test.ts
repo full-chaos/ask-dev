@@ -88,6 +88,68 @@ describe("selectPresentation", () => {
         expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
     });
 
+    it("rejects an out-of-range calendar date that Date.parse silently normalizes (2026-02-30)", () => {
+        const rows = [
+            // Date.parse("2026-02-30") normalizes to March 2 instead of
+            // rejecting it — the round-trip check must catch this even
+            // though shape and Date.parse both accept it (codex round 2).
+            row({ day: { string: "2026-02-30" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-03-02" }, count: { integer: 2 } }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        // Not a time axis: falls back to ordinal (the strings still vary).
+        expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
+    });
+
+    it("does not classify a column as a time axis when a row is missing the value entirely (falls back to ordinal, never index-spaced pseudo-time)", () => {
+        const rows = [
+            row({ day: { string: "2026-08-20" }, count: { integer: 1 } }),
+            row({ count: { integer: 2 } }), // no `day` at all on this row
+            row({ day: { string: "2026-08-22" }, count: { integer: 3 } }),
+        ];
+        // `day` fails the TIME classification (incomplete coverage), so it
+        // is never plotted with index spacing under a false "elapsed time"
+        // claim (codex round 2). It still varies across present rows, so
+        // it remains usable as an honest ORDINAL/bar axis instead — the
+        // same "blank label for a missing cell" behavior any other ordinal
+        // column already has.
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { column: string; kind: string } }).axis).toEqual({
+            column: "day",
+            kind: "ordinal",
+        });
+    });
+
+    it("does not classify a column as a time axis when it mixes date-only and full-timestamp values (falls back to ordinal)", () => {
+        const rows = [
+            row({ day: { string: "2026-08-20" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-08-21T10:00:00Z" }, count: { integer: 2 } }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
+    });
+
+    it("still charts a numeric series that has an explicit null cell on some row (not a table fallback)", () => {
+        const rows = [
+            row({
+                team_name: { string: "Platform" },
+                commits_count: { integer: 61 },
+            }),
+            row({
+                team_name: { string: "Growth" },
+                commits_count: { null: true },
+            }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { seriesColumns: readonly string[] }).seriesColumns).toEqual([
+            "commits_count",
+        ]);
+    });
+
     it("picks a BAR chart for a non-date string axis plus a numeric column", () => {
         const rows = [
             row({ team_name: { string: "Platform" }, commits_count: { integer: 61 } }),
