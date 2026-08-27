@@ -70,7 +70,22 @@ describe("selectPresentation", () => {
             chartKind: "line",
             axis: { column: "day", kind: "time" },
             seriesColumns: ["pipelines_count"],
+            truncatedSeriesColumns: [],
         });
+    });
+
+    it("rejects a column that merely LOOKS like a date (shape matches, calendar does not)", () => {
+        const rows = [
+            row({ day: { string: "2026-99-99" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-13-40" }, count: { integer: 2 } }),
+        ];
+        // Neither `day` value is a real date, so it is not a time axis; it
+        // is still a varying string column, so it falls back to ordinal —
+        // but with only 2 rows and no other string column it still has an
+        // axis to plot against.
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
     });
 
     it("picks a BAR chart for a non-date string axis plus a numeric column", () => {
@@ -84,7 +99,28 @@ describe("selectPresentation", () => {
             chartKind: "bar",
             axis: { column: "team_name", kind: "ordinal" },
             seriesColumns: ["commits_count"],
+            truncatedSeriesColumns: [],
         });
+    });
+
+    it("prefers a human-readable *_name column over an opaque *_id column for the same dimension", () => {
+        // Field order mirrors the real wire shape: Go's encoding/json sorts
+        // map keys, so team_id reaches the client before team_name.
+        const rows = [
+            row({
+                commits_count: { integer: 61 },
+                team_id: { string: "team_platform_9f2a" },
+                team_name: { string: "Platform" },
+            }),
+            row({
+                commits_count: { integer: 24 },
+                team_id: { string: "team_growth_c410" },
+                team_name: { string: "Growth" },
+            }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { column: string } }).axis.column).toBe("team_name");
     });
 
     it("prefers a time axis over an ordinal one when both are present", () => {
@@ -127,7 +163,47 @@ describe("selectPresentation", () => {
             chartKind: "bar",
             axis: { column: "team_name", kind: "ordinal" },
             seriesColumns: ["commits_count"],
+            truncatedSeriesColumns: [],
         });
+    });
+
+    it("caps charted series at MAX_CHART_SERIES (fixed hue order, never cycled) and reports the rest as truncated", () => {
+        const rows = [
+            row({
+                team_name: { string: "Platform" },
+                c1: { integer: 1 },
+                c2: { integer: 2 },
+                c3: { integer: 3 },
+                c4: { integer: 4 },
+                c5: { integer: 5 },
+                c6: { integer: 6 },
+                c7: { integer: 7 },
+                c8: { integer: 8 },
+                c9: { integer: 9 },
+                c10: { integer: 10 },
+            }),
+            row({
+                team_name: { string: "Growth" },
+                c1: { integer: 1 },
+                c2: { integer: 2 },
+                c3: { integer: 3 },
+                c4: { integer: 4 },
+                c5: { integer: 5 },
+                c6: { integer: 6 },
+                c7: { integer: 7 },
+                c8: { integer: 8 },
+                c9: { integer: 9 },
+                c10: { integer: 10 },
+            }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        const chart = presentation as {
+            seriesColumns: readonly string[];
+            truncatedSeriesColumns: readonly string[];
+        };
+        expect(chart.seriesColumns).toEqual(["c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8"]);
+        expect(chart.truncatedSeriesColumns).toEqual(["c9", "c10"]);
     });
 
     it("plots every purely-numeric column as its own series, excluding the axis", () => {

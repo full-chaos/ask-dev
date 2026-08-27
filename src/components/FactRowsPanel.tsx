@@ -53,12 +53,36 @@ function FactRowsPanel({ fact, allFacts }: FactRowsPanelProps) {
                 {` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
             </p>
             {presentation.mode === "chart" ? (
-                <FactChart
-                    axis={presentation.axis}
-                    chartKind={presentation.chartKind}
-                    rows={rows}
-                    seriesColumns={presentation.seriesColumns}
-                />
+                <>
+                    <FactChart
+                        axis={presentation.axis}
+                        chartKind={presentation.chartKind}
+                        rows={rows}
+                        seriesColumns={presentation.seriesColumns}
+                    />
+                    {presentation.truncatedSeriesColumns.length > 0 ? (
+                        <p className="fact-panel__caption">
+                            +{presentation.truncatedSeriesColumns.length} more numeric column
+                            {presentation.truncatedSeriesColumns.length === 1 ? "" : "s"} in the
+                            table below.
+                        </p>
+                    ) : null}
+                    {/* The chart is a visual summary; the full data — every
+                        row and column, including any past the charted-series
+                        cap — is always available as a real table too, not
+                        just SVG marks (codex round 1, CHAOS-4355). Visible
+                        when series were truncated (the note above points at
+                        it); otherwise screen-reader-only, since the chart's
+                        own accessible marks (aria-label + title) already
+                        cover the charted data for that case. */}
+                    <div
+                        className={
+                            presentation.truncatedSeriesColumns.length > 0 ? undefined : "sr-only"
+                        }
+                    >
+                        <FactTable rows={rows} />
+                    </div>
+                </>
             ) : (
                 <FactTable rows={rows} />
             )}

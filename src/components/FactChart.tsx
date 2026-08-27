@@ -18,9 +18,10 @@ const MAX_AXIS_LABELS_SINGLE = 8;
 const MAX_AXIS_LABELS_MULTIPLE = 5;
 
 // Fixed hue order (dataviz skill): series 1 always takes slot 1, never
-// reassigned by which columns happen to be present, and never cycled past
-// slot 8 — a 9th numeric column would need to fold into "Other" or a
-// second chart, which no producer in this codebase emits yet.
+// reassigned by which columns happen to be present. `seriesColumns` is
+// already capped at this length by `selectPresentation` (MAX_CHART_SERIES),
+// so no modulo/cycling is needed here — a 9th numeric column never reaches
+// this component (it stays in the accompanying table instead).
 const SERIES_VARS = [
     "--series-1",
     "--series-2",
@@ -69,6 +70,35 @@ function labelIndices(count: number, maxLabels: number): Set<number> {
     return indices;
 }
 
+type Point = {
+    readonly x: number;
+    readonly y: number;
+    readonly value: number;
+    readonly row: ClaimedFactRow;
+};
+
+/**
+ * Splits points into contiguous runs by their original row index. A missing
+ * value breaks the run — connecting across it with one polyline would
+ * visually claim continuity the data does not have (codex round 1,
+ * CHAOS-4355).
+ */
+function contiguousSegments(indexed: readonly { point: Point; rowIndex: number }[]): Point[][] {
+    const segments: Point[][] = [];
+    let current: Point[] = [];
+    let previousRowIndex: number | null = null;
+    for (const { point, rowIndex } of indexed) {
+        if (previousRowIndex !== null && rowIndex !== previousRowIndex + 1) {
+            if (current.length > 0) segments.push(current);
+            current = [];
+        }
+        current.push(point);
+        previousRowIndex = rowIndex;
+    }
+    if (current.length > 0) segments.push(current);
+    return segments;
+}
+
 type SeriesChartProps = {
     readonly rows: readonly ClaimedFactRow[];
     readonly axis: ChartAxis;
@@ -98,10 +128,22 @@ function SeriesChart({
     maxAxisLabels,
     showTitle,
 }: SeriesChartProps) {
-    const orderedRows =
-        axis.kind === "time"
-            ? [...rows].sort((a, b) => axisLabel(a, axis).localeCompare(axisLabel(b, axis)))
-            : rows;
+    // Time rows are ordered — and, when every axis value parses as a real
+    // date, POSITIONED — by actual elapsed time, not lexical string order
+    // or row index (codex round 1: index spacing implies evenly-spaced
+    // samples even when the real gaps between them are not equal).
+    const rawTimes = axis.kind === "time" ? rows.map((r) => Date.parse(axisLabel(r, axis))) : [];
+    const timeIsUsable = axis.kind === "time" && rawTimes.every((t) => !Number.isNaN(t));
+
+    // Sort by parsed time only once every value is a usable date (a row
+    // missing the axis cell parses to NaN, which sorts unpredictably) —
+    // otherwise keep the rows in the order the service sent them.
+    const orderedRows = timeIsUsable
+        ? rows
+              .map((r, i) => ({ r, t: rawTimes[i] ?? 0 }))
+              .sort((a, b) => a.t - b.t)
+              .map(({ r }) => r)
+        : rows;
 
     const plotWidth = width - MARGIN.left - MARGIN.right;
     const plotHeight = height - MARGIN.top - MARGIN.bottom;
@@ -114,22 +156,37 @@ function SeriesChart({
     const valueRange = maxValue - minValue || 1;
 
     const bandWidth = plotWidth / Math.max(orderedRows.length, 1);
-    const xForIndex = (index: number) => MARGIN.left + bandWidth * (index + 0.5);
+
+    let xForIndex: (index: number) => number;
+    if (timeIsUsable) {
+        const times = orderedRows.map((r) => Date.parse(axisLabel(r, axis)));
+        const minTime = Math.min(...times);
+        const maxTime = Math.max(...times);
+        const timeRange = maxTime - minTime || 1;
+        xForIndex = (index) => MARGIN.left + ((times[index]! - minTime) / timeRange) * plotWidth;
+    } else {
+        xForIndex = (index) => MARGIN.left + bandWidth * (index + 0.5);
+    }
     const yForValue = (value: number) =>
         MARGIN.top + plotHeight - ((value - minValue) / valueRange) * plotHeight;
 
     const shownLabels = labelIndices(orderedRows.length, maxAxisLabels);
 
-    const points = orderedRows
+    const indexedPoints = orderedRows
         .map((r, index) => {
             const value = seriesValue(r, column);
             return value === undefined
                 ? null
-                : { x: xForIndex(index), y: yForValue(value), value, row: r };
+                : {
+                      point: { x: xForIndex(index), y: yForValue(value), value, row: r },
+                      rowIndex: index,
+                  };
         })
-        .filter(
-            (p): p is { x: number; y: number; value: number; row: ClaimedFactRow } => p !== null,
-        );
+        .filter((p): p is { point: Point; rowIndex: number } => p !== null);
+    const points = indexedPoints.map((p) => p.point);
+    const segments = contiguousSegments(indexedPoints);
+
+    const axisDescription = `${humanizeTerm(column)} by ${humanizeTerm(axis.column)}`;
 
     return (
         <div className="fact-chart__cell">
@@ -143,12 +200,13 @@ function SeriesChart({
                 </p>
             ) : null}
             <svg
+                aria-label={axisDescription}
                 className="fact-chart__svg"
                 role="img"
                 viewBox={`0 0 ${width} ${height}`}
                 xmlns="http://www.w3.org/2000/svg"
             >
-                <title>{`${humanizeTerm(column)} by ${humanizeTerm(axis.column)}`}</title>
+                <title>{axisDescription}</title>
                 <line
                     className="fact-chart__gridline"
                     x1={MARGIN.left}
@@ -188,55 +246,67 @@ function SeriesChart({
                     ) : null,
                 )}
 
-                {chartKind === "bar" ? (
-                    points.map((p, index) => {
-                        const barWidth = bandWidth * 0.6;
-                        const x = p.x - barWidth / 2;
-                        const y = Math.min(yForValue(0), p.y);
-                        const h = Math.abs(yForValue(0) - p.y);
-                        return (
-                            <g className="fact-chart__mark-group" key={index} tabIndex={0}>
-                                <path d={roundedTopRectPath(x, y, barWidth, h, 4)} fill={color} />
-                                <text
-                                    className="fact-chart__value-label"
-                                    textAnchor="middle"
-                                    x={p.x}
-                                    y={y - 4}
-                                >
-                                    {formatValue(p.value)}
-                                </text>
-                                <title>
-                                    {`${axisLabel(p.row, axis)} · ${humanizeTerm(column)}: ${formatValue(p.value)}`}
-                                </title>
-                            </g>
-                        );
-                    })
-                ) : (
-                    <>
-                        <polyline
-                            fill="none"
-                            points={points.map((p) => `${p.x},${p.y}`).join(" ")}
-                            stroke={color}
-                            strokeWidth={2}
-                        />
-                        {points.map((p, index) => (
-                            <g className="fact-chart__mark-group" key={index} tabIndex={0}>
-                                <circle cx={p.x} cy={p.y} fill={color} r={4} />
-                                <text
-                                    className="fact-chart__value-label"
-                                    textAnchor="middle"
-                                    x={p.x}
-                                    y={p.y - 8}
-                                >
-                                    {formatValue(p.value)}
-                                </text>
-                                <title>
-                                    {`${axisLabel(p.row, axis)} · ${humanizeTerm(column)}: ${formatValue(p.value)}`}
-                                </title>
-                            </g>
-                        ))}
-                    </>
-                )}
+                {chartKind === "bar"
+                    ? points.map((p, index) => {
+                          const barWidth = bandWidth * 0.6;
+                          const x = p.x - barWidth / 2;
+                          const y = Math.min(yForValue(0), p.y);
+                          const h = Math.abs(yForValue(0) - p.y);
+                          const markLabel = `${axisLabel(p.row, axis)}: ${formatValue(p.value)}`;
+                          return (
+                              <g
+                                  aria-label={markLabel}
+                                  className="fact-chart__mark-group"
+                                  key={index}
+                                  role="img"
+                                  tabIndex={0}
+                              >
+                                  <path d={roundedTopRectPath(x, y, barWidth, h, 4)} fill={color} />
+                                  <text
+                                      className="fact-chart__value-label"
+                                      textAnchor="middle"
+                                      x={p.x}
+                                      y={y - 4}
+                                  >
+                                      {formatValue(p.value)}
+                                  </text>
+                                  <title>{markLabel}</title>
+                              </g>
+                          );
+                      })
+                    : segments.map((segment, segmentIndex) => (
+                          <g key={segmentIndex}>
+                              <polyline
+                                  fill="none"
+                                  points={segment.map((p) => `${p.x},${p.y}`).join(" ")}
+                                  stroke={color}
+                                  strokeWidth={2}
+                              />
+                              {segment.map((p, index) => {
+                                  const markLabel = `${axisLabel(p.row, axis)}: ${formatValue(p.value)}`;
+                                  return (
+                                      <g
+                                          aria-label={markLabel}
+                                          className="fact-chart__mark-group"
+                                          key={index}
+                                          role="img"
+                                          tabIndex={0}
+                                      >
+                                          <circle cx={p.x} cy={p.y} fill={color} r={4} />
+                                          <text
+                                              className="fact-chart__value-label"
+                                              textAnchor="middle"
+                                              x={p.x}
+                                              y={p.y - 8}
+                                          >
+                                              {formatValue(p.value)}
+                                          </text>
+                                          <title>{markLabel}</title>
+                                      </g>
+                                  );
+                              })}
+                          </g>
+                      ))}
             </svg>
         </div>
     );
@@ -252,7 +322,15 @@ function SeriesChart({
  * y-scale — never one shared axis: two measures of different magnitude
  * (e.g. a 0..1 rate beside a 0..100 count) squashed onto a single range is
  * the #1 dataviz anti-pattern (dataviz skill, "never dual-axis"). A missing
- * value for a row is skipped, never interpolated or shown as zero.
+ * value for a row is skipped, never interpolated or shown as zero, and a
+ * line never connects across a gap it does not cover (see
+ * `contiguousSegments`).
+ *
+ * Every chart is a `role="img"` with an `aria-label`/`<title>` describing
+ * it, and every mark carries its own `aria-label` + `<title>` + a
+ * keyboard-focusable, visibly-outlined hit area — `FactRowsPanel` also
+ * renders a visually-hidden full data table alongside every chart so the
+ * underlying numbers are never SVG-only (codex round 1, CHAOS-4355).
  */
 export function FactChart({ rows, axis, seriesColumns, chartKind }: FactChartProps) {
     if (seriesColumns.length <= 1) {
@@ -281,7 +359,7 @@ export function FactChart({ rows, axis, seriesColumns, chartKind }: FactChartPro
                 <SeriesChart
                     axis={axis}
                     chartKind={chartKind}
-                    color={`var(${SERIES_VARS[seriesIndex % SERIES_VARS.length]})`}
+                    color={`var(${SERIES_VARS[seriesIndex]!})`}
                     height={MULTIPLE_HEIGHT}
                     key={column}
                     maxAxisLabels={MAX_AXIS_LABELS_MULTIPLE}

@@ -53,6 +53,39 @@ const ISO_DATE_PATTERN =
 
 const AXIS_NAME_HINTS = new Set(["day", "date", "time", "timestamp", "period", "week", "month"]);
 
+/**
+ * A row column may carry both an opaque identifier and a human-readable
+ * label for the same dimension (e.g. `devhealthfacts/metrics.go`'s
+ * `readProjectMetrics` row carries both `team_id` and `team_name`). Go's
+ * `encoding/json` marshals a map's keys in SORTED order, so `team_id`
+ * reaches the wire BEFORE `team_name` — first-seen column order alone would
+ * pick the opaque id as the chart axis. A `*_name`/`*_label` column is
+ * preferred over any other ordinal candidate; a `*_id`/`id` column is
+ * deprioritized below a neutral one, so an axis is never an opaque
+ * identifier when a readable alternative exists in the same row set
+ * (codex round 1, CHAOS-4355).
+ */
+function ordinalAxisPreferenceScore(column: string): number {
+    const lower = column.toLowerCase();
+    if (
+        lower === "name" ||
+        lower === "label" ||
+        lower.endsWith("_name") ||
+        lower.endsWith("_label")
+    ) {
+        return 2;
+    }
+    if (lower === "id" || lower.endsWith("_id")) return 0;
+    return 1;
+}
+
+/** Parses an ISO date/date-time to epoch millis, or null if it does not represent a real calendar date. */
+function parseIsoDate(value: string): number | null {
+    if (!ISO_DATE_PATTERN.test(value)) return null;
+    const millis = Date.parse(value);
+    return Number.isNaN(millis) ? null : millis;
+}
+
 function presentValues(rows: readonly ClaimedFactRow[], column: string): ScalarValue[] {
     const values: ScalarValue[] = [];
     for (const row of rows) {
@@ -68,14 +101,19 @@ function isNumericColumn(rows: readonly ClaimedFactRow[], column: string): boole
     return values.length > 0 && values.every((v) => typeof cellValue(v) === "number");
 }
 
-/** True when every present value in `column` is a string matching an ISO date/date-time. */
+/**
+ * True when every present value in `column` is a string that parses as a
+ * real calendar date/date-time — shape alone is not enough (`2026-99-99`
+ * matches the ISO pattern but is not a date), so this also rejects via
+ * `Date.parse` (codex round 1, CHAOS-4355).
+ */
 function isTimeColumn(rows: readonly ClaimedFactRow[], column: string): boolean {
     const values = presentValues(rows, column);
     return (
         values.length > 0 &&
         values.every((v) => {
             const cell = cellValue(v);
-            return typeof cell === "string" && ISO_DATE_PATTERN.test(cell);
+            return typeof cell === "string" && parseIsoDate(cell) !== null;
         })
     );
 }
@@ -104,20 +142,37 @@ export type ChartPresentation = {
     readonly chartKind: "line" | "bar";
     readonly axis: ChartAxis;
     readonly seriesColumns: readonly string[];
+    /**
+     * Numeric columns that qualified for charting but were dropped past the
+     * `MAX_CHART_SERIES` cap (fixed hue order, never cycled — dataviz
+     * skill). Always shown in the accompanying table, never silently
+     * dropped from the fact entirely (CHAOS-4355, codex round 1).
+     */
+    readonly truncatedSeriesColumns: readonly string[];
 };
 export type TablePresentation = { readonly mode: "table" };
 export type FactRowsPresentation = ChartPresentation | TablePresentation;
 
+/** Fixed categorical hue slots (`--series-1`..`--series-8`, dataviz skill palette) — never cycled. */
+export const MAX_CHART_SERIES = 8;
+
 /**
  * Table by default. A chart only when the row set has a time or ordinal
  * axis column PLUS at least one purely-numeric column to plot against it
- * (CHAOS-4355). A time-shaped axis (every value an ISO date/date-time)
- * renders as a line; any other single-valued string axis (e.g. a
- * `team_name` breakdown) renders as a bar chart. An axis candidate that
- * never varies across the row set (see `hasVariation`) is skipped — it
- * cannot discriminate rows, so it reads as provenance, not an axis. Ties
- * break toward the axis-name hint list, then first-seen column order —
- * both deterministic, so the same rows always pick the same presentation.
+ * (CHAOS-4355). A time-shaped axis (every value parses as a real ISO
+ * date/date-time) renders as a line; any other single-valued string axis
+ * (e.g. a `team_name` breakdown) renders as a bar chart.
+ *
+ * Axis selection: an axis candidate that never varies across the row set
+ * (see `hasVariation`) is skipped — it cannot discriminate rows, so it
+ * reads as provenance, not an axis. Among ordinal candidates, a
+ * human-readable `*_name`/`*_label` column is preferred over an opaque
+ * `*_id`/`id` column for the SAME row set (a producer commonly emits both,
+ * e.g. `team_id` + `team_name`, and Go's `encoding/json` sorts map keys —
+ * `team_id` reaches the wire first — so first-seen order alone would pick
+ * the opaque id; codex round 1). Remaining ties break toward the
+ * axis-name hint list, then first-seen column order — both deterministic,
+ * so the same rows always pick the same presentation.
  */
 export function selectPresentation(rows: readonly ClaimedFactRow[]): FactRowsPresentation {
     if (rows.length === 0) return { mode: "table" };
@@ -137,18 +192,26 @@ export function selectPresentation(rows: readonly ClaimedFactRow[]): FactRowsPre
     const timeCandidates = candidates.filter((c) => c.kind === "time");
     const pool = timeCandidates.length > 0 ? timeCandidates : candidates;
     const hinted = pool.find((c) => AXIS_NAME_HINTS.has(c.column.toLowerCase()));
-    const axis = hinted ?? pool[0]!;
+    let axis = hinted ?? pool[0]!;
+    if (hinted === undefined && pool[0]!.kind === "ordinal") {
+        // Pick the highest-scoring ordinal candidate (name-like > neutral >
+        // id-like), first-seen order as the tiebreak.
+        axis = [...pool].sort(
+            (a, b) => ordinalAxisPreferenceScore(b.column) - ordinalAxisPreferenceScore(a.column),
+        )[0]!;
+    }
 
-    const seriesColumns = columns.filter(
+    const eligibleSeriesColumns = columns.filter(
         (column) => column !== axis.column && isNumericColumn(rows, column),
     );
-    if (seriesColumns.length === 0) return { mode: "table" };
+    if (eligibleSeriesColumns.length === 0) return { mode: "table" };
 
     return {
         mode: "chart",
         chartKind: axis.kind === "time" ? "line" : "bar",
         axis,
-        seriesColumns,
+        seriesColumns: eligibleSeriesColumns.slice(0, MAX_CHART_SERIES),
+        truncatedSeriesColumns: eligibleSeriesColumns.slice(MAX_CHART_SERIES),
     };
 }
 

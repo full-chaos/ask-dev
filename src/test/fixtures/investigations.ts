@@ -137,22 +137,29 @@ function rowsScenario(): InvestigationResult {
         subject: ASK_DEV_SUBJECT,
         field: "team_breakdown",
         value: { integer: 2 },
+        // Field order mirrors the real wire shape: acr's Go
+        // `encoding/json` marshals a `map[string]FactValue` in SORTED key
+        // order, so `team_id` reaches the client BEFORE `team_name`
+        // (codex round 1, CHAOS-4355) — the renderer must still prefer the
+        // readable name as the chart axis, never the opaque id.
         rows: [
             {
                 fields: {
-                    team_name: { string: "Platform" },
-                    day: { string: "2026-08-22" },
-                    commits_count: { integer: 61 },
                     after_hours_commit_ratio: { number: 0.18 },
+                    commits_count: { integer: 61 },
+                    day: { string: "2026-08-22" },
+                    team_id: { string: "team_platform_9f2a" },
+                    team_name: { string: "Platform" },
                     weekend_commit_ratio: { number: 0.07 },
                 },
             },
             {
                 fields: {
-                    team_name: { string: "Growth" },
-                    day: { string: "2026-08-22" },
-                    commits_count: { integer: 24 },
                     after_hours_commit_ratio: { number: 0.29 },
+                    commits_count: { integer: 24 },
+                    day: { string: "2026-08-22" },
+                    team_id: { string: "team_growth_c410" },
+                    team_name: { string: "Growth" },
                     weekend_commit_ratio: { number: 0.12 },
                 },
             },

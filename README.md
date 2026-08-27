@@ -55,7 +55,15 @@ Rendered today:
   could not choose between, with its own clarification prompt;
 - **evidence references** — the `evidence_ref_ids` verbatim, per driver, per
   finding, per candidate, and for the result as a whole;
-- provenance — the full `versions` block.
+- provenance — the full `versions` block;
+- **claimed-fact tables/charts** (CHAOS-4355, CHAOS-4347) — any claimed fact
+  carrying a renderable `rows` table gets its own panel stacked under the
+  answer text: a plain table by default, or a chart (line for a time axis,
+  bar for an ordinal one, small multiples — one mini-chart per numeric
+  column — when there is more than one) when the rows have a usable axis
+  plus at least one numeric column (`src/lib/fact-rows.ts`). The caption
+  shows the fact's subject, row count, and the sibling `rollup_basis` claim
+  when the producer emits one.
 
 ## Running it
 
@@ -174,8 +182,13 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `e946ad907cdfd66b45895839c7adb65f2e436808` (acr main; CHAOS-4171
-PR3 — adds bounded offer `phrasing` (acr PR2, #263) on the
+Currently pinned: `30f38869f6ecc1233ddb903ef962d6be4a806a09` (acr main; CHAOS-4355
+— bumps past CHAOS-4347's additive `rows` on `ClaimedFact`/`ProjectedFact`
+(`ContextFabricClaimedFactRow`, #300), so `ClaimedFact.rows` renders as a
+table or chart. Also pulls in CHAOS-4335/CHAOS-4336's window-gate fixes and
+CHAOS-4348's subject-pool reachability fixes. Previously pinned at
+`e946ad907cdfd66b45895839c7adb65f2e436808` — CHAOS-4171 PR3, adding bounded
+offer `phrasing` (acr PR2, #263) on the
 `expected_kind`/`subject_anchor`/`subject_handle`/`subject_candidate` option
 types, and `SubjectResolution.prior_subject_receipt_dispositions` (CHAOS-3478/
 CHAOS-3813, #265), on top of CHAOS-4012's ranked-candidate-list structure
