@@ -25,7 +25,7 @@
  * invented coverage state.
  */
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { ClaimedFact, InvestigationResult, SubjectRef } from "@/lib/contracts";
 
 /**
  * The canonical example, unmodified. Structurally cloned on every read so a
@@ -51,6 +51,12 @@ const ATLAS_PROJECT_SUBJECT: SubjectRef = {
     label: "Atlas",
 };
 
+const ASK_DEV_REPOSITORY_SUBJECT: SubjectRef = {
+    kind: "repository",
+    canonical_id: "repository:repo_ask_dev",
+    label: "full-chaos/ask-dev",
+};
+
 export type MockScenario = {
     /** Stable id used by tests and the scenario picker. */
     readonly id: string;
@@ -63,6 +69,130 @@ export type MockScenario = {
 
 function completeScenario(): InvestigationResult {
     return canonical();
+}
+
+/**
+ * CHAOS-4355: exercises `ClaimedFact.rows` (CHAOS-4347, additive on acr main
+ * @ 30f38869) — NOT YET produced by a live investigation as of this
+ * scenario's authoring (hop 5's synthesis routing is in flight on a sibling
+ * lane), so this is a fixture/mock walkthrough, not a live one. Field names
+ * are drawn from the real producers, not invented (CHAOS-2225): the CI daily
+ * rollup shape mirrors `devhealthfacts/ci.go`'s `readRepositoryAggregate`
+ * (`day`/`pipelines_count`/`success_rate`), and the project metrics rollup
+ * mirrors `devhealthfacts/metrics.go`'s `readProjectMetrics`
+ * (`rollup_basis: "team_project_ownership_sum"` as a SIBLING claim next to
+ * the `team_breakdown` rows claim, `team_name`/`day`/`commits_count`/
+ * `after_hours_commit_ratio`/`weekend_commit_ratio`).
+ *
+ * Three shapes, one of each renderer path:
+ *   - `continuous_integration`/`pipelines_count` — time axis (`day`) +
+ *     two numeric columns -> multi-series LINE chart with a legend.
+ *   - `metrics`/`team_breakdown` — ordinal axis (`team_name`) + numeric
+ *     columns -> BAR chart, caption shows the sibling `rollup_basis`.
+ *   - `metrics`/`latency_percentiles` — every column numeric, no axis
+ *     candidate at all -> falls back to the TABLE renderer.
+ */
+function rowsScenario(): InvestigationResult {
+    const result = canonical();
+    const ciRollup: ClaimedFact = {
+        claim_id: "claim_rows_ci_daily",
+        kind: "continuous_integration",
+        subject: ASK_DEV_REPOSITORY_SUBJECT,
+        field: "pipelines_count",
+        value: { integer: 42 },
+        rows: [
+            {
+                fields: {
+                    day: { string: "2026-08-20" },
+                    pipelines_count: { integer: 38 },
+                    success_rate: { number: 0.86 },
+                },
+            },
+            {
+                fields: {
+                    day: { string: "2026-08-21" },
+                    pipelines_count: { integer: 41 },
+                    success_rate: { number: 0.9 },
+                },
+            },
+            {
+                fields: {
+                    day: { string: "2026-08-22" },
+                    pipelines_count: { integer: 42 },
+                    success_rate: { number: 0.88 },
+                },
+            },
+        ],
+    };
+    const teamRollupBasis: ClaimedFact = {
+        claim_id: "claim_rows_metrics_basis",
+        kind: "metrics",
+        subject: ASK_DEV_SUBJECT,
+        field: "rollup_basis",
+        value: { string: "team_project_ownership_sum" },
+    };
+    const teamBreakdown: ClaimedFact = {
+        claim_id: "claim_rows_metrics_breakdown",
+        kind: "metrics",
+        subject: ASK_DEV_SUBJECT,
+        field: "team_breakdown",
+        value: { integer: 2 },
+        rows: [
+            {
+                fields: {
+                    team_name: { string: "Platform" },
+                    day: { string: "2026-08-22" },
+                    commits_count: { integer: 61 },
+                    after_hours_commit_ratio: { number: 0.18 },
+                    weekend_commit_ratio: { number: 0.07 },
+                },
+            },
+            {
+                fields: {
+                    team_name: { string: "Growth" },
+                    day: { string: "2026-08-22" },
+                    commits_count: { integer: 24 },
+                    after_hours_commit_ratio: { number: 0.29 },
+                    weekend_commit_ratio: { number: 0.12 },
+                },
+            },
+        ],
+    };
+    const latencyTable: ClaimedFact = {
+        claim_id: "claim_rows_latency_percentiles",
+        kind: "metrics",
+        subject: ASK_DEV_REPOSITORY_SUBJECT,
+        field: "latency_percentiles",
+        value: { number: 340 },
+        rows: [
+            {
+                fields: {
+                    p50_duration_minutes: { number: 12.4 },
+                    p90_duration_minutes: { number: 28.1 },
+                    p99_duration_minutes: { number: 55.6 },
+                },
+            },
+        ],
+    };
+    return {
+        ...result,
+        result_id: "result_rows_0001",
+        request_id: "request_rows_0001",
+        question: "How has full-chaos/ask-dev's CI and team investment looked this week?",
+        deterministic_answer:
+            "full-chaos/ask-dev's CI has held steady this week, and its metrics rollup carries a per-team breakdown alongside the project total.",
+        direct_judgment:
+            "CI and delivery metrics are stable, with no single team dominating investment.",
+        current_state:
+            "Pipeline success rate has stayed in the high 80s over the last three days; the Platform and Growth teams both contributed commits this week.",
+        claimed_facts: [
+            ...result.claimed_facts,
+            ciRollup,
+            teamRollupBasis,
+            teamBreakdown,
+            latencyTable,
+        ],
+    };
 }
 
 /**
@@ -325,6 +455,13 @@ export function mockScenarios(): readonly MockScenario[] {
             question: canonicalResult.question,
             demonstrates: "Canonical example: full judgment, drivers, evidence, one pruned source.",
             result: completeScenario(),
+        },
+        {
+            id: "rows",
+            question: "How has full-chaos/ask-dev's CI and team investment looked this week?",
+            demonstrates:
+                "Claimed facts carrying rows (CHAOS-4347): a time-axis line chart, an ordinal bar chart with a rollup_basis caption, and an all-numeric fallback table.",
+            result: rowsScenario(),
         },
         {
             id: "degraded",

@@ -20,6 +20,9 @@ export type {
     AcceptedGrammar,
     AnchorOption,
     CandidateOption,
+    ClaimedFact,
+    // CHAOS-4355: a claimed fact's OPTIONAL renderable table (CHAOS-4347).
+    ClaimedFactRow,
     ConfirmedStructureEntry,
     Coverage,
     DriverJudgment,
@@ -29,6 +32,7 @@ export type {
     KindOption,
     PriorSubjectReceiptDispositionEntry,
     RelationshipPath,
+    ScalarValue,
     StructureNeeds,
     StructureOfferSnapshotEntry,
     SubjectCandidate,
