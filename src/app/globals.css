@@ -32,6 +32,19 @@
 
     --radius: 8px;
     --gap: 16px;
+
+    /* Chart categorical series (dataviz skill reference palette, dark
+       values — this stylesheet is dark-first, see the light override
+       below). Fixed hue order, never cycled: a chart with more series than
+       slots folds extras into a table column instead of reusing a hue. */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
 }
 
 @media (prefers-color-scheme: light) {
@@ -50,6 +63,15 @@
         --state-warn: #8a6417;
         --state-bad: #a5423f;
         --state-neutral: #626c7d;
+
+        --series-1: #2a78d6;
+        --series-2: #eb6834;
+        --series-3: #1baf7a;
+        --series-4: #eda100;
+        --series-5: #e87ba4;
+        --series-6: #008300;
+        --series-7: #4a3aa7;
+        --series-8: #e34948;
     }
 }
 
@@ -758,6 +780,133 @@ body {
    row and the composer keep their full content on-screen at 375px with no
    horizontal scroll; the timeline's own `.record`/`.badge` wrapping already
    holds at this width without a rule of its own. */
+/* --- Fact rows panel (CHAOS-4355) ---
+   One panel per claimed fact carrying a renderable `rows` table, stacked
+   under the answer text. Table by default; a chart only when the rows have
+   a time/ordinal axis plus a numeric column (see src/lib/fact-rows.ts). */
+
+.fact-panel__caption {
+    margin: 0 0 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.fact-table-wrap {
+    overflow-x: auto;
+}
+
+.fact-table {
+    width: 100%;
+    min-width: max-content;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.fact-table th,
+.fact-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.fact-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.fact-table td {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.fact-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Small multiples: two or more numeric columns never share one y-scale
+   (dataviz skill — never dual-axis), so each gets its own mini chart in a
+   responsive grid instead. */
+.fact-chart--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.fact-chart__cell {
+    min-width: 0;
+}
+
+.fact-chart__cell-title {
+    display: flex;
+    align-items: center;
+    margin: 0 0 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.fact-chart__legend-swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    flex: 0 0 auto;
+}
+
+.fact-chart__svg {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.fact-chart__gridline {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.fact-chart__axis-label {
+    fill: var(--text-muted);
+    font-size: 10px;
+}
+
+.fact-chart__value-label {
+    fill: var(--text-strong);
+    font-size: 10px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+}
+
+.fact-chart__mark-group:hover .fact-chart__value-label,
+.fact-chart__mark-group:focus-within .fact-chart__value-label {
+    opacity: 1;
+}
+
+/* Every mark (bar/point) is a focusable, keyboard-reachable `<g>` — give it
+   a real visible focus ring, the same accent used everywhere else in this
+   stylesheet, not just a hover-only affordance (codex round 1, CHAOS-4355). */
+.fact-chart__mark-group:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+/* Visually hidden but present for assistive tech — the accessible-data
+   fallback FactRowsPanel renders alongside a chart (codex round 1,
+   CHAOS-4355), same pattern as `.chat-composer__label` above. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 @media (max-width: 480px) {
     .chat__header {
         padding: 16px 14px 12px;

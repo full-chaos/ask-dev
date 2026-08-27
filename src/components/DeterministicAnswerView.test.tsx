@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import type { InvestigationResult } from "@/lib/contracts";
+import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 /**
@@ -54,5 +55,37 @@ describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clari
         render(<DeterministicAnswerView result={base} />);
 
         expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
+    });
+});
+
+/**
+ * CHAOS-4355: a claimed fact's `rows` table renders stacked directly under
+ * the answer text (Answer panel), not per-driver and not folded into
+ * another section.
+ */
+describe("DeterministicAnswerView: fact rows panels (CHAOS-4355)", () => {
+    it("stacks a fact-rows panel immediately after the Answer panel", () => {
+        const result = mockScenarios().find((s) => s.id === "rows")!.result;
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const sections = Array.from(article.querySelectorAll("section.panel"));
+        const answerSectionIndex = sections.findIndex(
+            (section) => section.getAttribute("aria-labelledby") === "answer-title",
+        );
+        expect(answerSectionIndex).toBeGreaterThanOrEqual(0);
+        const nextSection = sections[answerSectionIndex + 1]!;
+        expect(nextSection.querySelector(".panel__title")?.textContent).toMatch(
+            /continuous integration/i,
+        );
+    });
+
+    it("renders no fact-rows panel for a result whose claimed facts carry no rows", () => {
+        const result = mockScenarios().find((s) => s.id === "complete")!.result;
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        expect(article.querySelector(".fact-table-wrap")).toBeNull();
+        expect(article.querySelector(".fact-chart")).toBeNull();
     });
 });

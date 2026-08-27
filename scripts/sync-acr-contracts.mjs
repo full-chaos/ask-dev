@@ -28,11 +28,14 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-4171 PR3: pulls in CHAOS-4171 PR2's bounded offer phrasing
-// (`0c7b5b6c`, #263) and CHAOS-3478/CHAOS-3813's wire-visible
-// PriorSubjectReceiptDisposition (`e946ad90`, #265). Bump procedure lives in
-// README.md.
-export const SOURCE_COMMIT = "e946ad907cdfd66b45895839c7adb65f2e436808";
+// acr main, CHAOS-4355: pins to acr main tip #300 (30f38869), which adds
+// CHAOS-4347's additive `rows` on ClaimedFact/ProjectedFact
+// (`ContextFabricClaimedFactRow`) so the workbench can render a claimed
+// fact's renderable table. Pulls in everything between e946ad90 (the prior
+// pin) and 30f38869, including CHAOS-4335/CHAOS-4336's window-gate fixes,
+// CHAOS-4133's architecture diagrams, and CHAOS-4348's subject-pool
+// reachability fixes. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "30f38869f6ecc1233ddb903ef962d6be4a806a09";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

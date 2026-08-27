@@ -17,6 +17,9 @@ describe("mock investigation fixtures", () => {
     it("covers every status the renderer has to draw", () => {
         expect(mockScenarios().map((scenario) => scenario.result.status)).toEqual([
             "complete",
+            // CHAOS-4355: "rows" is a second `complete` scenario — it exists
+            // to carry `ClaimedFact.rows`, not to add a new status.
+            "complete",
             "degraded",
             "clarification_required",
             "no_match",

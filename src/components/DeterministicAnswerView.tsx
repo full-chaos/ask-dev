@@ -5,6 +5,7 @@ import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
+import { FactRowsPanels } from "@/components/FactRowsPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
@@ -241,6 +242,7 @@ export function DeterministicAnswerView({
             {structureConfirmationNotice}
             {structureNeedsPanel}
             <AnswerPanel result={result} />
+            <FactRowsPanels facts={result.claimed_facts} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
                 title="Remaining work"
