@@ -663,6 +663,24 @@ export default function ChatPage() {
         if (isDeselecting) structureCarry.dropMember(member);
     }
 
+    /**
+     * CHAOS-4355 stopgap (codex review round 2): the SAME explicit-deselect
+     * rule as `toggleStructure` above, for the `subject_candidate` member —
+     * `structureCandidateSelections` is a SEPARATE multi-select hook
+     * (`useCandidateSelections`) with its own toggle semantic (a Set:
+     * deselecting means the id was already in the batch), so it needs its
+     * own wrapper rather than sharing `toggleStructure`'s single-receipt
+     * check. Without this, deselecting a candidate offer left a STALE
+     * carried `subject_candidate` receipt free to ride along on the next
+     * re-ask, silently binding the answer to a candidate the tester had
+     * just rejected.
+     */
+    function toggleStructureCandidate(receiptId: string) {
+        const isDeselecting = structureCandidateSelections.batch.has(receiptId);
+        structureCandidateSelections.toggle(receiptId);
+        if (isDeselecting) structureCarry.dropMember("subject_candidate");
+    }
+
     function chooseCandidates(choices: readonly ClarificationChoice[]) {
         if (
             latestAssistantTurn?.role !== "assistant" ||
@@ -868,9 +886,7 @@ export default function ChatPage() {
                                                 isLatest ? toggleStructure : undefined
                                             }
                                             onToggleStructureCandidate={
-                                                isLatest
-                                                    ? structureCandidateSelections.toggle
-                                                    : undefined
+                                                isLatest ? toggleStructureCandidate : undefined
                                             }
                                             result={turn.outcome.result}
                                             carriedStructureEntries={turn.carriedStructureEntries}
