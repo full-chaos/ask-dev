@@ -102,6 +102,30 @@ describe("selectPresentation", () => {
         expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
     });
 
+    it("rejects an out-of-range calendar date even inside a FULL timestamp (codex round 3)", () => {
+        const rows = [
+            // Date.parse("2026-02-30T10:00:00Z") ALSO silently normalizes to
+            // March — round 2's fix only checked date-only values against
+            // this failure mode; the time-suffixed shape needs the same
+            // component-level validation.
+            row({ day: { string: "2026-02-30T10:00:00Z" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-03-02T10:00:00Z" }, count: { integer: 2 } }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { kind: string } }).axis.kind).toBe("ordinal");
+    });
+
+    it("accepts a real full timestamp with a non-UTC offset as a time axis", () => {
+        const rows = [
+            row({ day: { string: "2026-08-20T23:30:00-07:00" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-08-21T23:30:00-07:00" }, count: { integer: 2 } }),
+        ];
+        const presentation = selectPresentation(rows);
+        expect(presentation.mode).toBe("chart");
+        expect((presentation as { axis: { kind: string } }).axis.kind).toBe("time");
+    });
+
     it("does not classify a column as a time axis when a row is missing the value entirely (falls back to ordinal, never index-spaced pseudo-time)", () => {
         const rows = [
             row({ day: { string: "2026-08-20" }, count: { integer: 1 } }),

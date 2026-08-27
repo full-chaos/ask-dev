@@ -47,9 +47,11 @@ export function columnOrder(rows: readonly ClaimedFactRow[]): string[] {
 
 // ISO 8601 date or date-time — the shape every producer in this codebase
 // emits for a "day" column (devhealthfacts, e.g. `toString(day)` off a
-// ClickHouse `Date`), plus room for a full timestamp.
+// ClickHouse `Date`), plus room for a full timestamp. Captures the
+// calendar-date digits (year/month/day) so `parseIsoDate` can validate them
+// directly, independent of any time/offset suffix.
 const ISO_DATE_PATTERN =
-    /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+    /^(\d{4})-(\d{2})-(\d{2})([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
 const AXIS_NAME_HINTS = new Set(["day", "date", "time", "timestamp", "period", "week", "month"]);
 
@@ -80,28 +82,42 @@ function ordinalAxisPreferenceScore(column: string): number {
 }
 
 /**
+ * True when (year, month, day) is a real calendar date — `Date.UTC` itself
+ * normalizes an out-of-range value instead of rejecting it (day 30 of
+ * February rolls forward into March), so the constructed date's own
+ * component getters are read back and compared against the input.
+ */
+function isValidCalendarDate(year: number, month: number, day: number): boolean {
+    const constructed = new Date(Date.UTC(year, month - 1, day));
+    return (
+        constructed.getUTCFullYear() === year &&
+        constructed.getUTCMonth() === month - 1 &&
+        constructed.getUTCDate() === day
+    );
+}
+
+/**
  * Parses an ISO date/date-time to epoch millis, or null if it does not
- * represent a real calendar date. `Date.parse` normalizes an out-of-range
- * day instead of rejecting it (`2026-02-30` silently becomes March 2), so a
- * date-ONLY value (no time component — every producer in this codebase
- * emits `toString(day)` off a ClickHouse `Date`, this exact shape) is
- * round-tripped: reformat the parsed UTC instant back to `YYYY-MM-DD` and
- * require it to match the input verbatim (codex round 2, CHAOS-4355). A
- * full date-TIME value is not round-tripped the same way — a non-UTC
- * offset can legitimately land on a different UTC calendar day, so that
- * would reject valid input; `Date.parse` already rejects a wholesale
- * malformed date-time (e.g. month 13), which is the failure mode that
- * actually reaches this codebase's own producers.
+ * represent a real calendar date. The year/month/day are validated as
+ * literal digits from the string via `isValidCalendarDate` — never by
+ * round-tripping `Date.parse`'s own output through a UTC-based
+ * re-serialization, which `Date.parse` itself would silently normalize
+ * (`2026-02-30` becomes March 2) and which breaks for a value that carries
+ * a non-UTC offset (its UTC calendar day can legitimately differ from the
+ * literal date it names) — codex rounds 2 and 3, CHAOS-4355. This makes the
+ * check correct for a bare date AND a full offset timestamp alike, by
+ * validating the calendar digits directly instead of anything timezone-
+ * shifted.
  */
 function parseIsoDate(value: string): number | null {
-    if (!ISO_DATE_PATTERN.test(value)) return null;
+    const match = ISO_DATE_PATTERN.exec(value);
+    if (match === null) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (!isValidCalendarDate(year, month, day)) return null;
     const millis = Date.parse(value);
-    if (Number.isNaN(millis)) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-        const roundTripped = new Date(millis).toISOString().slice(0, 10);
-        if (roundTripped !== value) return null;
-    }
-    return millis;
+    return Number.isNaN(millis) ? null : millis;
 }
 
 /** True when `value` carries a time component (a "T" or space time separator), not just a bare date. */
