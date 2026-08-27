@@ -13,6 +13,7 @@ import type {
     ConversationTurn,
     InvestigationRequest,
     InvestigationResult,
+    StructureSubjectKind,
 } from "@/lib/contracts";
 
 /**
@@ -81,6 +82,13 @@ export type InvestigationOptions = {
     readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
     // CHAOS-4012's own addition to the four above, same shape.
     readonly priorCandidateReceipts?: readonly BoundStructureReceipt[] | undefined;
+    /**
+     * CHAOS-4343 item 3: the caller's own explicit `expected_kind` guess(es),
+     * derived from a literal kind noun in the question text (see
+     * `@/lib/kind-nouns`). A plain request field, not a receipt — legal on a
+     * FRESH question with no prior result to redeem one from.
+     */
+    readonly expectedKinds?: readonly StructureSubjectKind[] | undefined;
     // Chat-surface conversation threading. See src/lib/conversation.ts's own
     // header: the Workbench never supplies this (it asks one independent
     // question at a time by design), so it defaults to empty below exactly
@@ -102,6 +110,8 @@ function requestId(): string {
 const MAX_PRIOR_SUBJECT_RECEIPTS = 20;
 /** The contract's own bound on every `prior_*_receipts` structure field (§2.1). */
 const MAX_STRUCTURE_RECEIPTS = 20;
+/** The contract's own bound on `expected_kinds` (CHAOS-3972 P3 §2.3/2.0/DP12(b)). */
+const MAX_EXPECTED_KINDS = 15;
 
 /** Deduplicates by `(result_id, receipt_id)` and caps at `limit`, matching the contract's `uniqueItems`/`maxItems`. */
 function dedupeAndCap<T extends BoundStructureReceipt>(
@@ -126,6 +136,7 @@ export function buildInvestigationRequest(
         readonly priorCandidateReceipts?: readonly BoundStructureReceipt[] | undefined;
     } = {},
     conversation: readonly ConversationTurn[] = [],
+    expectedKinds: readonly StructureSubjectKind[] = [],
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
@@ -212,6 +223,15 @@ export function buildInvestigationRequest(
     // request the contract rejects.
     const conversationTurns = conversation.slice(-MAX_CONVERSATION_TURNS_ON_WIRE);
 
+    // CHAOS-4343 item 3: deduplicated and capped the same way every other
+    // array field above is — `uniqueItems`/`maxItems: 15` on the pinned
+    // contract — then attached only when non-empty (wire minimization,
+    // same as the four structure-receipt fields and `conversation`).
+    const dedupedExpectedKinds = [...new Set(expectedKinds)].slice(
+        0,
+        MAX_EXPECTED_KINDS,
+    ) as NonNullable<InvestigationRequest["expected_kinds"]>;
+
     return {
         schema_version: "context_fabric_investigation_request.v1",
         request_id: requestId(),
@@ -219,6 +239,7 @@ export function buildInvestigationRequest(
         ...(conversationTurns.length > 0 ? { conversation: conversationTurns } : {}),
         prior_subject_receipts: receipts,
         ...structureFields,
+        ...(dedupedExpectedKinds.length > 0 ? { expected_kinds: dedupedExpectedKinds } : {}),
         time_context: { axis: "current" },
         options: {
             max_subject_candidates: 10,
@@ -405,6 +426,7 @@ export async function investigate(
             priorCandidateReceipts: options.priorCandidateReceipts,
         },
         options.conversation ?? [],
+        options.expectedKinds ?? [],
     );
     const body = JSON.stringify(request);
 

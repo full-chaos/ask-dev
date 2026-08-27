@@ -52,6 +52,8 @@ import { structureMemberLabel } from "@/lib/structure-disposition";
  * choice. The caller (page.tsx) owns the batch in shared state and passes
  * the SAME value to both instances.
  */
+const EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS: ReadonlySet<string> = new Set();
+
 export type StructureNeedsPanelProps = {
     /** The issuing result's own id — every receipt below is bound to it, never to the option. */
     readonly resultId: string;
@@ -67,8 +69,30 @@ export type StructureNeedsPanelProps = {
      * not emitted here directly.
      */
     readonly onReject: (member: StructureNeedKind) => void;
-    /** Absent when the surrounding surface cannot re-ask, mirroring ClarificationPanel. */
-    readonly onConfirm?: ((batch: StructureSelectionBatch) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: candidate offers (`subject_candidate`) are the
+     * ONE member a tester may pick SEVERAL of at once — each becomes its own
+     * independent turn-2 request (mirroring `ClarificationPanel`'s own
+     * multi-select). So this is a SEPARATE accumulator from `batch` above,
+     * which models "at most one pick per member" for the other four members.
+     * Owned by the caller, same "controlled prop, survives a view switch"
+     * rule `batch` already holds.
+     */
+    readonly selectedCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    readonly onToggleCandidate?: ((receiptId: string) => void) | undefined;
+    /**
+     * Absent when the surrounding surface cannot re-ask, mirroring
+     * ClarificationPanel. `candidateReceipts` is every currently-selected
+     * candidate, in ACR's OWN order — one confirm action, but the caller
+     * fires one request PER entry (CHAOS-4343 item 2), never one request
+     * carrying several `prior_candidate_receipts`.
+     */
+    readonly onConfirm?:
+        | ((
+              batch: StructureSelectionBatch,
+              candidateReceipts: readonly BoundStructureReceipt[],
+          ) => void)
+        | undefined;
     readonly pending?: boolean | undefined;
 };
 
@@ -270,16 +294,24 @@ function WindowOptionsSection({
     );
 }
 
+/**
+ * CHAOS-4343 items 1/2: the ONE offer section that is MULTI-select — every
+ * other `*OptionsSection` above allows at most one pick (the engine accepts
+ * exactly one confirmed receipt per those members in a request), but a
+ * tester may want several distinct candidates, each firing its own
+ * independent turn-2 request. `selectedReceiptIds` is a Set, not a single
+ * value, for exactly that reason.
+ */
 function CandidateOptionsSection({
     options,
-    selectedReceiptId,
+    selectedReceiptIds,
     pending,
     onToggle,
 }: {
     readonly options: readonly CandidateOption[];
-    readonly selectedReceiptId: string | undefined;
+    readonly selectedReceiptIds: ReadonlySet<string>;
     readonly pending: boolean;
-    readonly onToggle: ((option: CandidateOption) => void) | undefined;
+    readonly onToggle: ((receiptId: string) => void) | undefined;
 }) {
     return (
         <ul className="stack">
@@ -291,14 +323,14 @@ function CandidateOptionsSection({
                         onToggle === undefined
                             ? undefined
                             : () => {
-                                  onToggle(option);
+                                  onToggle(option.receipt_id);
                               }
                     }
                     optionId={option.option_id}
                     pending={pending}
                     phrasing={option.phrasing}
                     receiptId={option.receipt_id}
-                    selected={selectedReceiptId === option.receipt_id}
+                    selected={selectedReceiptIds.has(option.receipt_id)}
                 />
             ))}
         </ul>
@@ -319,6 +351,8 @@ export function StructureNeedsPanel({
     batch,
     onToggle,
     onReject,
+    selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
+    onToggleCandidate,
     onConfirm,
     pending = false,
 }: StructureNeedsPanelProps) {
@@ -503,18 +537,13 @@ export function StructureNeedsPanel({
                     ) : (
                         <CandidateOptionsSection
                             onToggle={
-                                onConfirm === undefined
+                                onConfirm === undefined || onToggleCandidate === undefined
                                     ? undefined
-                                    : (option) => {
-                                          toggle("subject_candidate", {
-                                              result_id: resultId,
-                                              receipt_id: option.receipt_id,
-                                          });
-                                      }
+                                    : onToggleCandidate
                             }
                             options={candidateOptions}
                             pending={pending}
-                            selectedReceiptId={batch.subject_candidate?.receipt_id}
+                            selectedReceiptIds={selectedCandidateReceiptIds}
                         />
                     )}
                 </section>
@@ -533,9 +562,22 @@ export function StructureNeedsPanel({
             ) : (
                 <button
                     className="question-form__submit"
-                    disabled={pending || structureSelectionCount(batch) === 0}
+                    disabled={
+                        pending ||
+                        (structureSelectionCount(batch) === 0 &&
+                            selectedCandidateReceiptIds.size === 0)
+                    }
                     onClick={() => {
-                        onConfirm(batch);
+                        // Built from `candidateOptions` in ACR's OWN order
+                        // (never selection-click order) — same rule
+                        // `ClarificationPanel`'s own confirm handler holds.
+                        const candidateReceipts = candidateOptions
+                            .filter((option) => selectedCandidateReceiptIds.has(option.receipt_id))
+                            .map((option) => ({
+                                result_id: resultId,
+                                receipt_id: option.receipt_id,
+                            }));
+                        onConfirm(batch, candidateReceipts);
                     }}
                     type="button"
                 >

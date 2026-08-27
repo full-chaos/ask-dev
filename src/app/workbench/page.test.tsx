@@ -62,9 +62,7 @@ describe("the clarification choice is reachable from every view", () => {
         expect(
             screen.getByRole("region", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
-        expect(screen.getAllByRole("button", { name: /^Ask again about / }).length).toBeGreaterThan(
-            0,
-        );
+        expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
     });
 
     it("shows no choice panel when the result is an answer", async () => {
@@ -212,5 +210,59 @@ describe("a failure is shown as a failure", () => {
         expect(await screen.findByRole("alert", { name: "No answer" })).toBeInTheDocument();
         expect(screen.queryByRole("article", { name: "Deterministic answer" })).toBeNull();
         expect(screen.queryByRole("tab", { name: "Canonical result" })).toBeNull();
+    });
+});
+
+/**
+ * Medium, codex review round 2: `chooseCandidates`'s sequential loop calls
+ * the SAME `ask()` closure once per selected candidate. `ask()` used to
+ * re-read `candidateSelections.pendingSelectionEvents` itself on every one
+ * of those calls — but a closure captured before the loop started never
+ * sees the effect of its own `.reset()` calls, so every iteration read the
+ * SAME pre-reset (non-empty) value, resending one tester action's telemetry
+ * once per fired request instead of once total.
+ */
+describe("Workbench multi-select telemetry (CHAOS-4343, codex review round 2)", () => {
+    it("emits candidate-selection telemetry once for the whole batch, not once per sequential request", async () => {
+        const [first, second] = clarification.subject_resolution.candidates;
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const user = await ask("Is Atlas on track?");
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.structureSelectionEvents).toEqual([
+            { member: "subject_candidate", outcome: "submitted" },
+            { member: "subject_candidate", outcome: "submitted" },
+        ]);
+        // The SECOND fired request must NOT resend the same telemetry.
+        expect(thirdCallBody).not.toHaveProperty("structureSelectionEvents");
     });
 });

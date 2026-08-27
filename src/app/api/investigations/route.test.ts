@@ -335,6 +335,62 @@ describe("structure receipts are validated with the same discipline as subject r
 });
 
 /**
+ * CHAOS-4343 item 3: `expectedKinds` is a plain, client-computed request
+ * field (see `@/lib/kind-nouns`'s own header) — no receipt, no namespace to
+ * validate, just a closed-vocab array. Same "malformed rejects the whole
+ * request" discipline as every other field this route parses.
+ */
+describe("expectedKinds (CHAOS-4343 item 3)", () => {
+    it("accepts a valid expected-kind hint (past validation)", async () => {
+        const response = await POST(
+            post(JSON.stringify({ question: "What project is this?", expectedKinds: ["project"] })),
+        );
+
+        // Past shape validation: it fails later for missing config, same
+        // "accepts, fails downstream" shape the receipt tests above use.
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    it("accepts several distinct kinds at once", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "Which team owns this project?",
+                    expectedKinds: ["project", "team"],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    it("accepts an absent field (the common case: no literal kind noun matched)", async () => {
+        const response = await POST(post(JSON.stringify({ question: "status?" })));
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    for (const [label, malformed] of [
+        ["not an array", "project"],
+        ["an entry that is not a string", [123]],
+        ["an unrecognized kind", ["not_a_real_kind"]],
+        ["more than 15 entries", Array.from({ length: 16 }, () => "project" as const)],
+    ] as const) {
+        it(`rejects the whole request with a 400 when expectedKinds is ${label}`, async () => {
+            const response = await POST(
+                post(JSON.stringify({ question: "status?", expectedKinds: malformed })),
+            );
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    }
+});
+
+/**
  * CHAOS-4171 standing order: telemetry baked into new logic, same PR. A
  * browser `console.info` lands only in that one viewer's own devtools and
  * is collected nowhere in prod (team-lead ruling, 2026-08-24) — so

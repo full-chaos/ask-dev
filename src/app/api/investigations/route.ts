@@ -7,9 +7,11 @@ import { isDateTimeFormatted } from "@/lib/acr/validate";
 import {
     STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER,
     STRUCTURE_RECEIPT_PREFIX,
+    SUBJECT_KIND_VOCABULARY,
     type BoundStructureReceipt,
     type ConversationTurn,
     type StructureNeedKind,
+    type StructureSubjectKind,
 } from "@/lib/contracts";
 import { emitTelemetryEvent } from "@/lib/telemetry/emit";
 import {
@@ -69,6 +71,14 @@ type InvestigateBody = {
     // CHAOS-4012's own addition, same shape/discipline as the four above
     // (validated against its own candr_ namespace, never filtered).
     readonly priorCandidateReceipts?: unknown;
+    /**
+     * CHAOS-4343 item 3: literal kind nouns in the question ("project",
+     * "repository", "team") bind as an explicit `expected_kinds` guess —
+     * see `@/lib/kind-nouns`'s own header. A plain request field, not a
+     * receipt, so (unlike every `prior*Receipts` field above) it needs no
+     * prior result and is legal on a fresh question.
+     */
+    readonly expectedKinds?: unknown;
     /** Chat-surface conversation threading. See src/lib/conversation.ts's own header. */
     readonly conversation?: unknown;
     /**
@@ -212,6 +222,34 @@ function parseConversation(value: unknown): readonly ConversationTurn[] {
 
 class MalformedConversationError extends Error {
     override readonly name = "MalformedConversationError";
+}
+
+const SUBJECT_KIND_SET: ReadonlySet<string> = new Set(SUBJECT_KIND_VOCABULARY);
+const MAX_EXPECTED_KINDS = 15;
+
+/**
+ * CHAOS-4343 item 3. Same discipline as every other field this route parses:
+ * closed-vocab shape check, malformed REJECTS the whole request rather than
+ * being filtered — a silently-dropped bad entry would look identical to the
+ * literal-noun match never having fired, which is exactly the "silently not
+ * working" class this route already closes for receipts and conversation
+ * turns. `expected_kinds` is entirely client-computed (`@/lib/kind-nouns`),
+ * so a malformed entry should be unreachable in practice — checked anyway.
+ */
+function parseExpectedKinds(value: unknown): readonly StructureSubjectKind[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw new MalformedExpectedKindsError();
+    if (value.length > MAX_EXPECTED_KINDS) throw new MalformedExpectedKindsError();
+    return value.map((entry) => {
+        if (typeof entry !== "string" || !SUBJECT_KIND_SET.has(entry)) {
+            throw new MalformedExpectedKindsError();
+        }
+        return entry as StructureSubjectKind;
+    });
+}
+
+class MalformedExpectedKindsError extends Error {
+    override readonly name = "MalformedExpectedKindsError";
 }
 
 const STRUCTURE_SELECTION_EVENT_MEMBERS: ReadonlySet<string> = new Set(
@@ -407,6 +445,21 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
     }
 
+    let expectedKinds: readonly StructureSubjectKind[];
+    try {
+        expectedKinds = parseExpectedKinds(body.expectedKinds);
+    } catch {
+        return failureResponse(
+            {
+                code: "acr_rejected_request",
+                message:
+                    "The supplied expected-kind hint was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+
     // CHAOS-4171 standing order: emitted here, not where the selection was
     // made — this route is the one place a browser click becomes a server
     // log line (see `emitTelemetryEvent`'s own header for why). Independent
@@ -459,6 +512,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             priorWindowReceipts: structureReceipts.priorWindowReceipts,
             priorCandidateReceipts: structureReceipts.priorCandidateReceipts,
             conversation,
+            expectedKinds,
             signal: request.signal,
         });
         return NextResponse.json({ result }, { status: 200 });

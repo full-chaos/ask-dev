@@ -159,3 +159,38 @@ export type InvestigationStatus =
 /** The closed subject-candidate state vocabulary, as declared by the contract. */
 export type SubjectCandidateState =
     import("@/contracts/generated/investigation-result").SubjectCandidate["state"];
+
+/**
+ * The closed `ContextFabricSubjectKind` vocabulary as a runtime value
+ * (CHAOS-4343 item 3: literal kind nouns in the question bind to
+ * `expected_kinds`, which needs a runtime list to validate against — the
+ * `StructureSubjectKind` type alone is compile-time only).
+ *
+ * Keyed via `Record<StructureSubjectKind, true>` rather than a hand-typed
+ * array literal: a pin bump that adds or removes a kind changes
+ * `StructureSubjectKind`, and `Object.keys` below would silently drift from
+ * it if this were a bare array — the `Record` makes that a compile error
+ * instead, the same discipline `STRUCTURE_RECEIPT_PREFIX` above already
+ * documents for itself.
+ */
+const SUBJECT_KIND_MEMBERSHIP: Record<StructureSubjectKind, true> = {
+    organization: true,
+    team: true,
+    project: true,
+    repository: true,
+    work_item: true,
+    pull_request: true,
+    deployment: true,
+    incident: true,
+    document: true,
+    decision: true,
+    episode: true,
+    metric: true,
+    pull_request_review: true,
+    ci_pipeline_run: true,
+    work_item_ref: true,
+};
+
+export const SUBJECT_KIND_VOCABULARY: readonly StructureSubjectKind[] = Object.keys(
+    SUBJECT_KIND_MEMBERSHIP,
+) as StructureSubjectKind[];

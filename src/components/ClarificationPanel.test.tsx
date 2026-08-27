@@ -7,7 +7,7 @@ import { validateContract } from "@/lib/acr/validate";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
 /**
- * The clarification flow (CHAOS-3738).
+ * The clarification flow (CHAOS-3738; multi-select CHAOS-4343).
  *
  * The fixture is a schema-valid `clarification_required` result, not a
  * fabricated ANSWER. The no-mock-results boundary forbids presenting invented
@@ -33,7 +33,13 @@ describe("clarification fixture", () => {
 
 describe("clarification flow", () => {
     it("leads with the choice rather than an empty answer", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={clarification} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
 
         expect(
             screen.getByRole("region", { name: "Which subject did you mean?" }),
@@ -46,7 +52,13 @@ describe("clarification flow", () => {
     });
 
     it("shows the service's own prompt, never one of its own", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={clarification} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
 
         expect(
             screen.getByText(clarification.subject_resolution.clarification_prompt!),
@@ -54,7 +66,13 @@ describe("clarification flow", () => {
     });
 
     it("shows every candidate with its receipt, rank, confidence and reasons", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={clarification} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
 
         const panel = screen.getByRole("region", { name: "Which subject did you mean?" });
         for (const candidate of clarification.subject_resolution.candidates) {
@@ -74,16 +92,46 @@ describe("clarification flow", () => {
      * judgment ACR did not make.
      */
     it("preserves ACR's candidate order", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={clarification} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
 
         const buttons = screen
-            .getAllByRole("button", { name: /^Ask again about / })
+            .getAllByRole("button", { name: /^Select / })
             .map((button) => button.textContent);
         expect(buttons).toEqual(
             clarification.subject_resolution.candidates.map(
-                (candidate) => `Ask again about ${candidate.subject.label}`,
+                (candidate) => `Select ${candidate.subject.label}`,
             ),
         );
+    });
+
+    /**
+     * CHAOS-4343 items 1/2: selection leads, confirming follows — mirrors
+     * `StructureNeedsPanel`'s own "select, then confirm" discipline. A single
+     * toggle must not fire a request by itself.
+     */
+    it("toggling a candidate calls onToggle with its receipt id, and does not confirm by itself", async () => {
+        const onToggle = vi.fn();
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={onConfirm}
+                onToggleCandidate={onToggle}
+                result={clarification}
+            />,
+        );
+
+        const second = clarification.subject_resolution.candidates[1]!;
+        await user.click(screen.getByRole("button", { name: `Select ${second.subject.label}` }));
+
+        expect(onToggle).toHaveBeenCalledWith(second.receipt_id);
+        expect(onConfirm).not.toHaveBeenCalled();
     });
 
     /**
@@ -91,34 +139,109 @@ describe("clarification flow", () => {
      * name — so the Workbench never names or authorizes a subject on the
      * tester's behalf.
      */
-    it("returns the chosen candidate's receipt bound to this result", async () => {
-        const onChoose = vi.fn();
+    it("confirming a single selection sends that candidate's receipt bound to this result", async () => {
+        const onConfirm = vi.fn();
         const user = userEvent.setup();
-        render(<DeterministicAnswerView onChooseCandidate={onChoose} result={clarification} />);
-
         const second = clarification.subject_resolution.candidates[1]!;
-        await user.click(
-            screen.getByRole("button", { name: `Ask again about ${second.subject.label}` }),
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={onConfirm}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+                selectedCandidateReceiptIds={new Set([second.receipt_id])}
+            />,
         );
 
-        expect(onChoose).toHaveBeenCalledWith({
-            result_id: clarification.result_id,
-            receipt_id: second.receipt_id,
-        });
+        await user.click(screen.getByRole("button", { name: /^Ask about 1 selected candidate$/ }));
+
+        expect(onConfirm).toHaveBeenCalledWith([
+            { result_id: clarification.result_id, receipt_id: second.receipt_id },
+        ]);
+    });
+
+    /**
+     * Item 2: N selections confirm as N entries, in ACR's OWN candidate
+     * order — never the order the tester happened to click them in.
+     */
+    it("confirming multiple selections sends every chosen candidate's receipt, in ACR's order", async () => {
+        const onConfirm = vi.fn();
+        const user = userEvent.setup();
+        const [first, second] = clarification.subject_resolution.candidates;
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={onConfirm}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+                // Selected out of ACR's own order (second before first) —
+                // the confirmed payload must still come back first-then-second.
+                selectedCandidateReceiptIds={new Set([second!.receipt_id, first!.receipt_id])}
+            />,
+        );
+
+        await user.click(screen.getByRole("button", { name: /^Ask about 2 selected candidates$/ }));
+
+        expect(onConfirm).toHaveBeenCalledWith([
+            { result_id: clarification.result_id, receipt_id: first!.receipt_id },
+            { result_id: clarification.result_id, receipt_id: second!.receipt_id },
+        ]);
+    });
+
+    it("disables the confirm action until at least one candidate is selected", () => {
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
+
+        expect(
+            screen.getByRole("button", { name: "Ask about the selected candidates" }),
+        ).toBeDisabled();
+    });
+
+    it("shows a selected badge on a chosen candidate", () => {
+        const first = clarification.subject_resolution.candidates[0]!;
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+                selectedCandidateReceiptIds={new Set([first.receipt_id])}
+            />,
+        );
+
+        expect(
+            screen.getByRole("button", { name: `Unselect ${first.subject.label}` }),
+        ).toBeInTheDocument();
     });
 
     it("disables the choices while a re-ask is in flight", () => {
         render(
-            <DeterministicAnswerView onChooseCandidate={vi.fn()} pending result={clarification} />,
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                pending
+                result={clarification}
+            />,
         );
 
-        for (const button of screen.getAllByRole("button", { name: /^Ask again about / })) {
+        for (const button of screen.getAllByRole("button", { name: /^Select / })) {
             expect(button).toBeDisabled();
         }
+        expect(
+            screen.getByRole("button", { name: "Ask about the selected candidates" }),
+        ).toBeDisabled();
     });
 
     it("still shows coverage and limitations alongside the choice", () => {
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={clarification} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={clarification}
+            />,
+        );
 
         expect(screen.getByRole("region", { name: "Coverage" })).toBeInTheDocument();
         expect(screen.getByRole("region", { name: "Limitations" })).toBeInTheDocument();
@@ -133,10 +256,16 @@ describe("clarification flow", () => {
             ...clarification,
             subject_resolution: { candidates: [], committed: [] },
         };
-        render(<DeterministicAnswerView onChooseCandidate={vi.fn()} result={empty} />);
+        render(
+            <DeterministicAnswerView
+                onConfirmCandidates={vi.fn()}
+                onToggleCandidate={vi.fn()}
+                result={empty}
+            />,
+        );
 
         expect(screen.getByText(/nothing to choose/)).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Select / })).toBeNull();
     });
 
     /**
@@ -161,7 +290,8 @@ describe("clarification flow", () => {
         }
         // ...it says it cannot act here...
         expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
-        expect(screen.queryByRole("button", { name: /^Ask again about / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Select / })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Ask about (the selected|\d)/ })).toBeNull();
         // ...and the answer shape is absent.
         expect(screen.queryByRole("region", { name: "Answer" })).toBeNull();
         expect(screen.queryByRole("region", { name: "Remaining work" })).toBeNull();

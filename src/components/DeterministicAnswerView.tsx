@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { AnswerPanel } from "@/components/AnswerPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
@@ -22,10 +24,42 @@ import {
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
-    /** Supplied when the surface can re-ask; omitted in read-only contexts. */
-    readonly onChooseCandidate?: ((choice: ClarificationChoice) => void) | undefined;
-    /** CHAOS-3927 P2: supplied when the surface can re-ask with structure receipts. */
-    readonly onConfirmStructure?: ((batch: StructureSelectionBatch) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: the candidate receipt ids selected so far on
+     * THIS result, owned by the caller — same "shared across every
+     * simultaneous rendering" rule `structureBatch` already holds below.
+     */
+    readonly selectedCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    /** Toggles one candidate's selection. Supplied when the surface can re-ask. */
+    readonly onToggleCandidate?: ((receiptId: string) => void) | undefined;
+    /**
+     * Fires once per confirmed selection (see `ClarificationPanel`'s own
+     * `onConfirm` doc comment): the caller re-asks about EVERY entry in
+     * `choices`, each as its own independent turn-2 request.
+     */
+    readonly onConfirmCandidates?: ((choices: readonly ClarificationChoice[]) => void) | undefined;
+    /**
+     * CHAOS-4343 items 1/2: the STRUCTURE_NEEDS candidate axis
+     * (`candidate_options`, CHAOS-4012) — a SEPARATE surface from
+     * `selectedCandidateReceiptIds` above (`subject_resolution.candidates`),
+     * with its own receipt namespace (`candr_` via `prior_candidate_receipts`
+     * vs the unconstrained `prior_subject_receipts`). Same multi-select
+     * discipline: several picks, each its own turn-2 request.
+     */
+    readonly selectedStructureCandidateReceiptIds?: ReadonlySet<string> | undefined;
+    readonly onToggleStructureCandidate?: ((receiptId: string) => void) | undefined;
+    /**
+     * CHAOS-3927 P2: supplied when the surface can re-ask with structure
+     * receipts. `candidateReceipts` mirrors `onConfirmCandidates`'s own
+     * array — every currently-selected `candidate_options` entry, one
+     * request per entry.
+     */
+    readonly onConfirmStructure?:
+        | ((
+              batch: StructureSelectionBatch,
+              candidateReceipts: readonly BoundStructureReceipt[],
+          ) => void)
+        | undefined;
     /**
      * The shared selection batch (codex round 3): owned by the caller, not
      * this view, because the SAME StructureNeedsPanel offers are also
@@ -63,9 +97,15 @@ export type DeterministicAnswerViewProps = {
  * itself said it cannot support. Coverage and limitations are never collapsed
  * away and never shown only on failure.
  */
+const EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS: ReadonlySet<string> = new Set();
+
 export function DeterministicAnswerView({
     result,
-    onChooseCandidate,
+    selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
+    onToggleCandidate,
+    onConfirmCandidates,
+    selectedStructureCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
+    onToggleStructureCandidate,
     onConfirmStructure,
     structureBatch = EMPTY_STRUCTURE_SELECTION_BATCH,
     // No-op default: harmless, because the offer buttons that would call it
@@ -77,6 +117,13 @@ export function DeterministicAnswerView({
     pending = false,
     chosenSubject,
 }: DeterministicAnswerViewProps) {
+    // Portability/multi-instance safety (codex review round 2, CHAOS-4343:
+    // several DeterministicAnswerView instances now commonly coexist — one
+    // per stacked turn — so a hardcoded heading id here breaks
+    // `aria-labelledby` the same way it did in `ClarificationPanel` before
+    // that fix, the same class `StructureNeedsPanel` already guards against
+    // with `useId()`).
+    const idPrefix = useId();
     // Rendered in BOTH branches below. A dishonoured choice is invisible
     // otherwise: an answer reads as being about the chosen subject, and a second
     // clarification reads as an ordinary one.
@@ -118,8 +165,10 @@ export function DeterministicAnswerView({
                 onConfirm={onConfirmStructure}
                 onReject={onRejectStructure}
                 onToggle={onToggleStructure}
+                onToggleCandidate={onToggleStructureCandidate}
                 pending={pending}
                 resultId={result.result_id}
+                selectedCandidateReceiptIds={selectedStructureCandidateReceiptIds}
                 structureNeeds={result.structure_needs}
             />
         );
@@ -156,13 +205,18 @@ export function DeterministicAnswerView({
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
                 <ClarificationPanel
-                    onChoose={onChooseCandidate}
+                    onConfirm={onConfirmCandidates}
+                    onToggle={onToggleCandidate}
                     pending={pending}
                     result={result}
+                    selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
-                <section className="panel" aria-labelledby="clarification-limitations-title">
-                    <h2 className="panel__title" id="clarification-limitations-title">
+                <section
+                    className="panel"
+                    aria-labelledby={`${idPrefix}-clarification-limitations-title`}
+                >
+                    <h2 className="panel__title" id={`${idPrefix}-clarification-limitations-title`}>
                         Limitations
                     </h2>
                     {result.limitations.length === 0 ? (
@@ -205,8 +259,8 @@ export function DeterministicAnswerView({
             />
             <CoveragePanel coverage={result.coverage} />
 
-            <section className="panel" aria-labelledby="limitations-title">
-                <h2 className="panel__title" id="limitations-title">
+            <section className="panel" aria-labelledby={`${idPrefix}-limitations-title`}>
+                <h2 className="panel__title" id={`${idPrefix}-limitations-title`}>
                     Limitations
                 </h2>
                 {result.limitations.length === 0 ? (
@@ -236,8 +290,8 @@ export function DeterministicAnswerView({
                 ) : null}
             </section>
 
-            <section className="panel" aria-labelledby="evidence-title">
-                <h2 className="panel__title" id="evidence-title">
+            <section className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
+                <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>
                     Evidence references
                 </h2>
                 {result.evidence_ref_ids.length === 0 ? (
