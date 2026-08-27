@@ -1049,6 +1049,110 @@ describe("CHAOS-4355: carried structure receipts survive a re-ask that doesn't r
     });
 
     /**
+     * Codex review round 2 (branch scope vs origin/main): deselecting a
+     * `structure_needs.candidate_options` offer (the `subject_candidate`
+     * member, via the SEPARATE `structureCandidateSelections` multi-select
+     * hook) never told the carry — only `toggleStructure`'s single-receipt
+     * members (kind/anchor/handle/window) dropped on deselect. So a
+     * rejected candidate stayed carried and rode silently along on the next
+     * re-ask, bound to a candidate the tester had just rejected.
+     *
+     * Turn 1 confirms a `subject_candidate` receipt alone (so the carry
+     * records it, mirroring `deriveCarryUpdate`'s own applied+receipt
+     * rule). Turn 2 selects a DIFFERENT candidate offer, then deselects it
+     * (net zero picks) but confirms a window pick instead — a re-ask that
+     * never touches `subject_candidate` explicitly. The fix: turn 3's
+     * request must carry no `priorCandidateReceipts` at all.
+     */
+    it("codex R2: an explicit deselect on a later turn drops the carried subject_candidate before the next re-ask", async () => {
+        const [firstOption, secondOption] = structureCandidate.structure_needs!.candidate_options!;
+
+        // What ACR returns to turn 1's candidate confirm: the candidate
+        // applied, plus a FRESH structure_needs offering both a window and
+        // another round of candidates (so turn 2 has something to
+        // select-and-deselect, and something else to confirm instead).
+        const turn2ResultR2: InvestigationResult = {
+            ...structuredClone(clarification),
+            result_id: "result_r2_turn2_0001",
+            request_id: "request_r2_turn2_0001",
+            structure_needs: {
+                missing: ["window", "subject_candidate"],
+                window_options: anchorWindow.structure_needs!.window_options,
+                candidate_options: structureCandidate.structure_needs!.candidate_options,
+            } as NonNullable<InvestigationResult["structure_needs"]>,
+            confirmed_structure: [
+                {
+                    member: "subject_candidate",
+                    applied_value: firstOption!.canonical_id,
+                    source: "receipt",
+                    prior_result_id: "result_r2_turn1_0001",
+                    receipt_id: firstOption!.receipt_id,
+                    offer_source: "engine",
+                    provenance: "clarification_confirmed",
+                    disposition: "applied",
+                },
+            ] as NonNullable<InvestigationResult["confirmed_structure"]>,
+        };
+
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureCandidate }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: turn2ResultR2 }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        // Turn 1 -> 2: confirm ONE subject_candidate offer alone.
+        await ask("Who owns this?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${firstOption!.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        await screen.findAllByRole("article", { name: "Deterministic answer" });
+
+        // Turn 2 -> 3: select a candidate, then deselect it again (net zero
+        // picks on THIS axis) — but pick a window too, so the confirm
+        // button is enabled and this is a genuine re-ask, not a no-op.
+        const secondOptionButton = await screen.findByRole("button", {
+            name: `Select ${secondOption!.label}`,
+        });
+        await user.click(secondOptionButton); // select
+        await user.click(secondOptionButton); // deselect — must drop the carry
+        const windowOptionR2 = anchorWindow.structure_needs!.window_options![0]!;
+        await user.click(screen.getByRole("button", { name: `Select ${windowOptionR2.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        expect(
+            await screen.findAllByRole("article", { name: "Deterministic answer" }),
+        ).toHaveLength(3);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        // The fix: turn 3 never touched subject_candidate explicitly, and
+        // the tester's own deselect on turn 2 must have dropped the carry
+        // — no stale, just-rejected candidate rides along.
+        expect(thirdCallBody.priorCandidateReceipts ?? []).toEqual([]);
+        expect(thirdCallBody.priorWindowReceipts).toEqual([
+            { result_id: turn2ResultR2.result_id, receipt_id: windowOptionR2.receipt_id },
+        ]);
+    });
+
+    /**
      * Codex review round 1, finding 1 (P1): a fan-out fires N independent,
      * CONCURRENT requests, and each can settle in any order. Folding every
      * sibling's own `confirmed_structure` echo into the ONE shared carry let
