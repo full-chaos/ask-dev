@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { AnswerPanel } from "@/components/AnswerPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
@@ -115,6 +117,13 @@ export function DeterministicAnswerView({
     pending = false,
     chosenSubject,
 }: DeterministicAnswerViewProps) {
+    // Portability/multi-instance safety (codex review round 2, CHAOS-4343:
+    // several DeterministicAnswerView instances now commonly coexist — one
+    // per stacked turn — so a hardcoded heading id here breaks
+    // `aria-labelledby` the same way it did in `ClarificationPanel` before
+    // that fix, the same class `StructureNeedsPanel` already guards against
+    // with `useId()`).
+    const idPrefix = useId();
     // Rendered in BOTH branches below. A dishonoured choice is invisible
     // otherwise: an answer reads as being about the chosen subject, and a second
     // clarification reads as an ordinary one.
@@ -203,8 +212,11 @@ export function DeterministicAnswerView({
                     selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
-                <section className="panel" aria-labelledby="clarification-limitations-title">
-                    <h2 className="panel__title" id="clarification-limitations-title">
+                <section
+                    className="panel"
+                    aria-labelledby={`${idPrefix}-clarification-limitations-title`}
+                >
+                    <h2 className="panel__title" id={`${idPrefix}-clarification-limitations-title`}>
                         Limitations
                     </h2>
                     {result.limitations.length === 0 ? (
@@ -247,8 +259,8 @@ export function DeterministicAnswerView({
             />
             <CoveragePanel coverage={result.coverage} />
 
-            <section className="panel" aria-labelledby="limitations-title">
-                <h2 className="panel__title" id="limitations-title">
+            <section className="panel" aria-labelledby={`${idPrefix}-limitations-title`}>
+                <h2 className="panel__title" id={`${idPrefix}-limitations-title`}>
                     Limitations
                 </h2>
                 {result.limitations.length === 0 ? (
@@ -278,8 +290,8 @@ export function DeterministicAnswerView({
                 ) : null}
             </section>
 
-            <section className="panel" aria-labelledby="evidence-title">
-                <h2 className="panel__title" id="evidence-title">
+            <section className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
+                <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>
                     Evidence references
                 </h2>
                 {result.evidence_ref_ids.length === 0 ? (

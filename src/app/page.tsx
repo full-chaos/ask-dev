@@ -21,7 +21,6 @@ import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
     EMPTY_SELECTION_EVENTS,
-    pendingStructureBatchOrUndefined,
     type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
@@ -68,10 +67,11 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
  *     confirm" discipline) and the confirm action — the thing that actually
  *     composes and sends the next request — follows the selection, never the
  *     other way around.
- *  2. Confirming N selected candidates fires N INDEPENDENT turn-2 requests,
- *     each landing as its own stacked assistant turn with its own
- *     pending/answered/failed status (`askMany` below) — not one request
- *     carrying several candidate receipts.
+ *  2. Confirming N selected candidates (across EITHER candidate axis, or
+ *     both at once) fires N INDEPENDENT turn-2 requests, each landing as its
+ *     own stacked assistant turn with its own pending/answered/failed status
+ *     (`confirmSelections` below) — not one request carrying several
+ *     candidate receipts.
  *
  * Item 3 (literal kind nouns bind as an explicit receipt) needs no timeline
  * change: `literalKindNounsInQuestion` runs on every outgoing `question`
@@ -157,15 +157,16 @@ const BOTTOM_PIN_THRESHOLD_PX = 48;
 
 /**
  * The one place a request actually goes out over the wire, shared by `ask`
- * (one request) and `askMany` (N independent requests, CHAOS-4343 item 2) —
- * both build the SAME body shape and interpret the SAME response shape, and
- * duplicating that between them would be the two-branches-one-tested trap:
- * a fix to one would silently not apply to the other.
+ * (one request) and `confirmSelections` (N independent requests, CHAOS-4343
+ * items 1/2) — both build the SAME body shape and interpret the SAME
+ * response shape, and duplicating that between them would be the
+ * two-branches-one-tested trap: a fix to one would silently not apply to
+ * the other.
  *
  * Takes no turn ids and touches no timeline state: the caller owns settling
- * whichever turn(s) this outcome belongs to, which is what lets `askMany`
- * fire several of these concurrently and settle each independently as it
- * resolves, rather than waiting for the slowest.
+ * whichever turn(s) this outcome belongs to, which is what lets
+ * `confirmSelections` fire several of these concurrently and settle each
+ * independently as it resolves, rather than waiting for the slowest.
  */
 async function fireInvestigation(params: {
     readonly question: string;
@@ -392,11 +393,54 @@ export default function ChatPage() {
     }
 
     /**
-     * CHAOS-4343 item 2: fires N independent turn-2 requests, one per
-     * confirmed candidate selection, each landing as its OWN stacked
-     * assistant turn with its own pending/answered/failed status — never one
-     * request carrying several candidate receipts, and never blocked on the
-     * others (each settles the moment ITS OWN response arrives).
+     * ACR's own order for whichever candidate axis the CURRENT confirm
+     * action is NOT driving (codex review round 2: "mixed candidate axes
+     * silently lose each other" — confirming one axis used to drop any
+     * pending-but-unconfirmed picks in the OTHER one entirely). Mirrors
+     * exactly what `ClarificationPanel`/`StructureNeedsPanel` themselves do
+     * to build their own `choices`/`candidateReceipts` arrays: filter the
+     * result's own candidate list by membership, never re-sort.
+     */
+    function subjectChoicesInAcrOrder(
+        result: InvestigationResult,
+        selectedIds: ReadonlySet<string>,
+    ): readonly ClarificationChoice[] {
+        return result.subject_resolution.candidates
+            .filter((candidate) => selectedIds.has(candidate.receipt_id))
+            .map((candidate) => ({
+                result_id: result.result_id,
+                receipt_id: candidate.receipt_id,
+            }));
+    }
+
+    function structureCandidateReceiptsInAcrOrder(
+        result: InvestigationResult,
+        selectedIds: ReadonlySet<string>,
+    ): readonly BoundStructureReceipt[] {
+        return (result.structure_needs?.candidate_options ?? [])
+            .filter((option) => selectedIds.has(option.receipt_id))
+            .map((option) => ({ result_id: result.result_id, receipt_id: option.receipt_id }));
+    }
+
+    /**
+     * CHAOS-4343 items 1/2: fires one independent turn-2 request PER entry
+     * across BOTH candidate axes combined (`subjectChoices` —
+     * `subject_resolution.candidates` via `ClarificationPanel` —
+     * and `structureCandidateReceipts` — `structure_needs.candidate_options`
+     * via `StructureNeedsPanel`), each landing as its OWN stacked assistant
+     * turn with its own pending/answered/failed status. Never one request
+     * carrying several candidate receipts, and never blocked on the others
+     * (each settles the moment ITS OWN response arrives).
+     *
+     * Whichever axis the tester actually clicked "confirm" on supplies most
+     * of these entries; the OTHER axis's pending-but-unconfirmed picks (if
+     * any) ride along too — see `subjectChoicesInAcrOrder`/
+     * `structureCandidateReceiptsInAcrOrder` above and this function's two
+     * call sites (`chooseCandidates`/`chooseStructure`).
+     *
+     * Callers must not invoke this with BOTH arrays empty — that case is the
+     * ordinary "no candidate axis in play" re-ask, which stays a single
+     * plain `ask()` call so its wire shape and existing tests are unchanged.
      *
      * The question is appended as a SINGLE user turn shared by every fired
      * request below it — it is the identical, unchanged text on every one of
@@ -404,123 +448,63 @@ export default function ChatPage() {
      * repeating it once per candidate would only look like N separate things
      * were asked when exactly one was.
      */
-    function askMany(
-        question: string,
-        choices: readonly ClarificationChoice[],
-        chosenSubjects: readonly (SubjectRef | undefined)[],
-        structureSelectionsToSend?: StructureSelectionBatch,
+    function confirmSelections(
+        result: InvestigationResult,
+        subjectChoices: readonly ClarificationChoice[],
+        structureCandidateReceipts: readonly BoundStructureReceipt[],
+        otherStructureBatch: StructureSelectionBatch,
     ): void {
-        if (choices.length === 0) return;
+        const question = result.question;
+        if (subjectChoices.length === 0 && structureCandidateReceipts.length === 0) return;
         const conversation = buildConversationTurns(turns);
-        structureSelections.reset();
-        candidateSelections.reset();
-        structureCandidateSelections.reset();
-        const askedAt = new Date().toISOString();
-
-        const structureReceiptFields =
-            structureSelectionsToSend === undefined
-                ? {}
-                : buildStructureReceiptFields(structureSelectionsToSend);
-        // All three selection hooks' queued outcomes belong to this ONE
-        // tester action (picking N candidates, optionally alongside a
-        // structure pick — including an unconfirmed structure-candidate
-        // toggle, codex review) — emitted once, on the first of the N fired
-        // requests below, never once per request: N identical telemetry
-        // events would overcount one action as N (see the per-request
-        // comment below).
+        // Read BEFORE any reset() — a plain synchronous read at the top of
+        // this ONE call, never re-read after a loop iteration's own
+        // re-render (codex review: a stale closure re-reading a hook after
+        // `.reset()` sees the SAME pre-reset value on every iteration,
+        // which is why the per-request fan-out below fires everything from
+        // ONE synchronous pass rather than a sequence of awaited `ask()`
+        // calls that could each re-enter this component's hooks).
         const selectionEvents = [
             ...structureSelections.pendingSelectionEvents,
             ...candidateSelections.pendingSelectionEvents,
             ...structureCandidateSelections.pendingSelectionEvents,
         ];
+        structureSelections.reset();
+        candidateSelections.reset();
+        structureCandidateSelections.reset();
+        const askedAt = new Date().toISOString();
 
-        const userTurnId = nextId.current++;
-        const assistantTurns = choices.map((choice, index) => ({
-            id: nextId.current++,
-            choice,
-            chosenSubject: chosenSubjects[index],
-        }));
+        const structureReceiptFieldsBase = buildStructureReceiptFields(otherStructureBatch);
 
-        setTurns((current) => [
-            ...current,
-            { role: "user", id: userTurnId, question, createdAt: askedAt },
-            ...assistantTurns.map(({ id, chosenSubject }) => ({
-                role: "assistant" as const,
-                id,
-                createdAt: askedAt,
-                outcome: { kind: "pending" as const },
-                chosenSubject,
-                submittedStructureBatch: undefined,
-                submittedCandidateReceiptIds: undefined,
-                submittedStructureCandidateReceiptIds: undefined,
-                retryQuestion: undefined,
+        type PendingItem =
+            | { readonly kind: "subject"; readonly choice: ClarificationChoice }
+            | { readonly kind: "structure"; readonly receipt: BoundStructureReceipt };
+        const items: readonly PendingItem[] = [
+            ...subjectChoices.map((choice): PendingItem => ({ kind: "subject", choice })),
+            ...structureCandidateReceipts.map((receipt): PendingItem => ({
+                kind: "structure",
+                receipt,
             })),
-        ]);
-
-        assistantTurns.forEach(({ id, choice }, index) => {
-            void fireInvestigation({
-                question,
-                priorSubjectReceipts: [choice],
-                conversation,
-                structureReceiptFields,
-                selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            }).then((outcome) => {
-                settleTurn(id, outcome);
-            });
-        });
-    }
-
-    /**
-     * CHAOS-4343 items 1/2, the `structure_needs.candidate_options` twin of
-     * `askMany` above: fires N independent turn-2 requests, one per
-     * confirmed `subject_candidate` structure pick, each carrying the SAME
-     * other structure picks (kind/anchor/handle/window) plus exactly ONE
-     * candidate receipt — never one request with several
-     * `prior_candidate_receipts`. `otherBatch` never itself carries
-     * `subject_candidate` (the caller-side `StructureNeedsPanel` no longer
-     * drives that member through the single-pick `batch` at all — see its
-     * own `selectedCandidateReceiptIds` prop).
-     */
-    function askManyStructure(
-        question: string,
-        otherBatch: StructureSelectionBatch,
-        candidateReceipts: readonly BoundStructureReceipt[],
-    ): void {
-        if (candidateReceipts.length === 0) return;
-        const conversation = buildConversationTurns(turns);
-        structureSelections.reset();
-        structureCandidateSelections.reset();
-        candidateSelections.reset();
-        const askedAt = new Date().toISOString();
-
-        // All three hooks merged — same reason `ask()`/`askMany()` do
-        // (codex review): an unconfirmed `candidateSelections` toggle must
-        // not be silently dropped just because THIS action confirmed the
-        // structure-candidate axis instead.
-        const selectionEvents = [
-            ...structureSelections.pendingSelectionEvents,
-            ...structureCandidateSelections.pendingSelectionEvents,
-            ...candidateSelections.pendingSelectionEvents,
         ];
 
         const userTurnId = nextId.current++;
-        const assistantTurns = candidateReceipts.map((receipt) => ({
-            id: nextId.current++,
-            receipt,
-        }));
+        const assistantTurns = items.map((item) => ({ id: nextId.current++, item }));
 
         setTurns((current) => [
             ...current,
             { role: "user", id: userTurnId, question, createdAt: askedAt },
-            ...assistantTurns.map(({ id }) => ({
+            ...assistantTurns.map(({ id, item }) => ({
                 role: "assistant" as const,
                 id,
                 createdAt: askedAt,
                 outcome: { kind: "pending" as const },
                 // Structure `candidate_options` entries carry no `SubjectRef`
                 // (unlike `subject_resolution.candidates`) — nothing to show
-                // via ChoiceNotice, same as every other structure confirm.
-                chosenSubject: undefined,
+                // via ChoiceNotice for those.
+                chosenSubject:
+                    item.kind === "subject"
+                        ? subjectForReceipt(result, item.choice.receipt_id)
+                        : undefined,
                 submittedStructureBatch: undefined,
                 submittedCandidateReceiptIds: undefined,
                 submittedStructureCandidateReceiptIds: undefined,
@@ -528,14 +512,18 @@ export default function ChatPage() {
             })),
         ]);
 
-        assistantTurns.forEach(({ id, receipt }, index) => {
-            const structureReceiptFields = buildStructureReceiptFields({
-                ...otherBatch,
-                subject_candidate: receipt,
-            });
+        assistantTurns.forEach(({ id, item }, index) => {
+            const priorSubjectReceipts = item.kind === "subject" ? [item.choice] : [];
+            const structureReceiptFields =
+                item.kind === "structure"
+                    ? buildStructureReceiptFields({
+                          ...otherStructureBatch,
+                          subject_candidate: item.receipt,
+                      })
+                    : structureReceiptFieldsBase;
             void fireInvestigation({
                 question,
-                priorSubjectReceipts: [],
+                priorSubjectReceipts,
                 conversation,
                 structureReceiptFields,
                 selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
@@ -544,49 +532,56 @@ export default function ChatPage() {
             });
         });
     }
-
     const latestAssistantTurn = [...turns].reverse().find((turn) => turn.role === "assistant");
 
     function chooseCandidates(choices: readonly ClarificationChoice[]) {
         if (
             latestAssistantTurn?.role !== "assistant" ||
-            latestAssistantTurn.outcome.kind !== "answered" ||
-            choices.length === 0
+            latestAssistantTurn.outcome.kind !== "answered"
         ) {
             return;
         }
         const { result } = latestAssistantTurn.outcome;
-        // Mixed-receipt-family unification: a response can carry BOTH subject
-        // candidates and a structure_needs disclosure at once. Any structure
-        // picks the tester already made in this SAME turn — accumulated but
-        // not yet confirmed — must travel alongside EVERY fired candidate
-        // request, or `askMany()` resetting the shared selection hook below
-        // would silently drop them.
-        const pendingStructureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
-        // Snapshotted BEFORE `askMany()` resets the shared hooks and appends
-        // new turns — otherwise this turn's own frozen echo would render as
-        // if nothing had ever been picked (codex review round 1, finding 3;
-        // extended to the candidate axis in a later round: without this, a
-        // frozen turn's candidate panel loses every "selected" badge the
-        // instant a newer turn takes over the shared selection hook).
+        const pendingStructureBatch = structureSelections.batch;
+        // Mixed-receipt-family unification (codex review round 2): a
+        // pending-but-unconfirmed STRUCTURE-candidate pick must ride along
+        // too, not just the ordinary kind/anchor/handle/window batch.
+        const pendingStructureCandidateReceipts = structureCandidateReceiptsInAcrOrder(
+            result,
+            structureCandidateSelections.batch,
+        );
+        if (choices.length === 0 && pendingStructureCandidateReceipts.length === 0) return;
+
+        // Snapshotted BEFORE `confirmSelections()` resets the shared hooks
+        // and appends new turns — otherwise this turn's own frozen echo
+        // would render as if nothing had ever been picked (codex review
+        // round 1, finding 3; extended to the candidate axes in later
+        // rounds: without this, a frozen turn's candidate panel loses every
+        // "selected" badge the instant a newer turn takes over the shared
+        // selection hook).
         const supersededTurnId = latestAssistantTurn.id;
         const submittedCandidateReceiptIds = new Set(choices.map((choice) => choice.receipt_id));
+        const submittedStructureCandidateReceiptIds = new Set(
+            pendingStructureCandidateReceipts.map((receipt) => receipt.receipt_id),
+        );
         setTurns((current) =>
             current.map((turn) =>
                 turn.role === "assistant" && turn.id === supersededTurnId
                     ? {
                           ...turn,
-                          submittedStructureBatch:
-                              pendingStructureBatch ?? turn.submittedStructureBatch,
+                          submittedStructureBatch: pendingStructureBatch,
                           submittedCandidateReceiptIds,
+                          submittedStructureCandidateReceiptIds,
                       }
                     : turn,
             ),
         );
-        const chosenSubjects = choices.map((choice) =>
-            subjectForReceipt(result, choice.receipt_id),
+        confirmSelections(
+            result,
+            choices,
+            pendingStructureCandidateReceipts,
+            pendingStructureBatch,
         );
-        askMany(result.question, choices, chosenSubjects, pendingStructureBatch);
     }
 
     /**
@@ -594,8 +589,10 @@ export default function ChatPage() {
      * candidate_options` entry (CHAOS-4343 items 1/2) — empty in the
      * ordinary case (no candidate axis, or none picked), in which case this
      * behaves exactly as before: one re-ask carrying `batch`. Non-empty
-     * fans out into N independent requests via `askManyStructure`, one per
-     * entry, each also carrying every OTHER member `batch` holds.
+     * fans out into independent requests via `confirmSelections`, one per
+     * entry (plus any pending SUBJECT-candidate picks, codex review round 2
+     * — mixed axes must not drop each other), each also carrying every
+     * OTHER member `batch` holds.
      */
     function chooseStructure(
         batch: StructureSelectionBatch,
@@ -607,16 +604,22 @@ export default function ChatPage() {
         ) {
             return;
         }
+        const { result } = latestAssistantTurn.outcome;
+        const pendingSubjectChoices = subjectChoicesInAcrOrder(result, candidateSelections.batch);
+
         // Snapshot what was actually submitted onto the turn being
-        // superseded BEFORE `ask()`/`askManyStructure()` resets the shared
-        // hook and appends a new turn — otherwise this turn's own frozen
+        // superseded BEFORE `ask()`/`confirmSelections()` resets the shared
+        // hooks and appends a new turn — otherwise this turn's own frozen
         // echo would render as if nothing had ever been picked (codex
-        // review round 1, finding 3; extended to the structure-candidate
-        // axis in a later round, same reason `chooseCandidates` above
-        // snapshots its own candidate picks).
+        // review round 1, finding 3; extended to the candidate axes in
+        // later rounds, same reason `chooseCandidates` above snapshots its
+        // own candidate picks).
         const supersededTurnId = latestAssistantTurn.id;
         const submittedStructureCandidateReceiptIds = new Set(
             candidateReceipts.map((receipt) => receipt.receipt_id),
+        );
+        const submittedCandidateReceiptIds = new Set(
+            pendingSubjectChoices.map((choice) => choice.receipt_id),
         );
         setTurns((current) =>
             current.map((turn) =>
@@ -625,16 +628,18 @@ export default function ChatPage() {
                           ...turn,
                           submittedStructureBatch: batch,
                           submittedStructureCandidateReceiptIds,
+                          submittedCandidateReceiptIds,
                       }
                     : turn,
             ),
         );
-        const { question } = latestAssistantTurn.outcome.result;
-        if (candidateReceipts.length === 0) {
-            void ask(question, [], undefined, batch);
-        } else {
-            askManyStructure(question, batch, candidateReceipts);
+        if (candidateReceipts.length === 0 && pendingSubjectChoices.length === 0) {
+            // Exact pre-CHAOS-4343 shape: no candidate axis in play at all,
+            // one plain re-ask carrying only the ordinary structure batch.
+            void ask(result.question, [], undefined, batch);
+            return;
         }
+        confirmSelections(result, pendingSubjectChoices, candidateReceipts, batch);
     }
 
     return (

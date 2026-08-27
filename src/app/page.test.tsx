@@ -28,6 +28,20 @@ const mixed: InvestigationResult = {
     structure_needs: structureKind.structure_needs!,
 };
 
+/**
+ * CHAOS-4343 items 1/2, codex review round 2: BOTH multi-select candidate
+ * axes on the SAME result — `subject_resolution.candidates`
+ * (`ClarificationPanel`) AND `structure_needs.candidate_options`
+ * (`StructureNeedsPanel`) at once. A pending pick in whichever axis the
+ * tester does NOT explicitly confirm must still ride along, not be dropped.
+ */
+const mixedCandidates: InvestigationResult = {
+    ...structuredClone(clarification),
+    result_id: "result_mixed_candidates_0001",
+    request_id: "request_mixed_candidates_0001",
+    structure_needs: structureCandidate.structure_needs!,
+};
+
 function respondWith(body: unknown): void {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
         new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } }),
@@ -792,6 +806,75 @@ describe("fan-out correctness (codex review)", () => {
         >;
         expect(secondCallBody.structureSelectionEvents).toEqual([
             { member: "subject_candidate", outcome: "submitted" },
+        ]);
+    });
+
+    /**
+     * Medium, codex review round 2: confirming ONE candidate axis used to
+     * drop any pending-but-unconfirmed pick in the OTHER axis entirely. Both
+     * axes present on the same result; select one candidate from EACH,
+     * confirm only the subject-candidate one — the structure-candidate pick
+     * must still fire its own request.
+     */
+    it("confirming one candidate axis still fires the other axis's pending pick", async () => {
+        const subjectCandidate = mixedCandidates.subject_resolution.candidates[0]!;
+        const structureCandidateOption = mixedCandidates.structure_needs!.candidate_options![0]!;
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: mixedCandidates }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Who owns this?");
+        const user = userEvent.setup();
+        // Pick one structure candidate, WITHOUT confirming it...
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${structureCandidateOption.label}` }),
+        );
+        // ...then pick and confirm a SUBJECT candidate instead.
+        await user.click(
+            screen.getByRole("button", { name: `Select ${subjectCandidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        expect(
+            await screen.findAllByRole("article", { name: "Deterministic answer" }),
+        ).toHaveLength(3);
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+
+        const bodies = fetchSpy.mock.calls
+            .slice(1)
+            .map((call) => JSON.parse(call[1]!.body as string) as Record<string, unknown>);
+        const subjectRequest = bodies.find(
+            (body) =>
+                Array.isArray(body.priorSubjectReceipts) && body.priorSubjectReceipts.length > 0,
+        );
+        const structureRequest = bodies.find(
+            (body) =>
+                Array.isArray(body.priorCandidateReceipts) &&
+                body.priorCandidateReceipts.length > 0,
+        );
+        expect(subjectRequest?.priorSubjectReceipts).toEqual([
+            { result_id: mixedCandidates.result_id, receipt_id: subjectCandidate.receipt_id },
+        ]);
+        expect(structureRequest?.priorCandidateReceipts).toEqual([
+            {
+                result_id: mixedCandidates.result_id,
+                receipt_id: structureCandidateOption.receipt_id,
+            },
         ]);
     });
 });

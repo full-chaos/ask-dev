@@ -19,7 +19,9 @@ import type { BoundStructureReceipt, InvestigationResult, SubjectRef } from "@/l
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
+    EMPTY_SELECTION_EVENTS,
     pendingStructureBatchOrUndefined,
+    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useCandidateSelections } from "@/lib/use-candidate-selections";
@@ -100,6 +102,17 @@ export default function WorkbenchPage() {
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
         structureSelectionsToSend?: StructureSelectionBatch,
+        // The COMPLETE set of selection-outcome telemetry to emit with THIS
+        // request, computed by the CALLER (codex review round 2): `ask()`
+        // itself must never read a selection hook's `pendingSelectionEvents`
+        // directly, because `chooseCandidates`/`chooseStructure` below call
+        // this SAME function repeatedly from within one sequential loop —
+        // every call after the first reuses THIS closure's already-captured
+        // hook references, so `.reset()` (also called below) never actually
+        // empties what THIS closure sees on a later iteration, and reading
+        // the hook again here would resend the identical telemetry once per
+        // fired request instead of once per tester action.
+        selectionEvents: readonly PendingSelectionEvent[] = EMPTY_SELECTION_EVENTS,
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
@@ -124,20 +137,6 @@ export default function WorkbenchPage() {
             structureSelectionsToSend === undefined
                 ? {}
                 : buildStructureReceiptFields(structureSelectionsToSend);
-        // CHAOS-4171: every selection outcome observed since the last
-        // reset() rides this SAME request — the route is the sink (see
-        // `useStructureSelections`'s own `pendingSelectionEvents` header).
-        // Read AFTER every hook's `reset()` above but still the pre-reset
-        // value: `setState` schedules a re-render, it does not mutate this
-        // closure's already-captured array. All THREE selection hooks
-        // merged (codex review, CHAOS-4343): an unconfirmed candidate
-        // toggle must not be silently dropped just because THIS action was
-        // a plain ask or a different axis's confirm.
-        const selectionEvents = [
-            ...structureSelections.pendingSelectionEvents,
-            ...candidateSelections.pendingSelectionEvents,
-            ...structureCandidateSelections.pendingSelectionEvents,
-        ];
         // CHAOS-4343 item 3: derived from the SAME `question` this request
         // sends — a re-ask resends the ORIGINAL question unchanged, so this
         // stays consistent with whatever hint fired on the first ask.
@@ -207,19 +206,45 @@ export default function WorkbenchPage() {
         if (outcome.kind !== "answered" || choices.length === 0) return;
         const { result } = outcome;
         const structureBatch = pendingStructureBatchOrUndefined(structureSelections.batch);
-        // `ask()` itself reads-then-resets every selection hook's queued
-        // telemetry (see its own comment) — the FIRST awaited call below
-        // carries whatever this action queued; every later iteration in
-        // this SAME loop sees an already-emptied queue (React has flushed
-        // the reset by the time an `await`ed round trip returns), so no
-        // manual "only on index 0" bookkeeping is needed here.
+        // Mixed-receipt-family unification (codex review round 2): a
+        // pending-but-unconfirmed STRUCTURE-candidate pick must ride along
+        // too, not just the ordinary kind/anchor/handle/window batch — same
+        // reason the chat surface's own `chooseCandidates` folds in
+        // `structureCandidateSelections`.
+        const pendingStructureCandidateReceipts = (result.structure_needs?.candidate_options ?? [])
+            .filter((option) => structureCandidateSelections.batch.has(option.receipt_id))
+            .map((option) => ({ result_id: result.result_id, receipt_id: option.receipt_id }));
+        // Captured ONCE, synchronously, before any `.reset()` — `ask()` no
+        // longer reads these hooks itself (codex review round 2: it used to,
+        // which replayed the SAME pre-reset telemetry on every iteration of
+        // this loop, since every call below reuses THIS closure's `ask`
+        // reference — see `ask()`'s own parameter doc comment).
+        const selectionEvents = [
+            ...structureSelections.pendingSelectionEvents,
+            ...candidateSelections.pendingSelectionEvents,
+            ...structureCandidateSelections.pendingSelectionEvents,
+        ];
+        structureCandidateSelections.reset();
+        let index = 0;
         for (const choice of choices) {
             await ask(
                 askedQuestion,
                 [choice],
                 subjectForReceipt(result, choice.receipt_id),
                 structureBatch,
+                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             );
+            index += 1;
+        }
+        for (const receipt of pendingStructureCandidateReceipts) {
+            await ask(
+                askedQuestion,
+                [],
+                undefined,
+                { ...structureBatch, subject_candidate: receipt },
+                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+            );
+            index += 1;
         }
     }
 
@@ -239,14 +264,53 @@ export default function WorkbenchPage() {
         batch: StructureSelectionBatch,
         candidateReceipts: readonly BoundStructureReceipt[] = [],
     ) {
-        if (candidateReceipts.length === 0) {
-            await ask(askedQuestion, [], undefined, batch);
+        if (outcome.kind !== "answered") return;
+        const { result } = outcome;
+        // Mixed-receipt-family unification (codex review round 2): a
+        // pending-but-unconfirmed SUBJECT-candidate pick must ride along
+        // too — same reason `chooseCandidates` above folds in the structure
+        // axis.
+        const pendingSubjectChoices = result.subject_resolution.candidates
+            .filter((candidate) => candidateSelections.batch.has(candidate.receipt_id))
+            .map((candidate) => ({
+                result_id: result.result_id,
+                receipt_id: candidate.receipt_id,
+            }));
+
+        // Captured ONCE, synchronously, before any `.reset()` — see `ask()`'s
+        // own parameter doc comment for why it can't safely read these hooks
+        // itself across this loop's repeated calls.
+        const selectionEvents = [
+            ...structureSelections.pendingSelectionEvents,
+            ...candidateSelections.pendingSelectionEvents,
+            ...structureCandidateSelections.pendingSelectionEvents,
+        ];
+
+        if (candidateReceipts.length === 0 && pendingSubjectChoices.length === 0) {
+            await ask(askedQuestion, [], undefined, batch, selectionEvents);
             return;
         }
-        // Same "ask() itself reads-then-resets" reasoning as
-        // `chooseCandidates` above.
+        candidateSelections.reset();
+        let index = 0;
         for (const receipt of candidateReceipts) {
-            await ask(askedQuestion, [], undefined, { ...batch, subject_candidate: receipt });
+            await ask(
+                askedQuestion,
+                [],
+                undefined,
+                { ...batch, subject_candidate: receipt },
+                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+            );
+            index += 1;
+        }
+        for (const choice of pendingSubjectChoices) {
+            await ask(
+                askedQuestion,
+                [choice],
+                subjectForReceipt(result, choice.receipt_id),
+                batch,
+                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
+            );
+            index += 1;
         }
     }
 
@@ -268,7 +332,15 @@ export default function WorkbenchPage() {
                 initialQuestion=""
                 pending={outcome.kind === "pending"}
                 onAsk={(question) => {
-                    void ask(question);
+                    // Captured explicitly (codex review round 2): a plain new
+                    // question must not silently drop telemetry for a
+                    // candidate the tester toggled but never confirmed.
+                    const selectionEvents = [
+                        ...structureSelections.pendingSelectionEvents,
+                        ...candidateSelections.pendingSelectionEvents,
+                        ...structureCandidateSelections.pendingSelectionEvents,
+                    ];
+                    void ask(question, [], undefined, undefined, selectionEvents);
                 }}
             />
 
