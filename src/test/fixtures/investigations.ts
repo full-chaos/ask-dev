@@ -137,10 +137,21 @@ function rowsScenario(): InvestigationResult {
         value: { string: "team_project_ownership_sum" },
     };
     const teamBreakdown: ClaimedFact = {
-        claim_id: "claim_rows_metrics_breakdown",
+        claim_id: "claim_rows_metrics_team_count",
         kind: "metrics",
+        // Cites `team_count` (a real scalar sibling field on the same
+        // canonical fact, metrics.go's `readProjectMetrics`), never
+        // `team_breakdown` itself — `team_breakdown` carries only a Rows
+        // value, no scalar, so acr's `SynthesisDraft.ValidateAgainst`
+        // (`claim.field`/`claim.value` must equal a real scalar field on the
+        // canonical fact it cites) can never produce a claim naming it
+        // directly. The rows still attach to this claim regardless —
+        // `attachCanonicalRows` copies a canonical fact's one Rows-shaped
+        // field onto every claim citing the same (kind, subject) (codex
+        // round 2, CHAOS-4364 — this claim predated that PR but shares its
+        // fix).
         subject: ASK_DEV_SUBJECT,
-        field: "team_breakdown",
+        field: "team_count",
         value: { integer: 2 },
         // Field order mirrors the real wire shape: acr's Go
         // `encoding/json` marshals a `map[string]FactValue` in SORTED key

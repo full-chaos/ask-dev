@@ -44,13 +44,12 @@ describe("FactRowsPanels", () => {
     it("renders one panel per claimed fact carrying rows", () => {
         render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
         // Three facts in the fixture carry rows: the CI daily rollup, the
-        // project's team breakdown, and the latency-percentiles table.
+        // project's team_count claim (team_breakdown rows attached), and
+        // the latency-percentiles table.
         expect(
             screen.getByRole("heading", { name: /continuous integration.*pipelines count/i }),
         ).toBeInTheDocument();
-        expect(
-            screen.getByRole("heading", { name: /metrics.*team breakdown/i }),
-        ).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: /metrics.*team count/i })).toBeInTheDocument();
         expect(
             screen.getByRole("heading", { name: /metrics.*latency percentiles/i }),
         ).toBeInTheDocument();
@@ -74,7 +73,7 @@ describe("FactRowsPanels", () => {
 
     it("renders a BAR chart for the ordinal team_name breakdown (never the opaque team_id), with the rollup_basis caption", () => {
         render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
-        const heading = screen.getByRole("heading", { name: /metrics.*team breakdown/i });
+        const heading = screen.getByRole("heading", { name: /metrics.*team count/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("svg")).not.toBeNull();
         expect(panel.querySelector("polyline")).toBeNull();
@@ -95,7 +94,7 @@ describe("FactRowsPanels", () => {
 
     it("gives every chart mark an accessible label, not just a hover/mouse tooltip", () => {
         render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
-        const heading = screen.getByRole("heading", { name: /metrics.*team breakdown/i });
+        const heading = screen.getByRole("heading", { name: /metrics.*team count/i });
         const panel = heading.closest("section")!;
         const marks = panel.querySelectorAll(".fact-chart__mark-group");
         expect(marks.length).toBeGreaterThan(0);
