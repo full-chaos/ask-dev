@@ -75,13 +75,26 @@ describe("DeterministicAnswerView: fact rows panels (CHAOS-4355)", () => {
         );
         expect(answerSectionIndex).toBeGreaterThanOrEqual(0);
         const nextSection = sections[answerSectionIndex + 1]!;
+        // CHAOS-4364 pin bump (acr #303, ef303358): the pinned canonical
+        // example itself now carries a rows-bearing claimed fact
+        // (readiness/release_ready), spread in FIRST by the "rows" scenario
+        // (`...result.claimed_facts` before its own CI/metrics additions) —
+        // so it, not the CI rollup, is the first stacked panel now.
         expect(nextSection.querySelector(".panel__title")?.textContent).toMatch(
-            /continuous integration/i,
+            /readiness.*release ready/i,
         );
     });
 
     it("renders no fact-rows panel for a result whose claimed facts carry no rows", () => {
-        const result = mockScenarios().find((s) => s.id === "complete")!.result;
+        const base = mockScenarios().find((s) => s.id === "complete")!.result;
+        // CHAOS-4364 pin bump: the pinned canonical example ("complete")
+        // itself now carries one rows-bearing fact (readiness/release_ready,
+        // acr #303), so this drops it rather than using "complete" as-is —
+        // the assertion is about the no-rows case, not about that one fact.
+        const result: InvestigationResult = {
+            ...base,
+            claimed_facts: base.claimed_facts.filter((fact) => fact.rows === undefined),
+        };
         render(<DeterministicAnswerView result={result} />);
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });

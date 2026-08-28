@@ -2,10 +2,14 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
+import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 const applied = structureMockScenarios().find((s) => s.id === "structure-applied")!.result;
 const vetoed = structureMockScenarios().find((s) => s.id === "structure-vetoed")!.result;
+// CHAOS-4364 (acr #306, 02c44254): a `carried` (not `receipt`/`explicit`)
+// confirmed_structure source — the same-conversation window carry.
+const flowLandscape = mockScenarios().find((s) => s.id === "flow-landscape")!.result;
 
 describe("StructureConfirmationNotice", () => {
     it("renders nothing when the result carried no structure confirmation", () => {
@@ -39,5 +43,13 @@ describe("StructureConfirmationNotice", () => {
         expect(
             screen.getByText(/is no longer current \(superseded by a later confirmation\)/),
         ).toBeInTheDocument();
+    });
+
+    it("shows a carried (not receipt) structure member's source verbatim", () => {
+        render(<StructureConfirmationNotice entries={flowLandscape.confirmed_structure} />);
+
+        const region = screen.getByRole("status", { name: "Structure confirmation" });
+        expect(region).toHaveTextContent("source carried");
+        expect(region).toHaveTextContent("source receipt");
     });
 });
