@@ -182,11 +182,24 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `30f38869f6ecc1233ddb903ef962d6be4a806a09` (acr main; CHAOS-4355
-— bumps past CHAOS-4347's additive `rows` on `ClaimedFact`/`ProjectedFact`
+Currently pinned: `b8350816ec5823c7c6859a5d88fc917bb318d43b` (acr main; CHAOS-4364
+follow-up to CHAOS-4355 — bumps past #307 (56316ebe)'s new FactKinds
+`flow`/`landscape` (bottlenecks, IC landscape/area) and #306 (02c44254)'s
+`carried` `StructureSource` value for a same-conversation window carry.
+A live proof against the prior pin surfaced the gap this closes: ACR itself
+answered decisively (claims=4, rows_count=5, `composed_kinds` including
+`flow`/`landscape`) but the Workbench's own Ajv validation rejected the 200
+response as `acr_contract_violation` because the pin predated both additions
+(dev-health `.remember/context-fabric/cf-question-results.md`, "20:46
+08-27"). Also pulls in #303 (ef303358)'s Rows-into-synthesis routing (the
+pinned canonical example itself now carries a rows-bearing `readiness`/
+`release_ready` fact and a `confirmed_structure` block) and #309/#310's
+response-bound and synthesis-rejection fixes (no contract change). Previously
+pinned at `30f38869f6ecc1233ddb903ef962d6be4a806a09` — CHAOS-4355, bumping
+past CHAOS-4347's additive `rows` on `ClaimedFact`/`ProjectedFact`
 (`ContextFabricClaimedFactRow`, #300), so `ClaimedFact.rows` renders as a
-table or chart. Also pulls in CHAOS-4335/CHAOS-4336's window-gate fixes and
-CHAOS-4348's subject-pool reachability fixes. Previously pinned at
+table or chart. Also pulled in CHAOS-4335/CHAOS-4336's window-gate fixes and
+CHAOS-4348's subject-pool reachability fixes. Before that, pinned at
 `e946ad907cdfd66b45895839c7adb65f2e436808` — CHAOS-4171 PR3, adding bounded
 offer `phrasing` (acr PR2, #263) on the
 `expected_kind`/`subject_anchor`/`subject_handle`/`subject_candidate` option

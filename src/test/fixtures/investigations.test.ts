@@ -20,6 +20,10 @@ describe("mock investigation fixtures", () => {
             // CHAOS-4355: "rows" is a second `complete` scenario — it exists
             // to carry `ClaimedFact.rows`, not to add a new status.
             "complete",
+            // CHAOS-4364: "flow-landscape" is a third `complete` scenario — it
+            // exists to carry the flow/landscape FactKinds and a `carried`
+            // confirmed_structure source, not a new status either.
+            "complete",
             "degraded",
             "clarification_required",
             "no_match",

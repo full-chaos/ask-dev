@@ -5,14 +5,40 @@ import { FactRowsPanels } from "@/components/FactRowsPanel";
 import type { ClaimedFact } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
+/** A claimed fact carrying no `rows` at all — the "nothing to render" case. */
+const NO_ROWS_FACT: ClaimedFact = {
+    claim_id: "claim_no_rows",
+    kind: "status",
+    subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+    field: "current_phase",
+    value: { string: "steady" },
+};
+
 const rowsResult = mockScenarios().find((scenario) => scenario.id === "rows")!.result;
 const completeResult = mockScenarios().find((scenario) => scenario.id === "complete")!.result;
+// CHAOS-4364 (acr #307, 56316ebe): the `flow`/`landscape` FactKinds. No
+// kind-specific rendering exists in FactRowsPanel — `humanizeTerm(fact.kind)`
+// is generic over every kind — so these prove that generic path actually
+// covers the two new kinds, not just the pre-existing ones.
+const flowLandscapeResult = mockScenarios().find(
+    (scenario) => scenario.id === "flow-landscape",
+)!.result;
 
 describe("FactRowsPanels", () => {
     it("renders nothing when no claimed fact carries rows (empty state = no data, not a missing feature)", () => {
-        expect(completeResult.claimed_facts.every((fact) => fact.rows === undefined)).toBe(true);
-        const { container } = render(<FactRowsPanels facts={completeResult.claimed_facts} />);
+        const { container } = render(<FactRowsPanels facts={[NO_ROWS_FACT]} />);
         expect(container).toBeEmptyDOMElement();
+    });
+
+    it("renders the complete scenario's own rows-bearing fact (readiness/release_ready, acr #303)", () => {
+        // CHAOS-4364 pin bump: the pinned canonical example itself now
+        // carries a rows-bearing claimed fact — this is that fact, not a
+        // fixture invention (see `investigations.ts`'s CHAOS-2225 house rule).
+        expect(completeResult.claimed_facts.some((fact) => fact.rows !== undefined)).toBe(true);
+        render(<FactRowsPanels facts={completeResult.claimed_facts} />);
+        expect(
+            screen.getByRole("heading", { name: /readiness.*release ready/i }),
+        ).toBeInTheDocument();
     });
 
     it("renders one panel per claimed fact carrying rows", () => {
@@ -145,5 +171,33 @@ describe("FactRowsPanels", () => {
         // Unlike the untruncated case above, this table is genuinely
         // visible — it is the only place the 9th column ("c9") appears.
         expect(table!.closest(".sr-only")).toBeNull();
+    });
+
+    it("renders a panel for the flow FactKind's team_breakdown rows (team_id axis, since flow.go emits no team_name)", () => {
+        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
+        const heading = screen.getByRole("heading", { name: /^flow · team breakdown$/i });
+        const panel = heading.closest("section")!;
+        // Every row column here is numeric except team_id, so team_id is the
+        // only axis candidate and IS charted despite being id-shaped —
+        // devhealthfacts/flow.go's real project rollup carries no
+        // human-readable team_name alongside it (unlike metrics.go's).
+        expect(panel.querySelector("svg")).not.toBeNull();
+        const svg = panel.querySelector("svg")!;
+        expect(svg.textContent).toContain("team_platform_9f2a");
+        expect(panel.textContent).toContain("team project ownership sum");
+        expect(panel.textContent).toContain("2 rows");
+    });
+
+    it("renders a panel for the landscape FactKind's team_breakdown rows", () => {
+        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
+        const heading = screen.getByRole("heading", { name: /^landscape · team breakdown$/i });
+        const panel = heading.closest("section")!;
+        expect(panel.querySelector("svg")).not.toBeNull();
+        expect(panel.textContent).toContain("team project ownership landscape");
+        expect(panel.textContent).toContain("2 rows");
+        const table = panel.querySelector("table")!;
+        // Column headers are humanized ("_" -> " "), never the raw wire name.
+        expect(table.textContent).toContain("churn loc 30d");
+        expect(table.textContent).toContain("18420");
     });
 });

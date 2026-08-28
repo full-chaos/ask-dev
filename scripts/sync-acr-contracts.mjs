@@ -28,14 +28,18 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-4355: pins to acr main tip #300 (30f38869), which adds
-// CHAOS-4347's additive `rows` on ClaimedFact/ProjectedFact
-// (`ContextFabricClaimedFactRow`) so the workbench can render a claimed
-// fact's renderable table. Pulls in everything between e946ad90 (the prior
-// pin) and 30f38869, including CHAOS-4335/CHAOS-4336's window-gate fixes,
-// CHAOS-4133's architecture diagrams, and CHAOS-4348's subject-pool
-// reachability fixes. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "30f38869f6ecc1233ddb903ef962d6be4a806a09";
+// acr main, CHAOS-4355 follow-up (CHAOS-4364): pins to acr main tip #310
+// (b8350816), past #307 (56316ebe)'s new FactKinds `flow`/`landscape` and
+// #306 (02c44254)'s `carried` StructureSource for a same-conversation
+// window carry. Pulls in everything between 30f38869 (the prior pin) and
+// b8350816, including #303 (ef303358)'s Rows-into-synthesis routing and
+// #309/#310's response-bound and synthesis-rejection fixes (no contract
+// change — see README's "Currently pinned" note). Live proof against the
+// new pin surfaced this staleness: rev 20's server answered decisively
+// (claims=4, rows_count=5) but the Workbench's own Ajv validation rejected
+// it as `acr_contract_violation` on the old pin (cf-question-results.md,
+// "20:46 08-27"). Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "b8350816ec5823c7c6859a5d88fc917bb318d43b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

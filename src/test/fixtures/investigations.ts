@@ -25,7 +25,12 @@
  * invented coverage state.
  */
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import type { ClaimedFact, InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type {
+    ClaimedFact,
+    ConfirmedStructureEntry,
+    InvestigationResult,
+    SubjectRef,
+} from "@/lib/contracts";
 
 /**
  * The canonical example, unmodified. Structurally cloned on every read so a
@@ -199,6 +204,159 @@ function rowsScenario(): InvestigationResult {
             teamBreakdown,
             latencyTable,
         ],
+    };
+}
+
+/**
+ * CHAOS-4364 (acr #307, 56316ebe): exercises the `flow` and `landscape`
+ * FactKinds and a `carried` (not `receipt`) `confirmed_structure` source —
+ * the live shape ACR's pinned commit b8350816 emits on a multi-turn
+ * ask -> clarify -> confirm flow (cf-question-results.md "20:46 08-27
+ * CHAOS-4355 live proof rev 20"). That live proof got `outcome=success`,
+ * `claims=4`, `rows_count=5` from ACR itself but the Workbench's OWN Ajv
+ * validation rejected the response as `acr_contract_violation` because the
+ * pin predates both additions — this scenario is that shape, structurally
+ * cloned from the producers' own field names (never invented, CHAOS-2225):
+ *
+ *   - `flow`/`team_breakdown` mirrors `devhealthfacts/flow.go`'s
+ *     `readProjectFlow` project rollup (`rollup_basis:
+ *     "team_project_ownership_sum"`, `items_started`/`items_completed`/
+ *     `team_count`, per-team rows carrying `team_id`/`items_started`/
+ *     `items_completed`/`wip_count_end_of_day`/`bug_completed_ratio`/
+ *     `story_points_completed`/the WIP-age/cycle/lead percentiles).
+ *   - `landscape`/`team_breakdown` mirrors `devhealthfacts/landscape.go`'s
+ *     `readProjectLandscape` project rollup (`rollup_basis:
+ *     "team_project_ownership_landscape"`, per-team rows carrying
+ *     `team_id`/`map_name`/`as_of_day`/`identity_count`/`churn_loc_30d`/
+ *     `delivery_units_30d`/`cycle_p50_30d_hours_avg`/`wip_max_30d`).
+ *   - `confirmed_structure` carries one `receipt`-sourced `expected_kind`
+ *     entry (the ordinary carried-kind shape) AND one `carried`-sourced
+ *     `window` entry — acr #306 (02c44254)'s same-conversation window carry,
+ *     which requires `prior_result_id` and forbids `receipt_id` (unlike
+ *     every other source, which requires neither or the opposite pairing).
+ */
+function flowLandscapeScenario(): InvestigationResult {
+    const result = canonical();
+    const confirmedStructure: [ConfirmedStructureEntry, ConfirmedStructureEntry] = [
+        {
+            member: "expected_kind",
+            applied_value: "project",
+            source: "receipt",
+            prior_result_id: "result_prior_flow_0001",
+            receipt_id: "kindr_flow_9012",
+            provenance: "clarification_confirmed",
+            disposition: "applied",
+        },
+        {
+            member: "window",
+            applied_value: "trailing_90d",
+            source: "carried",
+            prior_result_id: "result_prior_flow_0001",
+            provenance: "clarification_confirmed",
+            disposition: "applied",
+        },
+    ];
+    const flowRollupBasis: ClaimedFact = {
+        claim_id: "claim_flow_rollup_basis",
+        kind: "flow",
+        subject: ASK_DEV_SUBJECT,
+        field: "rollup_basis",
+        value: { string: "team_project_ownership_sum" },
+    };
+    const flowTeamBreakdown: ClaimedFact = {
+        claim_id: "claim_flow_team_breakdown",
+        kind: "flow",
+        subject: ASK_DEV_SUBJECT,
+        field: "team_breakdown",
+        value: { integer: 2 },
+        rows: [
+            {
+                fields: {
+                    team_id: { string: "team_platform_9f2a" },
+                    items_started: { integer: 14 },
+                    items_completed: { integer: 11 },
+                    wip_count_end_of_day: { integer: 6 },
+                    wip_age_p50_hours: { number: 18.4 },
+                    cycle_time_p50_hours: { number: 22.1 },
+                    lead_time_p50_hours: { number: 40.7 },
+                    bug_completed_ratio: { number: 0.18 },
+                    story_points_completed: { number: 23 },
+                },
+            },
+            {
+                fields: {
+                    team_id: { string: "team_growth_c410" },
+                    items_started: { integer: 9 },
+                    items_completed: { integer: 7 },
+                    wip_count_end_of_day: { integer: 4 },
+                    wip_age_p50_hours: { number: 21.2 },
+                    cycle_time_p50_hours: { number: 26.5 },
+                    lead_time_p50_hours: { number: 48.3 },
+                    bug_completed_ratio: { number: 0.11 },
+                    story_points_completed: { number: 15 },
+                },
+            },
+        ],
+    };
+    const landscapeRollupBasis: ClaimedFact = {
+        claim_id: "claim_landscape_rollup_basis",
+        kind: "landscape",
+        subject: ASK_DEV_SUBJECT,
+        field: "rollup_basis",
+        value: { string: "team_project_ownership_landscape" },
+    };
+    const landscapeTeamBreakdown: ClaimedFact = {
+        claim_id: "claim_landscape_team_breakdown",
+        kind: "landscape",
+        subject: ASK_DEV_SUBJECT,
+        field: "team_breakdown",
+        value: { integer: 2 },
+        rows: [
+            {
+                fields: {
+                    team_id: { string: "team_platform_9f2a" },
+                    map_name: { string: "churn_throughput" },
+                    as_of_day: { string: "2026-08-26" },
+                    identity_count: { integer: 5 },
+                    churn_loc_30d: { integer: 18420 },
+                    delivery_units_30d: { integer: 61 },
+                    cycle_p50_30d_hours_avg: { number: 24.6 },
+                    wip_max_30d: { integer: 9 },
+                },
+            },
+            {
+                fields: {
+                    team_id: { string: "team_growth_c410" },
+                    map_name: { string: "churn_throughput" },
+                    as_of_day: { string: "2026-08-26" },
+                    identity_count: { integer: 3 },
+                    churn_loc_30d: { integer: 9310 },
+                    delivery_units_30d: { integer: 34 },
+                    cycle_p50_30d_hours_avg: { number: 29.8 },
+                    wip_max_30d: { integer: 5 },
+                },
+            },
+        ],
+    };
+    return {
+        ...result,
+        result_id: "result_flow_landscape_0001",
+        request_id: "request_flow_landscape_0001",
+        question: "What's the delivery flow and IC landscape picture for Ask Dev right now?",
+        deterministic_answer:
+            "Ask Dev's delivery flow is steady across both owning teams, and the IC landscape shows no team concentrated at the WIP ceiling.",
+        direct_judgment:
+            "Flow and landscape signals are both healthy; no team is carrying disproportionate churn or WIP.",
+        current_state:
+            "Both owning teams completed most of what they started this window, and 30-day churn/throughput stays within the normal band for each.",
+        claimed_facts: [
+            ...result.claimed_facts,
+            flowRollupBasis,
+            flowTeamBreakdown,
+            landscapeRollupBasis,
+            landscapeTeamBreakdown,
+        ],
+        confirmed_structure: confirmedStructure,
     };
 }
 
@@ -469,6 +627,13 @@ export function mockScenarios(): readonly MockScenario[] {
             demonstrates:
                 "Claimed facts carrying rows (CHAOS-4347): a time-axis line chart, an ordinal bar chart with a rollup_basis caption, and an all-numeric fallback table.",
             result: rowsScenario(),
+        },
+        {
+            id: "flow-landscape",
+            question: "What's the delivery flow and IC landscape picture for Ask Dev right now?",
+            demonstrates:
+                "CHAOS-4364 flow/landscape FactKinds with rows, plus a carried (not receipt) confirmed_structure source (acr #306/#307).",
+            result: flowLandscapeScenario(),
         },
         {
             id: "degraded",

@@ -1348,7 +1348,8 @@
       "enum": [
         "receipt",
         "explicit",
-        "explicit_unattributed"
+        "explicit_unattributed",
+        "carried"
       ]
     },
     "WindowConfirmationMode": {
@@ -1474,19 +1475,41 @@
         ]
       },
       "else": {
-        "not": {
-          "anyOf": [
-            {
-              "required": [
-                "prior_result_id"
-              ]
-            },
-            {
-              "required": [
-                "receipt_id"
-              ]
+        "if": {
+          "properties": {
+            "source": {
+              "const": "carried"
             }
+          },
+          "required": [
+            "source"
           ]
+        },
+        "then": {
+          "required": [
+            "prior_result_id"
+          ],
+          "not": {
+            "required": [
+              "receipt_id"
+            ]
+          }
+        },
+        "else": {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "prior_result_id"
+                ]
+              },
+              {
+                "required": [
+                  "receipt_id"
+                ]
+              }
+            ]
+          }
         }
       }
     },
@@ -2403,7 +2426,9 @@
             "readiness",
             "operational_deficiencies",
             "source_health",
-            "evidence"
+            "evidence",
+            "flow",
+            "landscape"
           ]
         },
         "subject": {
@@ -2636,7 +2661,9 @@
             "readiness",
             "operational_deficiencies",
             "source_health",
-            "evidence"
+            "evidence",
+            "flow",
+            "landscape"
           ]
         },
         "subjects": {
@@ -2704,7 +2731,7 @@
           "items": {
             "$ref": "#/$defs/FactRequirement"
           },
-          "maxItems": 20
+          "maxItems": 22
         },
         "clarification_needed": {
           "type": "boolean"
