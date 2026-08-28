@@ -218,17 +218,29 @@ function rowsScenario(): InvestigationResult {
  * pin predates both additions — this scenario is that shape, structurally
  * cloned from the producers' own field names (never invented, CHAOS-2225):
  *
- *   - `flow`/`team_breakdown` mirrors `devhealthfacts/flow.go`'s
- *     `readProjectFlow` project rollup (`rollup_basis:
- *     "team_project_ownership_sum"`, `items_started`/`items_completed`/
- *     `team_count`, per-team rows carrying `team_id`/`items_started`/
- *     `items_completed`/`wip_count_end_of_day`/`bug_completed_ratio`/
- *     `story_points_completed`/the WIP-age/cycle/lead percentiles).
- *   - `landscape`/`team_breakdown` mirrors `devhealthfacts/landscape.go`'s
- *     `readProjectLandscape` project rollup (`rollup_basis:
- *     "team_project_ownership_landscape"`, per-team rows carrying
+ *   - `flow`/`team_count` mirrors `devhealthfacts/flow.go`'s `readProjectFlow`
+ *     project rollup (`rollup_basis: "team_project_ownership_sum"`,
+ *     `items_started`/`items_completed`/`team_count`). The claim cites
+ *     `team_count` (a real scalar sibling field on the same canonical fact),
+ *     never `team_breakdown` itself — `team_breakdown` carries ONLY a Rows
+ *     value (`RowsFactValue`, model.go's `FactValue`), so acr's own
+ *     claim-grounding rule (`SynthesisDraft.ValidateAgainst`: `claim.field`/
+ *     `claim.value` must equal a real scalar field on the canonical fact it
+ *     cites) makes it impossible for a real claim to name it directly
+ *     (codex round 1, CHAOS-4364). The rows attach to the claim anyway —
+ *     `attachCanonicalRows` copies a canonical fact's one Rows-shaped field
+ *     onto every claim citing that same (kind, subject), regardless of which
+ *     scalar field the claim names. Per-team rows carry `team_id`/
+ *     `items_started`/`items_completed`/`wip_count_end_of_day`/
+ *     `bug_completed_ratio`/`story_points_completed`/the WIP-age/cycle/lead
+ *     percentiles.
+ *   - `landscape`/`team_count` mirrors `devhealthfacts/landscape.go`'s
+ *     `readProjectLandscape` project rollup — same claim-grounding shape as
+ *     `flow` above (`rollup_basis: "team_project_ownership_landscape"`,
+ *     `team_count` as the claim's real scalar field, `team_breakdown` as the
+ *     Rows-only sibling attached by (kind, subject)). Per-team rows carry
  *     `team_id`/`map_name`/`as_of_day`/`identity_count`/`churn_loc_30d`/
- *     `delivery_units_30d`/`cycle_p50_30d_hours_avg`/`wip_max_30d`).
+ *     `delivery_units_30d`/`cycle_p50_30d_hours_avg`/`wip_max_30d`.
  *   - `confirmed_structure` carries one `receipt`-sourced `expected_kind`
  *     entry (the ordinary carried-kind shape) AND one `carried`-sourced
  *     `window` entry — acr #306 (02c44254)'s same-conversation window carry,
@@ -263,11 +275,21 @@ function flowLandscapeScenario(): InvestigationResult {
         field: "rollup_basis",
         value: { string: "team_project_ownership_sum" },
     };
+    // acr's `attachCanonicalRows` (model_runtime.go) attaches a canonical
+    // fact's ONE Rows-shaped field to a claim by (kind, subject) match,
+    // regardless of which field the claim itself names — and
+    // `SynthesisDraft.ValidateAgainst` requires `claim.field`/`claim.value`
+    // to equal a REAL scalar sibling field on that same canonical fact
+    // (`observed, present := canonical.Fields[claim.Field]`). `team_breakdown`
+    // itself carries only `Rows`, no scalar (`RowsFactValue`, model.go's
+    // `FactValue`), so a claim can never cite it directly — it must cite
+    // `team_count` (or `items_started`/`items_completed`) instead, and the
+    // rows arrive attached regardless (codex round 1, CHAOS-4364).
     const flowTeamBreakdown: ClaimedFact = {
-        claim_id: "claim_flow_team_breakdown",
+        claim_id: "claim_flow_team_count",
         kind: "flow",
         subject: ASK_DEV_SUBJECT,
-        field: "team_breakdown",
+        field: "team_count",
         value: { integer: 2 },
         rows: [
             {
@@ -305,11 +327,14 @@ function flowLandscapeScenario(): InvestigationResult {
         field: "rollup_basis",
         value: { string: "team_project_ownership_landscape" },
     };
+    // Same `attachCanonicalRows`/`ValidateAgainst` shape as `flowTeamBreakdown`
+    // above — `team_count` is landscape.go's own scalar sibling of its
+    // Rows-shaped `team_breakdown` field.
     const landscapeTeamBreakdown: ClaimedFact = {
-        claim_id: "claim_landscape_team_breakdown",
+        claim_id: "claim_landscape_team_count",
         kind: "landscape",
         subject: ASK_DEV_SUBJECT,
-        field: "team_breakdown",
+        field: "team_count",
         value: { integer: 2 },
         rows: [
             {

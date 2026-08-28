@@ -173,9 +173,13 @@ describe("FactRowsPanels", () => {
         expect(table!.closest(".sr-only")).toBeNull();
     });
 
-    it("renders a panel for the flow FactKind's team_breakdown rows (team_id axis, since flow.go emits no team_name)", () => {
+    it("renders a panel for the flow FactKind's team_count claim (team_id axis, since flow.go emits no team_name)", () => {
         render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
-        const heading = screen.getByRole("heading", { name: /^flow · team breakdown$/i });
+        // The claim cites `team_count` (a real scalar sibling field) per
+        // acr's own claim-grounding rule — `team_breakdown` itself carries
+        // only Rows, no scalar (codex round 1, CHAOS-4364) — but the rows
+        // still attach to it, by (kind, subject), same as production.
+        const heading = screen.getByRole("heading", { name: /^flow · team count$/i });
         const panel = heading.closest("section")!;
         // Every row column here is numeric except team_id, so team_id is the
         // only axis candidate and IS charted despite being id-shaped —
@@ -188,9 +192,9 @@ describe("FactRowsPanels", () => {
         expect(panel.textContent).toContain("2 rows");
     });
 
-    it("renders a panel for the landscape FactKind's team_breakdown rows", () => {
+    it("renders a panel for the landscape FactKind's team_count claim", () => {
         render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
-        const heading = screen.getByRole("heading", { name: /^landscape · team breakdown$/i });
+        const heading = screen.getByRole("heading", { name: /^landscape · team count$/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("svg")).not.toBeNull();
         expect(panel.textContent).toContain("team project ownership landscape");
