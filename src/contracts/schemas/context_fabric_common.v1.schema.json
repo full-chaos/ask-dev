@@ -1979,12 +1979,514 @@
           },
           "maxItems": 100,
           "uniqueItems": true
+        },
+        "ranking_computed": {
+          "type": "boolean"
+        },
+        "attention_rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ranking_basis": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "enum": [
+              "investment_mix",
+              "health.compounding_risk",
+              "operational_deficiencies.severity",
+              "readiness.coverage_gap",
+              "workload.forecast_pressure",
+              "investment_mix.reactive_share_high",
+              "investment_mix.deliberate_share_low",
+              "investment_mix.mix_concentrated",
+              "investment_mix.mix_shift_toward_operational",
+              "investment_mix.mix_shift_toward_feature",
+              "investment_mix.mix_shift_other"
+            ]
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "data_completeness": {
+          "type": "string",
+          "enum": [
+            "complete",
+            "partial",
+            "degraded"
+          ]
+        },
+        "drivers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CohortMemberDriver"
+          },
+          "maxItems": 5
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "qualified",
+            "provisional",
+            "insufficient_evidence",
+            "not_applicable"
+          ]
+        },
+        "missing_signals": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "investment_mix",
+              "health.compounding_risk",
+              "operational_deficiencies.severity",
+              "readiness.coverage_gap",
+              "workload.forecast_pressure"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true
         }
       },
       "required": [
         "subject",
         "rank",
         "inclusion_reasons"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "data_completeness": {
+                "const": "complete"
+              }
+            },
+            "required": [
+              "data_completeness"
+            ]
+          },
+          "then": {
+            "properties": {
+              "drivers": {
+                "minItems": 5,
+                "maxItems": 5
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "data_completeness": {
+                "const": "partial"
+              }
+            },
+            "required": [
+              "data_completeness"
+            ]
+          },
+          "then": {
+            "properties": {
+              "drivers": {
+                "minItems": 3,
+                "maxItems": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "data_completeness": {
+                "const": "degraded"
+              }
+            },
+            "required": [
+              "data_completeness"
+            ]
+          },
+          "then": {
+            "properties": {
+              "drivers": {
+                "maxItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ranking_computed": {
+                "const": true
+              }
+            },
+            "required": [
+              "ranking_computed"
+            ]
+          },
+          "then": {
+            "required": [
+              "outcome"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "qualified",
+                  "provisional"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "required": [
+              "score"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "insufficient_evidence",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "score"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "missing_signals"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "enum": [
+                  "provisional",
+                  "insufficient_evidence",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "required": [
+              "missing_signals"
+            ]
+          }
+        }
+      ]
+    },
+    "CohortMemberDriver": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "signal": {
+          "type": "string",
+          "enum": [
+            "investment_mix",
+            "health.compounding_risk",
+            "operational_deficiencies.severity",
+            "readiness.coverage_gap",
+            "workload.forecast_pressure"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "weight_contributed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "window": {
+          "type": "string",
+          "enum": [
+            "current",
+            "current_vs_prior"
+          ]
+        },
+        "threshold_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "enum": [
+              "investment_mix.reactive_share_high",
+              "investment_mix.deliberate_share_low",
+              "investment_mix.mix_concentrated",
+              "investment_mix.mix_shift_toward_operational",
+              "investment_mix.mix_shift_toward_feature",
+              "investment_mix.mix_shift_other"
+            ]
+          },
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "concentration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "concentration_method": {
+          "type": "string",
+          "enum": [
+            "max_share"
+          ]
+        },
+        "source_claimed_fact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256
+          },
+          "maxItems": 250,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "signal",
+        "value",
+        "weight",
+        "weight_contributed",
+        "window"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "investment_mix"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "weight": {
+                "const": 30
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "health.compounding_risk"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "weight": {
+                "const": 25
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "operational_deficiencies.severity"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "weight": {
+                "const": 20
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "readiness.coverage_gap"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "weight": {
+                "const": 15
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "workload.forecast_pressure"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "weight": {
+                "const": 10
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "window": {
+                "const": "current_vs_prior"
+              }
+            },
+            "required": [
+              "window"
+            ]
+          },
+          "then": {
+            "properties": {
+              "signal": {
+                "const": "investment_mix"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "not": {
+                  "const": "investment_mix"
+                }
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "properties": {
+              "threshold_labels": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "const": "investment_mix"
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "required": [
+              "concentration",
+              "concentration_method"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "signal": {
+                "not": {
+                  "const": "investment_mix"
+                }
+              }
+            },
+            "required": [
+              "signal"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "concentration"
+                  ]
+                },
+                {
+                  "required": [
+                    "concentration_method"
+                  ]
+                }
+              ]
+            }
+          }
+        }
       ]
     },
     "CohortExclusion": {

@@ -28,18 +28,13 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main, CHAOS-4355 follow-up (CHAOS-4364): pins to acr main tip #310
-// (b8350816), past #307 (56316ebe)'s new FactKinds `flow`/`landscape` and
-// #306 (02c44254)'s `carried` StructureSource for a same-conversation
-// window carry. Pulls in everything between 30f38869 (the prior pin) and
-// b8350816, including #303 (ef303358)'s Rows-into-synthesis routing and
-// #309/#310's response-bound and synthesis-rejection fixes (no contract
-// change — see README's "Currently pinned" note). Live proof against the
-// new pin surfaced this staleness: rev 20's server answered decisively
-// (claims=4, rows_count=5) but the Workbench's own Ajv validation rejected
-// it as `acr_contract_violation` on the old pin (cf-question-results.md,
-// "20:46 08-27"). Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "b8350816ec5823c7c6859a5d88fc917bb318d43b";
+// acr main (CHAOS-4449, PR4): pins to acr main tip #326 (aa214606), past
+// CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking surface. The whole
+// widening lands in ONE schema, `context_fabric_common.v1`'s `CohortMember`
+// and its new `CohortMemberDriver`; the investigation-result schema itself
+// is byte-identical to the prior pin, because `cohort` was already a result
+// field and only its member shape grew. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "aa214606e70d9beb1cd2ea78d62a17bd4e680c3b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
