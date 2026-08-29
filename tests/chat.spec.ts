@@ -17,6 +17,8 @@ const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
 const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 // Kept in sync by hand with `TRIGGER_MIXED` for the same reason.
 const TRIGGER_MIXED = "e2e-mixed-me";
+// Kept in sync by hand with `TRIGGER_COHORT` for the same reason.
+const TRIGGER_COHORT = "e2e-cohort-me";
 // Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
 const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 
@@ -565,5 +567,95 @@ test.describe("conversation threading", () => {
         // fake-acr-server.mjs's own `conversationEchoResult`).
         await expect(turns.last()).toContainText("conversation_turns=2");
         await expect(turns.last()).toContainText("What is Ask Dev");
+    });
+});
+
+/**
+ * The cohort ranking, end to end (CHAOS-4449).
+ *
+ * Runs against the ACR-configured instance, so the ranked cohort travels the
+ * WHOLE real path — fake-ACR's HTTP response → the app's own Ajv validation
+ * against the pinned schemas → the DOM. That validation is the point: the
+ * pinned contract is `additionalProperties: false`, so a result carrying
+ * `score`/`outcome`/`data_completeness`/`drivers` on a cohort member is
+ * rejected outright on any pin older than this one. A green run here is
+ * therefore also a live proof that the pin bump itself landed.
+ *
+ * `TRIGGER_COHORT` is required: the canonical example carries the ranked
+ * cohort but its own `interpretation.shape` is `single_subject`, and the
+ * table is gated on cohort intent. That makes the UNMODIFIED answer the
+ * negative control below — a pairing that only works because the double
+ * overrides `shape` and nothing else.
+ */
+test.describe("cohort ranking", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: a decisive cohort answer renders the ranking table and its drivers", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`Which teams are struggling, and why, ${TRIGGER_COHORT}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turn).toHaveCount(1);
+        // Decisive, not a clarification the UI merely rendered thinly.
+        await expect(turn).toHaveAttribute("data-state", "complete");
+
+        const rows = page.getByTestId("ranking-row");
+        await expect(rows).toHaveCount(1);
+        // The score AND the outcome that qualifies it — never a bare score.
+        await expect(rows.first()).toContainText("CHAOS");
+        await expect(rows.first()).toContainText("43.5");
+        await expect(rows.first()).toContainText("qualified");
+        await expect(rows.first()).toContainText("complete");
+        // The two strongest drivers, strongest first.
+        await expect(rows.first()).toContainText("operational deficiencies.severity");
+        await expect(rows.first()).toContainText("health.compounding risk");
+
+        // The member acr did not rank is named, not silently dropped.
+        await expect(page.getByTestId("unranked-members")).toContainText("Platform");
+
+        // The §5a narration behind the ranking: an inferred judgment, the
+        // subject it is about, and the claimed fact it cites.
+        // Scoped to the cohort driver's OWN record, not the first driver on
+        // the page: the result carries the example's pre-existing drivers
+        // too, and asserting on `.first()` would pass while saying nothing
+        // about the cohort narration this test exists for.
+        const cohortDriver = page
+            .locator("li.record")
+            .filter({ hasText: "CHAOS: operational deficiencies" });
+        await expect(cohortDriver).toHaveCount(1);
+        await expect(cohortDriver).toContainText("inferred");
+        await expect(cohortDriver.getByTestId("driver-affected-subjects")).toContainText(
+            "CHAOS (team)",
+        );
+        // The claimed fact the judgment cites, verbatim.
+        await expect(cohortDriver).toContainText("claim_cohort_88cad88367c815eae568ce1f979c1471");
+    });
+
+    test("NEGATIVE: a single_subject answer carrying cohort data renders no ranking table", async ({
+        page,
+    }) => {
+        // The unmodified canonical example: it DOES carry a ranked team
+        // cohort, and its `interpretation.shape` is `single_subject`. A rich
+        // view must be conditional on intent (AGENTS.md check 10), so the
+        // table must not appear even though the data is right there.
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill("Why is Ask Dev still not ready to ship?");
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turn).toHaveAttribute("data-state", "complete");
+        // Discriminating: the answer really did arrive and really does carry
+        // the cohort's own driver narration — so this is the gate closing,
+        // not the request having failed.
+        await expect(turn).toContainText("CHAOS: operational deficiencies");
+        await expect(page.getByTestId("cohort-ranking-panel")).toHaveCount(0);
+        await expect(page.getByTestId("ranking-row")).toHaveCount(0);
     });
 });

@@ -7,6 +7,8 @@
  * alongside the tone, so a reader can see the vocabulary, not just the color.
  */
 import type {
+    CohortMemberDataCompleteness,
+    CohortMemberOutcome,
     CoverageState,
     InvestigationStatus,
     PriorSubjectReceiptDisposition,
@@ -99,6 +101,43 @@ export function priorSubjectReceiptDispositionTone(
         case "skipped_stale_graph_epoch":
         case "skipped_failed_reauth":
             return "warn";
+    }
+}
+
+/**
+ * Tone for one ranked `CohortMember.outcome` (CHAOS-4449; acr CHAOS-4398
+ * PR3b). Exhaustive over the closed enum.
+ *
+ * `insufficient_evidence` and `not_applicable` are `neutral`, not `bad`:
+ * neither is a poor result for the team, and colouring them as one would be
+ * the presentation layer forming a judgment acr did not make (North Star
+ * check 12 — missing is not healthy, but it is also not unhealthy).
+ */
+export function cohortOutcomeTone(outcome: CohortMemberOutcome): Tone {
+    switch (outcome) {
+        case "qualified":
+            return "ok";
+        case "provisional":
+            return "warn";
+        case "insufficient_evidence":
+        case "not_applicable":
+            return "neutral";
+    }
+}
+
+/**
+ * Tone for one ranked `CohortMember.data_completeness` (CHAOS-4449).
+ * Exhaustive over the closed enum. This describes the EVIDENCE behind a row,
+ * never the team's health.
+ */
+export function cohortDataCompletenessTone(completeness: CohortMemberDataCompleteness): Tone {
+    switch (completeness) {
+        case "complete":
+            return "ok";
+        case "partial":
+            return "warn";
+        case "degraded":
+            return "bad";
     }
 }
 

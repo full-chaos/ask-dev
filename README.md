@@ -64,6 +64,31 @@ Rendered today:
   plus at least one numeric column (`src/lib/fact-rows.ts`). The caption
   shows the fact's subject, row count, and the sibling `rollup_basis` claim
   when the producer emits one.
+- **cohort ranking** (CHAOS-4449, acr CHAOS-4398 PR3/PR3b) — when the question
+  asked for one (`interpretation.shape` is `explicit_cohort` or
+  `discovered_cohort`) **and** the result carries a cohort whose members acr
+  actually ranked, `CohortRankingPanel`
+  renders one row per ranked member in `attention_rank` order: rank, subject,
+  score (an em dash when there is none — never a blank or a zero), `outcome`,
+  `data_completeness`, the row-level window, and the member's two strongest
+  drivers. `src/lib/cohort-ranking.ts` is a re-expression of acr's own
+  reference rendering (`internal/contextfabric/answerprojection/ranking_table.go`)
+  and re-derives nothing. Four rules hold it. It is **conditional on intent,
+  never default** — the pinned canonical example is `single_subject` and still
+  carries a ranked team cohort, so carrying the data is not on its own a
+  reason to render a rich view (check 10); nothing is lost when the gate
+  closes, since the raw cohort stays in the canonical result inspector. A
+  score never appears without the drivers explaining it, and a score the
+  contract accepts but nothing explains is **withheld** rather than shown —
+  this view fails closed (check 8, and `AGENTS.md`). No ranked member at all
+  renders **nothing**, not an empty table, because "ranking never ran" is a
+  different claim from "nothing qualified". And members acr did not rank are
+  named under the table rather than silently dropped as acr's own table drops
+  them, with the cohort-level `complete`/`truncated` flags surfaced so a
+  partial census never reads as an exhaustive one. The narrated `§5a` judgments behind the ranking are ordinary result
+  `drivers`, rendered by `AnswerPanel` with their standing, epistemic status
+  (`inferred`, never presented as an observation), affected subjects, and the
+  claimed facts they cite.
 
 ## Running it
 
@@ -182,7 +207,35 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `b8350816ec5823c7c6859a5d88fc917bb318d43b` (acr main; CHAOS-4364
+Currently pinned: `aa214606e70d9beb1cd2ea78d62a17bd4e680c3b` (acr main tip #326;
+CHAOS-4449, bumping past CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking
+surface). The whole widening lands in ONE schema: `context_fabric_common.v1`'s
+`CohortMember` grew `ranking_computed`, `attention_rank`, `score`,
+`ranking_basis`, `data_completeness`, `outcome`, `missing_signals` and
+`drivers`, the last pointing at a new `CohortMemberDriver`
+(`signal`/`value`/`weight`/`weight_contributed`/`window`, plus
+`threshold_labels`, `concentration`/`concentration_method` and
+`source_claimed_fact_ids`). The **investigation-result schema is byte-identical
+to the prior pin** — `cohort` was already a result field and only its member
+shape grew — so the `src/contracts/` diff shows the change where it actually is.
+
+Two things moved in the canonical example, and both had consequences here: it
+gained a ranked `cohort` plus three narrated cohort `drivers` (what the new
+tests read), and its `canonical_fact:workload` coverage source flipped from
+`pruned` to `available`, failing a telemetry test that had named those two
+states literally (`src/lib/telemetry/outcome.test.ts`, now asserted against the
+example's own source/state pairs instead).
+
+**Not in this bump: CHAOS-4413.** Its `terminal_status`, `terminal_reason`,
+`rows_count` and `claimed_facts_count` are absent from
+`contracts/jsonschema/v1` at this pin — they exist only in acr's trial harness
+(`cmd/acr-trial-merge-two-turn/main.go`), which is exactly the harness-only
+telemetry CHAOS-4413 exists to promote into the public contract. `coverage`
+(its fifth field) was already public and is already rendered by
+`CoveragePanel`. Rendering the other four would mean inventing fields the
+contract does not carry, so they wait for the acr side.
+
+Previously pinned: `b8350816ec5823c7c6859a5d88fc917bb318d43b` (acr main; CHAOS-4364
 follow-up to CHAOS-4355 — bumps past #307 (56316ebe)'s new FactKinds
 `flow`/`landscape` (bottlenecks, IC landscape/area) and #306 (02c44254)'s
 `carried` `StructureSource` value for a same-conversation window carry.

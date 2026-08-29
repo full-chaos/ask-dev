@@ -33,7 +33,27 @@ function DriverRecord({ driver }: { readonly driver: DriverJudgment }) {
                     <SafeAnswerText text={driver.qualification} />
                 </p>
             ) : null}
+            {
+                // CHAOS-4449: who the judgment is about. Required by the
+                // contract (minItems 1), and the field that makes a cohort
+                // driver readable at all — acr's cohort drivers all share the
+                // shape "<team>: <signal>", so without the subject the
+                // narration reads as if it were about the whole org.
+            }
+            <p className="record__meta" data-testid="driver-affected-subjects">
+                Affected:{" "}
+                {driver.affected_subjects
+                    .map((subject) => `${subject.label} (${subject.kind})`)
+                    .join(", ")}
+            </p>
             <EvidenceReferences evidenceRefIds={driver.evidence_ref_ids} label="Evidence" />
+            {
+                // The citations behind a narrated judgment, verbatim. Rendered
+                // as ids rather than as links: the result carries claim ids,
+                // not addresses, and the claimed facts they name are shown in
+                // full by the canonical result inspector.
+            }
+            <EvidenceReferences evidenceRefIds={driver.claimed_fact_ids} label="Claimed facts" />
         </li>
     );
 }

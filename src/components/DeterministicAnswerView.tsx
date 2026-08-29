@@ -3,6 +3,7 @@ import { useId } from "react";
 import { AnswerPanel } from "@/components/AnswerPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
+import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
@@ -242,6 +243,15 @@ export function DeterministicAnswerView({
             {structureConfirmationNotice}
             {structureNeedsPanel}
             <AnswerPanel result={result} />
+            {
+                // Directly under the answer, above the fact tables: when the
+                // question asked for a ranking, the ranking IS the answer, so
+                // it leads the supporting evidence rather than trailing it.
+                // `shape` gates it — a result can carry cohort data without
+                // the question having asked for a ranking (see the panel's
+                // own rule 0).
+            }
+            <CohortRankingPanel cohort={result.cohort} shape={result.interpretation.shape} />
             <FactRowsPanels facts={result.claimed_facts} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel

@@ -930,3 +930,20 @@ body {
         max-width: 85%;
     }
 }
+
+/* --- Cohort ranking table (CHAOS-4449) ---
+   Reuses `.fact-table` wholesale; only the per-row driver list needs rules of
+   its own. Separation stays surface/hairline-based — no bright borders. */
+
+.ranking__drivers {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 2px;
+}
+
+.ranking__driver-signal {
+    color: var(--text);
+    font-weight: 600;
+}
