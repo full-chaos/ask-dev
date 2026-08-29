@@ -17,6 +17,8 @@ const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
 const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 // Kept in sync by hand with `TRIGGER_MIXED` for the same reason.
 const TRIGGER_MIXED = "e2e-mixed-me";
+// Kept in sync by hand with `TRIGGER_COHORT` for the same reason.
+const TRIGGER_COHORT = "e2e-cohort-me";
 // Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
 const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 
@@ -579,8 +581,11 @@ test.describe("conversation threading", () => {
  * rejected outright on any pin older than this one. A green run here is
  * therefore also a live proof that the pin bump itself landed.
  *
- * No trigger needed — the double answers an ordinary question with the
- * canonical example verbatim, and that example now carries the ranked cohort.
+ * `TRIGGER_COHORT` is required: the canonical example carries the ranked
+ * cohort but its own `interpretation.shape` is `single_subject`, and the
+ * table is gated on cohort intent. That makes the UNMODIFIED answer the
+ * negative control below — a pairing that only works because the double
+ * overrides `shape` and nothing else.
  */
 test.describe("cohort ranking", () => {
     test.use({ baseURL: configuredBaseURL });
@@ -590,7 +595,9 @@ test.describe("cohort ranking", () => {
     }) => {
         await page.goto("/");
 
-        await page.getByLabel("Ask a question").fill("Which teams are struggling, and why?");
+        await page
+            .getByLabel("Ask a question")
+            .fill(`Which teams are struggling, and why, ${TRIGGER_COHORT}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
         const turn = page.getByRole("article", { name: "Deterministic answer" });
@@ -628,5 +635,27 @@ test.describe("cohort ranking", () => {
         );
         // The claimed fact the judgment cites, verbatim.
         await expect(cohortDriver).toContainText("claim_cohort_88cad88367c815eae568ce1f979c1471");
+    });
+
+    test("NEGATIVE: a single_subject answer carrying cohort data renders no ranking table", async ({
+        page,
+    }) => {
+        // The unmodified canonical example: it DOES carry a ranked team
+        // cohort, and its `interpretation.shape` is `single_subject`. A rich
+        // view must be conditional on intent (AGENTS.md check 10), so the
+        // table must not appear even though the data is right there.
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill("Why is Ask Dev still not ready to ship?");
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turn).toHaveAttribute("data-state", "complete");
+        // Discriminating: the answer really did arrive and really does carry
+        // the cohort's own driver narration — so this is the gate closing,
+        // not the request having failed.
+        await expect(turn).toContainText("CHAOS: operational deficiencies");
+        await expect(page.getByTestId("cohort-ranking-panel")).toHaveCount(0);
+        await expect(page.getByTestId("ranking-row")).toHaveCount(0);
     });
 });

@@ -13,7 +13,33 @@
  * column. acr's row omits it; CHAOS-4449 asks for it, and it is a real
  * contract field on the member, so surfacing it invents nothing.
  */
-import type { CohortDriverWindow, CohortMember, CohortMemberDriver } from "@/lib/contracts";
+import type {
+    CohortDriverWindow,
+    CohortMember,
+    CohortMemberDriver,
+    InterpretedShape,
+} from "@/lib/contracts";
+
+/**
+ * The interpreted shapes a cohort ranking is an answer TO.
+ *
+ * A ranking table is a rich view, and AGENTS.md check 10 makes rich views
+ * conditional on intent, never default — so carrying cohort data is not on
+ * its own a reason to render one. The pinned canonical example proves the two
+ * come apart: its `interpretation.shape` is `single_subject` (the question is
+ * about one project) while it still carries a ranked team cohort. Rendering
+ * on the data alone would answer a question nobody asked, which is check 1's
+ * "never answer the nearest measurable question".
+ *
+ * `open` is deliberately excluded: an unshaped question has not asked for a
+ * ranking either.
+ */
+const COHORT_INTENT_SHAPES: readonly InterpretedShape[] = ["explicit_cohort", "discovered_cohort"];
+
+/** Whether an interpreted question actually asked for a cohort ranking. */
+export function isCohortIntent(shape: InterpretedShape): boolean {
+    return COHORT_INTENT_SHAPES.includes(shape);
+}
 
 /**
  * How many of a member's own drivers a row surfaces, matching

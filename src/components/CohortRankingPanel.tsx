@@ -1,12 +1,18 @@
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
-import type { Cohort, CohortMember, CohortMemberDriver } from "@/lib/contracts";
-import { rankingTable } from "@/lib/cohort-ranking";
+import type { Cohort, CohortMember, CohortMemberDriver, InterpretedShape } from "@/lib/contracts";
+import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "@/lib/presentation";
 
 export type CohortRankingPanelProps = {
     readonly cohort: Cohort | undefined;
+    /**
+     * `interpretation.shape` — what the question actually asked for. Required,
+     * not optional: a caller that simply forgot to pass it would silently get
+     * the old unconditional rendering back.
+     */
+    readonly shape: InterpretedShape;
 };
 
 /** A driver's contribution, as the member itself states it. Nothing re-derived. */
@@ -37,7 +43,15 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
  * built by `@/lib/cohort-ranking` from fields the member already carries —
  * see that module for why each rule is acr's and not this repo's.
  *
- * Three boundary rules hold this panel honest:
+ * Four boundary rules hold this panel honest:
+ *
+ * 0. **Conditional on intent, never default.** A ranking renders only when the
+ *    question asked for one (`interpretation.shape`), not merely because the
+ *    result carries cohort data — the pinned canonical example is
+ *    `single_subject` and still carries a ranked team cohort, so the two come
+ *    apart in practice (AGENTS.md check 10; see `isCohortIntent`). Nothing is
+ *    lost when the gate closes: the raw cohort stays visible in the canonical
+ *    result inspector, which is the view that exists to show everything.
  *
  * 1. **Never a bare score, and fail closed.** Every score renders with its
  *    `outcome` beside it and its strongest drivers below it. A member that
@@ -62,12 +76,13 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
  *    team (AGENTS.md checks 11 and 12: completeness is a public contract
  *    field, and missing is not healthy).
  */
-export function CohortRankingPanel({ cohort }: CohortRankingPanelProps) {
+export function CohortRankingPanel({ cohort, shape }: CohortRankingPanelProps) {
     // Several answered turns coexist on the chat surface, so a hardcoded id
     // would make the second panel's `aria-labelledby` resolve to the FIRST
     // panel's heading — the same multi-instance bug `DeterministicAnswerView`
     // and `StructureNeedsPanel` already use `useId()` to avoid.
     const idPrefix = useId();
+    if (!isCohortIntent(shape)) return null;
     if (cohort === undefined) return null;
     const rows = rankingTable(cohort.members);
     if (rows === null) return null;

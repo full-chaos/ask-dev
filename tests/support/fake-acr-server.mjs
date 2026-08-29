@@ -31,9 +31,11 @@
  * `structure_needs` disclosure (kind offers) instead, TRIGGER_CANDIDATE_NEEDS
  * (CHAOS-4012/CHAOS-4171) returns one with a candidate-list disclosure
  * instead, TRIGGER_MIXED returns one with BOTH clarification and kind offers
- * at once, and TRIGGER_CONVERSATION_ECHO returns a decisive result whose
+ * at once, TRIGGER_CONVERSATION_ECHO returns a decisive result whose
  * `deterministic_answer` reports back what `conversation` the request itself
- * carried. Every other question returns the canonical `complete` example
+ * carried, and TRIGGER_COHORT (CHAOS-4449) returns the canonical example with
+ * `interpretation.shape` overridden to `discovered_cohort` and nothing else
+ * changed. Every other question returns the canonical `complete` example
  * unchanged apart from `question`/`result_id`/`request_id`, so it never
  * accidentally collides with any scenario's identifiers.
  *
@@ -63,11 +65,12 @@
  *       idle for any spec that never talks to it). Only `tests/chat.spec.ts`'s
  *       `"clarification chips"`, `"structure needs chips"`, `"mixed receipt
  *       families"`, and `"conversation threading"` describe blocks actually
- *       TALK to it, by overriding `baseURL` to the configured app instance
- *       that points at it (codex review round 2, correcting an earlier
- *       version of this comment that implied the double itself was scoped
- *       to one spec; extended again in round 2 of the mixed-receipt-family
- *       and conversation-threading follow-up for the same reason).
+ *       TALK to it, along with `"cohort ranking"` (CHAOS-4449), by overriding
+ *       `baseURL` to the configured app instance that points at it (codex
+ *       review round 2, correcting an earlier version of this comment that
+ *       implied the double itself was scoped to one spec; extended again in
+ *       round 2 of the mixed-receipt-family and conversation-threading
+ *       follow-up for the same reason).
  *   (d) CHAOS-3927 P1 (+ CHAOS-3900 W1) merged to acr `main`, and this
  *       repo's contract pin bumped past that merge (README's "Bumping the
  *       pin", pin `7d275c2e`): `structure_needs`/`confirmed_structure` are
@@ -107,6 +110,13 @@ export const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 // CandidateOptionsSection gets the same proof the kind-offer path already
 // has, not just component-level coverage.
 export const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
+// CHAOS-4449: a decisive result whose question actually ASKED for a ranking.
+// The canonical example carries a ranked team cohort while its
+// `interpretation.shape` is `single_subject` (its own question is about one
+// project), and the ranking table is gated on cohort intent — so unmodified
+// `answeredResult` is the NEGATIVE control for that gate, and this trigger,
+// which overrides `shape` and nothing else, is the positive one.
+export const TRIGGER_COHORT = "e2e-cohort-me";
 
 const canonical = JSON.parse(
     readFileSync(
@@ -121,6 +131,23 @@ function answeredResult(question) {
         result_id: "result_e2e_answered_0001",
         request_id: "request_e2e_answered_0001",
         question,
+    };
+}
+
+/**
+ * The same decisive result, reinterpreted as a cohort question.
+ *
+ * `interpretation.shape` is the ONLY field overridden: the cohort, its ranked
+ * member and the narrated cohort drivers all come from the canonical example
+ * untouched, so this double still invents no ranking data of its own.
+ */
+function cohortResult(question) {
+    const result = answeredResult(question);
+    return {
+        ...result,
+        result_id: "result_e2e_cohort_0001",
+        request_id: "request_e2e_cohort_0001",
+        interpretation: { ...result.interpretation, shape: "discovered_cohort" },
     };
 }
 
@@ -504,15 +531,17 @@ const server = createServer((request, response) => {
                 : mixedResult(question)
             : question.includes(TRIGGER_CONVERSATION_ECHO)
               ? conversationEchoResult(question, conversation)
-              : hasChosenReceipt
-                ? answeredResult(question)
-                : question.includes(TRIGGER_STRUCTURE_NEEDS)
-                  ? structureNeedsResult(question)
-                  : question.includes(TRIGGER_CANDIDATE_NEEDS)
-                    ? candidateNeedsResult(question)
-                    : question.includes(TRIGGER_CLARIFICATION)
-                      ? clarificationResult(question)
-                      : answeredResult(question);
+              : question.includes(TRIGGER_COHORT)
+                ? cohortResult(question)
+                : hasChosenReceipt
+                  ? answeredResult(question)
+                  : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                    ? structureNeedsResult(question)
+                    : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                      ? candidateNeedsResult(question)
+                      : question.includes(TRIGGER_CLARIFICATION)
+                        ? clarificationResult(question)
+                        : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

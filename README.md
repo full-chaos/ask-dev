@@ -64,19 +64,28 @@ Rendered today:
   plus at least one numeric column (`src/lib/fact-rows.ts`). The caption
   shows the fact's subject, row count, and the sibling `rollup_basis` claim
   when the producer emits one.
-- **cohort ranking** (CHAOS-4449, acr CHAOS-4398 PR3/PR3b) — when the result
-  carries a cohort whose members acr actually ranked, `CohortRankingPanel`
+- **cohort ranking** (CHAOS-4449, acr CHAOS-4398 PR3/PR3b) — when the question
+  asked for one (`interpretation.shape` is `explicit_cohort` or
+  `discovered_cohort`) **and** the result carries a cohort whose members acr
+  actually ranked, `CohortRankingPanel`
   renders one row per ranked member in `attention_rank` order: rank, subject,
   score (an em dash when there is none — never a blank or a zero), `outcome`,
   `data_completeness`, the row-level window, and the member's two strongest
   drivers. `src/lib/cohort-ranking.ts` is a re-expression of acr's own
   reference rendering (`internal/contextfabric/answerprojection/ranking_table.go`)
-  and re-derives nothing. Three rules hold it: a score never appears without
-  the drivers explaining it (North Star check 8); no ranked member at all
+  and re-derives nothing. Four rules hold it. It is **conditional on intent,
+  never default** — the pinned canonical example is `single_subject` and still
+  carries a ranked team cohort, so carrying the data is not on its own a
+  reason to render a rich view (check 10); nothing is lost when the gate
+  closes, since the raw cohort stays in the canonical result inspector. A
+  score never appears without the drivers explaining it, and a score the
+  contract accepts but nothing explains is **withheld** rather than shown —
+  this view fails closed (check 8, and `AGENTS.md`). No ranked member at all
   renders **nothing**, not an empty table, because "ranking never ran" is a
-  different claim from "nothing qualified"; and members acr did not rank are
+  different claim from "nothing qualified". And members acr did not rank are
   named under the table rather than silently dropped as acr's own table drops
-  them. The narrated `§5a` judgments behind the ranking are ordinary result
+  them, with the cohort-level `complete`/`truncated` flags surfaced so a
+  partial census never reads as an exhaustive one. The narrated `§5a` judgments behind the ranking are ordinary result
   `drivers`, rendered by `AnswerPanel` with their standing, epistemic status
   (`inferred`, never presented as an observation), affected subjects, and the
   claimed facts they cite.

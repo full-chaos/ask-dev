@@ -171,6 +171,14 @@ export type CohortDriverSignal =
 export type CohortDriverWindow =
     import("@/contracts/generated/investigation-result").CohortMemberDriver["window"];
 
+/**
+ * The closed `interpretation.shape` vocabulary — the intent axis a rich view
+ * has to be conditional on (AGENTS.md check 10). Derived by indexed access,
+ * same discipline as the vocabularies above.
+ */
+export type InterpretedShape =
+    import("@/contracts/generated/investigation-result").InterpretedQuestion["shape"];
+
 /** One entry of `coverage.sources`; the contract declares it inline. */
 export type CoverageSource =
     import("@/contracts/generated/investigation-result").Coverage["sources"][number];

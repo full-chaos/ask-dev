@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { CohortMember, CohortMemberDriver, InvestigationResult } from "@/lib/contracts";
 import {
+    isCohortIntent,
     RANKING_TABLE_TOP_DRIVERS,
     rankingTable,
     rowWindow,
@@ -36,6 +37,23 @@ function driver(overrides: Partial<CohortMemberDriver>): CohortMemberDriver {
         ...overrides,
     };
 }
+
+describe("isCohortIntent", () => {
+    it("is true only for the two cohort shapes", () => {
+        expect(isCohortIntent("explicit_cohort")).toBe(true);
+        expect(isCohortIntent("discovered_cohort")).toBe(true);
+        expect(isCohortIntent("single_subject")).toBe(false);
+        expect(isCohortIntent("open")).toBe(false);
+    });
+
+    it("is false for the pinned example, which carries a cohort anyway", () => {
+        // The data and the intent genuinely come apart — this is the payload
+        // that made the unconditional rendering a defect rather than a
+        // theoretical one.
+        expect(result.cohort).toBeDefined();
+        expect(isCohortIntent(result.interpretation.shape)).toBe(false);
+    });
+});
 
 describe("rankingTable", () => {
     it("is null when the cohort carries no ranked member (not computed ≠ nothing qualified)", () => {
