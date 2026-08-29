@@ -567,3 +567,66 @@ test.describe("conversation threading", () => {
         await expect(turns.last()).toContainText("What is Ask Dev");
     });
 });
+
+/**
+ * The cohort ranking, end to end (CHAOS-4449).
+ *
+ * Runs against the ACR-configured instance, so the ranked cohort travels the
+ * WHOLE real path — fake-ACR's HTTP response → the app's own Ajv validation
+ * against the pinned schemas → the DOM. That validation is the point: the
+ * pinned contract is `additionalProperties: false`, so a result carrying
+ * `score`/`outcome`/`data_completeness`/`drivers` on a cohort member is
+ * rejected outright on any pin older than this one. A green run here is
+ * therefore also a live proof that the pin bump itself landed.
+ *
+ * No trigger needed — the double answers an ordinary question with the
+ * canonical example verbatim, and that example now carries the ranked cohort.
+ */
+test.describe("cohort ranking", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: a decisive cohort answer renders the ranking table and its drivers", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill("Which teams are struggling, and why?");
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turn).toHaveCount(1);
+        // Decisive, not a clarification the UI merely rendered thinly.
+        await expect(turn).toHaveAttribute("data-state", "complete");
+
+        const rows = page.getByTestId("ranking-row");
+        await expect(rows).toHaveCount(1);
+        // The score AND the outcome that qualifies it — never a bare score.
+        await expect(rows.first()).toContainText("CHAOS");
+        await expect(rows.first()).toContainText("43.5");
+        await expect(rows.first()).toContainText("qualified");
+        await expect(rows.first()).toContainText("complete");
+        // The two strongest drivers, strongest first.
+        await expect(rows.first()).toContainText("operational deficiencies.severity");
+        await expect(rows.first()).toContainText("health.compounding risk");
+
+        // The member acr did not rank is named, not silently dropped.
+        await expect(page.getByTestId("unranked-members")).toContainText("Platform");
+
+        // The §5a narration behind the ranking: an inferred judgment, the
+        // subject it is about, and the claimed fact it cites.
+        // Scoped to the cohort driver's OWN record, not the first driver on
+        // the page: the result carries the example's pre-existing drivers
+        // too, and asserting on `.first()` would pass while saying nothing
+        // about the cohort narration this test exists for.
+        const cohortDriver = page
+            .locator("li.record")
+            .filter({ hasText: "CHAOS: operational deficiencies" });
+        await expect(cohortDriver).toHaveCount(1);
+        await expect(cohortDriver).toContainText("inferred");
+        await expect(cohortDriver.getByTestId("driver-affected-subjects")).toContainText(
+            "CHAOS (team)",
+        );
+        // The claimed fact the judgment cites, verbatim.
+        await expect(cohortDriver).toContainText("claim_cohort_88cad88367c815eae568ce1f979c1471");
+    });
+});
