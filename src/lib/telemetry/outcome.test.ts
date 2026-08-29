@@ -185,9 +185,31 @@ describe("outcome telemetry — what it does record", () => {
             result,
         });
 
-        const states = event.coverageSourceStates.map((entry) => entry.state);
-        expect(states).toContain("pruned");
-        expect(states).toContain("available");
+        // Asserted against the pinned example's OWN source/state pairs, in
+        // order, rather than against two hand-named states: the literal pair
+        // this used to check ("pruned"/"available") was a fact about which
+        // states the example happened to carry, and the CHAOS-4449 pin bump
+        // flipped its `canonical_fact:workload` source from `pruned` to
+        // `available` — failing a test that was never about that source. The
+        // multiset comparison is strictly stronger than the two `toContain`s
+        // it replaces: it catches a dropped, duplicated, or substituted
+        // entry, and it pins the source↔state PAIRING this event exists to
+        // preserve. Compared as a multiset, not a sequence, because the event
+        // sorts by (source, state); that sort, mixed states, and the
+        // unknown-source bounding all stay pinned by the constructed-result
+        // test above, which does not depend on the example's own contents.
+        const asMultiset = (pairs: readonly { source: string; state: string }[]) =>
+            pairs.map((pair) => `${pair.source}|${pair.state}`).sort();
+
+        expect(event.coverageSourceStates).toHaveLength(result.coverage.sources.length);
+        expect(asMultiset(event.coverageSourceStates)).toEqual(
+            asMultiset(
+                result.coverage.sources.map((source) => ({
+                    source: boundedCoverageSource(source.source),
+                    state: source.state,
+                })),
+            ),
+        );
         expect(event.coveragePartial).toBe(result.coverage.partial);
         expect(event.limitationCount).toBe(result.limitations.length);
         expect(event.evidenceRefCount).toBe(result.evidence_ref_ids.length);
