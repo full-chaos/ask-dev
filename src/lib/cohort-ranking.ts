@@ -1,0 +1,102 @@
+/**
+ * The ranking-table projection over `cohort.members` (CHAOS-4449; acr
+ * CHAOS-4398 PR3/PR3b).
+ *
+ * This is a re-expression of acr's OWN reference rendering,
+ * `internal/contextfabric/answerprojection/ranking_table.go`, and every rule
+ * below is that file's rule, not one invented here: rows come only from
+ * members acr actually ranked, in `attention_rank` order, built from fields
+ * the member already carries. Nothing is re-derived, re-scored, or re-worded
+ * — the Workbench is a read-only consumer (README, "What this is").
+ *
+ * The one intentional difference: `data_completeness` is carried through as a
+ * column. acr's row omits it; CHAOS-4449 asks for it, and it is a real
+ * contract field on the member, so surfacing it invents nothing.
+ */
+import type { CohortDriverWindow, CohortMember, CohortMemberDriver } from "@/lib/contracts";
+
+/**
+ * How many of a member's own drivers a row surfaces, matching
+ * `rankingTableTopDrivers` in acr's ranking_table.go: "never a bare score" —
+ * every scored row also carries the strongest evidence behind it.
+ */
+export const RANKING_TABLE_TOP_DRIVERS = 2;
+
+export type RankedCohortRow = {
+    readonly member: CohortMember;
+    /**
+     * Present on every ranked row: `ranking_computed: true` makes `outcome`
+     * required, and `attention_rank` is what the rows are ordered by.
+     */
+    readonly attentionRank: number | undefined;
+    /**
+     * `null` — not `undefined` — when the member carries no score. The
+     * distinction is acr's: a row "never silently omits the key when there is
+     * no score either, so a consumer can tell 'no score' from 'field not
+     * rendered'". `outcome` is always beside it, which is the other half of
+     * "never a bare score".
+     */
+    readonly score: number | null;
+    /** The member's strongest drivers, already ordered. May be empty. */
+    readonly topDrivers: readonly CohortMemberDriver[];
+    /** The row-level window summary; see `rowWindow` below. */
+    readonly window: CohortDriverWindow;
+};
+
+/**
+ * Summarizes a member's per-driver windows into one row-level value:
+ * `current_vs_prior` iff any driver used a prior-window comparison, else
+ * `current` (including when the member carries no drivers at all — there is
+ * then nothing to have compared against a prior window). Deterministic, and
+ * a real summary rather than a fabricated one, because only `investment_mix`
+ * ever carries `current_vs_prior`.
+ */
+export function rowWindow(drivers: readonly CohortMemberDriver[]): CohortDriverWindow {
+    return drivers.some((driver) => driver.window === "current_vs_prior")
+        ? "current_vs_prior"
+        : "current";
+}
+
+/**
+ * The strongest `limit` drivers by `weight_contributed` descending, ties
+ * broken by `signal` ascending so the order is stable across renders. This
+ * orders evidence; it never re-judges it.
+ */
+export function topDriversByWeightContributed(
+    drivers: readonly CohortMemberDriver[],
+    limit: number,
+): readonly CohortMemberDriver[] {
+    return [...drivers]
+        .sort((left, right) =>
+            left.weight_contributed === right.weight_contributed
+                ? left.signal.localeCompare(right.signal)
+                : right.weight_contributed - left.weight_contributed,
+        )
+        .slice(0, limit);
+}
+
+/**
+ * The ranking table for a cohort, or `null` when acr ranked no member of it.
+ *
+ * `null` is the "not computed" distinction `ranking_computed` itself makes,
+ * and it is why the panel renders nothing at all rather than an empty table:
+ * an empty table would read as "ranked, and nothing qualified", which is a
+ * different claim from "ranking never ran".
+ */
+export function rankingTable(members: readonly CohortMember[]): readonly RankedCohortRow[] | null {
+    const ranked = members.filter((member) => member.ranking_computed === true);
+    if (ranked.length === 0) return null;
+
+    return [...ranked]
+        .sort((left, right) => (left.attention_rank ?? 0) - (right.attention_rank ?? 0))
+        .map((member) => {
+            const drivers = member.drivers ?? [];
+            return {
+                member,
+                attentionRank: member.attention_rank,
+                score: member.score ?? null,
+                topDrivers: topDriversByWeightContributed(drivers, RANKING_TABLE_TOP_DRIVERS),
+                window: rowWindow(drivers),
+            };
+        });
+}

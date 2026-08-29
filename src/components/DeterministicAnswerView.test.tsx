@@ -69,7 +69,15 @@ describe("DeterministicAnswerView: fact rows panels (CHAOS-4355)", () => {
         render(<DeterministicAnswerView result={result} />);
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });
-        const sections = Array.from(article.querySelectorAll("section.panel"));
+        // CHAOS-4449: the cohort ranking panel is answer content too, and sits
+        // between the answer prose and the fact tables when the result carries
+        // a ranked cohort. It is excluded here rather than accommodated, so
+        // this stays the assertion it has always been — fact rows follow the
+        // ANSWER, and are not folded into a later section — instead of
+        // becoming an assertion about how many panels precede them.
+        const sections = Array.from(article.querySelectorAll("section.panel")).filter(
+            (section) => section.getAttribute("aria-labelledby") !== "cohort-ranking-title",
+        );
         const answerSectionIndex = sections.findIndex(
             (section) => section.getAttribute("aria-labelledby") === "answer-title",
         );
@@ -98,7 +106,11 @@ describe("DeterministicAnswerView: fact rows panels (CHAOS-4355)", () => {
         render(<DeterministicAnswerView result={result} />);
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });
-        expect(article.querySelector(".fact-table-wrap")).toBeNull();
+        // Scoped to the fact-rows panels by their own heading ids (CHAOS-4449):
+        // `.fact-table-wrap` is a shared table style, and the cohort ranking
+        // panel reuses it, so querying the class alone would make this assert
+        // "no table of any kind" — a claim this test never meant to make.
+        expect(article.querySelector('section[aria-labelledby^="fact-rows-"]')).toBeNull();
         expect(article.querySelector(".fact-chart")).toBeNull();
     });
 });

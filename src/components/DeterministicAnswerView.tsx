@@ -3,6 +3,7 @@ import { useId } from "react";
 import { AnswerPanel } from "@/components/AnswerPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
+import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
@@ -242,6 +243,13 @@ export function DeterministicAnswerView({
             {structureConfirmationNotice}
             {structureNeedsPanel}
             <AnswerPanel result={result} />
+            {
+                // Directly under the answer, above the fact tables: the ranking
+                // IS the answer to a cohort question ("which teams are
+                // struggling"), so it leads the supporting evidence rather than
+                // trailing it.
+            }
+            <CohortRankingPanel cohort={result.cohort} />
             <FactRowsPanels facts={result.claimed_facts} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel

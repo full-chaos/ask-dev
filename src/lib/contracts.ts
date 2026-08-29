@@ -23,6 +23,10 @@ export type {
     ClaimedFact,
     // CHAOS-4355: a claimed fact's OPTIONAL renderable table (CHAOS-4347).
     ClaimedFactRow,
+    // CHAOS-4449 (acr CHAOS-4398 PR3/PR3b): the cohort and its ranked members.
+    Cohort,
+    CohortMember,
+    CohortMemberDriver,
     ConfirmedStructureEntry,
     Coverage,
     DriverJudgment,
@@ -148,6 +152,24 @@ export const STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER: readonly StructureNeedKind[
     "window",
     "subject_candidate",
 ];
+
+/**
+ * The four closed vocabularies CHAOS-4398 PR3/PR3b added to `CohortMember`
+ * and `CohortMemberDriver`. Derived by indexed access for the same reason
+ * the structure vocabularies above are: `json-schema-to-typescript` inlines
+ * them rather than naming them, so this is the one place a pin bump that
+ * changes one has to be absorbed.
+ */
+export type CohortMemberOutcome = NonNullable<
+    import("@/contracts/generated/investigation-result").CohortMember["outcome"]
+>;
+export type CohortMemberDataCompleteness = NonNullable<
+    import("@/contracts/generated/investigation-result").CohortMember["data_completeness"]
+>;
+export type CohortDriverSignal =
+    import("@/contracts/generated/investigation-result").CohortMemberDriver["signal"];
+export type CohortDriverWindow =
+    import("@/contracts/generated/investigation-result").CohortMemberDriver["window"];
 
 /** One entry of `coverage.sources`; the contract declares it inline. */
 export type CoverageSource =
