@@ -100,6 +100,81 @@ describe("CohortRankingPanel", () => {
         const cells = within(screen.getAllByTestId("ranking-row")[0]!).getAllByRole("cell");
         expect(cells[2]!.textContent).toBe("—");
         expect(screen.getByText("No drivers reported.")).toBeInTheDocument();
+        // Nothing was withheld — there was no score to withhold.
+        expect(screen.queryByTestId("score-withheld")).not.toBeInTheDocument();
+    });
+
+    it("WITHHOLDS a score the contract accepts but nothing explains (fail closed)", () => {
+        // The pinned schema accepts this: `outcome: "qualified"` requires
+        // `score`, and `drivers` is only bounded when `data_completeness` is
+        // present. So Ajv passes it and this view is the last place to catch
+        // it — AGENTS.md:40 requires failing closed rather than masking an
+        // answer-quality failure.
+        const bareScore: Cohort = {
+            ...cohort,
+            members: [
+                {
+                    ...cohort.members[0]!,
+                    data_completeness: undefined,
+                    drivers: undefined,
+                },
+            ],
+        } as unknown as Cohort;
+        render(<CohortRankingPanel cohort={bareScore} />);
+
+        // The number itself never reaches the DOM.
+        expect(screen.queryByText("43.5")).not.toBeInTheDocument();
+        expect(screen.getByTestId("score-withheld")).toBeInTheDocument();
+        expect(screen.getByText("No drivers reported — score withheld.")).toBeInTheDocument();
+        // Withheld, not dropped: the row and its outcome still render, so the
+        // member is not silently omitted either.
+        expect(screen.getAllByTestId("ranking-row")).toHaveLength(1);
+        expect(screen.getByText("qualified")).toBeInTheDocument();
+    });
+
+    it("says nothing about completeness for a complete, untruncated cohort", () => {
+        render(<CohortRankingPanel cohort={cohort} />);
+        expect(screen.queryByTestId("cohort-incomplete-notice")).not.toBeInTheDocument();
+    });
+
+    it("qualifies a ranking built from an INCOMPLETE cohort", () => {
+        // `unrankedLabels` can only name members the cohort still carries, so
+        // teams dropped during discovery are invisible here. Without this
+        // notice the table reads as an exhaustive ranking of every team
+        // (AGENTS.md checks 11 and 12).
+        const incomplete: Cohort = { ...cohort, complete: false, truncated: false };
+        render(<CohortRankingPanel cohort={incomplete} />);
+        expect(screen.getByTestId("cohort-incomplete-notice")).toHaveTextContent(
+            /did not report this cohort as complete/,
+        );
+    });
+
+    it("qualifies a ranking built from a TRUNCATED cohort", () => {
+        const truncated: Cohort = { ...cohort, complete: false, truncated: true };
+        render(<CohortRankingPanel cohort={truncated} />);
+        expect(screen.getByTestId("cohort-incomplete-notice")).toHaveTextContent(
+            /cohort was truncated/,
+        );
+    });
+
+    it("gives each mounted panel its own heading id", () => {
+        // Several answered turns coexist on the chat surface; a hardcoded id
+        // would point the second panel's `aria-labelledby` at the FIRST
+        // panel's heading, naming the wrong turn.
+        render(
+            <>
+                <CohortRankingPanel cohort={cohort} />
+                <CohortRankingPanel cohort={cohort} />
+            </>,
+        );
+        const [first, second] = screen.getAllByTestId("cohort-ranking-panel");
+        const firstId = first!.getAttribute("aria-labelledby");
+        const secondId = second!.getAttribute("aria-labelledby");
+        expect(firstId).toBeTruthy();
+        expect(firstId).not.toBe(secondId);
+        // Each id actually resolves to that panel's OWN heading.
+        expect(first!.querySelector(`[id="${firstId}"]`)).toBeInTheDocument();
+        expect(second!.querySelector(`[id="${secondId}"]`)).toBeInTheDocument();
     });
 
     it("discloses a member's missing signals", () => {

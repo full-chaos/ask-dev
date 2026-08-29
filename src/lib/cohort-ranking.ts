@@ -41,6 +41,19 @@ export type RankedCohortRow = {
     readonly topDrivers: readonly CohortMemberDriver[];
     /** The row-level window summary; see `rowWindow` below. */
     readonly window: CohortDriverWindow;
+    /**
+     * True when the member carries a score but NO drivers to explain it.
+     *
+     * The pinned schema accepts that shape — `outcome: "qualified"` requires
+     * `score`, while `drivers` is only bounded when `data_completeness` is
+     * present — so Ajv will not reject it upstream and this view is the last
+     * place it can be caught. AGENTS.md:40 requires failing closed here
+     * rather than masking an answer-quality failure, so the caller renders
+     * the score as withheld and says why. Withheld, not dropped: the row and
+     * its outcome still render, because silently omitting the member would
+     * be the other failure mode.
+     */
+    readonly scoreWithheld: boolean;
 };
 
 /**
@@ -91,12 +104,14 @@ export function rankingTable(members: readonly CohortMember[]): readonly RankedC
         .sort((left, right) => (left.attention_rank ?? 0) - (right.attention_rank ?? 0))
         .map((member) => {
             const drivers = member.drivers ?? [];
+            const score = member.score ?? null;
             return {
                 member,
                 attentionRank: member.attention_rank,
-                score: member.score ?? null,
+                score,
                 topDrivers: topDriversByWeightContributed(drivers, RANKING_TABLE_TOP_DRIVERS),
                 window: rowWindow(drivers),
+                scoreWithheld: score !== null && drivers.length === 0,
             };
         });
 }

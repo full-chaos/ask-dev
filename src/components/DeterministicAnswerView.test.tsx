@@ -76,7 +76,7 @@ describe("DeterministicAnswerView: fact rows panels (CHAOS-4355)", () => {
         // ANSWER, and are not folded into a later section — instead of
         // becoming an assertion about how many panels precede them.
         const sections = Array.from(article.querySelectorAll("section.panel")).filter(
-            (section) => section.getAttribute("aria-labelledby") !== "cohort-ranking-title",
+            (section) => section.getAttribute("data-testid") !== "cohort-ranking-panel",
         );
         const answerSectionIndex = sections.findIndex(
             (section) => section.getAttribute("aria-labelledby") === "answer-title",

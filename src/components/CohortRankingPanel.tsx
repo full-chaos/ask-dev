@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { Badge } from "@/components/Badge";
 import type { Cohort, CohortMember, CohortMemberDriver } from "@/lib/contracts";
 import { rankingTable } from "@/lib/cohort-ranking";
@@ -37,11 +39,15 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
  *
  * Three boundary rules hold this panel honest:
  *
- * 1. **Never a bare score.** Every score renders with its `outcome` beside it
- *    and its strongest drivers below it, and a member that scored while
- *    carrying no drivers says so in words rather than leaving the cell blank
- *    (North Star check 8; acr's `rankingTableRow` comment states the same
- *    rule from the producing side).
+ * 1. **Never a bare score, and fail closed.** Every score renders with its
+ *    `outcome` beside it and its strongest drivers below it. A member that
+ *    scored while carrying NO drivers has its score **withheld** — the number
+ *    is not shown at all, and the row says why. The pinned schema accepts
+ *    that shape, so Ajv will not reject it upstream and this view is the last
+ *    place to catch it; AGENTS.md:40 requires failing closed here rather than
+ *    masking an answer-quality failure. Withheld rather than dropped: the row
+ *    and its outcome still render, because omitting the member silently would
+ *    be the opposite failure.
  * 2. **A missing ranking is not an empty one.** When acr ranked no member the
  *    panel renders nothing at all, because an empty table would read as
  *    "ranked, and nothing qualified" — a different claim from "ranking never
@@ -49,9 +55,19 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
  * 3. **Nothing is silently discarded.** acr's reference table drops members it
  *    did not rank; dropping them without a word is the exact shape
  *    `silent-discard-closure.test.ts` exists to close, so they are named
- *    under the table instead.
+ *    under the table instead. `unrankedLabels` can only name members the
+ *    cohort still CARRIES, though — so the cohort-level `complete`/`truncated`
+ *    flags are surfaced too. Without them a census that never finished, or one
+ *    cut by the 250-member cap, would read as an exhaustive ranking of every
+ *    team (AGENTS.md checks 11 and 12: completeness is a public contract
+ *    field, and missing is not healthy).
  */
 export function CohortRankingPanel({ cohort }: CohortRankingPanelProps) {
+    // Several answered turns coexist on the chat surface, so a hardcoded id
+    // would make the second panel's `aria-labelledby` resolve to the FIRST
+    // panel's heading — the same multi-instance bug `DeterministicAnswerView`
+    // and `StructureNeedsPanel` already use `useId()` to avoid.
+    const idPrefix = useId();
     if (cohort === undefined) return null;
     const rows = rankingTable(cohort.members);
     if (rows === null) return null;
@@ -59,10 +75,21 @@ export function CohortRankingPanel({ cohort }: CohortRankingPanelProps) {
     const unranked = unrankedLabels(cohort.members);
 
     return (
-        <section className="panel" aria-labelledby="cohort-ranking-title">
-            <h2 className="panel__title" id="cohort-ranking-title">
+        <section
+            className="panel"
+            aria-labelledby={`${idPrefix}-cohort-ranking-title`}
+            data-testid="cohort-ranking-panel"
+        >
+            <h2 className="panel__title" id={`${idPrefix}-cohort-ranking-title`}>
                 Ranked {humanizeTerm(cohort.kind)}s
             </h2>
+            {cohort.complete && !cohort.truncated ? null : (
+                <p className="record__meta" data-testid="cohort-incomplete-notice">
+                    {cohort.truncated
+                        ? `This ranking covers only the ${humanizeTerm(cohort.kind)}s the service returned — the cohort was truncated, so it is not every ${humanizeTerm(cohort.kind)}.`
+                        : `The service did not report this cohort as complete, so this ranking may not cover every ${humanizeTerm(cohort.kind)}.`}
+                </p>
+            )}
             <div className="fact-table-wrap">
                 <table className="fact-table">
                     <thead>
@@ -85,11 +112,25 @@ export function CohortRankingPanel({ cohort }: CohortRankingPanelProps) {
                                 </td>
                                 <td>
                                     {
-                                        // An em dash, never a blank or a zero: the
-                                        // contract distinguishes "no score" from a
-                                        // score of 0, and `outcome` in the next
-                                        // column says which this is.
-                                        row.score === null ? "—" : row.score
+                                        // Three distinct states, never collapsed:
+                                        // a real score; an em dash for "the service
+                                        // sent none" (the contract distinguishes
+                                        // that from a score of 0, and `outcome`
+                                        // next door says which); and "withheld"
+                                        // for a score this view refuses to show
+                                        // because nothing explains it.
+                                        row.scoreWithheld ? (
+                                            <span
+                                                className="panel__empty"
+                                                data-testid="score-withheld"
+                                            >
+                                                withheld
+                                            </span>
+                                        ) : row.score === null ? (
+                                            "—"
+                                        ) : (
+                                            row.score
+                                        )
                                     }
                                 </td>
                                 <td>
@@ -121,7 +162,11 @@ export function CohortRankingPanel({ cohort }: CohortRankingPanelProps) {
                                 <td>{humanizeTerm(row.window)}</td>
                                 <td>
                                     {row.topDrivers.length === 0 ? (
-                                        <span className="panel__empty">No drivers reported.</span>
+                                        <span className="panel__empty">
+                                            {row.scoreWithheld
+                                                ? "No drivers reported — score withheld."
+                                                : "No drivers reported."}
+                                        </span>
                                     ) : (
                                         <ul className="ranking__drivers">
                                             {row.topDrivers.map((driver) => (

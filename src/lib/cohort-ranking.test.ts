@@ -93,6 +93,44 @@ describe("rankingTable", () => {
         ]);
     });
 
+    it("flags a score with no drivers as withheld", () => {
+        const [row] = rankingTable([
+            member({
+                label: "CHAOS",
+                ranking_computed: true,
+                attention_rank: 1,
+                outcome: "qualified",
+                score: 43.5,
+            }),
+        ])!;
+        expect(row!.scoreWithheld).toBe(true);
+    });
+
+    it("does not flag a score that HAS drivers, nor an absent score", () => {
+        const [explained] = rankingTable([
+            member({
+                label: "CHAOS",
+                ranking_computed: true,
+                attention_rank: 1,
+                outcome: "qualified",
+                score: 43.5,
+                drivers: [driver({})],
+            }),
+        ])!;
+        expect(explained!.scoreWithheld).toBe(false);
+
+        const [scoreless] = rankingTable([
+            member({
+                label: "Platform",
+                ranking_computed: true,
+                attention_rank: 1,
+                outcome: "insufficient_evidence",
+            }),
+        ])!;
+        // Nothing to withhold — "no score" is not a withheld score.
+        expect(scoreless!.scoreWithheld).toBe(false);
+    });
+
     it("never yields a score without the drivers that explain it", () => {
         // North Star check 8, stated over the pinned example rather than a
         // constructed one: a scored row always carries drivers to show.
