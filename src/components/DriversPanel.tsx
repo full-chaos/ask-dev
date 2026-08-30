@@ -3,6 +3,7 @@ import { useId } from "react";
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
+import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import type { DriverJudgment, InvestigationResult } from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
@@ -29,10 +30,25 @@ export type DriversPanelProps = {
  * server's own summary still reachable, unmodified, inside Details — this
  * repositions it, it never rewrites or drops it (AGENTS.md: UX renders only
  * persisted values).
+ *
+ * codex review round 2 (CHAOS-4581): the reference is only safe to show when
+ * `CohortRankingPanel` is ACTUALLY rendering a table for this same result —
+ * that panel self-gates (non-cohort intent, no cohort, or nothing ranked),
+ * and a withheld driver is not contractually guaranteed to appear only
+ * alongside one. `rankedTeamsVisible` (computed by the caller with the same
+ * gate `CohortRankingPanel` itself uses) decides which treatment applies —
+ * pointing at a table that is not there would be a worse gap than the
+ * duplication this was built to close.
  */
-function DriverCard({ driver }: { readonly driver: DriverJudgment }) {
+function DriverCard({
+    driver,
+    rankedTeamsVisible,
+}: {
+    readonly driver: DriverJudgment;
+    readonly rankedTeamsVisible: boolean;
+}) {
     const isPrincipal = driver.standing === "principal";
-    const isWithheld = driver.standing === "withheld";
+    const isWithheld = driver.standing === "withheld" && rankedTeamsVisible;
     const affected = driver.affected_subjects.map((subject) => subject.label).join(", ");
     return (
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
@@ -97,6 +113,13 @@ function DriverCard({ driver }: { readonly driver: DriverJudgment }) {
  */
 export function DriversPanel({ result }: DriversPanelProps) {
     const idPrefix = useId();
+    // Mirrors CohortRankingPanel's own gate exactly (rule 0 there): a
+    // withheld driver's reference is only safe when that panel is actually
+    // rendering a table for THIS result.
+    const rankedTeamsVisible =
+        isCohortIntent(result.interpretation.shape) &&
+        result.cohort !== undefined &&
+        rankingTable(result.cohort.members) !== null;
     return (
         <section
             className="panel panel--card"
@@ -123,7 +146,11 @@ export function DriversPanel({ result }: DriversPanelProps) {
             ) : (
                 <ul className="stack">
                     {result.drivers.map((driver) => (
-                        <DriverCard driver={driver} key={driver.driver_id} />
+                        <DriverCard
+                            driver={driver}
+                            key={driver.driver_id}
+                            rankedTeamsVisible={rankedTeamsVisible}
+                        />
                     ))}
                 </ul>
             )}

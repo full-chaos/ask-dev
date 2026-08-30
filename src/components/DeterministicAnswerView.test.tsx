@@ -178,3 +178,27 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
         expect(article.querySelector(".fact-chart")).toBeNull();
     });
 });
+
+/**
+ * codex review round 2 (CHAOS-4581): extracting the clarification branch's
+ * inline Limitations block into the shared `LimitationsPanel` component also
+ * surfaces `result.warnings` there for the first time (the old inline copy
+ * never rendered them). Deliberate — `warnings` is unconditional on the
+ * result type, not gated by status, and informational only — so this is a
+ * closed gap, not scope creep; pinned here rather than left an ARGUED
+ * finding.
+ */
+describe("DeterministicAnswerView: clarification branch shows warnings too (codex round 2, CHAOS-4581)", () => {
+    it("renders result.warnings on a clarification_required result", () => {
+        const base = structureMockScenarios().find((s) => s.id === "structure-kind")!.result;
+        const result: InvestigationResult = {
+            ...base,
+            warnings: ["The cohort ranking is provisional."],
+        };
+        expect(result.status).toBe("clarification_required");
+        render(<DeterministicAnswerView result={result} />);
+
+        expect(screen.getByRole("heading", { name: "Warnings" })).toBeInTheDocument();
+        expect(screen.getByText("The cohort ranking is provisional.")).toBeInTheDocument();
+    });
+});

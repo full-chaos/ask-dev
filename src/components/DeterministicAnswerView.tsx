@@ -216,6 +216,21 @@ export function DeterministicAnswerView({
                     selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
+                {
+                    // codex review round 2 (CHAOS-4581): extracting the old
+                    // inline Limitations block into `LimitationsPanel`
+                    // (shared with the decisive branch below) means this
+                    // branch now ALSO surfaces `result.warnings` — the prior
+                    // inline copy here never rendered them. Deliberate, not
+                    // accidental: `warnings` is unconditional on the base
+                    // result type (not gated by status), a `clarification_required`
+                    // result can legitimately carry them, and they are purely
+                    // informational (never gate the clarification flow) — so
+                    // showing them here closes a real gap rather than
+                    // widening scope. Pinned by
+                    // `DeterministicAnswerView.test.tsx`'s "clarification
+                    // branch shows warnings" test.
+                }
                 <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </article>
         );

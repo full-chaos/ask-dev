@@ -149,9 +149,18 @@ describe("DriversPanel — a withheld driver references the table instead of res
             "Ops Team's score is withheld because readiness.coverage_gap and workload.forecast_pressure are missing.",
         affected_subjects: [{ kind: "team", canonical_id: "team_ops", label: "Ops Team" }],
     };
+    // codex review round 2: the reference is only safe when Ranked Teams is
+    // actually rendering for this result — `base` alone is interpreted
+    // `single_subject` (see below), so these tests force a cohort-intent
+    // shape to reach the scenario they're pinning. The no-cohort-visible
+    // case is its own test, further down.
+    const cohortShapedResult: InvestigationResult = {
+        ...base,
+        interpretation: { ...base.interpretation, shape: "discovered_cohort" },
+    };
 
     it("does not show the withheld driver's full summary in the always-visible body", () => {
-        render(<DriversPanel result={{ ...base, drivers: [withheldDriver] }} />);
+        render(<DriversPanel result={{ ...cohortShapedResult, drivers: [withheldDriver] }} />);
 
         const card = screen.getByText(withheldDriver.title).closest("li")!;
         // The always-visible summary paragraph (`.record__body`, same
@@ -165,7 +174,7 @@ describe("DriversPanel — a withheld driver references the table instead of res
     });
 
     it("keeps the original summary reachable, unmodified, behind Details", () => {
-        render(<DriversPanel result={{ ...base, drivers: [withheldDriver] }} />);
+        render(<DriversPanel result={{ ...cohortShapedResult, drivers: [withheldDriver] }} />);
 
         const card = screen.getByText(withheldDriver.title).closest("li")!;
         const details = within(card).getByText("Details").closest("details")!;
@@ -180,5 +189,25 @@ describe("DriversPanel — a withheld driver references the table instead of res
         // happens to be standing:"withheld" already, so that coverage is
         // real and not accidentally vacuous.
         expect(base.drivers.some((d) => d.standing === "withheld")).toBe(false);
+    });
+
+    /**
+     * codex review round 2 (CHAOS-4581): `CohortRankingPanel` self-gates
+     * away for a `single_subject`-interpreted result even when it carries
+     * cohort data (its own rule 0 — `base` is exactly that shape, per
+     * `CohortRankingPanel.test.tsx`). Pointing a withheld card at "Ranked
+     * teams above" when that panel is not rendering would be a dangling
+     * reference — worse than the duplication this was built to close.
+     */
+    it("shows the full summary (no dangling reference) when Ranked Teams is not rendering", () => {
+        expect(base.interpretation.shape).toBe("single_subject");
+        expect(base.cohort).not.toBeUndefined();
+
+        render(<DriversPanel result={{ ...base, drivers: [withheldDriver] }} />);
+
+        const card = screen.getByText(withheldDriver.title).closest("li")!;
+        const visibleBody = card.querySelector(":scope > .record__body")!;
+        expect(visibleBody.textContent).toBe(withheldDriver.summary);
+        expect(screen.queryByText(/Ranked teams above/i)).toBeNull();
     });
 });
