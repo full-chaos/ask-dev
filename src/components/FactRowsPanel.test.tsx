@@ -311,3 +311,23 @@ describe("FactRowsPanels — the trend acr selected (CHAOS-4415)", () => {
         );
     });
 });
+
+describe("codex P2 — a withheld trend must not fall back to the heuristic chart", () => {
+    it("shows the table, not a client-side chart, when acr's own trend was refused", () => {
+        // Falling back draws a chart for exactly the rows whose SERVER-chosen
+        // chart was just refused as untrustworthy. The withheld notice then
+        // sits beside a chart, which reads as "we withheld one and drew
+        // another" — the opposite of failing closed.
+        const shaped = renderShapesExample as unknown as InvestigationResult;
+        const tampered = structuredClone(shaped);
+        const trend = tampered.render_shapes!.find(
+            (shape) => shape.selected_by === "dated_fact_trend",
+        )!;
+        trend.series[0].points[0].value += 1;
+        const { container } = render(
+            <FactRowsPanels facts={tampered.claimed_facts} result={tampered} />,
+        );
+        expect(screen.getByTestId("trend-shape-withheld")).toBeInTheDocument();
+        expect(container.querySelectorAll(".fact-chart").length).toBe(0);
+    });
+});

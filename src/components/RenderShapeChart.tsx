@@ -11,6 +11,17 @@ const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const MAX_AXIS_LABELS = 8;
 const MAX_BAR_WIDTH = 88;
+// Axis labels are drawn at fixed positions, so a long one overlaps its
+// neighbours and obscures which bar it names (codex round 1, P3). Truncated
+// for DISPLAY only: the full label is still in every mark's aria-label and
+// in the accessible data table, so nothing is lost to a reader.
+const MAX_AXIS_LABEL_CHARS = 18;
+
+function axisLabelText(label: string): string {
+    return label.length <= MAX_AXIS_LABEL_CHARS
+        ? label
+        : `${label.slice(0, MAX_AXIS_LABEL_CHARS - 1)}\u2026`;
+}
 
 // Fixed hue order (dataviz skill), never cycled. acr caps a shape at 8
 // series, exactly the number of slots, so an index never wraps.
@@ -25,7 +36,30 @@ const SERIES_VARS = [
     "--series-8",
 ];
 
+/**
+ * Formats a plotted number WITHOUT turning it into a different one.
+ *
+ * Two decimals is a readable default, but `0.004` rounds to `0` — and this
+ * contract exists so a chart number equals the fact it cites. In the
+ * accessible table it is the only number a reader gets at all. So the short
+ * form is used only when it round-trips to the same value; otherwise the
+ * value is shown in full (codex round 1, P2).
+ */
 function formatValue(value: number): string {
+    return String(value);
+}
+
+/**
+ * The DRAWN form of a number: at most two decimals.
+ *
+ * Rounding a glyph is honest only because the exact value is always
+ * reachable beside it — every mark carries the full value in its
+ * `aria-label` and `<title>`, and the accessible table prints it in full via
+ * `formatValue`. What is never allowed is rounding being the ONLY form a
+ * reader can get, which is why the table uses the exact value and this is
+ * used for drawn text alone.
+ */
+function formatDisplay(value: number): string {
     return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
 }
 
@@ -163,14 +197,24 @@ function CategoryBars({
     readonly labels: readonly string[];
 }) {
     const stacked = shape.presentation === "stacked_bars";
-    const totals = labels.map((label) =>
-        shape.series.reduce((sum, _series, index) => sum + (valueAt(shape, index, label) ?? 0), 0),
-    );
     const singleMax = Math.max(
         0,
         ...shape.series.flatMap((series) => series.points.map((point) => point.value)),
     );
-    const maxValue = stacked ? Math.max(0, ...totals) : singleMax;
+    // The y-scale must fit every drawn column. Summing the present segments
+    // is the right thing HERE — it is the height actually drawn — and it is
+    // deliberately NOT surfaced as a number anywhere (see the label block
+    // below for why a computed sum may not be printed).
+    const stackedMax = Math.max(
+        0,
+        ...labels.map((label) =>
+            shape.series.reduce(
+                (sum, _series, index) => sum + (valueAt(shape, index, label) ?? 0),
+                0,
+            ),
+        ),
+    );
+    const maxValue = stacked ? stackedMax : singleMax;
     // A flat all-zero shape still needs a finite scale; 1 keeps every bar at
     // height 0 rather than dividing by zero.
     const scale = maxValue > 0 ? maxValue : 1;
@@ -201,7 +245,8 @@ function CategoryBars({
                 y2={yFor(0)}
             />
             <text className="fact-chart__axis-label" textAnchor="start" x={0} y={MARGIN.top - 6}>
-                {formatValue(maxValue)}
+                <title>{formatValue(maxValue)}</title>
+                {formatDisplay(maxValue)}
             </text>
             {labels.map((label, labelIndex) => {
                 const centre = MARGIN.left + band * (labelIndex + 0.5);
@@ -243,33 +288,43 @@ function CategoryBars({
                             );
                         })}
                         {
-                            // A single number above each bar: the stack's
-                            // total, or the one series' value. Deliberately
-                            // NOT drawn for a multi-series unstacked shape,
-                            // where "the value" is ambiguous — reading
-                            // series 0 and labelling it as the bar's value
-                            // would silently pick one of several.
-                            stacked || shape.series.length === 1 ? (
-                                <text
-                                    className="fact-chart__value-label"
-                                    style={{ opacity: 1 }}
-                                    textAnchor="middle"
-                                    x={centre}
-                                    y={
-                                        yFor(
-                                            stacked
-                                                ? (totals[labelIndex] ?? 0)
-                                                : (valueAt(shape, 0, label) ?? 0),
-                                        ) - 5
-                                    }
-                                >
-                                    {formatValue(
-                                        stacked
-                                            ? (totals[labelIndex] ?? 0)
-                                            : (valueAt(shape, 0, label) ?? 0),
-                                    )}
-                                </text>
-                            ) : null
+                            // A single number above the bar, and ONLY for a
+                            // single-series shape.
+                            //
+                            // A stacked bar gets NO total label, and that is
+                            // not a style choice. The height of a stack is a
+                            // SUM this component computed, and a computed
+                            // sum is not a fact: on the live cohort answer,
+                            // 0 + 13.333333333333334 + 20 + 13.333333333333334
+                            // is 46.66666666666667, while the member's own
+                            // score is 46.666666666666664 — a different
+                            // number. Printing it would be the exact defect
+                            // this whole contract exists to prevent, arrived
+                            // at from the renderer's side. The score itself
+                            // is already plotted, verbatim and verified, by
+                            // the attention-score shape beside it.
+                            //
+                            // A multi-series UNSTACKED shape gets none
+                            // either: reading series 0 and calling it "the
+                            // value" silently picks one of several.
+                            !stacked && shape.series.length === 1
+                                ? (() => {
+                                      const only = valueAt(shape, 0, label);
+                                      if (only === undefined) return null;
+                                      return (
+                                          <text
+                                              className="fact-chart__value-label"
+                                              style={{ opacity: 1 }}
+                                              textAnchor="middle"
+                                              x={centre}
+                                              y={yFor(only) - 5}
+                                          >
+                                              <title>{formatValue(only)}</title>
+                                              {formatDisplay(only)}
+                                          </text>
+                                      );
+                                  })()
+                                : null
                         }
                         {shown.has(labelIndex) ? (
                             <text
@@ -278,7 +333,8 @@ function CategoryBars({
                                 x={centre}
                                 y={HEIGHT - 10}
                             >
-                                {label}
+                                <title>{label}</title>
+                                {axisLabelText(label)}
                             </text>
                         ) : null}
                     </g>
@@ -337,7 +393,8 @@ function TimeLines({
                 y2={yFor(minValue)}
             />
             <text className="fact-chart__axis-label" textAnchor="start" x={0} y={MARGIN.top - 6}>
-                {formatValue(maxValue)}
+                <title>{formatValue(maxValue)}</title>
+                {formatDisplay(maxValue)}
             </text>
             {shape.series.map((series, seriesIndex) => {
                 const points = labels
@@ -392,7 +449,8 @@ function TimeLines({
                                         x={point.x}
                                         y={point.y - 8}
                                     >
-                                        {formatValue(point.value)}
+                                        <title>{formatValue(point.value)}</title>
+                                        {formatDisplay(point.value)}
                                     </text>
                                     <title>{markLabel}</title>
                                 </g>
@@ -410,7 +468,8 @@ function TimeLines({
                         x={xFor(label, index)}
                         y={HEIGHT - 10}
                     >
-                        {label}
+                        <title>{label}</title>
+                        {axisLabelText(label)}
                     </text>
                 ) : null,
             )}

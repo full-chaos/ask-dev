@@ -50,6 +50,12 @@ type FactRowsPanelProps = {
 
 function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
     const rows = fact.rows ?? [];
+    // A WITHHELD trend suppresses the heuristic chart too, not just a
+    // rendered one: falling back would draw a client-side chart for exactly
+    // the rows whose SERVER-chosen chart was just refused as untrustworthy,
+    // leaving a "chart withheld" notice sitting beside a chart — the
+    // opposite of failing closed (codex round 1, P2).
+    //
     // CHAOS-4415: acr's OWN selection wins over this panel's CHAOS-4355
     // client-side heuristic. Both look at the same rows, but only acr can see
     // the interpreted intent, and only acr's shape carries a per-point source
@@ -61,7 +67,9 @@ function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
             ? { shapes: [], withheld: 0 }
             : trendShapesForClaim(result, fact.claim_id);
     const presentation =
-        trends.shapes.length > 0 ? { mode: "table" as const } : selectPresentation(rows);
+        trends.shapes.length > 0 || trends.withheld > 0
+            ? { mode: "table" as const }
+            : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
     // breakdown) was derived — see fact-rows.ts's `findRollupBasis` doc
     // comment. It is a SIBLING claim, not a property of this fact, and is

@@ -71,6 +71,60 @@ function rowsFor(facts: readonly ClaimedFact[], claimId: string): readonly Claim
  * rejects a malformed address, and duplicating that rule here would create a
  * second place for it to drift.
  */
+/**
+ * True when a source's ADDRESS fields match its own kind.
+ *
+ * Mirrors acr's `validateRenderPointSourceShape`, which rejects e.g. a
+ * `cohort_member_score` carrying a driver `signal`. The published JSON Schema
+ * requires only `kind`, so a payload acr would never emit still validates
+ * upstream and reaches here; the address IS the provenance, so a
+ * contradictory one is refused rather than resolved on the fields that
+ * happen to be usable (codex round 1, P2).
+ */
+function sourceAddressMatchesKind(
+    source: RenderShape["series"][number]["points"][number]["source"],
+): boolean {
+    const has = (value: string | number | undefined) => value !== undefined;
+    switch (source.kind) {
+        case "cohort_member_score":
+            return (
+                has(source.subject_canonical_id) &&
+                !has(source.signal) &&
+                !has(source.claim_id) &&
+                !has(source.row_index) &&
+                !has(source.field)
+            );
+        case "cohort_driver_weight_contributed":
+            return (
+                has(source.subject_canonical_id) &&
+                has(source.signal) &&
+                !has(source.claim_id) &&
+                !has(source.row_index) &&
+                !has(source.field)
+            );
+        case "claimed_fact_row":
+            return (
+                has(source.claim_id) &&
+                has(source.row_index) &&
+                has(source.field) &&
+                !has(source.subject_canonical_id) &&
+                !has(source.signal)
+            );
+        default:
+            return false;
+    }
+}
+
+/** True when every label parses as a real calendar date/date-time. */
+function everyLabelIsADate(shape: RenderShape): boolean {
+    for (const series of shape.series) {
+        for (const point of series.points) {
+            if (Number.isNaN(Date.parse(point.label))) return false;
+        }
+    }
+    return true;
+}
+
 function resolvePointSource(
     source: RenderShape["series"][number]["points"][number]["source"],
     cohort: Cohort | undefined,
@@ -113,8 +167,36 @@ function resolvePointSource(
  * see acr's `validateRenderShapes`.
  */
 export function verifyRenderShape(shape: RenderShape, result: InvestigationResult): boolean {
+    // Structure first, then values. acr enforces every rule below before it
+    // serves, and the published JSON Schema cannot express any of them, so
+    // this is the last place a payload acr would never emit can be refused
+    // (codex round 1, P1/P2). Each one, left unchecked, lets a chart draw
+    // while saying something the answer does not.
+    if (shape.kind === "series") {
+        // An encoding this view cannot read is not a default to guess at:
+        // rendering an unspecified presentation as bars picks one of three
+        // meanings on the reader's behalf.
+        if (
+            shape.presentation !== "bars" &&
+            shape.presentation !== "stacked_bars" &&
+            shape.presentation !== "line"
+        ) {
+            return false;
+        }
+    }
+    // A time axis is POSITIONED by elapsed time. Falling back to index
+    // spacing would draw evenly-spaced samples the observations do not have.
+    if (shape.axis_kind === "time" && !everyLabelIsADate(shape)) return false;
+
     for (const series of shape.series) {
+        // One axis position, one value. Two points at one label is a table
+        // drawn as a chart that silently overwrites itself — and the
+        // renderer, which draws by label, would keep only the first.
+        const seen = new Set<string>();
         for (const point of series.points) {
+            if (seen.has(point.label)) return false;
+            seen.add(point.label);
+            if (!sourceAddressMatchesKind(point.source)) return false;
             const resolved = resolvePointSource(point.source, result.cohort, result.claimed_facts);
             if (resolved === undefined || resolved !== point.value) return false;
         }
@@ -158,8 +240,18 @@ export function trendShapesForClaim(result: InvestigationResult, claimId: string
     return { shapes, withheld: candidates.length - shapes.length };
 }
 
+/**
+ * True when EVERY point of `shape` cites `claimId`.
+ *
+ * `some()` was wrong (codex round 1, P2): a trend whose points span claims A
+ * and B would render under both panels — one chart shown twice — and a
+ * tampered B would be reported as A's rows disagreeing, which is a false
+ * statement about the data in front of the reader. acr only ever builds a
+ * trend from a single fact, so requiring all points is exactly the shape it
+ * emits and refuses anything else.
+ */
 function shapeCitesClaim(shape: RenderShape, claimId: string): boolean {
-    return shape.series.some((series) =>
-        series.points.some((point) => point.source.claim_id === claimId),
+    return shape.series.every((series) =>
+        series.points.every((point) => point.source.claim_id === claimId),
     );
 }
