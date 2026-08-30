@@ -331,3 +331,58 @@ describe("codex P2 — a withheld trend must not fall back to the heuristic char
         expect(container.querySelectorAll(".fact-chart").length).toBe(0);
     });
 });
+
+describe("chris's ruling: nothing disappears from the UI", () => {
+    // chris, 2026-08-30 14:24 PT: "I object to losing the charts and the data
+    // in front of people."
+    //
+    // acr withdrew its server-asserted `dated_fact_trend` (CHAOS-4616: a row
+    // table cannot say which of its columns are measures, so the trend was a
+    // claim resting on a guess). That removes a SERVER assertion. It must not
+    // remove a CHART: this panel's own CHAOS-4355 visualization keeps
+    // rendering the rows, presented as a view of them rather than as a trend
+    // the service vouches for.
+    //
+    // The distinction is the whole ruling, so it is pinned rather than
+    // assumed.
+    const rows = [
+        { fields: { day: { string: "2026-07-20" }, items_completed: { number: 0 } } },
+        { fields: { day: { string: "2026-08-30" }, items_completed: { number: 3 } } },
+    ];
+    const factWithRows = {
+        claim_id: "claim_flow",
+        kind: "flow",
+        subject: { kind: "team", canonical_id: "team:fullchaos", label: "fullchaos" },
+        field: "items_completed",
+        value: { number: 3 },
+        rows,
+    } as unknown as ClaimedFact;
+
+    it("still draws the heuristic chart when acr selects no trend", () => {
+        const answer = {
+            claimed_facts: [factWithRows],
+            // Post-withdrawal shape of a real answer: cohort shapes only,
+            // never a trend.
+            render_shapes: [],
+        } as unknown as InvestigationResult;
+        const { container } = render(<FactRowsPanels facts={[factWithRows]} result={answer} />);
+        expect(container.querySelectorAll(".fact-chart").length).toBeGreaterThan(0);
+        expect(screen.queryByTestId("trend-shape-withheld")).not.toBeInTheDocument();
+    });
+
+    it("draws it identically whether or not the answer carries a render_shapes field at all", () => {
+        // A pre-4415 answer and a post-withdrawal answer must look the same
+        // here — the field's absence and its emptiness are the same story for
+        // this panel.
+        const withField = {
+            claimed_facts: [factWithRows],
+            render_shapes: [],
+        } as unknown as InvestigationResult;
+        const withoutField = { claimed_facts: [factWithRows] } as unknown as InvestigationResult;
+        const a = render(<FactRowsPanels facts={[factWithRows]} result={withField} />);
+        const withCount = a.container.querySelectorAll(".fact-chart").length;
+        a.unmount();
+        const b = render(<FactRowsPanels facts={[factWithRows]} result={withoutField} />);
+        expect(b.container.querySelectorAll(".fact-chart").length).toBe(withCount);
+    });
+});
