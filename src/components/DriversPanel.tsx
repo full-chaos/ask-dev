@@ -18,9 +18,22 @@ export type DriversPanelProps = {
  * field inline" pop-up reference. `principal` drivers get the elevated
  * `record--principal` treatment so the strongest judgment reads first even
  * within this one panel.
+ *
+ * `standing: "withheld"` (team-lead, 2026-08-30, folding in a lane-4580
+ * close-out finding): acr composes this judgment's `summary` to explain WHY
+ * a cohort member's score was withheld, which restates the SAME
+ * `missing_signals` list `CohortRankingPanel`'s own table footnote already
+ * states once for that member — visible twice in the same answer otherwise.
+ * Missing signals stay stated once (the table footnote); a withheld card
+ * shows a short reference instead of the full restatement, with the
+ * server's own summary still reachable, unmodified, inside Details — this
+ * repositions it, it never rewrites or drops it (AGENTS.md: UX renders only
+ * persisted values).
  */
 function DriverCard({ driver }: { readonly driver: DriverJudgment }) {
     const isPrincipal = driver.standing === "principal";
+    const isWithheld = driver.standing === "withheld";
+    const affected = driver.affected_subjects.map((subject) => subject.label).join(", ");
     return (
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
             <div className="record__head">
@@ -29,11 +42,23 @@ function DriverCard({ driver }: { readonly driver: DriverJudgment }) {
                     {humanizeTerm(driver.standing)}
                 </Badge>
             </div>
-            <p className="record__body">
-                <SafeAnswerText text={driver.summary} />
-            </p>
+            {isWithheld ? (
+                <p className="record__body">
+                    Score withheld for {affected} — missing signals are listed once, in Ranked teams
+                    above.
+                </p>
+            ) : (
+                <p className="record__body">
+                    <SafeAnswerText text={driver.summary} />
+                </p>
+            )}
             <details className="disclosure">
                 <summary>Details</summary>
+                {isWithheld ? (
+                    <p className="record__meta">
+                        <SafeAnswerText text={driver.summary} />
+                    </p>
+                ) : null}
                 <p className="record__meta">
                     {humanizeTerm(driver.category)} · {humanizeTerm(driver.epistemic_status)} ·{" "}
                     {humanizeTerm(driver.derivation)} · confidence{" "}

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { DriversPanel } from "@/components/DriversPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { DriverJudgment, InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
 const base = mockScenarios().find((s) => s.id === "complete")!.result;
@@ -127,5 +127,58 @@ describe("DriversPanel — pop-up card chrome (CHAOS-4581)", () => {
         expect(first!.getAttribute("aria-labelledby")).not.toBe(
             second!.getAttribute("aria-labelledby"),
         );
+    });
+});
+
+/**
+ * Scope addition, team-lead 2026-08-30 (folding in a lane-4580 close-out
+ * finding, CHAOS-4580 item 3): a `standing: "withheld"` driver's own
+ * `summary` restates the SAME `missing_signals` list `CohortRankingPanel`'s
+ * table footnote already states once for that member — visible twice
+ * otherwise. Missing signals stay stated once; a withheld card shows a
+ * short reference instead, with the original summary still reachable
+ * (unmodified) behind Details.
+ */
+describe("DriversPanel — a withheld driver references the table instead of restating missing signals", () => {
+    const withheldDriver: DriverJudgment = {
+        ...base.drivers[0]!,
+        driver_id: "driver_withheld_0001",
+        standing: "withheld",
+        title: "Ops Team: score withheld",
+        summary:
+            "Ops Team's score is withheld because readiness.coverage_gap and workload.forecast_pressure are missing.",
+        affected_subjects: [{ kind: "team", canonical_id: "team_ops", label: "Ops Team" }],
+    };
+
+    it("does not show the withheld driver's full summary in the always-visible body", () => {
+        render(<DriversPanel result={{ ...base, drivers: [withheldDriver] }} />);
+
+        const card = screen.getByText(withheldDriver.title).closest("li")!;
+        // The always-visible summary paragraph (`.record__body`, same
+        // element every non-withheld card shows its summary in) carries the
+        // short reference, not the restated missing-signals prose.
+        const visibleBody = card.querySelector(":scope > .record__body")!;
+        expect(visibleBody.textContent).not.toContain(withheldDriver.summary);
+        expect(
+            within(card).getByText(/missing signals are listed once, in Ranked teams/i),
+        ).toBeInTheDocument();
+    });
+
+    it("keeps the original summary reachable, unmodified, behind Details", () => {
+        render(<DriversPanel result={{ ...base, drivers: [withheldDriver] }} />);
+
+        const card = screen.getByText(withheldDriver.title).closest("li")!;
+        const details = within(card).getByText("Details").closest("details")!;
+        expect(details).not.toHaveAttribute("open");
+        expect(within(details).getByText(withheldDriver.summary)).toBeInTheDocument();
+    });
+
+    it("does not shorten a non-withheld driver's summary the same way", () => {
+        render(<DriversPanel result={base} />);
+        // The pre-existing "renders a card ... summary visible" test already
+        // pins this for every driver in `base`; this asserts none of them
+        // happens to be standing:"withheld" already, so that coverage is
+        // real and not accidentally vacuous.
+        expect(base.drivers.some((d) => d.standing === "withheld")).toBe(false);
     });
 });
