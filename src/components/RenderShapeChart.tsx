@@ -10,6 +10,7 @@ const MARGIN = { top: 18, right: 12, bottom: 34, left: 12 };
 const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const MAX_AXIS_LABELS = 8;
+const MAX_BAR_WIDTH = 88;
 
 // Fixed hue order (dataviz skill), never cycled. acr caps a shape at 8
 // series, exactly the number of slots, so an index never wraps.
@@ -174,7 +175,12 @@ function CategoryBars({
     // height 0 rather than dividing by zero.
     const scale = maxValue > 0 ? maxValue : 1;
     const band = PLOT_WIDTH / Math.max(labels.length, 1);
-    const barWidth = band * 0.6;
+    // Capped, not just proportional. A cohort with one ranked team gets one
+    // bar, and 60% of a 640px canvas reads as a filled area rather than a
+    // bar — the mark stops looking like a measurement. Small-org reality is
+    // the normal case here (3-8 teams, often one of them scored), so the
+    // one-bar chart is a shape this has to look right in, not an edge case.
+    const barWidth = Math.min(band * 0.6, MAX_BAR_WIDTH);
     const shown = labelIndices(labels.length, MAX_AXIS_LABELS);
     const yFor = (value: number) => MARGIN.top + PLOT_HEIGHT - (value / scale) * PLOT_HEIGHT;
 
