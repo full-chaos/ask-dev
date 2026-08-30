@@ -28,13 +28,15 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main (CHAOS-4449, PR4): pins to acr main tip #326 (aa214606), past
-// CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking surface. The whole
-// widening lands in ONE schema, `context_fabric_common.v1`'s `CohortMember`
-// and its new `CohortMemberDriver`; the investigation-result schema itself
-// is byte-identical to the prior pin, because `cohort` was already a result
-// field and only its member shape grew. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "8d0fa0fcb0363f8fc7f2f6a74e735f06bca2b4e7";
+// acr main (CHAOS-4415 slice 1): pins to acr main tip #336, the conditional
+// render-shape surface. Two schemas widen — `context_fabric_common.v1` gains
+// the eight Render* $defs, and `context_fabric_investigation_result.v1`
+// gains the optional `render_shapes` array that references them. The new
+// render-shape EXAMPLE joins the copied set too, because the workbench's
+// chart tests must run against a document acr's own producer emitted rather
+// than a hand-authored fixture that could pass while the live shape
+// differed. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "d5a394e25d378ad1965dcf9fc55bd251efb795f3";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
