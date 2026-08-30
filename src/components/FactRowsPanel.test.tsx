@@ -222,8 +222,8 @@ describe("FactRowsPanels", () => {
         };
         render(
             <>
-                <FactRowsPanels facts={[fact]} />
-                <FactRowsPanels facts={[fact]} />
+                <FactRowsPanels facts={[fact]} result={undefined} />
+                <FactRowsPanels facts={[fact]} result={undefined} />
             </>,
         );
         const sections = Array.from(
@@ -248,7 +248,7 @@ describe("FactRowsPanels", () => {
             value: { integer: 1 },
             rows: [{ fields: { open_incidents: { integer: 2 }, mttr_hours: { number: 4.5 } } }],
         };
-        render(<FactRowsPanels facts={[fact]} />);
+        render(<FactRowsPanels facts={[fact]} result={undefined} />);
         const tiles = screen.getByTestId("fact-tiles");
         expect(tiles.textContent).toContain("2");
         expect(tiles.textContent).toContain("open incidents");
@@ -257,7 +257,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders no tiles for a multi-row fact (a real series, not a single summary)", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         // The CI daily rollup is a real multi-day time series (3 rows) —
         // scoped to its own panel, since `rowsResult` also carries the
         // single-row latency-percentiles fact, which legitimately DOES

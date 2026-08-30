@@ -4,12 +4,7 @@ import { FactChart } from "@/components/FactChart";
 import { FactTable } from "@/components/FactTable";
 import { RenderShapeChart } from "@/components/RenderShapeChart";
 import type { ClaimedFact, InvestigationResult } from "@/lib/contracts";
-import {
-    factRowTiles,
-    factsWithRows,
-    findRollupBasis,
-    selectPresentation,
-} from "@/lib/fact-rows";
+import { factRowTiles, factsWithRows, findRollupBasis, selectPresentation } from "@/lib/fact-rows";
 import { trendShapesForClaim } from "@/lib/render-shapes";
 import { humanizeTerm } from "@/lib/presentation";
 
