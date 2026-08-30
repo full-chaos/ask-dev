@@ -5,9 +5,11 @@ import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
+import { DriversPanel } from "@/components/DriversPanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
+import { LimitationsPanel } from "@/components/LimitationsPanel";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
@@ -214,25 +216,7 @@ export function DeterministicAnswerView({
                     selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
-                <section
-                    className="panel"
-                    aria-labelledby={`${idPrefix}-clarification-limitations-title`}
-                >
-                    <h2 className="panel__title" id={`${idPrefix}-clarification-limitations-title`}>
-                        Limitations
-                    </h2>
-                    {result.limitations.length === 0 ? (
-                        <p className="panel__empty">The service reported no limitations.</p>
-                    ) : (
-                        <ul className="stack stack--tight">
-                            {result.limitations.map((limitation) => (
-                                <li className="record" key={limitation}>
-                                    {limitation}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
+                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </article>
         );
     }
@@ -242,17 +226,48 @@ export function DeterministicAnswerView({
             {notice}
             {structureConfirmationNotice}
             {structureNeedsPanel}
-            <AnswerPanel result={result} />
             {
-                // Directly under the answer, above the fact tables: when the
-                // question asked for a ranking, the ranking IS the answer, so
-                // it leads the supporting evidence rather than trailing it.
-                // `shape` gates it — a result can carry cohort data without
-                // the question having asked for a ranking (see the panel's
-                // own rule 0).
+                // CHAOS-4581: panels lead, prose follows — chris's own
+                // complaint was that the decision-carrying panels (ranked
+                // table, driver contributions, coverage) sat below a wall of
+                // text. Nothing here changes WHAT renders, only the order:
+                // every panel below still self-gates to null exactly as
+                // before, so a single-subject result (no cohort, no fact
+                // rows) simply skips straight to the drivers/coverage strip,
+                // and `AnswerPanel`'s prose always renders last among the
+                // decision-carrying panels, never above them.
+                //
+                // 1. Ranked teams — leads for a cohort answer; a no-op
+                //    (renders null) otherwise (`shape` gates it, see the
+                //    panel's own rule 0).
             }
             <CohortRankingPanel cohort={result.cohort} shape={result.interpretation.shape} />
+            {
+                // 2. Fact rows — the "health/flow tiles + rows table" the
+                //    single-subject (project-status) shape of this ticket
+                //    asks to lead with. A no-op when no claimed fact carries
+                //    rows.
+            }
             <FactRowsPanels facts={result.claimed_facts} />
+            {
+                // 3. Principal driver cards.
+            }
+            <DriversPanel result={result} />
+            {
+                // 4. Coverage / limitations, as a compact strip (CSS only —
+                //    each panel is still a full, independently testable
+                //    component; `.strip` just lays them out side by side and
+                //    each keeps its own collapsed-by-default detail).
+            }
+            <div className="strip">
+                <CoveragePanel coverage={result.coverage} />
+                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
+            </div>
+            {
+                // 5. The narrative prose — short by construction (see
+                //    AnswerPanel), and never above the panels above it.
+            }
+            <AnswerPanel result={result} />
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
                 title="Remaining work"
@@ -269,38 +284,6 @@ export function DeterministicAnswerView({
                 findings={result.conflicts}
                 emptyMessage="No conflicting evidence was reported."
             />
-            <CoveragePanel coverage={result.coverage} />
-
-            <section className="panel" aria-labelledby={`${idPrefix}-limitations-title`}>
-                <h2 className="panel__title" id={`${idPrefix}-limitations-title`}>
-                    Limitations
-                </h2>
-                {result.limitations.length === 0 ? (
-                    <p className="panel__empty">The service reported no limitations.</p>
-                ) : (
-                    <ul className="stack stack--tight">
-                        {result.limitations.map((limitation) => (
-                            <li className="record" key={limitation}>
-                                {limitation}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                {result.warnings.length > 0 ? (
-                    <>
-                        <h3 className="panel__title" style={{ marginTop: 14 }}>
-                            Warnings
-                        </h3>
-                        <ul className="stack stack--tight">
-                            {result.warnings.map((warning) => (
-                                <li className="record" key={warning}>
-                                    {warning}
-                                </li>
-                            ))}
-                        </ul>
-                    </>
-                ) : null}
-            </section>
 
             <section className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
                 <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>

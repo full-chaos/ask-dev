@@ -1,73 +1,61 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
-import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
+import { mockScenarios } from "@/test/fixtures/investigations";
 
-const result = canonicalResult as unknown as InvestigationResult;
+const base = mockScenarios().find((s) => s.id === "complete")!.result;
 
 /**
- * The narrated driver judgments behind a cohort ranking (CHAOS-4449, design
- * doc §5a). These are ordinary `DriverJudgment`s — the panel has no
- * cohort-specific branch — so these assertions prove the generic narration
- * actually carries what a cohort answer needs: standing, title, summary,
- * epistemic status, affected subject, and the claimed facts cited.
+ * CHAOS-4581: the prose stays to one paragraph by default —
+ * `deterministic_answer` only — with `direct_judgment`/`current_state`
+ * (where a long fact dump tends to land) collapsed behind a closed
+ * `<details>` rather than always inline.
  */
-const cohortDrivers = result.drivers.filter((driver) => driver.driver_id.startsWith("cohort-"));
+describe("AnswerPanel — short by default, full text behind a disclosure (CHAOS-4581)", () => {
+    it("shows deterministic_answer directly and collapses the rest by default", () => {
+        render(<AnswerPanel result={base} />);
 
-describe("AnswerPanel — narrated driver judgments", () => {
-    it("the pinned example carries cohort driver judgments at all", () => {
-        // Red on the parent pin: the example had no cohort drivers.
-        expect(cohortDrivers.length).toBeGreaterThan(0);
+        expect(screen.getByText(base.deterministic_answer)).toBeInTheDocument();
+
+        const details = screen.getByText("Full answer").closest("details");
+        expect(details).not.toBeNull();
+        expect(details).not.toHaveAttribute("open");
+        expect(screen.getByText(base.direct_judgment)).toBeInTheDocument();
+        expect(screen.getByText(base.current_state)).toBeInTheDocument();
     });
 
-    it("renders each driver's standing, title and summary", () => {
-        render(<AnswerPanel result={result} />);
-
-        expect(screen.getByText("CHAOS: operational deficiencies")).toBeInTheDocument();
-        expect(screen.getByText("CHAOS: health risk")).toBeInTheDocument();
-        expect(screen.getByText("CHAOS: readiness gap")).toBeInTheDocument();
-        expect(
-            screen.getByText(/operational deficiencies \(weight 20, value 1\.00\)/),
-        ).toBeInTheDocument();
+    it("opens the full answer on click", () => {
+        render(<AnswerPanel result={base} />);
+        const summary = screen.getByText("Full answer");
+        summary.click();
+        const details = summary.closest("details")!;
+        expect(details).toHaveAttribute("open");
     });
 
-    it("shows a principal driver's standing distinctly from a contributing one", () => {
+    it("keeps the honest 'no direct judgment' message when there is nothing to disclose", () => {
+        const result: InvestigationResult = { ...base, direct_judgment: "", current_state: "" };
         render(<AnswerPanel result={result} />);
-        expect(screen.getAllByTitle("principal").length).toBeGreaterThan(0);
-        expect(screen.getAllByTitle("contributing").length).toBeGreaterThan(0);
+
+        expect(screen.getByText(base.deterministic_answer)).toBeInTheDocument();
+        expect(screen.getByText("The service returned no direct judgment.")).toBeInTheDocument();
+        expect(screen.queryByText("Full answer")).toBeNull();
     });
 
-    it("labels an inferred judgment as inferred, never as an observation", () => {
-        // Every cohort driver is `epistemic_status: "inferred"`. Rendering it
-        // as an observation would upgrade a rule-derived judgment into a
-        // measured fact — the distinction North Star check 12 turns on.
-        expect(cohortDrivers.every((driver) => driver.epistemic_status === "inferred")).toBe(true);
-
-        render(<AnswerPanel result={result} />);
-        const record = screen.getByText("CHAOS: operational deficiencies").closest("li")!;
-        expect(within(record).getByText(/inferred/)).toBeInTheDocument();
-        expect(within(record).queryByText(/\bobserved\b/)).not.toBeInTheDocument();
-    });
-
-    it("names who each judgment is about", () => {
-        render(<AnswerPanel result={result} />);
-        const record = screen.getByText("CHAOS: operational deficiencies").closest("li")!;
-        expect(within(record).getByTestId("driver-affected-subjects")).toHaveTextContent(
-            "CHAOS (team)",
+    it("gives each mounted instance its own heading id (CHAOS-4510)", () => {
+        const other: InvestigationResult = { ...base, result_id: "result_other" };
+        render(
+            <>
+                <AnswerPanel result={base} />
+                <AnswerPanel result={other} />
+            </>,
         );
-    });
-
-    it("cites the claimed facts a judgment rests on, verbatim", () => {
-        const [driver] = cohortDrivers;
-        const claimId = driver!.claimed_fact_ids![0]!;
-
-        render(<AnswerPanel result={result} />);
-        const record = screen.getByText(driver!.title).closest("li")!;
-        expect(within(record).getByText(claimId)).toBeInTheDocument();
-        // The cited claim really is one the result carries — a citation to a
-        // claim that is not in the payload would be a dangling reference.
-        expect(result.claimed_facts.some((fact) => fact.claim_id === claimId)).toBe(true);
+        const [first, second] = screen.getAllByTestId("answer-panel");
+        const firstId = first!.getAttribute("aria-labelledby");
+        const secondId = second!.getAttribute("aria-labelledby");
+        expect(firstId).not.toBe(secondId);
+        expect(first!.querySelector(`#${CSS.escape(firstId!)}`)).not.toBeNull();
+        expect(second!.querySelector(`#${CSS.escape(secondId!)}`)).not.toBeNull();
     });
 });

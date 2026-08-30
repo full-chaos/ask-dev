@@ -1,7 +1,7 @@
 import { FactChart } from "@/components/FactChart";
 import { FactTable } from "@/components/FactTable";
 import type { ClaimedFact } from "@/lib/contracts";
-import { factsWithRows, findRollupBasis, selectPresentation } from "@/lib/fact-rows";
+import { factRowTiles, factsWithRows, findRollupBasis, selectPresentation } from "@/lib/fact-rows";
 import { humanizeTerm } from "@/lib/presentation";
 
 export type FactRowsPanelsProps = {
@@ -42,8 +42,9 @@ function FactRowsPanel({ fact, allFacts }: FactRowsPanelProps) {
     // never blank even when there is no rollup basis to disclose.
     const rollupBasis = findRollupBasis(allFacts, fact);
     const titleId = `fact-rows-${fact.claim_id}`;
+    const tiles = factRowTiles(rows);
     return (
-        <section aria-labelledby={titleId} className="panel">
+        <section aria-labelledby={titleId} className="panel panel--card">
             <h2 className="panel__title" id={titleId}>
                 {humanizeTerm(fact.kind)} · {humanizeTerm(fact.field)}
             </h2>
@@ -52,6 +53,19 @@ function FactRowsPanel({ fact, allFacts }: FactRowsPanelProps) {
                 {rollupBasis !== undefined ? ` · ${humanizeTerm(rollupBasis)}` : ""}
                 {` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
             </p>
+            {tiles.length > 0 ? (
+                // CHAOS-4581 pop-up-card reference: a single-row rollup's own
+                // numeric columns, shown as tiles ABOVE the same table — the
+                // table below still carries every column, tiled or not.
+                <div className="tiles" data-testid="fact-tiles">
+                    {tiles.map((tile) => (
+                        <div className="tile" key={tile.label}>
+                            <span className="tile__value">{String(tile.value ?? "—")}</span>
+                            <span className="tile__label">{humanizeTerm(tile.label)}</span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
             {presentation.mode === "chart" ? (
                 <>
                     <FactChart
