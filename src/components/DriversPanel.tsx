@@ -4,8 +4,21 @@ import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
-import type { DriverJudgment, InvestigationResult } from "@/lib/contracts";
+import type { DriverJudgment, InvestigationResult, SubjectRef } from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
+
+/**
+ * A subject's identity for set/map membership: `(kind, canonical_id)`, never
+ * `canonical_id` alone (codex review round 4) — the contract does not
+ * guarantee `canonical_id` is unique ACROSS kinds, so a bare-id key could
+ * match a team to a same-id project. `JSON.stringify` of the pair is used
+ * rather than a delimited string join because `canonical_id` values already
+ * contain `:` in this dataset (e.g. `team:CHAOS`), which would make a
+ * delimiter-joined key itself ambiguous.
+ */
+function subjectKey(subject: SubjectRef): string {
+    return JSON.stringify([subject.kind, subject.canonical_id]);
+}
 
 export type DriversPanelProps = {
     readonly result: InvestigationResult;
@@ -47,6 +60,12 @@ export type DriversPanelProps = {
  * ones that actually carry `missing_signals`) is checked against every one
  * of the driver's own `affected_subjects` — the short reference is used only
  * when ALL of them are covered.
+ *
+ * codex review round 4: membership is keyed by `subjectKey` — `(kind,
+ * canonical_id)` — not bare `canonical_id`, so a driver about a subject that
+ * happens to share an id string with an unrelated ranked-with-footnote
+ * member of a DIFFERENT kind is not wrongly matched to that member's
+ * footnote.
  */
 function DriverCard({
     driver,
@@ -58,7 +77,7 @@ function DriverCard({
     const isPrincipal = driver.standing === "principal";
     const isWithheld =
         driver.standing === "withheld" &&
-        driver.affected_subjects.every((subject) => membersWithFootnote.has(subject.canonical_id));
+        driver.affected_subjects.every((subject) => membersWithFootnote.has(subjectKey(subject)));
     const affected = driver.affected_subjects.map((subject) => subject.label).join(", ");
     return (
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
@@ -136,7 +155,7 @@ export function DriversPanel({ result }: DriversPanelProps) {
     const membersWithFootnote = new Set(
         (rows ?? [])
             .filter((row) => row.member.missing_signals !== undefined)
-            .map((row) => row.member.subject.canonical_id),
+            .map((row) => subjectKey(row.member.subject)),
     );
     return (
         <section

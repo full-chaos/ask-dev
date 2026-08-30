@@ -268,4 +268,35 @@ describe("DriversPanel — a withheld driver references the table instead of res
         expect(visibleBody.textContent).toBe(withheldDriver.summary);
         expect(within(card).queryByText(/Ranked teams above/i)).toBeNull();
     });
+
+    /**
+     * codex review round 4: membership used to be keyed by bare
+     * `canonical_id` — a driver about a DIFFERENT-kind subject that happens
+     * to share the ranked member's id string was wrongly matched to that
+     * member's footnote. `rankedMember`'s own canonical_id is reused here on
+     * a `project`-kind subject on purpose, to prove the kind is checked too.
+     */
+    it("does not match a footnote across kinds sharing the same canonical_id", () => {
+        expect(rankedMember.subject.kind).toBe("team");
+        const crossKindDriver: DriverJudgment = {
+            ...withheldDriver,
+            driver_id: "driver_withheld_cross_kind",
+            title: "Collision Project: score withheld",
+            summary: "Collision Project's score is withheld for an unrelated reason.",
+            affected_subjects: [
+                {
+                    kind: "project",
+                    canonical_id: rankedMember.subject.canonical_id,
+                    label: "Collision Project",
+                },
+            ],
+        };
+
+        render(<DriversPanel result={{ ...cohortShapedResult, drivers: [crossKindDriver] }} />);
+
+        const card = screen.getByText(crossKindDriver.title).closest("li")!;
+        const visibleBody = card.querySelector(":scope > .record__body")!;
+        expect(visibleBody.textContent).toBe(crossKindDriver.summary);
+        expect(within(card).queryByText(/Ranked teams above/i)).toBeNull();
+    });
 });
