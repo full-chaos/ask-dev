@@ -81,7 +81,13 @@ function valueAt(shape: RenderShape, seriesIndex: number, label: string): number
  * the same accessible-data fallback FactRowsPanel already renders beside its
  * charts.
  */
-function ShapeDataTable({ shape, labels }: { readonly shape: RenderShape; readonly labels: readonly string[] }) {
+function ShapeDataTable({
+    shape,
+    labels,
+}: {
+    readonly shape: RenderShape;
+    readonly labels: readonly string[];
+}) {
     return (
         <div className="sr-only">
             <table>
@@ -148,7 +154,13 @@ function Legend({ shape }: { readonly shape: RenderShape }) {
  * selects `stacked_bars` where the parts genuinely compose, and it never
  * trims a stack to the segments that fit.
  */
-function CategoryBars({ shape, labels }: { readonly shape: RenderShape; readonly labels: readonly string[] }) {
+function CategoryBars({
+    shape,
+    labels,
+}: {
+    readonly shape: RenderShape;
+    readonly labels: readonly string[];
+}) {
     const stacked = shape.presentation === "stacked_bars";
     const totals = labels.map((label) =>
         shape.series.reduce((sum, _series, index) => sum + (valueAt(shape, index, label) ?? 0), 0),
@@ -229,10 +241,18 @@ function CategoryBars({ shape, labels }: { readonly shape: RenderShape; readonly
                             style={{ opacity: 1 }}
                             textAnchor="middle"
                             x={centre}
-                            y={yFor(stacked ? (totals[labelIndex] ?? 0) : (valueAt(shape, 0, label) ?? 0)) - 5}
+                            y={
+                                yFor(
+                                    stacked
+                                        ? (totals[labelIndex] ?? 0)
+                                        : (valueAt(shape, 0, label) ?? 0),
+                                ) - 5
+                            }
                         >
                             {formatValue(
-                                stacked ? (totals[labelIndex] ?? 0) : (valueAt(shape, 0, label) ?? 0),
+                                stacked
+                                    ? (totals[labelIndex] ?? 0)
+                                    : (valueAt(shape, 0, label) ?? 0),
                             )}
                         </text>
                         {shown.has(labelIndex) ? (
@@ -260,7 +280,13 @@ function CategoryBars({ shape, labels }: { readonly shape: RenderShape; readonly
  * evenly spacing unevenly-sampled observations would claim a regularity the
  * data does not have.
  */
-function TimeLines({ shape, labels }: { readonly shape: RenderShape; readonly labels: readonly string[] }) {
+function TimeLines({
+    shape,
+    labels,
+}: {
+    readonly shape: RenderShape;
+    readonly labels: readonly string[];
+}) {
     const times = labels.map((label) => Date.parse(label));
     const usable = times.every((time) => !Number.isNaN(time));
     const minTime = usable ? Math.min(...times) : 0;

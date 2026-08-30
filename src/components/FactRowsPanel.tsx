@@ -57,8 +57,11 @@ function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
     // replaced by it — never drawn beside it, which would show one fact's
     // numbers twice under two different selection rules.
     const trends =
-        result === undefined ? { shapes: [], withheld: 0 } : trendShapesForClaim(result, fact.claim_id);
-    const presentation = trends.shapes.length > 0 ? { mode: "table" as const } : selectPresentation(rows);
+        result === undefined
+            ? { shapes: [], withheld: 0 }
+            : trendShapesForClaim(result, fact.claim_id);
+    const presentation =
+        trends.shapes.length > 0 ? { mode: "table" as const } : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
     // breakdown) was derived — see fact-rows.ts's `findRollupBasis` doc
     // comment. It is a SIBLING claim, not a property of this fact, and is

@@ -144,8 +144,8 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
             ))}
             {withheldShapes > 0 ? (
                 <p className="record__meta" data-testid="render-shapes-withheld">
-                    {withheldShapes === 1 ? "A chart was" : `${withheldShapes} charts were`} withheld:
-                    the plotted values did not match the facts they cite in this answer.
+                    {withheldShapes === 1 ? "A chart was" : `${withheldShapes} charts were`}{" "}
+                    withheld: the plotted values did not match the facts they cite in this answer.
                 </p>
             ) : null}
             <div className="fact-table-wrap">
