@@ -236,25 +236,35 @@ function CategoryBars({
                                 </g>
                             );
                         })}
-                        <text
-                            className="fact-chart__value-label"
-                            style={{ opacity: 1 }}
-                            textAnchor="middle"
-                            x={centre}
-                            y={
-                                yFor(
-                                    stacked
-                                        ? (totals[labelIndex] ?? 0)
-                                        : (valueAt(shape, 0, label) ?? 0),
-                                ) - 5
-                            }
-                        >
-                            {formatValue(
-                                stacked
-                                    ? (totals[labelIndex] ?? 0)
-                                    : (valueAt(shape, 0, label) ?? 0),
-                            )}
-                        </text>
+                        {
+                            // A single number above each bar: the stack's
+                            // total, or the one series' value. Deliberately
+                            // NOT drawn for a multi-series unstacked shape,
+                            // where "the value" is ambiguous — reading
+                            // series 0 and labelling it as the bar's value
+                            // would silently pick one of several.
+                            stacked || shape.series.length === 1 ? (
+                                <text
+                                    className="fact-chart__value-label"
+                                    style={{ opacity: 1 }}
+                                    textAnchor="middle"
+                                    x={centre}
+                                    y={
+                                        yFor(
+                                            stacked
+                                                ? (totals[labelIndex] ?? 0)
+                                                : (valueAt(shape, 0, label) ?? 0),
+                                        ) - 5
+                                    }
+                                >
+                                    {formatValue(
+                                        stacked
+                                            ? (totals[labelIndex] ?? 0)
+                                            : (valueAt(shape, 0, label) ?? 0),
+                                    )}
+                                </text>
+                            ) : null
+                        }
                         {shown.has(labelIndex) ? (
                             <text
                                 className="fact-chart__axis-label"
