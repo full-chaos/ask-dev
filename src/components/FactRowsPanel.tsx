@@ -2,12 +2,26 @@ import { useId } from "react";
 
 import { FactChart } from "@/components/FactChart";
 import { FactTable } from "@/components/FactTable";
-import type { ClaimedFact } from "@/lib/contracts";
-import { factRowTiles, factsWithRows, findRollupBasis, selectPresentation } from "@/lib/fact-rows";
+import { RenderShapeChart } from "@/components/RenderShapeChart";
+import type { ClaimedFact, InvestigationResult } from "@/lib/contracts";
+import {
+    factRowTiles,
+    factsWithRows,
+    findRollupBasis,
+    selectPresentation,
+} from "@/lib/fact-rows";
+import { trendShapesForClaim } from "@/lib/render-shapes";
 import { humanizeTerm } from "@/lib/presentation";
 
 export type FactRowsPanelsProps = {
     readonly facts: readonly ClaimedFact[];
+    /**
+     * CHAOS-4415: the whole answer, so a fact's panel can show the TREND acr
+     * selected for it and re-resolve every plotted number against this same
+     * document. Optional: a pre-4415 answer carries no shapes and each panel
+     * falls back to its own CHAOS-4355 table/chart choice, unchanged.
+     */
+    readonly result: InvestigationResult | undefined;
 };
 
 /**
@@ -16,13 +30,13 @@ export type FactRowsPanelsProps = {
  * empty `rows` array, renders nothing — an empty state here only ever means
  * "the service sent no table for this fact", never a missing feature.
  */
-export function FactRowsPanels({ facts }: FactRowsPanelsProps) {
+export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
     const withRows = factsWithRows(facts);
     if (withRows.length === 0) return null;
     return (
         <>
             {withRows.map((fact) => (
-                <FactRowsPanel allFacts={facts} fact={fact} key={fact.claim_id} />
+                <FactRowsPanel allFacts={facts} fact={fact} key={fact.claim_id} result={result} />
             ))}
         </>
     );
@@ -31,11 +45,20 @@ export function FactRowsPanels({ facts }: FactRowsPanelsProps) {
 type FactRowsPanelProps = {
     readonly fact: ClaimedFact;
     readonly allFacts: readonly ClaimedFact[];
+    readonly result: InvestigationResult | undefined;
 };
 
-function FactRowsPanel({ fact, allFacts }: FactRowsPanelProps) {
+function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
     const rows = fact.rows ?? [];
-    const presentation = selectPresentation(rows);
+    // CHAOS-4415: acr's OWN selection wins over this panel's CHAOS-4355
+    // client-side heuristic. Both look at the same rows, but only acr can see
+    // the interpreted intent, and only acr's shape carries a per-point source
+    // this view can check. Where acr selected a trend, the heuristic chart is
+    // replaced by it — never drawn beside it, which would show one fact's
+    // numbers twice under two different selection rules.
+    const trends =
+        result === undefined ? { shapes: [], withheld: 0 } : trendShapesForClaim(result, fact.claim_id);
+    const presentation = trends.shapes.length > 0 ? { mode: "table" as const } : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
     // breakdown) was derived — see fact-rows.ts's `findRollupBasis` doc
     // comment. It is a SIBLING claim, not a property of this fact, and is
@@ -74,6 +97,22 @@ function FactRowsPanel({ fact, allFacts }: FactRowsPanelProps) {
                         </div>
                     ))}
                 </div>
+            ) : null}
+            {
+                // acr's own selection, above the table it was derived from.
+                // The table always follows: a chart is a reading of the rows,
+                // never a replacement for them.
+            }
+            {trends.shapes.map((trend) => (
+                <RenderShapeChart key={trend.shape_id} shape={trend} />
+            ))}
+            {trends.withheld > 0 ? (
+                <p className="fact-panel__caption" data-testid="trend-shape-withheld">
+                    {trends.withheld === 1
+                        ? "A trend chart was"
+                        : `${trends.withheld} trend charts were`}{" "}
+                    withheld: it could not be checked against this fact&apos;s own rows.
+                </p>
             ) : null}
             {presentation.mode === "chart" ? (
                 <>

@@ -36,6 +36,13 @@ export type {
     KindOption,
     PriorSubjectReceiptDispositionEntry,
     RelationshipPath,
+    // CHAOS-4415: the service's own conditional render shapes and their
+    // parts. Exported by name because the generated module is rewritten
+    // wholesale on every pin bump (see this file's own header).
+    RenderPoint,
+    RenderPointSource,
+    RenderSeries,
+    RenderShape,
     ScalarValue,
     StructureNeeds,
     StructureOfferSnapshotEntry,

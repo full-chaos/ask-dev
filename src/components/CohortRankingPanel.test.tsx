@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { Cohort, InvestigationResult } from "@/lib/contracts";
 
 const result = canonicalResult as unknown as InvestigationResult;
@@ -17,19 +18,19 @@ describe("CohortRankingPanel — conditional on intent", () => {
         // nearest measurable question).
         expect(result.interpretation.shape).toBe("single_subject");
         const { container } = render(
-            <CohortRankingPanel cohort={cohort} shape={result.interpretation.shape} />,
+            <CohortRankingPanel cohort={cohort} result={undefined} shape={result.interpretation.shape} />,
         );
         expect(container).toBeEmptyDOMElement();
     });
 
     it("renders nothing for an open question carrying a cohort", () => {
-        const { container } = render(<CohortRankingPanel cohort={cohort} shape="open" />);
+        const { container } = render(<CohortRankingPanel cohort={cohort} result={undefined} shape="open" />);
         expect(container).toBeEmptyDOMElement();
     });
 
     it("renders for both cohort intents", () => {
         for (const shape of ["explicit_cohort", "discovered_cohort"] as const) {
-            const { unmount } = render(<CohortRankingPanel cohort={cohort} shape={shape} />);
+            const { unmount } = render(<CohortRankingPanel cohort={cohort} result={undefined} shape={shape} />);
             expect(screen.getByTestId("cohort-ranking-panel")).toBeInTheDocument();
             unmount();
         }
@@ -39,7 +40,7 @@ describe("CohortRankingPanel — conditional on intent", () => {
 describe("CohortRankingPanel", () => {
     it("renders nothing without a cohort", () => {
         const { container } = render(
-            <CohortRankingPanel cohort={undefined} shape="discovered_cohort" />,
+            <CohortRankingPanel cohort={undefined} result={undefined} shape="discovered_cohort" />,
         );
         expect(container).toBeEmptyDOMElement();
     });
@@ -52,7 +53,7 @@ describe("CohortRankingPanel", () => {
             members: cohort.members.map(({ ranking_computed: _ranking, ...rest }) => rest),
         };
         const { container } = render(
-            <CohortRankingPanel cohort={unranked} shape="discovered_cohort" />,
+            <CohortRankingPanel cohort={unranked} result={undefined} shape="discovered_cohort" />,
         );
         expect(container).toBeEmptyDOMElement();
     });
@@ -60,7 +61,7 @@ describe("CohortRankingPanel", () => {
     it("renders the pinned example's ranked member with score, outcome, completeness and window", () => {
         // Red on the parent pin: the example carried no ranked cohort member,
         // and `CohortMember` had no `score`/`outcome`/`data_completeness` at all.
-        render(<CohortRankingPanel cohort={cohort} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
 
         const rows = screen.getAllByTestId("ranking-row");
         expect(rows).toHaveLength(1);
@@ -74,7 +75,7 @@ describe("CohortRankingPanel", () => {
     });
 
     it("shows the top two drivers behind the score, strongest first", () => {
-        render(<CohortRankingPanel cohort={cohort} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         const row = within(screen.getAllByTestId("ranking-row")[0]!);
 
         expect(row.getByText("operational deficiencies.severity")).toBeInTheDocument();
@@ -85,7 +86,7 @@ describe("CohortRankingPanel", () => {
     });
 
     it("never shows a score without the drivers that explain it", () => {
-        render(<CohortRankingPanel cohort={cohort} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         for (const element of screen.getAllByTestId("ranking-row")) {
             const cells = within(element).getAllByRole("cell");
             const scoreShown = cells[2]!.textContent !== "—";
@@ -98,7 +99,7 @@ describe("CohortRankingPanel", () => {
     it("names the cohort members the service did not rank, rather than dropping them", () => {
         // acr's own reference table drops unranked members; dropping them with
         // no word is the silent-discard shape this repo closes by policy.
-        render(<CohortRankingPanel cohort={cohort} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         expect(screen.getByTestId("unranked-members")).toHaveTextContent("Platform");
     });
 
@@ -111,7 +112,7 @@ describe("CohortRankingPanel", () => {
                 attention_rank: index + 1,
             })),
         };
-        render(<CohortRankingPanel cohort={allRanked} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={allRanked} result={undefined} shape="discovered_cohort" />);
         expect(screen.queryByTestId("unranked-members")).not.toBeInTheDocument();
     });
 
@@ -128,7 +129,7 @@ describe("CohortRankingPanel", () => {
                 },
             ],
         } as unknown as Cohort;
-        render(<CohortRankingPanel cohort={scoreless} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={scoreless} result={undefined} shape="discovered_cohort" />);
         const cells = within(screen.getAllByTestId("ranking-row")[0]!).getAllByRole("cell");
         expect(cells[2]!.textContent).toBe("—");
         expect(screen.getByText("No drivers reported.")).toBeInTheDocument();
@@ -152,7 +153,7 @@ describe("CohortRankingPanel", () => {
                 },
             ],
         } as unknown as Cohort;
-        render(<CohortRankingPanel cohort={bareScore} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={bareScore} result={undefined} shape="discovered_cohort" />);
 
         // The number itself never reaches the DOM.
         expect(screen.queryByText("43.5")).not.toBeInTheDocument();
@@ -165,7 +166,7 @@ describe("CohortRankingPanel", () => {
     });
 
     it("says nothing about completeness for a complete, untruncated cohort", () => {
-        render(<CohortRankingPanel cohort={cohort} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         expect(screen.queryByTestId("cohort-incomplete-notice")).not.toBeInTheDocument();
     });
 
@@ -175,7 +176,7 @@ describe("CohortRankingPanel", () => {
         // notice the table reads as an exhaustive ranking of every team
         // (AGENTS.md checks 11 and 12).
         const incomplete: Cohort = { ...cohort, complete: false, truncated: false };
-        render(<CohortRankingPanel cohort={incomplete} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={incomplete} result={undefined} shape="discovered_cohort" />);
         expect(screen.getByTestId("cohort-incomplete-notice")).toHaveTextContent(
             /did not report this cohort as complete/,
         );
@@ -183,7 +184,7 @@ describe("CohortRankingPanel", () => {
 
     it("qualifies a ranking built from a TRUNCATED cohort", () => {
         const truncated: Cohort = { ...cohort, complete: false, truncated: true };
-        render(<CohortRankingPanel cohort={truncated} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={truncated} result={undefined} shape="discovered_cohort" />);
         expect(screen.getByTestId("cohort-incomplete-notice")).toHaveTextContent(
             /cohort was truncated/,
         );
@@ -195,8 +196,8 @@ describe("CohortRankingPanel", () => {
         // panel's heading, naming the wrong turn.
         render(
             <>
-                <CohortRankingPanel cohort={cohort} shape="discovered_cohort" />
-                <CohortRankingPanel cohort={cohort} shape="discovered_cohort" />
+                <CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />
+                <CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />
             </>,
         );
         const [first, second] = screen.getAllByTestId("cohort-ranking-panel");
@@ -221,7 +222,70 @@ describe("CohortRankingPanel", () => {
                 },
             ],
         } as unknown as Cohort;
-        render(<CohortRankingPanel cohort={scoreless} shape="discovered_cohort" />);
+        render(<CohortRankingPanel cohort={scoreless} result={undefined} shape="discovered_cohort" />);
         expect(screen.getByText(/missing signals: workload.forecast pressure/)).toBeInTheDocument();
+    });
+});
+
+describe("CohortRankingPanel — the charts acr selected (CHAOS-4415)", () => {
+    // The producer-generated example, not a hand-authored fixture: it is what
+    // acr's own selector emitted, so a renderer test that passes here is a
+    // test against the live shape.
+    const shaped = renderShapesResult as unknown as InvestigationResult;
+
+    it("draws the attention-score bars and the driver-contribution stack inside the panel", () => {
+        // chris, 2026-08-29: the teams answer rendered the RANKED TEAMS table
+        // and nothing else — no chart for the cohort attention score, no
+        // per-driver contribution breakdown. Both belong to this panel,
+        // because when the question asked for a ranking, the ranking IS the
+        // answer.
+        render(
+            <CohortRankingPanel
+                cohort={shaped.cohort}
+                result={shaped}
+                shape={shaped.interpretation.shape}
+            />,
+        );
+        const panel = within(screen.getByTestId("cohort-ranking-panel"));
+        expect(panel.getByRole("table", { name: /Attention score by team/i })).toBeInTheDocument();
+        expect(
+            panel.getByRole("table", { name: /contribution by driver/i }),
+        ).toBeInTheDocument();
+        // And the ranked table is still there: a chart is a reading of the
+        // rows, never a replacement for them.
+        expect(panel.getAllByTestId("ranking-row").length).toBeGreaterThan(0);
+    });
+
+    it("draws no chart at all when the answer carries no shapes", () => {
+        // The common case and the whole point of the feature: acr decides,
+        // and an answer it selected nothing for renders exactly what it did
+        // before CHAOS-4415.
+        render(
+            <CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />,
+        );
+        const panel = within(screen.getByTestId("cohort-ranking-panel"));
+        expect(panel.queryByRole("table", { name: /Attention score/i })).not.toBeInTheDocument();
+        expect(panel.queryByTestId("render-shapes-withheld")).not.toBeInTheDocument();
+    });
+
+    it("WITHHOLDS a chart whose numbers disagree with the cohort, and says so", () => {
+        // acr validates this before serving, so reaching here means the
+        // answer disagrees with itself. AGENTS.md makes this view fail closed
+        // rather than mask an answer-quality failure — and saying nothing
+        // would be the masking.
+        const tampered = structuredClone(shaped);
+        tampered.render_shapes![0]!.series[0].points[0].value += 5;
+        render(
+            <CohortRankingPanel
+                cohort={tampered.cohort}
+                result={tampered}
+                shape={tampered.interpretation.shape}
+            />,
+        );
+        const panel = within(screen.getByTestId("cohort-ranking-panel"));
+        expect(panel.getByTestId("render-shapes-withheld")).toHaveTextContent(
+            /did not match the facts they cite/i,
+        );
+        expect(panel.queryByRole("table", { name: /Attention score by team/i })).not.toBeInTheDocument();
     });
 });

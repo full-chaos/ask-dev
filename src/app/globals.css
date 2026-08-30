@@ -1096,3 +1096,32 @@ body {
     color: var(--text);
     font-weight: 600;
 }
+
+/* CHAOS-4415: a render shape acr selected, drawn. Sits inside an existing
+   panel (the ranked-cohort panel, or a fact's own rows panel), so it carries
+   no border or surface of its own — nesting a second bordered box inside a
+   panel is the visual noise the dark theme exists to avoid. */
+.render-shape {
+    margin: 0 0 12px;
+}
+
+.render-shape__title {
+    margin: 0 0 2px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.render-shape__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 0 0 6px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.render-shape__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}

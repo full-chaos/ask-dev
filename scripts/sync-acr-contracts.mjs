@@ -34,7 +34,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // and its new `CohortMemberDriver`; the investigation-result schema itself
 // is byte-identical to the prior pin, because `cohort` was already a result
 // field and only its member shape grew. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "aa214606e70d9beb1cd2ea78d62a17bd4e680c3b";
+export const SOURCE_COMMIT = "8d0fa0fcb0363f8fc7f2f6a74e735f06bca2b4e7";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -58,6 +58,13 @@ const SCHEMA_PATHS = [
 const EXAMPLE_PATHS = [
     "contracts/examples/v1/context_fabric_investigation_request.v1.json",
     "contracts/examples/v1/context_fabric_investigation_result.v1.json",
+    // CHAOS-4415: the render-shape example. Added because the workbench's
+    // chart tests must run against a document acr's OWN producer emitted --
+    // a hand-authored fixture would pass a renderer test while the live
+    // shape differed. The pre-4415 result example above carries a cohort
+    // under a single_subject interpretation and therefore no shapes at all,
+    // which is exactly why it cannot serve as this one.
+    "contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];

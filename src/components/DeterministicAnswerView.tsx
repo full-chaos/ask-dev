@@ -273,17 +273,21 @@ export function DeterministicAnswerView({
                 // use, so this never drifts from what those panels actually
                 // decide to render.
             }
-            <CohortRankingPanel cohort={result.cohort} shape={result.interpretation.shape} />
+            <CohortRankingPanel
+                cohort={result.cohort}
+                result={result}
+                shape={result.interpretation.shape}
+            />
             {isCohortIntent(result.interpretation.shape) &&
             result.cohort !== undefined &&
             rankingTable(result.cohort.members) !== null ? (
                 <>
                     <DriversPanel result={result} />
-                    <FactRowsPanels facts={result.claimed_facts} />
+                    <FactRowsPanels facts={result.claimed_facts} result={result} />
                 </>
             ) : (
                 <>
-                    <FactRowsPanels facts={result.claimed_facts} />
+                    <FactRowsPanels facts={result.claimed_facts} result={result} />
                     <DriversPanel result={result} />
                 </>
             )}
