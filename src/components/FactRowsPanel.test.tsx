@@ -270,68 +270,120 @@ describe("FactRowsPanels", () => {
     });
 });
 
-describe("FactRowsPanels — the trend acr selected (CHAOS-4415)", () => {
-    const shaped = renderShapesExample as unknown as InvestigationResult;
+describe("FactRowsPanels — a trend shape, which no acr build currently emits", () => {
+    // acr WITHDREW `dated_fact_trend` (CHAOS-4616): a row table cannot say
+    // which of its columns are measures, so any trend it drew was a claim
+    // resting on a guess. The capability returns through CHAOS-4627, when a
+    // row table declares its own shape.
+    //
+    // These tests therefore use a SYNTHETIC shape, and say so rather than
+    // pretending otherwise. That is a deliberate, named weakness: they prove
+    // this panel routes and checks a trend correctly, and they cannot prove
+    // it does so for real server output, because there is no real server
+    // output to test against. The golden-example test directly below pins
+    // the fact that acr sends none.
+    //
+    // The rendering path is kept rather than deleted because it is
+    // REACHABLE, not dead: it is driven by whatever `render_shapes` the
+    // server sends, so an acr that starts emitting trends again is rendered
+    // correctly with no consumer change. That is the opposite of acr's own
+    // dead helpers, which nothing could call.
+    const factWithTrendRows = {
+        claim_id: "claim_trend",
+        kind: "flow",
+        subject: { kind: "team", canonical_id: "team:t", label: "t" },
+        field: "items_completed",
+        value: { number: 3 },
+        rows: [
+            { fields: { day: { string: "2026-07-20" }, items_completed: { number: 0 } } },
+            { fields: { day: { string: "2026-08-30" }, items_completed: { number: 3 } } },
+        ],
+    } as unknown as ClaimedFact;
 
-    it("draws acr's trend for the fact it was derived from", () => {
-        // chris, 2026-08-29: "no readiness/workload trend series although the
-        // facts carry dated records (2026-08-03, 08-18, 08-30)". The trend
-        // belongs beside the table it came from, not in a panel of its own.
-        render(<FactRowsPanels facts={shaped.claimed_facts} result={shaped} />);
+    function answerWithTrend(value = 0): InvestigationResult {
+        return {
+            claimed_facts: [factWithTrendRows],
+            render_shapes: [
+                {
+                    shape_id: "rs_t",
+                    kind: "series",
+                    presentation: "line",
+                    selected_by: "dated_fact_trend",
+                    title: "Items completed over time — t",
+                    axis_kind: "time",
+                    axis_label: "day",
+                    value_label: "Items completed",
+                    series: [
+                        {
+                            key: "items_completed",
+                            label: "Items completed",
+                            points: [
+                                {
+                                    label: "2026-07-20",
+                                    value,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_trend",
+                                        row_index: 0,
+                                        field: "items_completed",
+                                    },
+                                },
+                                {
+                                    label: "2026-08-30",
+                                    value: 3,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_trend",
+                                        row_index: 1,
+                                        field: "items_completed",
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        } as unknown as InvestigationResult;
+    }
+
+    it("the shipped golden example carries NO trend, because acr emits none", () => {
+        // The live-facing pin: whatever the synthetic tests below prove, the
+        // real contract example must show the withdrawal.
+        const shipped = renderShapesExample as unknown as InvestigationResult;
+        expect(shipped.render_shapes?.some((s) => s.selected_by === "dated_fact_trend")).toBe(
+            false,
+        );
+    });
+
+    it("draws a trend beside the table it was derived from", () => {
+        render(<FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend()} />);
         expect(screen.getByRole("table", { name: /over time/i })).toBeInTheDocument();
     });
 
     it("REPLACES the client-side heuristic chart rather than drawing beside it", () => {
-        // Both look at the same rows, but only acr can see the interpreted
-        // intent and only acr's shape carries a checkable per-point source.
-        // Showing one fact's numbers twice, under two different selection
-        // rules, would make a reader ask which one to believe.
+        // One fact's numbers are never shown twice under two different
+        // selection rules.
         const { container } = render(
-            <FactRowsPanels facts={shaped.claimed_facts} result={shaped} />,
+            <FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend()} />,
         );
-        expect(container.querySelectorAll(".fact-chart").length).toBe(0);
-    });
-
-    it("falls back to its own CHAOS-4355 choice when the answer carries no shapes", () => {
-        // A pre-4415 answer, or one acr selected nothing for, must render
-        // exactly as it did before.
-        render(<FactRowsPanels facts={shaped.claimed_facts} result={undefined} />);
-        expect(screen.queryByRole("table", { name: /over time/i })).not.toBeInTheDocument();
+        expect(container.querySelectorAll(".fact-chart")).toHaveLength(0);
     });
 
     it("WITHHOLDS a trend whose numbers disagree with the fact's own rows", () => {
-        const tampered = structuredClone(shaped);
-        const trend = tampered.render_shapes!.find(
-            (shape) => shape.selected_by === "dated_fact_trend",
-        )!;
-        trend.series[0].points[0].value += 1;
-        render(<FactRowsPanels facts={tampered.claimed_facts} result={tampered} />);
+        render(<FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend(99)} />);
         expect(screen.getByTestId("trend-shape-withheld")).toHaveTextContent(
             /could not be checked against this fact/i,
         );
     });
-});
 
-describe("codex P2 — a withheld trend must not fall back to the heuristic chart", () => {
-    it("shows the table, not a client-side chart, when acr's own trend was refused", () => {
-        // Falling back draws a chart for exactly the rows whose SERVER-chosen
-        // chart was just refused as untrustworthy. The withheld notice then
-        // sits beside a chart, which reads as "we withheld one and drew
-        // another" — the opposite of failing closed.
-        const shaped = renderShapesExample as unknown as InvestigationResult;
-        const tampered = structuredClone(shaped);
-        const trend = tampered.render_shapes!.find(
-            (shape) => shape.selected_by === "dated_fact_trend",
-        )!;
-        trend.series[0].points[0].value += 1;
+    it("shows the table, not a client-side chart, when a trend was refused", () => {
         const { container } = render(
-            <FactRowsPanels facts={tampered.claimed_facts} result={tampered} />,
+            <FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend(99)} />,
         );
         expect(screen.getByTestId("trend-shape-withheld")).toBeInTheDocument();
-        expect(container.querySelectorAll(".fact-chart").length).toBe(0);
+        expect(container.querySelectorAll(".fact-chart")).toHaveLength(0);
     });
 });
-
 describe("chris's ruling: nothing disappears from the UI", () => {
     // chris, 2026-08-30 14:24 PT: "I object to losing the charts and the data
     // in front of people."

@@ -28,15 +28,20 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main (CHAOS-4415 slice 1): pins to acr main tip #336, the conditional
-// render-shape surface. Two schemas widen — `context_fabric_common.v1` gains
+// acr main: pins past #336 (the conditional render-shape surface) and #340,
+// which WITHDREW the `dated_fact_trend` rule — a row table cannot say which
+// of its columns are measures, so any trend drawn from one was a claim
+// resting on a guess (CHAOS-4616; the declared-shape contract that brings it
+// back is CHAOS-4627). The kind and rule stay in the closed vocabulary with
+// no producer, so nothing in the generated types changes; what changes is
+// that no answer carries a trend shape. Two schemas widen — `context_fabric_common.v1` gains
 // the eight Render* $defs, and `context_fabric_investigation_result.v1`
 // gains the optional `render_shapes` array that references them. The new
 // render-shape EXAMPLE joins the copied set too, because the workbench's
 // chart tests must run against a document acr's own producer emitted rather
 // than a hand-authored fixture that could pass while the live shape
 // differed. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "d5a394e25d378ad1965dcf9fc55bd251efb795f3";
+export const SOURCE_COMMIT = "6ac060eac757ffcc795bbdc39f3fe0eb3879559e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
