@@ -35,20 +35,30 @@ export type DriversPanelProps = {
  * `CohortRankingPanel` is ACTUALLY rendering a table for this same result —
  * that panel self-gates (non-cohort intent, no cohort, or nothing ranked),
  * and a withheld driver is not contractually guaranteed to appear only
- * alongside one. `rankedTeamsVisible` (computed by the caller with the same
- * gate `CohortRankingPanel` itself uses) decides which treatment applies —
- * pointing at a table that is not there would be a worse gap than the
- * duplication this was built to close.
+ * alongside one — pointing at a table that is not there would be a worse gap
+ * than the duplication this was built to close.
+ *
+ * codex review round 3: rendering a table is not sufficient either —
+ * `CohortRankingPanel`'s missing-signals footnote is only emitted per RANKED
+ * row (`rankingTable`'s own `rows`, never for a member `unrankedLabels`
+ * names), so a withheld driver about an unranked member has nothing to point
+ * at even while the table itself is on screen. `membersWithFootnote`
+ * (computed by the caller from the SAME `rankingTable` rows, filtered to
+ * ones that actually carry `missing_signals`) is checked against every one
+ * of the driver's own `affected_subjects` — the short reference is used only
+ * when ALL of them are covered.
  */
 function DriverCard({
     driver,
-    rankedTeamsVisible,
+    membersWithFootnote,
 }: {
     readonly driver: DriverJudgment;
-    readonly rankedTeamsVisible: boolean;
+    readonly membersWithFootnote: ReadonlySet<string>;
 }) {
     const isPrincipal = driver.standing === "principal";
-    const isWithheld = driver.standing === "withheld" && rankedTeamsVisible;
+    const isWithheld =
+        driver.standing === "withheld" &&
+        driver.affected_subjects.every((subject) => membersWithFootnote.has(subject.canonical_id));
     const affected = driver.affected_subjects.map((subject) => subject.label).join(", ");
     return (
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
@@ -113,13 +123,21 @@ function DriverCard({
  */
 export function DriversPanel({ result }: DriversPanelProps) {
     const idPrefix = useId();
-    // Mirrors CohortRankingPanel's own gate exactly (rule 0 there): a
-    // withheld driver's reference is only safe when that panel is actually
-    // rendering a table for THIS result.
-    const rankedTeamsVisible =
-        isCohortIntent(result.interpretation.shape) &&
-        result.cohort !== undefined &&
-        rankingTable(result.cohort.members) !== null;
+    // Mirrors CohortRankingPanel's own gate exactly (rule 0 there), then
+    // narrows further to just the members whose row actually carries a
+    // missing-signals footnote (codex review round 3) — an unranked member
+    // (named only in "Not ranked by the service: ...") gets no footnote at
+    // all, so a withheld driver about one has nothing to point at even
+    // though the table itself is on screen.
+    const rows =
+        isCohortIntent(result.interpretation.shape) && result.cohort !== undefined
+            ? rankingTable(result.cohort.members)
+            : null;
+    const membersWithFootnote = new Set(
+        (rows ?? [])
+            .filter((row) => row.member.missing_signals !== undefined)
+            .map((row) => row.member.subject.canonical_id),
+    );
     return (
         <section
             className="panel panel--card"
@@ -149,7 +167,7 @@ export function DriversPanel({ result }: DriversPanelProps) {
                         <DriverCard
                             driver={driver}
                             key={driver.driver_id}
-                            rankedTeamsVisible={rankedTeamsVisible}
+                            membersWithFootnote={membersWithFootnote}
                         />
                     ))}
                 </ul>

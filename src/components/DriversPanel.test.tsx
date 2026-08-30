@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { DriversPanel } from "@/components/DriversPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
-import type { DriverJudgment, InvestigationResult } from "@/lib/contracts";
+import type { CohortMember, DriverJudgment, InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
 const base = mockScenarios().find((s) => s.id === "complete")!.result;
@@ -140,14 +140,21 @@ describe("DriversPanel — pop-up card chrome (CHAOS-4581)", () => {
  * (unmodified) behind Details.
  */
 describe("DriversPanel — a withheld driver references the table instead of restating missing signals", () => {
+    // codex review round 3: the short reference is only safe for a member
+    // that BOTH is ranked AND carries `missing_signals` — `CohortRankingPanel`
+    // only emits the footnote for that exact case. `base.cohort`'s own
+    // "CHAOS" member is ranked but has no `missing_signals` in the pinned
+    // fixture, so it is added here rather than invented on an unrelated id —
+    // the driver below cites the SAME real member.
+    const rankedMember = base.cohort!.members.find((m) => m.subject.label === "CHAOS")!;
     const withheldDriver: DriverJudgment = {
         ...base.drivers[0]!,
         driver_id: "driver_withheld_0001",
         standing: "withheld",
-        title: "Ops Team: score withheld",
+        title: "CHAOS: score withheld",
         summary:
-            "Ops Team's score is withheld because readiness.coverage_gap and workload.forecast_pressure are missing.",
-        affected_subjects: [{ kind: "team", canonical_id: "team_ops", label: "Ops Team" }],
+            "CHAOS's score is withheld because readiness.coverage_gap and workload.forecast_pressure are missing.",
+        affected_subjects: [rankedMember.subject],
     };
     // codex review round 2: the reference is only safe when Ranked Teams is
     // actually rendering for this result — `base` alone is interpreted
@@ -157,6 +164,17 @@ describe("DriversPanel — a withheld driver references the table instead of res
     const cohortShapedResult: InvestigationResult = {
         ...base,
         interpretation: { ...base.interpretation, shape: "discovered_cohort" },
+        cohort: {
+            ...base.cohort!,
+            members: base.cohort!.members.map((m) =>
+                m.subject.label === "CHAOS"
+                    ? {
+                          ...m,
+                          missing_signals: ["readiness.coverage_gap", "workload.forecast_pressure"],
+                      }
+                    : m,
+            ),
+        },
     };
 
     it("does not show the withheld driver's full summary in the always-visible body", () => {
@@ -209,5 +227,45 @@ describe("DriversPanel — a withheld driver references the table instead of res
         const visibleBody = card.querySelector(":scope > .record__body")!;
         expect(visibleBody.textContent).toBe(withheldDriver.summary);
         expect(screen.queryByText(/Ranked teams above/i)).toBeNull();
+    });
+
+    /**
+     * codex review round 3: `CohortRankingPanel`'s missing-signals footnote
+     * is only emitted per RANKED row (`rankingTable`'s own `rows`) — a
+     * member that exists in the cohort but was not ranked (named only under
+     * "Not ranked by the service: ...") gets no footnote at all, even while
+     * the table itself renders for OTHER, ranked members. A withheld driver
+     * about that unranked member has nothing to point at.
+     */
+    it("shows the full summary when the table renders but the driver's own member has no footnote", () => {
+        const unrankedMember: CohortMember = {
+            subject: { kind: "team", canonical_id: "team:Platform", label: "Platform" },
+            rank: 2,
+            inclusion_reasons: ["Matched by kind census over the org's team roster."],
+            missing_signals: ["workload.forecast_pressure"],
+        };
+        const resultWithUnranked: InvestigationResult = {
+            ...cohortShapedResult,
+            cohort: {
+                ...cohortShapedResult.cohort!,
+                members: [...cohortShapedResult.cohort!.members, unrankedMember],
+            },
+            drivers: [
+                {
+                    ...withheldDriver,
+                    affected_subjects: [
+                        { kind: "team", canonical_id: "team:Platform", label: "Platform" },
+                    ],
+                },
+            ],
+        };
+
+        render(<DriversPanel result={resultWithUnranked} />);
+
+        // Sanity: the table IS rendering (a ranked member is present).
+        const card = screen.getByText(withheldDriver.title).closest("li")!;
+        const visibleBody = card.querySelector(":scope > .record__body")!;
+        expect(visibleBody.textContent).toBe(withheldDriver.summary);
+        expect(within(card).queryByText(/Ranked teams above/i)).toBeNull();
     });
 });

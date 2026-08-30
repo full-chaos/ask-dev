@@ -15,6 +15,7 @@ import { StructureConfirmationNotice } from "@/components/StructureConfirmationN
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { choiceDisposition } from "@/lib/clarification";
+import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
@@ -259,40 +260,46 @@ export function DeterministicAnswerView({
                 // table, driver contributions, coverage) sat below a wall of
                 // text. Nothing here changes WHAT renders, only the order:
                 // every panel below still self-gates to null exactly as
-                // before, so a single-subject result (no cohort, no fact
-                // rows) simply skips straight to the drivers/coverage strip,
-                // and `AnswerPanel`'s prose always renders last among the
-                // decision-carrying panels, never above them.
+                // before, and `AnswerPanel`'s prose always renders last among
+                // the decision-carrying panels, never above them.
                 //
-                // 1. Ranked teams — leads for a cohort answer; a no-op
-                //    (renders null) otherwise (`shape` gates it, see the
-                //    panel's own rule 0).
+                // codex review round 3: the ticket specifies TWO distinct
+                // sequences, not one shared order — a cohort answer wants
+                // "RANKED TEAMS ... then principal driver cards" (Drivers
+                // immediately after Ranked Teams), while a single-subject
+                // answer wants "health/flow tiles + rows table FIRST, prose
+                // after" (fact rows ahead of Drivers). `isCohortAnswer` uses
+                // the SAME gate `CohortRankingPanel`/`DriversPanel` already
+                // use, so this never drifts from what those panels actually
+                // decide to render.
             }
             <CohortRankingPanel cohort={result.cohort} shape={result.interpretation.shape} />
+            {isCohortIntent(result.interpretation.shape) &&
+            result.cohort !== undefined &&
+            rankingTable(result.cohort.members) !== null ? (
+                <>
+                    <DriversPanel result={result} />
+                    <FactRowsPanels facts={result.claimed_facts} />
+                </>
+            ) : (
+                <>
+                    <FactRowsPanels facts={result.claimed_facts} />
+                    <DriversPanel result={result} />
+                </>
+            )}
             {
-                // 2. Fact rows — the "health/flow tiles + rows table" the
-                //    single-subject (project-status) shape of this ticket
-                //    asks to lead with. A no-op when no claimed fact carries
-                //    rows.
-            }
-            <FactRowsPanels facts={result.claimed_facts} />
-            {
-                // 3. Principal driver cards.
-            }
-            <DriversPanel result={result} />
-            {
-                // 4. Coverage / limitations, as a compact strip (CSS only —
-                //    each panel is still a full, independently testable
-                //    component; `.strip` just lays them out side by side and
-                //    each keeps its own collapsed-by-default detail).
+                // Coverage / limitations, as a compact strip (CSS only —
+                // each panel is still a full, independently testable
+                // component; `.strip` just lays them out side by side and
+                // each keeps its own collapsed-by-default detail).
             }
             <div className="strip">
                 <CoveragePanel coverage={result.coverage} />
                 <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </div>
             {
-                // 5. The narrative prose — short by construction (see
-                //    AnswerPanel), and never above the panels above it.
+                // The narrative prose — short by construction (see
+                // AnswerPanel), and never above the panels above it.
             }
             <AnswerPanel result={result} />
             {structureConfirmationNotice}

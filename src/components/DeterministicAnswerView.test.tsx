@@ -135,6 +135,33 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
     });
 
     /**
+     * codex review round 3: the ticket specifies "RANKED TEAMS ... THEN
+     * principal driver cards" for a cohort answer — Drivers must immediately
+     * follow Ranked Teams, not just "somewhere after" it. The prior test
+     * only pinned relative ordering (cohort < drivers < answer), which a
+     * cohort-then-fact-rows-then-drivers sequence also satisfies; this pins
+     * the literal adjacency using the SAME scenario (cohort + a real
+     * rows-bearing fact) codex's own repro used.
+     */
+    it("cohort answer: Drivers immediately follows Ranked Teams, before any fact-rows panel", () => {
+        const base = mockScenarios().find((s) => s.id === "complete")!.result;
+        expect(base.claimed_facts.some((fact) => fact.rows !== undefined)).toBe(true);
+        const result: InvestigationResult = {
+            ...base,
+            interpretation: { ...base.interpretation, shape: "discovered_cohort" },
+        };
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const sections = Array.from(article.querySelectorAll("section.panel"));
+        const cohortIndex = sections.findIndex(
+            (s) => s.getAttribute("data-testid") === "cohort-ranking-panel",
+        );
+        const nextSection = sections[cohortIndex + 1]!;
+        expect(nextSection.getAttribute("data-testid")).toBe("drivers-panel");
+    });
+
+    /**
      * codex review round 1: the "Your selections were applied" chip row
      * (`StructureConfirmationNotice`) used to render ahead of everything,
      * including Ranked Teams — provenance outranking the panel it was
