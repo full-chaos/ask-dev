@@ -45,13 +45,23 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
             ) : (
                 <>
                     <div className="chip-row" data-testid="coverage-chip-row">
+                        {
+                            // codex review round 1 (CHAOS-4581): a color-only
+                            // (tone) distinction between e.g. `available` and
+                            // `unauthorized`/`no_data` is exactly the "known
+                            // gap reads as apparent completeness" failure this
+                            // panel exists to prevent (see the doc comment
+                            // above) — doubly so behind a title-only tooltip.
+                            // The state is real, visible TEXT on every chip,
+                            // not just a color or a hover.
+                        }
                         {coverage.sources.map((source) => (
                             <Badge
                                 key={`${source.source}:${source.state}`}
                                 tone={coverageStateTone(source.state)}
                                 title={`${source.source}: ${source.state}`}
                             >
-                                {source.source}
+                                {source.source} · {humanizeTerm(source.state)}
                             </Badge>
                         ))}
                     </div>

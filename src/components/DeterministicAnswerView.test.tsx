@@ -134,6 +134,29 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
         }
     });
 
+    /**
+     * codex review round 1: the "Your selections were applied" chip row
+     * (`StructureConfirmationNotice`) used to render ahead of everything,
+     * including Ranked Teams — provenance outranking the panel it was
+     * supposed to lead with. The pinned canonical example carries BOTH a
+     * real cohort AND `confirmed_structure`, so this is the exact scenario
+     * codex flagged, not a constructed one.
+     */
+    it("cohort answer: applied-selections chip row does not precede Ranked Teams", () => {
+        const base = mockScenarios().find((s) => s.id === "complete")!.result;
+        expect(base.confirmed_structure?.length).toBeGreaterThan(0);
+        const result: InvestigationResult = {
+            ...base,
+            interpretation: { ...base.interpretation, shape: "discovered_cohort" },
+        };
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        expect(screen.getByText("Your selections were applied")).toBeInTheDocument();
+        const firstPanel = article.querySelector("section.panel")!;
+        expect(firstPanel.getAttribute("data-testid")).toBe("cohort-ranking-panel");
+    });
+
     it("renders no fact-rows panel for a result whose claimed facts carry no rows", () => {
         const base = mockScenarios().find((s) => s.id === "complete")!.result;
         // CHAOS-4364 pin bump: the pinned canonical example ("complete")

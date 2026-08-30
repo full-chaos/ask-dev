@@ -203,4 +203,68 @@ describe("FactRowsPanels", () => {
         expect(table.textContent).toContain("churn loc 30d");
         expect(table.textContent).toContain("18420");
     });
+
+    /**
+     * CHAOS-4581 codex review round 1: `titleId` used to be bare
+     * `fact-rows-${claim_id}` — not instance-scoped like every other panel
+     * touched by this ticket, so the SAME claim_id repeated across two
+     * stacked chat turns collided, the CHAOS-4510 failure class.
+     */
+    it("gives two panels citing the same claim_id different heading ids (CHAOS-4510)", () => {
+        const fact: ClaimedFact = {
+            claim_id: "claim_dup",
+            kind: "status",
+            subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+            field: "current_phase",
+            value: { string: "steady" },
+            rows: [{ fields: { count: { integer: 3 } } }],
+        };
+        render(
+            <>
+                <FactRowsPanels facts={[fact]} />
+                <FactRowsPanels facts={[fact]} />
+            </>,
+        );
+        const sections = Array.from(
+            document.querySelectorAll('section[aria-labelledby^="fact-rows-"]'),
+        );
+        expect(sections).toHaveLength(2);
+        const ids = sections.map((s) => s.getAttribute("aria-labelledby"));
+        expect(ids[0]).not.toBe(ids[1]);
+        for (const section of sections) {
+            const labelledBy = section.getAttribute("aria-labelledby")!;
+            expect(section.querySelector(`#${CSS.escape(labelledBy)}`)).not.toBeNull();
+        }
+    });
+
+    /** "Key numbers as tiles" (CHAOS-4581): a single-row fact's numeric columns. */
+    it("renders a tile per numeric column for a single-row fact", () => {
+        const fact: ClaimedFact = {
+            claim_id: "claim_tiles",
+            kind: "health",
+            subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+            field: "summary",
+            value: { integer: 1 },
+            rows: [{ fields: { open_incidents: { integer: 2 }, mttr_hours: { number: 4.5 } } }],
+        };
+        render(<FactRowsPanels facts={[fact]} />);
+        const tiles = screen.getByTestId("fact-tiles");
+        expect(tiles.textContent).toContain("2");
+        expect(tiles.textContent).toContain("open incidents");
+        expect(tiles.textContent).toContain("4.5");
+        expect(tiles.textContent).toContain("mttr hours");
+    });
+
+    it("renders no tiles for a multi-row fact (a real series, not a single summary)", () => {
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        // The CI daily rollup is a real multi-day time series (3 rows) —
+        // scoped to its own panel, since `rowsResult` also carries the
+        // single-row latency-percentiles fact, which legitimately DOES
+        // render tiles (covered above).
+        const heading = screen.getByRole("heading", {
+            name: /continuous integration.*pipelines count/i,
+        });
+        const panel = heading.closest("section")!;
+        expect(panel.querySelector('[data-testid="fact-tiles"]')).toBeNull();
+    });
 });

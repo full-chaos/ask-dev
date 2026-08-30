@@ -19,11 +19,37 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
 
         const panel = screen.getByTestId("coverage-panel");
         expect(within(panel).getByText("Complete — every source contributed.")).toBeInTheDocument();
+        const chipRow = within(panel).getByTestId("coverage-chip-row");
         for (const source of coverage.sources) {
-            expect(
-                within(within(panel).getByTestId("coverage-chip-row")).getByText(source.source),
-            ).toBeInTheDocument();
+            expect(chipRow).toHaveTextContent(source.source);
         }
+    });
+
+    /**
+     * codex review round 1 (CHAOS-4581): a color-only (tone) distinction
+     * between e.g. `available` and `unauthorized`/`no_data` is exactly the
+     * "known gap reads as apparent completeness" failure this panel exists
+     * to prevent — the state must be real visible text on the chip, not
+     * just a hover title or a color a colorblind reader cannot use.
+     */
+    it("shows each source's state as visible chip text, not just a color/tooltip", () => {
+        const gapCoverage = {
+            sources: [
+                { source: "canonical_fact:workload", state: "available" as const },
+                { source: "dev-health-ops:readiness", state: "unauthorized" as const },
+                { source: "canonical_fact:blockers", state: "no_data" as const },
+            ],
+            partial: true,
+            degraded_reasons: [],
+        };
+        render(<CoveragePanel coverage={gapCoverage} />);
+        const chipRow = screen.getByTestId("coverage-chip-row");
+        expect(chipRow).toHaveTextContent("canonical_fact:workload");
+        expect(chipRow).toHaveTextContent("available");
+        expect(chipRow).toHaveTextContent("dev-health-ops:readiness");
+        expect(chipRow).toHaveTextContent("unauthorized");
+        expect(chipRow).toHaveTextContent("canonical_fact:blockers");
+        expect(chipRow).toHaveTextContent("no data");
     });
 
     it("keeps the full per-source detail reachable behind a closed disclosure", () => {

@@ -223,8 +223,20 @@ export function DeterministicAnswerView({
 
     return (
         <article aria-label="Deterministic answer" data-state={result.status}>
+            {
+                // `notice` (a dishonoured prior choice) and `structureNeedsPanel`
+                // (a fresh ask for more input) both change how everything BELOW
+                // should be read — a dishonoured choice means the answer may not
+                // even be about the subject the reader expects, and unresolved
+                // structure needs mean the answer is known-incomplete. Both stay
+                // first for that reason. `structureConfirmationNotice` (the
+                // "your selections were applied" chip row) is provenance, not a
+                // caveat — codex review round 1 flagged it sitting ahead of
+                // Ranked Teams as contradicting "RANKED TEAMS leads"; it now
+                // renders with `SubjectResolutionPanel` below, the panel it is
+                // thematically closest to (both are "what got resolved and how").
+            }
             {notice}
-            {structureConfirmationNotice}
             {structureNeedsPanel}
             {
                 // CHAOS-4581: panels lead, prose follows — chris's own
@@ -268,6 +280,7 @@ export function DeterministicAnswerView({
                 //    AnswerPanel), and never above the panels above it.
             }
             <AnswerPanel result={result} />
+            {structureConfirmationNotice}
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
                 title="Remaining work"
