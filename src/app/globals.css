@@ -472,6 +472,155 @@ body {
     font-weight: 600;
 }
 
+/* --- Pop-up card chrome (CHAOS-4581) ---
+   "Elevated cards ... the reference feel is the orchestrator's artifact
+   pages" — card elevation, quiet borders, number tiles. Elevation comes from
+   a low-alpha shadow, never a bright border: the dark-theme "no bright
+   borders" rule at the top of this file holds here too, and the same shadow
+   value already used for `.chat__jump-to-latest` is reused for consistency. */
+
+.panel--card {
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+@media (prefers-color-scheme: light) {
+    .panel--card {
+        box-shadow: 0 4px 14px rgba(16, 22, 32, 0.1);
+    }
+}
+
+/* A compact panel keeps its full detail reachable (never removed) but
+   collapsed by default behind a `<details>` — see CoveragePanel,
+   LimitationsPanel is plain-compact (no disclosure of its own, it is just
+   laid out side by side in `.strip`), StructureConfirmationNotice. */
+.panel--compact {
+    padding: 12px 16px;
+}
+
+.strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap);
+    margin-top: var(--gap);
+}
+
+.strip > .panel {
+    flex: 1 1 260px;
+    margin-top: 0;
+}
+
+/* Collapsed-by-default detail. Native `<details>`/`<summary>` — no JS, no
+   extra component, keyboard/screen-reader behavior for free. Only the
+   marker/summary line is themed; the revealed content reuses whatever
+   classes it already carries (`.stack`, `.record`, `.coverage`, ...). */
+.disclosure {
+    margin-top: 8px;
+}
+
+.disclosure > summary {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+
+.disclosure > summary::-webkit-details-marker {
+    display: none;
+}
+
+.disclosure > summary::before {
+    content: "▸ ";
+}
+
+.disclosure[open] > summary::before {
+    content: "▾ ";
+}
+
+.disclosure > summary:hover,
+.disclosure > summary:focus-visible {
+    color: var(--accent);
+}
+
+.disclosure[open] > summary {
+    margin-bottom: 8px;
+}
+
+/* Applied-selections / coverage-source chip row: the compact, always-visible
+   summary line that replaces a full record list once there is nothing left
+   to act on (CHAOS-4581 — "receipts/applied selections collapse to a single
+   chip row once applied"). */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.chip code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+}
+
+/* Key numbers as tiles (CHAOS-4581): the numeric columns of a single-row
+   rollup fact, pulled out of the table into a small grid of number tiles —
+   the values are unchanged, only the layout differs (`@/lib/fact-rows`'s
+   `factRowTiles` derives nothing new). */
+.tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.tile {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.tile__value {
+    color: var(--text-strong);
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.tile__label {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* A driver card gets the same elevated treatment as its panel; a principal
+   driver is set apart by a tinted surface, never a bright border (same
+   pattern as `.panel--failure` above). */
+.record--card {
+    padding: 12px 14px;
+}
+
+.record--principal {
+    background: color-mix(in srgb, var(--state-warn) 7%, var(--surface-2));
+}
+
 /* --- Chat surface (chat pivot, Phase 1) ---
    Content-first, quiet chrome: the timeline reads like a conversation, not a
    panel stack. Every border below reuses the SAME low-alpha tokens as the

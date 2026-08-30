@@ -5,6 +5,7 @@ import {
     cellText,
     cellValue,
     columnOrder,
+    factRowTiles,
     factsWithRows,
     findRollupBasis,
     selectPresentation,
@@ -389,5 +390,42 @@ describe("factsWithRows", () => {
         const emptyRows = fact({ claim_id: "empty_rows", rows: [] });
         const noRows = fact({ claim_id: "no_rows" });
         expect(factsWithRows([withRows, emptyRows, noRows])).toEqual([withRows]);
+    });
+});
+
+/**
+ * CHAOS-4581: "key numbers as tiles" — the presentation-only pick of a
+ * single-row fact's own numeric columns, never a computed value.
+ */
+describe("factRowTiles", () => {
+    it("returns one tile per numeric column of a single-row fact, in column order", () => {
+        const rows = [
+            row({
+                p50_duration_minutes: { number: 12.4 },
+                team_name: { string: "Platform" },
+                p99_duration_minutes: { number: 55.6 },
+            }),
+        ];
+        expect(factRowTiles(rows)).toEqual([
+            { label: "p50_duration_minutes", value: 12.4 },
+            { label: "p99_duration_minutes", value: 55.6 },
+        ]);
+    });
+
+    it("returns nothing for a multi-row fact — there is no single number to headline", () => {
+        const rows = [
+            row({ day: { string: "2026-08-01" }, count: { integer: 1 } }),
+            row({ day: { string: "2026-08-02" }, count: { integer: 2 } }),
+        ];
+        expect(factRowTiles(rows)).toEqual([]);
+    });
+
+    it("returns nothing for an empty row set", () => {
+        expect(factRowTiles([])).toEqual([]);
+    });
+
+    it("skips a non-numeric column even on a single-row fact", () => {
+        const rows = [row({ team_name: { string: "Platform" } })];
+        expect(factRowTiles(rows)).toEqual([]);
     });
 });

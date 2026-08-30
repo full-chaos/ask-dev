@@ -313,3 +313,25 @@ export function findRollupBasis(
 export function factsWithRows(facts: readonly ClaimedFact[]): ClaimedFact[] {
     return facts.filter((fact) => fact.rows !== undefined && fact.rows.length > 0);
 }
+
+export type FactRowTile = { readonly label: string; readonly value: Cell };
+
+/**
+ * "Key numbers as tiles" (CHAOS-4581's pop-up-card reference: elevated
+ * cards, a headline, key numbers as tiles, detail behind expand/click).
+ *
+ * Presentation-only, like the rest of this module: a single-row fact — the
+ * common shape for a project-status rollup (health/flow) — already carries
+ * its numeric columns verbatim; this only picks OUT the ones a table would
+ * otherwise bury one-per-row, in the SAME first-seen column order the table
+ * uses. Nothing is computed, aggregated, or re-derived, and a multi-row fact
+ * (a real series) returns no tiles — there is no single "the" number to
+ * headline, and the table/chart above already carries that shape.
+ */
+export function factRowTiles(rows: readonly ClaimedFactRow[]): readonly FactRowTile[] {
+    if (rows.length !== 1) return [];
+    const row = rows[0]!;
+    return columnOrder(rows)
+        .filter((column) => isNumericColumn(rows, column))
+        .map((column) => ({ label: column, value: cellValue(row.fields[column]!) }));
+}

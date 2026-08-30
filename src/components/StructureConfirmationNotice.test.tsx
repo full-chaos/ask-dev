@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
@@ -51,5 +51,32 @@ describe("StructureConfirmationNotice", () => {
         const region = screen.getByRole("status", { name: "Structure confirmation" });
         expect(region).toHaveTextContent("source carried");
         expect(region).toHaveTextContent("source receipt");
+    });
+
+    /**
+     * CHAOS-4581: "receipts/applied selections collapse to a single chip row
+     * once applied." The full per-entry record list is still reachable —
+     * nothing above stopped asserting on it — but it now sits behind a
+     * CLOSED disclosure by default, with a compact chip row as the visible
+     * default state.
+     */
+    it("collapses to a compact chip row by default once every member applied cleanly", () => {
+        render(<StructureConfirmationNotice entries={applied.confirmed_structure} />);
+
+        const region = screen.getByRole("status", { name: "Structure confirmation" });
+        const chipRow = within(region).getByTestId("structure-confirmation-chips");
+        for (const entry of applied.confirmed_structure!) {
+            expect(chipRow).toHaveTextContent(entry.applied_value);
+        }
+        const details = within(region).getByText("Selection details").closest("details")!;
+        expect(details).not.toHaveAttribute("open");
+    });
+
+    /** A veto needs attention — it is never collapsed. */
+    it("does not collapse the record list behind a disclosure when a member was vetoed", () => {
+        render(<StructureConfirmationNotice entries={vetoed.confirmed_structure} />);
+
+        const region = screen.getByRole("alert", { name: "Structure confirmation" });
+        expect(within(region).queryByText("Selection details")).toBeNull();
     });
 });

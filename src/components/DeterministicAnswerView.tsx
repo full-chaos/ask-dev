@@ -5,14 +5,17 @@ import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
+import { DriversPanel } from "@/components/DriversPanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
+import { LimitationsPanel } from "@/components/LimitationsPanel";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { choiceDisposition } from "@/lib/clarification";
+import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
@@ -214,45 +217,92 @@ export function DeterministicAnswerView({
                     selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
-                <section
-                    className="panel"
-                    aria-labelledby={`${idPrefix}-clarification-limitations-title`}
-                >
-                    <h2 className="panel__title" id={`${idPrefix}-clarification-limitations-title`}>
-                        Limitations
-                    </h2>
-                    {result.limitations.length === 0 ? (
-                        <p className="panel__empty">The service reported no limitations.</p>
-                    ) : (
-                        <ul className="stack stack--tight">
-                            {result.limitations.map((limitation) => (
-                                <li className="record" key={limitation}>
-                                    {limitation}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
+                {
+                    // codex review round 2 (CHAOS-4581): extracting the old
+                    // inline Limitations block into `LimitationsPanel`
+                    // (shared with the decisive branch below) means this
+                    // branch now ALSO surfaces `result.warnings` — the prior
+                    // inline copy here never rendered them. Deliberate, not
+                    // accidental: `warnings` is unconditional on the base
+                    // result type (not gated by status), a `clarification_required`
+                    // result can legitimately carry them, and they are purely
+                    // informational (never gate the clarification flow) — so
+                    // showing them here closes a real gap rather than
+                    // widening scope. Pinned by
+                    // `DeterministicAnswerView.test.tsx`'s "clarification
+                    // branch shows warnings" test.
+                }
+                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </article>
         );
     }
 
     return (
         <article aria-label="Deterministic answer" data-state={result.status}>
-            {notice}
-            {structureConfirmationNotice}
-            {structureNeedsPanel}
-            <AnswerPanel result={result} />
             {
-                // Directly under the answer, above the fact tables: when the
-                // question asked for a ranking, the ranking IS the answer, so
-                // it leads the supporting evidence rather than trailing it.
-                // `shape` gates it — a result can carry cohort data without
-                // the question having asked for a ranking (see the panel's
-                // own rule 0).
+                // `notice` (a dishonoured prior choice) and `structureNeedsPanel`
+                // (a fresh ask for more input) both change how everything BELOW
+                // should be read — a dishonoured choice means the answer may not
+                // even be about the subject the reader expects, and unresolved
+                // structure needs mean the answer is known-incomplete. Both stay
+                // first for that reason. `structureConfirmationNotice` (the
+                // "your selections were applied" chip row) is provenance, not a
+                // caveat — codex review round 1 flagged it sitting ahead of
+                // Ranked Teams as contradicting "RANKED TEAMS leads"; it now
+                // renders with `SubjectResolutionPanel` below, the panel it is
+                // thematically closest to (both are "what got resolved and how").
+            }
+            {notice}
+            {structureNeedsPanel}
+            {
+                // CHAOS-4581: panels lead, prose follows — chris's own
+                // complaint was that the decision-carrying panels (ranked
+                // table, driver contributions, coverage) sat below a wall of
+                // text. Nothing here changes WHAT renders, only the order:
+                // every panel below still self-gates to null exactly as
+                // before, and `AnswerPanel`'s prose always renders last among
+                // the decision-carrying panels, never above them.
+                //
+                // codex review round 3: the ticket specifies TWO distinct
+                // sequences, not one shared order — a cohort answer wants
+                // "RANKED TEAMS ... then principal driver cards" (Drivers
+                // immediately after Ranked Teams), while a single-subject
+                // answer wants "health/flow tiles + rows table FIRST, prose
+                // after" (fact rows ahead of Drivers). `isCohortAnswer` uses
+                // the SAME gate `CohortRankingPanel`/`DriversPanel` already
+                // use, so this never drifts from what those panels actually
+                // decide to render.
             }
             <CohortRankingPanel cohort={result.cohort} shape={result.interpretation.shape} />
-            <FactRowsPanels facts={result.claimed_facts} />
+            {isCohortIntent(result.interpretation.shape) &&
+            result.cohort !== undefined &&
+            rankingTable(result.cohort.members) !== null ? (
+                <>
+                    <DriversPanel result={result} />
+                    <FactRowsPanels facts={result.claimed_facts} />
+                </>
+            ) : (
+                <>
+                    <FactRowsPanels facts={result.claimed_facts} />
+                    <DriversPanel result={result} />
+                </>
+            )}
+            {
+                // Coverage / limitations, as a compact strip (CSS only —
+                // each panel is still a full, independently testable
+                // component; `.strip` just lays them out side by side and
+                // each keeps its own collapsed-by-default detail).
+            }
+            <div className="strip">
+                <CoveragePanel coverage={result.coverage} />
+                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
+            </div>
+            {
+                // The narrative prose — short by construction (see
+                // AnswerPanel), and never above the panels above it.
+            }
+            <AnswerPanel result={result} />
+            {structureConfirmationNotice}
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
                 title="Remaining work"
@@ -269,38 +319,6 @@ export function DeterministicAnswerView({
                 findings={result.conflicts}
                 emptyMessage="No conflicting evidence was reported."
             />
-            <CoveragePanel coverage={result.coverage} />
-
-            <section className="panel" aria-labelledby={`${idPrefix}-limitations-title`}>
-                <h2 className="panel__title" id={`${idPrefix}-limitations-title`}>
-                    Limitations
-                </h2>
-                {result.limitations.length === 0 ? (
-                    <p className="panel__empty">The service reported no limitations.</p>
-                ) : (
-                    <ul className="stack stack--tight">
-                        {result.limitations.map((limitation) => (
-                            <li className="record" key={limitation}>
-                                {limitation}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                {result.warnings.length > 0 ? (
-                    <>
-                        <h3 className="panel__title" style={{ marginTop: 14 }}>
-                            Warnings
-                        </h3>
-                        <ul className="stack stack--tight">
-                            {result.warnings.map((warning) => (
-                                <li className="record" key={warning}>
-                                    {warning}
-                                </li>
-                            ))}
-                        </ul>
-                    </>
-                ) : null}
-            </section>
 
             <section className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
                 <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>

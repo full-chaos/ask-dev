@@ -1,73 +1,75 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
-import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
+import { mockScenarios } from "@/test/fixtures/investigations";
 
-const result = canonicalResult as unknown as InvestigationResult;
+const base = mockScenarios().find((s) => s.id === "complete")!.result;
 
 /**
- * The narrated driver judgments behind a cohort ranking (CHAOS-4449, design
- * doc §5a). These are ordinary `DriverJudgment`s — the panel has no
- * cohort-specific branch — so these assertions prove the generic narration
- * actually carries what a cohort answer needs: standing, title, summary,
- * epistemic status, affected subject, and the claimed facts cited.
+ * CHAOS-4581: the one-line answer is never hidden behind a click
+ * (team-lead correction, 2026-08-30) — `deterministic_answer` AND
+ * `direct_judgment` (the judgment sentence, or an explicit "no direct
+ * judgment") are both always visible. Only `current_state` — where a long
+ * fact dump tends to land — collapses behind a closed `<details>`.
  */
-const cohortDrivers = result.drivers.filter((driver) => driver.driver_id.startsWith("cohort-"));
+describe("AnswerPanel — the answer/judgment stay visible, only current_state collapses (CHAOS-4581)", () => {
+    it("shows deterministic_answer and direct_judgment directly, without a click", () => {
+        render(<AnswerPanel result={base} />);
 
-describe("AnswerPanel — narrated driver judgments", () => {
-    it("the pinned example carries cohort driver judgments at all", () => {
-        // Red on the parent pin: the example had no cohort drivers.
-        expect(cohortDrivers.length).toBeGreaterThan(0);
+        expect(screen.getByText(base.deterministic_answer)).toBeInTheDocument();
+        expect(screen.getByText(base.direct_judgment)).toBeInTheDocument();
     });
 
-    it("renders each driver's standing, title and summary", () => {
-        render(<AnswerPanel result={result} />);
+    it("collapses current_state behind a closed disclosure by default", () => {
+        render(<AnswerPanel result={base} />);
 
-        expect(screen.getByText("CHAOS: operational deficiencies")).toBeInTheDocument();
-        expect(screen.getByText("CHAOS: health risk")).toBeInTheDocument();
-        expect(screen.getByText("CHAOS: readiness gap")).toBeInTheDocument();
-        expect(
-            screen.getByText(/operational deficiencies \(weight 20, value 1\.00\)/),
-        ).toBeInTheDocument();
+        const details = screen.getByText("More detail").closest("details");
+        expect(details).not.toBeNull();
+        expect(details).not.toHaveAttribute("open");
+        expect(screen.getByText(base.current_state)).toBeInTheDocument();
     });
 
-    it("shows a principal driver's standing distinctly from a contributing one", () => {
-        render(<AnswerPanel result={result} />);
-        expect(screen.getAllByTitle("principal").length).toBeGreaterThan(0);
-        expect(screen.getAllByTitle("contributing").length).toBeGreaterThan(0);
+    it("opens current_state on click", () => {
+        render(<AnswerPanel result={base} />);
+        const summary = screen.getByText("More detail");
+        summary.click();
+        const details = summary.closest("details")!;
+        expect(details).toHaveAttribute("open");
     });
 
-    it("labels an inferred judgment as inferred, never as an observation", () => {
-        // Every cohort driver is `epistemic_status: "inferred"`. Rendering it
-        // as an observation would upgrade a rule-derived judgment into a
-        // measured fact — the distinction North Star check 12 turns on.
-        expect(cohortDrivers.every((driver) => driver.epistemic_status === "inferred")).toBe(true);
-
+    it("renders no disclosure at all when current_state is empty", () => {
+        const result: InvestigationResult = { ...base, current_state: "" };
         render(<AnswerPanel result={result} />);
-        const record = screen.getByText("CHAOS: operational deficiencies").closest("li")!;
-        expect(within(record).getByText(/inferred/)).toBeInTheDocument();
-        expect(within(record).queryByText(/\bobserved\b/)).not.toBeInTheDocument();
+
+        expect(screen.getByText(base.deterministic_answer)).toBeInTheDocument();
+        expect(screen.getByText(base.direct_judgment)).toBeInTheDocument();
+        expect(screen.queryByText("More detail")).toBeNull();
     });
 
-    it("names who each judgment is about", () => {
+    it("keeps the honest 'no direct judgment' message visible, never collapsed", () => {
+        const result: InvestigationResult = { ...base, direct_judgment: "", current_state: "" };
         render(<AnswerPanel result={result} />);
-        const record = screen.getByText("CHAOS: operational deficiencies").closest("li")!;
-        expect(within(record).getByTestId("driver-affected-subjects")).toHaveTextContent(
-            "CHAOS (team)",
+
+        expect(screen.getByText(base.deterministic_answer)).toBeInTheDocument();
+        expect(screen.getByText("The service returned no direct judgment.")).toBeInTheDocument();
+        expect(screen.queryByText("More detail")).toBeNull();
+    });
+
+    it("gives each mounted instance its own heading id (CHAOS-4510)", () => {
+        const other: InvestigationResult = { ...base, result_id: "result_other" };
+        render(
+            <>
+                <AnswerPanel result={base} />
+                <AnswerPanel result={other} />
+            </>,
         );
-    });
-
-    it("cites the claimed facts a judgment rests on, verbatim", () => {
-        const [driver] = cohortDrivers;
-        const claimId = driver!.claimed_fact_ids![0]!;
-
-        render(<AnswerPanel result={result} />);
-        const record = screen.getByText(driver!.title).closest("li")!;
-        expect(within(record).getByText(claimId)).toBeInTheDocument();
-        // The cited claim really is one the result carries — a citation to a
-        // claim that is not in the payload would be a dangling reference.
-        expect(result.claimed_facts.some((fact) => fact.claim_id === claimId)).toBe(true);
+        const [first, second] = screen.getAllByTestId("answer-panel");
+        const firstId = first!.getAttribute("aria-labelledby");
+        const secondId = second!.getAttribute("aria-labelledby");
+        expect(firstId).not.toBe(secondId);
+        expect(first!.querySelector(`#${CSS.escape(firstId!)}`)).not.toBeNull();
+        expect(second!.querySelector(`#${CSS.escape(secondId!)}`)).not.toBeNull();
     });
 });

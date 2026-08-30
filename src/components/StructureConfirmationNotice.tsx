@@ -10,6 +10,36 @@ export type StructureConfirmationNoticeProps = {
     readonly entries: readonly ConfirmedStructureEntry[] | undefined;
 };
 
+/** The full per-entry record list, shared by both branches below. */
+function StructureConfirmationRecords({
+    summaries,
+}: {
+    readonly summaries: readonly ReturnType<typeof summarizeConfirmedStructure>[number][];
+}) {
+    return (
+        <ul className="stack stack--tight" style={{ marginTop: 10 }}>
+            {summaries.map((summary) => (
+                <li className="record" key={summary.entry.member}>
+                    <div className="record__head">
+                        <span className="record__title">{summary.label}</span>
+                        <Badge
+                            title={summary.entry.disposition}
+                            tone={structureDispositionTone(summary.entry.disposition)}
+                        >
+                            {summary.entry.disposition.replaceAll("_", " ")}
+                        </Badge>
+                    </div>
+                    <p className="answer__body">{summary.sentence}</p>
+                    <p className="record__meta">
+                        applied value <code>{summary.entry.applied_value}</code> · source{" "}
+                        {summary.entry.source} · provenance {summary.entry.provenance}
+                    </p>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 /**
  * Renders the `confirmed_structure` echo (CHAOS-3927 P2, design brief §2.1's
  * silent-drop closure).
@@ -25,6 +55,13 @@ export type StructureConfirmationNoticeProps = {
  *
  * Rendered even when every entry applied cleanly: an all-applied echo is
  * still the confirmation that the picks were used, not silently discarded.
+ *
+ * CHAOS-4581: once every carried member applied cleanly, the picks are old
+ * news by the time a reader reaches the answer — they collapse to a single
+ * compact chip row (member + applied value), with the full per-entry record
+ * list still present but behind a closed `<details>`, not gone. A veto is
+ * the opposite: it needs attention, so it stays fully expanded and alerted,
+ * exactly as before.
  */
 export function StructureConfirmationNotice({ entries }: StructureConfirmationNoticeProps) {
     const summaries = summarizeConfirmedStructure(entries);
@@ -35,32 +72,27 @@ export function StructureConfirmationNotice({ entries }: StructureConfirmationNo
     return (
         <section
             aria-label="Structure confirmation"
-            className={anyVetoed ? "panel panel--failure" : "panel"}
+            className={anyVetoed ? "panel panel--failure" : "panel panel--compact"}
             role={anyVetoed ? "alert" : "status"}
         >
             <h2 className="panel__title">
                 {anyVetoed ? "Some selections were not applied" : "Your selections were applied"}
             </h2>
-            <ul className="stack stack--tight">
+            <div className="chip-row" data-testid="structure-confirmation-chips">
                 {summaries.map((summary) => (
-                    <li className="record" key={summary.entry.member}>
-                        <div className="record__head">
-                            <span className="record__title">{summary.label}</span>
-                            <Badge
-                                title={summary.entry.disposition}
-                                tone={structureDispositionTone(summary.entry.disposition)}
-                            >
-                                {summary.entry.disposition.replaceAll("_", " ")}
-                            </Badge>
-                        </div>
-                        <p className="answer__body">{summary.sentence}</p>
-                        <p className="record__meta">
-                            applied value <code>{summary.entry.applied_value}</code> · source{" "}
-                            {summary.entry.source} · provenance {summary.entry.provenance}
-                        </p>
-                    </li>
+                    <span className="chip" key={summary.entry.member} title={summary.sentence}>
+                        {summary.label}: <code>{summary.entry.applied_value}</code>
+                    </span>
                 ))}
-            </ul>
+            </div>
+            {anyVetoed ? (
+                <StructureConfirmationRecords summaries={summaries} />
+            ) : (
+                <details className="disclosure">
+                    <summary>Selection details</summary>
+                    <StructureConfirmationRecords summaries={summaries} />
+                </details>
+            )}
         </section>
     );
 }

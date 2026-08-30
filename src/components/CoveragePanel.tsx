@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { Badge } from "@/components/Badge";
 import type { Coverage } from "@/lib/contracts";
 import { coverageStateTone, humanizeTerm } from "@/lib/presentation";
@@ -9,16 +11,28 @@ export type CoveragePanelProps = {
 /**
  * Shows what the investigation could and could not read.
  *
- * Every source is listed with its contract state term, including the ones that
- * carry no data — `pruned`, `unauthorized`, `no_data`. Hiding them would turn a
- * known gap into apparent completeness, which is the one thing this panel
- * exists to prevent.
+ * Every source is listed with its contract state term, including the ones
+ * that carry no data — `pruned`, `unauthorized`, `no_data`. Hiding them would
+ * turn a known gap into apparent completeness, which is the one thing this
+ * panel exists to prevent — so CHAOS-4581's compact "strip" treatment below
+ * only changes how much is visible BY DEFAULT, never what is reachable: a
+ * one-line summary plus a tone-coded chip per source is always on screen,
+ * and the full per-source reason/observed-at breakdown is one click away in
+ * a `<details>`, not removed.
  */
 export function CoveragePanel({ coverage }: CoveragePanelProps) {
+    // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
+    // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
+    // hardcoded heading id collided across turns.
+    const idPrefix = useId();
     const degradedReasons = coverage.degraded_reasons ?? [];
     return (
-        <section className="panel" aria-labelledby="coverage-title">
-            <h2 className="panel__title" id="coverage-title">
+        <section
+            className="panel panel--card panel--compact"
+            aria-labelledby={`${idPrefix}-coverage-title`}
+            data-testid="coverage-panel"
+        >
+            <h2 className="panel__title" id={`${idPrefix}-coverage-title`}>
                 Coverage
             </h2>
             <p className="record__meta">
@@ -29,22 +43,56 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
             {coverage.sources.length === 0 ? (
                 <p className="panel__empty">No sources were recorded.</p>
             ) : (
-                <div className="coverage">
-                    {coverage.sources.map((source) => (
-                        <div className="coverage__source" key={`${source.source}:${source.state}`}>
-                            <span className="coverage__name">{source.source}</span>
-                            <Badge tone={coverageStateTone(source.state)} title={source.state}>
-                                {humanizeTerm(source.state)}
+                <>
+                    <div className="chip-row" data-testid="coverage-chip-row">
+                        {
+                            // codex review round 1 (CHAOS-4581): a color-only
+                            // (tone) distinction between e.g. `available` and
+                            // `unauthorized`/`no_data` is exactly the "known
+                            // gap reads as apparent completeness" failure this
+                            // panel exists to prevent (see the doc comment
+                            // above) — doubly so behind a title-only tooltip.
+                            // The state is real, visible TEXT on every chip,
+                            // not just a color or a hover.
+                        }
+                        {coverage.sources.map((source) => (
+                            <Badge
+                                key={`${source.source}:${source.state}`}
+                                tone={coverageStateTone(source.state)}
+                                title={`${source.source}: ${source.state}`}
+                            >
+                                {source.source} · {humanizeTerm(source.state)}
                             </Badge>
-                            {source.reason !== undefined ? (
-                                <p className="coverage__reason">{source.reason}</p>
-                            ) : null}
-                            {source.observed_at !== undefined ? (
-                                <p className="coverage__reason">observed at {source.observed_at}</p>
-                            ) : null}
+                        ))}
+                    </div>
+                    <details className="disclosure">
+                        <summary>Source details</summary>
+                        <div className="coverage">
+                            {coverage.sources.map((source) => (
+                                <div
+                                    className="coverage__source"
+                                    key={`${source.source}:${source.state}`}
+                                >
+                                    <span className="coverage__name">{source.source}</span>
+                                    <Badge
+                                        tone={coverageStateTone(source.state)}
+                                        title={source.state}
+                                    >
+                                        {humanizeTerm(source.state)}
+                                    </Badge>
+                                    {source.reason !== undefined ? (
+                                        <p className="coverage__reason">{source.reason}</p>
+                                    ) : null}
+                                    {source.observed_at !== undefined ? (
+                                        <p className="coverage__reason">
+                                            observed at {source.observed_at}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
+                    </details>
+                </>
             )}
             {degradedReasons.length > 0 ? (
                 <>
