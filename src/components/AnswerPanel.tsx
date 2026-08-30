@@ -12,17 +12,17 @@ export type AnswerPanelProps = {
  *
  * CHAOS-4581: prose now reads AFTER the decision-carrying panels (ranked
  * teams / driver cards / coverage strip — see `DeterministicAnswerView`'s own
- * ordering comment), and stays short once it gets there:
- * `deterministic_answer` (the service's own non-model wording) is the one
- * paragraph shown by default. `direct_judgment` and `current_state` — the
- * fields where a long fact dump tends to land (CHAOS-4580 is shrinking that
- * on the acr side) — sit behind a closed `<details>` instead of inline, so
- * whatever prose arrives never reintroduces a wall of text between the
- * panels and the fold. Nothing is summarized, reordered by importance, or
- * filled with the workbench's own words: an empty judgment still renders as
- * an explicit absence, just inside the same disclosure. `strongest_pressures`
- * and `drivers` moved out to `DriversPanel` (CHAOS-4581) — a panel, not
- * prose.
+ * ordering comment). The one-line answer is NEVER hidden behind a click
+ * (team-lead correction, 2026-08-30): `deterministic_answer` (the service's
+ * own non-model wording) and `direct_judgment` (the judgment sentence, or an
+ * explicit "no direct judgment" when the service sent none) are both always
+ * visible. Only `current_state` — the field where a long fact dump tends to
+ * land (CHAOS-4580 is shrinking that on the acr side) — sits behind a closed
+ * `<details>`, so whatever prose arrives there never reintroduces a wall of
+ * text between the panels and the fold. Nothing is summarized, reordered by
+ * importance, or filled with the workbench's own words.
+ * `strongest_pressures` and `drivers` moved out to `DriversPanel`
+ * (CHAOS-4581) — a panel, not prose.
  */
 export function AnswerPanel({ result }: AnswerPanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
@@ -32,7 +32,6 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     const idPrefix = useId();
     const hasJudgment = result.direct_judgment.trim() !== "";
     const hasCurrentState = result.current_state.trim() !== "";
-    const hasMore = hasJudgment || hasCurrentState;
     return (
         <section
             className="panel"
@@ -45,25 +44,21 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <p className="answer__judgment">
                 <SafeAnswerText text={result.deterministic_answer} />
             </p>
-            {hasMore ? (
-                <details className="disclosure">
-                    <summary>Full answer</summary>
-                    {hasJudgment ? (
-                        <p className="answer__body">
-                            <SafeAnswerText text={result.direct_judgment} />
-                        </p>
-                    ) : (
-                        <p className="panel__empty">The service returned no direct judgment.</p>
-                    )}
-                    {hasCurrentState ? (
-                        <p className="answer__body">
-                            <SafeAnswerText text={result.current_state} />
-                        </p>
-                    ) : null}
-                </details>
+            {hasJudgment ? (
+                <p className="answer__body">
+                    <SafeAnswerText text={result.direct_judgment} />
+                </p>
             ) : (
                 <p className="panel__empty">The service returned no direct judgment.</p>
             )}
+            {hasCurrentState ? (
+                <details className="disclosure">
+                    <summary>More detail</summary>
+                    <p className="answer__body">
+                        <SafeAnswerText text={result.current_state} />
+                    </p>
+                </details>
+            ) : null}
         </section>
     );
 }
