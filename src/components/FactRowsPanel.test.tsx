@@ -307,7 +307,7 @@ describe("FactRowsPanels — the trend acr selected (CHAOS-4415)", () => {
         trend.series[0].points[0].value += 1;
         render(<FactRowsPanels facts={tampered.claimed_facts} result={tampered} />);
         expect(screen.getByTestId("trend-shape-withheld")).toHaveTextContent(
-            /did not match this fact/i,
+            /could not be checked against this fact/i,
         );
     });
 });

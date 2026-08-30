@@ -109,7 +109,7 @@ function isValidCalendarDate(year: number, month: number, day: number): boolean 
  * validating the calendar digits directly instead of anything timezone-
  * shifted.
  */
-function parseIsoDate(value: string): number | null {
+export function parseIsoDate(value: string): number | null {
     const match = ISO_DATE_PATTERN.exec(value);
     if (match === null) return null;
     const year = Number(match[1]);

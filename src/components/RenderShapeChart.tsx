@@ -244,10 +244,26 @@ function CategoryBars({
                 y1={yFor(0)}
                 y2={yFor(0)}
             />
-            <text className="fact-chart__axis-label" textAnchor="start" x={0} y={MARGIN.top - 6}>
-                <title>{formatValue(maxValue)}</title>
-                {formatDisplay(maxValue)}
-            </text>
+            {
+                // No axis maximum for a stacked shape. Its scale IS the sum
+                // of the drawn segments — a number this component computed —
+                // and printing it, even as an accessible <title>, is the
+                // same derived-number leak the removed stack-total glyph
+                // was (codex round 2). Every segment's own value stays
+                // reachable through its mark and the data table; the sum is
+                // not a fact and is never shown.
+                stacked ? null : (
+                    <text
+                        className="fact-chart__axis-label"
+                        textAnchor="start"
+                        x={0}
+                        y={MARGIN.top - 6}
+                    >
+                        <title>{formatValue(maxValue)}</title>
+                        {formatDisplay(maxValue)}
+                    </text>
+                )
+            }
             {labels.map((label, labelIndex) => {
                 const centre = MARGIN.left + band * (labelIndex + 0.5);
                 let cursor = 0;

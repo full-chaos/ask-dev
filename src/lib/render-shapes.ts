@@ -26,7 +26,7 @@ import type {
     RenderShape,
     ScalarValue,
 } from "@/lib/contracts";
-import { cellValue } from "@/lib/fact-rows";
+import { cellValue, parseIsoDate } from "@/lib/fact-rows";
 
 /** The selection rule that produced a shape (acr's closed vocabulary). */
 export type RenderShapeRule = RenderShape["selected_by"];
@@ -55,11 +55,21 @@ function numericCell(value: ScalarValue | undefined): number | undefined {
     return typeof cell === "number" ? cell : undefined;
 }
 
-function rowsFor(facts: readonly ClaimedFact[], claimId: string): readonly ClaimedFactRow[] {
-    for (const fact of facts) {
-        if (fact.claim_id === claimId) return fact.rows ?? [];
-    }
-    return [];
+/**
+ * The rows of the ONE fact carrying `claimId`, or undefined.
+ *
+ * A duplicate claim id is a malformed document — acr rejects one outright —
+ * and resolving it by picking a winner is how two readers of the same answer
+ * see different numbers: this view took the first match while acr's own
+ * resolver builds a map and would take the last (codex round 2). Neither is
+ * more correct, which is the point: it is refused instead.
+ */
+function rowsFor(
+    facts: readonly ClaimedFact[],
+    claimId: string,
+): readonly ClaimedFactRow[] | undefined {
+    const matches = facts.filter((fact) => fact.claim_id === claimId);
+    return matches.length === 1 ? (matches[0]!.rows ?? []) : undefined;
 }
 
 /**
@@ -115,11 +125,32 @@ function sourceAddressMatchesKind(
     }
 }
 
-/** True when every label parses as a real calendar date/date-time. */
+/**
+ * The largest magnitude a plotted number may carry, mirroring acr's
+ * `ContextFabricRenderPointExactIntegerBound`.
+ *
+ * Past 2^53 a double cannot tell adjacent integers apart, so a wire value of
+ * 9007199254740993 is already 9007199254740992 by the time JSON.parse
+ * returns — the original is unrecoverable here. acr refuses to emit such a
+ * point; refusing to render one keeps the two ends agreeing instead of this
+ * view silently showing a number the answer never carried (codex round 2).
+ */
+const EXACT_INTEGER_BOUND = 2 ** 53;
+
+/**
+ * True when every label is a REAL calendar date, not merely one `Date.parse`
+ * accepts.
+ *
+ * `Date.parse("2026-02-30")` succeeds and silently becomes 2026-03-02, which
+ * reorders a line and can reverse its apparent direction (codex round 2).
+ * `parseIsoDate` validates the calendar digits themselves — the same check
+ * `fact-rows.ts` already applies before it will call an axis a time axis, so
+ * the two selection paths cannot disagree about what a date is.
+ */
 function everyLabelIsADate(shape: RenderShape): boolean {
     for (const series of shape.series) {
         for (const point of series.points) {
-            if (Number.isNaN(Date.parse(point.label))) return false;
+            if (parseIsoDate(point.label) === null) return false;
         }
     }
     return true;
@@ -149,7 +180,9 @@ function resolvePointSource(
         }
         case "claimed_fact_row": {
             if (source.claim_id === undefined || source.row_index === undefined) return undefined;
-            const row = rowsFor(facts, source.claim_id)[source.row_index];
+            const rows = rowsFor(facts, source.claim_id);
+            if (rows === undefined) return undefined;
+            const row = rows[source.row_index];
             if (row === undefined || source.field === undefined) return undefined;
             return numericCell(row.fields[source.field]);
         }
@@ -173,6 +206,11 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // (codex round 1, P1/P2). Each one, left unchecked, lets a chart draw
     // while saying something the answer does not.
     if (shape.kind === "series") {
+        // A time axis is drawn by elapsed time only on a line; every other
+        // presentation routes through category (index) spacing, which would
+        // place a January and a December point one band apart (codex round
+        // 2). acr only ever emits `line` for a time axis.
+        if (shape.axis_kind === "time" && shape.presentation !== "line") return false;
         // An encoding this view cannot read is not a default to guess at:
         // rendering an unspecified presentation as bars picks one of three
         // meanings on the reader's behalf.
@@ -197,6 +235,15 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
             if (seen.has(point.label)) return false;
             seen.add(point.label);
             if (!sourceAddressMatchesKind(point.source)) return false;
+            // `>=`, one notch STRICTER than acr's `>`, and deliberately so:
+            // acr refuses to EMIT a magnitude past 2^53, but by the time
+            // JSON.parse has run here a wire value of 9007199254740993 is
+            // already 9007199254740992 and the two are indistinguishable. At
+            // exactly the bound this view cannot prove which number it is
+            // holding, so it declines to plot it.
+            if (!Number.isFinite(point.value) || Math.abs(point.value) >= EXACT_INTEGER_BOUND) {
+                return false;
+            }
             const resolved = resolvePointSource(point.source, result.cohort, result.claimed_facts);
             if (resolved === undefined || resolved !== point.value) return false;
         }
@@ -217,10 +264,19 @@ export function renderShapesFor(
     result: InvestigationResult,
     rules: readonly RenderShapeRule[],
 ): VerifiedShapes {
-    const candidates = (result.render_shapes ?? []).filter((shape) =>
-        rules.includes(shape.selected_by),
+    const all = result.render_shapes ?? [];
+    // A shape id is opaque but unique within an answer — acr rejects a
+    // duplicate. Rendering two shapes under one React key makes the second
+    // silently replace the first, so a reader loses a chart with no notice
+    // (codex round 2). Both copies are withheld rather than one arbitrarily
+    // preferred.
+    const duplicated = new Set(
+        all.map((shape) => shape.shape_id).filter((id, index, ids) => ids.indexOf(id) !== index),
     );
-    const shapes = candidates.filter((shape) => verifyRenderShape(shape, result));
+    const candidates = all.filter((shape) => rules.includes(shape.selected_by));
+    const shapes = candidates.filter(
+        (shape) => !duplicated.has(shape.shape_id) && verifyRenderShape(shape, result),
+    );
     return { shapes, withheld: candidates.length - shapes.length };
 }
 
@@ -233,11 +289,28 @@ export function renderShapesFor(
  * field) keeps a single source of truth for what a trend is about.
  */
 export function trendShapesForClaim(result: InvestigationResult, claimId: string): VerifiedShapes {
+    // A shape is a CANDIDATE for this claim if it cites the claim anywhere,
+    // and is admitted only if it cites nothing else and verifies. Filtering
+    // by "cites only this claim" FIRST was the round-2 defect: a trend
+    // spanning claims A and B matched neither, so both panels reported
+    // `shapes:[] withheld:0` — indistinguishable from "acr selected nothing"
+    // — and the client-side heuristic chart drew instead. A malformed shape
+    // must be visibly withheld by whichever fact it names, never silently
+    // absent from all of them.
     const candidates = (result.render_shapes ?? []).filter(
-        (shape) => shape.selected_by === "dated_fact_trend" && shapeCitesClaim(shape, claimId),
+        (shape) => shape.selected_by === "dated_fact_trend" && shapeMentionsClaim(shape, claimId),
     );
-    const shapes = candidates.filter((shape) => verifyRenderShape(shape, result));
+    const shapes = candidates.filter(
+        (shape) => shapeCitesClaim(shape, claimId) && verifyRenderShape(shape, result),
+    );
     return { shapes, withheld: candidates.length - shapes.length };
+}
+
+/** True when ANY point of `shape` cites `claimId` — candidacy, not ownership. */
+function shapeMentionsClaim(shape: RenderShape, claimId: string): boolean {
+    return shape.series.some((series) =>
+        series.points.some((point) => point.source.claim_id === claimId),
+    );
 }
 
 /**

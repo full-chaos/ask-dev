@@ -300,7 +300,7 @@ describe("CohortRankingPanel — the charts acr selected (CHAOS-4415)", () => {
         );
         const panel = within(screen.getByTestId("cohort-ranking-panel"));
         expect(panel.getByTestId("render-shapes-withheld")).toHaveTextContent(
-            /did not match the facts they cite/i,
+            /could not be checked against the facts it cites/i,
         );
         expect(
             panel.queryByRole("table", { name: /Attention score by team/i }),
