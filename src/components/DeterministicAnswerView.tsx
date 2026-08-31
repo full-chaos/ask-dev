@@ -3,6 +3,7 @@ import { useId } from "react";
 import { AnswerPanel } from "@/components/AnswerPanel";
 import { AnswerPlanPanel } from "@/components/AnswerPlanPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
+import { ChosenAnswersSummaryCard } from "@/components/ChosenAnswersSummaryCard";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CohortGroupsPanel } from "@/components/CohortGroupsPanel";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
@@ -29,6 +30,7 @@ import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
+import { hasVetoedStructureConfirmation, structureMemberLabel } from "@/lib/structure-disposition";
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
@@ -89,7 +91,63 @@ export type DeterministicAnswerViewProps = {
     readonly pending?: boolean | undefined;
     /** The subject the tester chose, when this result came from a re-ask. */
     readonly chosenSubject?: SubjectRef | undefined;
+    /**
+     * CHAOS-4671: `"inline"` (default) is the UNCHANGED pre-4671 shape —
+     * `/workbench` (the only other call site) always gets this, so its
+     * panel-stack behavior is byte-for-byte untouched by this prop's
+     * existence.
+     *
+     * `"popup"` is the Ask Dev chat surface: the floating
+     * `ClarificationPopup` (`page.tsx`) owns every actionable offer
+     * exclusively, so this view renders NEITHER `StructureNeedsPanel` NOR
+     * `ClarificationPanel` inline for the LIVE turn (a callback is
+     * supplied) — no duplicate "offer panel in the transcript" the ticket
+     * rules out. For a FROZEN turn (no callback), it renders a collapsed
+     * "how this was resolved" detail instead of the old inert panel with
+     * "shown for inspection only" text — no dead controls either way. The
+     * "your selections were applied" chip panel (`StructureConfirmationNotice`)
+     * is likewise replaced by the compact `ChosenAnswersSummaryCard`,
+     * EXCEPT when a selection was vetoed — that still needs the full alert
+     * treatment, so `StructureConfirmationNotice` renders unchanged in that
+     * one case regardless of `offersPresentation`.
+     */
+    readonly offersPresentation?: "inline" | "popup" | undefined;
 };
+
+/**
+ * The frozen-turn "how this was resolved" collapsed detail (CHAOS-4671,
+ * `offersPresentation === "popup"` only) — no controls, just what was asked.
+ * Replaces the old inert `StructureNeedsPanel`/`ClarificationPanel` echo
+ * (`data-testid="cannot-confirm-structure-here"`/`"cannot-choose-here"`),
+ * which rendered every offer as a disabled-looking-but-still-a-`<button>`
+ * control in a permanently dead state — exactly the "inspection only" dead
+ * control the ticket rules out.
+ */
+function FrozenOffersDisclosure({
+    missingMembers,
+    subjectPrompt,
+}: {
+    readonly missingMembers: readonly StructureNeedKind[];
+    readonly subjectPrompt: string | undefined;
+}) {
+    if (missingMembers.length === 0 && subjectPrompt === undefined) return null;
+    return (
+        <details className="disclosure" data-testid="frozen-offers-disclosure">
+            <summary>How this was resolved</summary>
+            <div className="stack stack--tight">
+                {missingMembers.length > 0 ? (
+                    <p className="record__meta">
+                        Asked about:{" "}
+                        {missingMembers.map((member) => structureMemberLabel(member)).join(", ")}.
+                    </p>
+                ) : null}
+                {subjectPrompt === undefined ? null : (
+                    <p className="record__meta">{subjectPrompt}</p>
+                )}
+            </div>
+        </details>
+    );
+}
 
 /**
  * The deterministic answer view — the REFERENCE answer and the fallback
@@ -124,6 +182,7 @@ export function DeterministicAnswerView({
     onRejectStructure = () => {},
     pending = false,
     chosenSubject,
+    offersPresentation = "inline",
 }: DeterministicAnswerViewProps) {
     // Portability/multi-instance safety (codex review round 2, CHAOS-4343:
     // several DeterministicAnswerView instances now commonly coexist — one
@@ -132,15 +191,17 @@ export function DeterministicAnswerView({
     // that fix, the same class `StructureNeedsPanel` already guards against
     // with `useId()`).
     const idPrefix = useId();
+    // Shared by `notice` below and, in popup mode, `ChosenAnswersSummaryCard`
+    // (CHAOS-4671) — one computation, not two independent calls that could
+    // drift.
+    const disposition =
+        chosenSubject === undefined ? undefined : choiceDisposition(result, chosenSubject);
     // Rendered in BOTH branches below. A dishonoured choice is invisible
     // otherwise: an answer reads as being about the chosen subject, and a second
     // clarification reads as an ordinary one.
     const notice =
-        chosenSubject === undefined ? null : (
-            <ChoiceNotice
-                chosen={chosenSubject}
-                disposition={choiceDisposition(result, chosenSubject)}
-            />
+        chosenSubject === undefined || disposition === undefined ? null : (
+            <ChoiceNotice chosen={chosenSubject} disposition={disposition} />
         );
 
     // A clarification is not a failed answer, and must not be rendered as a
@@ -160,13 +221,30 @@ export function DeterministicAnswerView({
     // `structure_needs` and `confirmed_structure` render EXACTLY what the
     // result carries; see StructureNeedsPanel/StructureConfirmationNotice for
     // the boundary pins (never re-rank, never invent, receipts only).
-    const structureNeedsPanel =
-        result.structure_needs === undefined ? null : (
-            // Keyed by result_id (codex round 1): resets the panel's own
-            // local (non-selection) UI state — e.g. a namespace-mismatch
-            // alert — per result. `batch`/`onToggle` are lifted to the
-            // caller (codex round 3), so the SELECTION itself survives a
-            // switch to the raw view's own instance of this panel.
+    // CHAOS-4671: in popup mode the LIVE turn's offers are owned exclusively
+    // by `ClarificationPopup` (`page.tsx`, floating above the chat input) —
+    // rendering them here too would be the exact "inline offer panel in the
+    // transcript" the ticket rules out. A FROZEN turn (no `onConfirmStructure`)
+    // gets the collapsed disclosure instead of the old inert panel.
+    const isLiveInPopupMode = offersPresentation === "popup" && onConfirmStructure !== undefined;
+    const isFrozenInPopupMode = offersPresentation === "popup" && onConfirmStructure === undefined;
+    function renderStructureNeedsPanel() {
+        if (result.structure_needs === undefined || isLiveInPopupMode) return null;
+        if (isFrozenInPopupMode) {
+            return (
+                <FrozenOffersDisclosure
+                    key={result.result_id}
+                    missingMembers={result.structure_needs.missing}
+                    subjectPrompt={undefined}
+                />
+            );
+        }
+        // Keyed by result_id (codex round 1): resets the panel's own local
+        // (non-selection) UI state — e.g. a namespace-mismatch alert — per
+        // result. `batch`/`onToggle` are lifted to the caller (codex round
+        // 3), so the SELECTION itself survives a switch to the raw view's
+        // own instance of this panel.
+        return (
             <StructureNeedsPanel
                 key={result.result_id}
                 batch={structureBatch}
@@ -180,9 +258,23 @@ export function DeterministicAnswerView({
                 structureNeeds={result.structure_needs}
             />
         );
-    const structureConfirmationNotice = (
-        <StructureConfirmationNotice entries={result.confirmed_structure} />
-    );
+    }
+    const structureNeedsPanel = renderStructureNeedsPanel();
+    // A veto still needs the full alert treatment regardless of presentation
+    // mode — only the "everything applied cleanly" case collapses to the
+    // compact card in popup mode (see `ChosenAnswersSummaryCard`'s own
+    // header for why it deliberately does not cover vetoes).
+    const anyVetoed = hasVetoedStructureConfirmation(result.confirmed_structure);
+    const structureConfirmationNotice =
+        offersPresentation === "popup" && !anyVetoed ? (
+            <ChosenAnswersSummaryCard
+                chosenSubject={chosenSubject}
+                confirmedStructure={result.confirmed_structure}
+                disposition={disposition}
+            />
+        ) : (
+            <StructureConfirmationNotice entries={result.confirmed_structure} />
+        );
 
     if (result.status === "clarification_required") {
         return (
@@ -212,13 +304,33 @@ export function DeterministicAnswerView({
                 />
                 {structureConfirmationNotice}
                 {structureNeedsPanel}
-                <ClarificationPanel
-                    onConfirm={onConfirmCandidates}
-                    onToggle={onToggleCandidate}
-                    pending={pending}
-                    result={result}
-                    selectedReceiptIds={selectedCandidateReceiptIds}
-                />
+                {(() => {
+                    const isLiveCandidatesInPopupMode =
+                        offersPresentation === "popup" && onConfirmCandidates !== undefined;
+                    if (isLiveCandidatesInPopupMode) return null;
+                    if (offersPresentation === "popup") {
+                        return (
+                            <FrozenOffersDisclosure
+                                missingMembers={[]}
+                                subjectPrompt={
+                                    result.subject_resolution.candidates.length === 0
+                                        ? undefined
+                                        : (result.subject_resolution.clarification_prompt ??
+                                          "Which subject did you mean?")
+                                }
+                            />
+                        );
+                    }
+                    return (
+                        <ClarificationPanel
+                            onConfirm={onConfirmCandidates}
+                            onToggle={onToggleCandidate}
+                            pending={pending}
+                            result={result}
+                            selectedReceiptIds={selectedCandidateReceiptIds}
+                        />
+                    );
+                })()}
                 <CoveragePanel coverage={result.coverage} />
                 <CompletenessPanel completeness={result.completeness} />
                 <AnswerPlanPanel answerPlan={result.answer_plan} />

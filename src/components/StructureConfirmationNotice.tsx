@@ -10,8 +10,17 @@ export type StructureConfirmationNoticeProps = {
     readonly entries: readonly ConfirmedStructureEntry[] | undefined;
 };
 
-/** The full per-entry record list, shared by both branches below. */
-function StructureConfirmationRecords({
+/**
+ * The full per-entry record list, shared by both branches below.
+ *
+ * Exported (CHAOS-4671 codex round 2 finding 2) so `ChosenAnswersSummaryCard`
+ * — the chat surface's popup-mode replacement for this component's own
+ * "everything applied cleanly" chip-row case — can reuse the SAME
+ * "Selection details" record list (receipt id / source / provenance) rather
+ * than dropping that detail entirely. `/workbench` is unaffected: this
+ * component's own rendering (below) is unchanged.
+ */
+export function StructureConfirmationRecords({
     summaries,
 }: {
     readonly summaries: readonly ReturnType<typeof summarizeConfirmedStructure>[number][];

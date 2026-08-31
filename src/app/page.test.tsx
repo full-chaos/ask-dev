@@ -9,6 +9,8 @@ import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 const clarification = mockScenarios().find((scenario) => scenario.id === "clarification")!.result;
 const answered = mockScenarios().find((scenario) => scenario.id === "complete")!.result;
+/** The fixture's own `subject_resolution.clarification_prompt` — ACR's wording, verbatim, is the popup page's title (never Ask Dev's own chrome). `mixed`/`mixedCandidates` below clone `clarification`, so they share this same prompt. */
+const CLARIFICATION_PROMPT = clarification.subject_resolution.clarification_prompt!;
 const structureKind = structureMockScenarios().find(
     (scenario) => scenario.id === "structure-kind",
 )!.result;
@@ -55,6 +57,26 @@ async function ask(question: string): Promise<ReturnType<typeof userEvent.setup>
     return user;
 }
 
+/**
+ * CHAOS-4671: every offer now lives in the floating `ClarificationPopup`
+ * (`role="dialog"`, `aria-label` = the current page's question), not an
+ * inline `region`. An option's accessible name is its `displayText` alone —
+ * the number tile and the selected checkmark are both `aria-hidden`, unlike
+ * the old inline panels' "Select X"/"Unselect X" button copy.
+ */
+function popupOptionButton(label: string): HTMLElement {
+    return screen.getByRole("button", { name: label });
+}
+
+async function pickPopupOption(user: ReturnType<typeof userEvent.setup>, label: string) {
+    await user.click(await screen.findByRole("button", { name: label }));
+}
+
+/** The multi-select page's own explicit confirm — see `ClarificationPopup`'s own header for why single-select pages need no equivalent (picking already IS confirming). */
+function continueButton(): HTMLElement {
+    return screen.getByRole("button", { name: /^Continue/ });
+}
+
 afterEach(() => {
     vi.restoreAllMocks();
 });
@@ -84,6 +106,8 @@ describe("asking a question appends a user turn and an assistant turn", () => {
         expect(
             screen.queryByText("Ask a question to start an investigation."),
         ).not.toBeInTheDocument();
+        // No popup at all when the result carries nothing to clarify.
+        expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     it("keeps every prior turn visible after a second question", async () => {
@@ -130,25 +154,32 @@ describe("a failure renders as a failure, in its own turn", () => {
     });
 });
 
-describe("the clarification chip is live only on the most recent assistant turn", () => {
-    it("offers the choice on a fresh clarification turn", async () => {
+describe("the clarification popup is live only on the most recent assistant turn (CHAOS-4671)", () => {
+    it("floats a popup above the composer with the candidates as numbered options", async () => {
         respondWith({ result: clarification });
         render(<ChatPage />);
 
         await ask("Is Atlas on track?");
 
-        expect(
-            await screen.findByRole("region", { name: "Which subject did you mean?" }),
-        ).toBeInTheDocument();
-        expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
+        const dialog = await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        expect(dialog).toBeInTheDocument();
+        // No inline offer panel anywhere in the transcript — the popup is the
+        // ONLY place the offers render (ticket acceptance).
+        expect(screen.queryByRole("region", { name: CLARIFICATION_PROMPT })).toBeNull();
+        for (const candidate of clarification.subject_resolution.candidates) {
+            expect(
+                within(dialog).getByRole("button", { name: candidate.subject.label }),
+            ).toBeInTheDocument();
+        }
     });
 
     /**
-     * CHAOS-4343 items 1/2: selection leads (a toggle, not an immediate
-     * fire), confirming follows. A single confirmed selection still
-     * re-asks with exactly that candidate's receipt, unchanged from before.
+     * CHAOS-4343 items 1/2 (ported to the popup): selection leads (a toggle,
+     * not an immediate fire), the page's own "Continue" confirm follows. A
+     * single confirmed selection still re-asks with exactly that candidate's
+     * receipt, unchanged from before — only the UI path to get there moved.
      */
-    it("re-asks with the chosen receipt and freezes the older turn's chip", async () => {
+    it("re-asks with the chosen receipt, closes the popup, and leaves no inline offer panel on the older turn", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -166,12 +197,8 @@ describe("the clarification chip is live only on the most recent assistant turn"
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
         const candidate = clarification.subject_resolution.candidates[0]!;
-        await user.click(
-            await screen.findByRole("button", {
-                name: `Select ${candidate.subject.label}`,
-            }),
-        );
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        await pickPopupOption(user, candidate.subject.label);
+        await user.click(continueButton());
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -185,12 +212,15 @@ describe("the clarification chip is live only on the most recent assistant turn"
         // the composer's original text — same rule the Workbench holds.
         expect(secondCallBody.question).toBe(clarification.question);
 
-        // The now-superseded clarification turn can no longer be acted on:
-        // its own candidate list renders, but read-only.
-        expect(
-            await screen.findByRole("region", { name: "Subject candidates" }),
-        ).toBeInTheDocument();
-        expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
+        // Popup closed once the flow completed and answered (a fresh
+        // decisive result has nothing left to clarify).
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        // The now-superseded clarification turn renders NO inline offer
+        // panel, dead or otherwise — a collapsed disclosure, no controls.
+        expect(screen.queryByRole("button", { name: candidate.subject.label })).toBeNull();
+        expect(screen.getByTestId("frozen-offers-disclosure")).toBeInTheDocument();
+        expect(screen.queryByTestId("cannot-choose-here")).toBeNull();
 
         // Discriminating, not just "an article rendered": both turns share
         // the same `aria-label`, so `data-state` is what actually proves the
@@ -202,10 +232,10 @@ describe("the clarification chip is live only on the most recent assistant turn"
     });
 
     /**
-     * CHAOS-4343 item 2, the ticket's own acceptance scenario: N selected
-     * candidates fire N INDEPENDENT turn-2 requests and land as N stacked
-     * assistant turns, each with its own status — never one request
-     * carrying several candidate receipts.
+     * CHAOS-4343 item 2, the ticket's own acceptance scenario, ported to the
+     * popup's multi-select page: N selected candidates fire N INDEPENDENT
+     * turn-2 requests and land as N stacked assistant turns, each with its
+     * own status — never one request carrying several candidate receipts.
      */
     it("confirming 2 selected candidates fires 2 independent requests and renders 2 stacked panels", async () => {
         const [first, second] = clarification.subject_resolution.candidates;
@@ -230,11 +260,9 @@ describe("the clarification chip is live only on the most recent assistant turn"
 
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+        await pickPopupOption(user, first!.subject.label);
+        await user.click(popupOptionButton(second!.subject.label));
+        await user.click(continueButton());
 
         expect(
             await screen.findAllByRole("article", { name: "Deterministic answer" }),
@@ -314,11 +342,9 @@ describe("the clarification chip is live only on the most recent assistant turn"
 
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+        await pickPopupOption(user, first!.subject.label);
+        await user.click(popupOptionButton(second!.subject.label));
+        await user.click(continueButton());
 
         // The failed panel settles (proving independence — it does not wait
         // on the successful one), and the successful one still shows its own
@@ -330,6 +356,125 @@ describe("the clarification chip is live only on the most recent assistant turn"
         expect(articles).toHaveLength(2);
         expect(articles[1]).toHaveAttribute("data-state", answered.status);
     });
+
+    /** CHAOS-4671 dismiss: X closes the popup with no re-ask — "proceed without the selection". */
+    it("X dismisses the popup without firing a re-ask, and the chat input stays usable", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+        // Typing a normal reply is always allowed, dismissed popup or not.
+        await ask("A completely different question?");
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    /**
+     * codex round 3 (chaos-4671-20260831T120929.md): Dismiss unmounts the
+     * popup but never restores focus, so a keyboard user's focus falls back
+     * to `document.body` — they must re-navigate (click, or Tab from the
+     * top) before they can keep typing. `ask()`'s own `userEvent.type` call
+     * would mask this (it focuses its target itself), so this test reads
+     * `document.activeElement` directly instead.
+     */
+    it("Dismiss returns focus to the composer, without the caller re-focusing it", async () => {
+        respondWith({ result: clarification });
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        const dismissButton = await screen.findByRole("button", { name: "Dismiss" });
+        dismissButton.focus();
+        await user.keyboard("{Enter}");
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(document.activeElement).toBe(screen.getByLabelText("Ask a question"));
+    });
+
+    /**
+     * CHAOS-4671 keyboard nav, single-select page: a number key picks AND
+     * confirms in one keystroke (there is nothing else to accumulate on a
+     * one-page, single-select result) — the ticket's own "1..N, selectable
+     * by number key" mapping.
+     */
+    it("a number key picks and immediately confirms on a single-select page", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureKind }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("How's the pipeline doing?");
+        const user = userEvent.setup();
+        const dialog = await screen.findByRole("dialog", {
+            name: "Which kind of thing is this about?",
+        });
+        const option = structureKind.structure_needs!.kind_options![1]!;
+        dialog.focus();
+        await user.keyboard("2");
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.priorKindReceipts).toEqual([
+            { result_id: structureKind.result_id, receipt_id: option.receipt_id },
+        ]);
+    });
+
+    /**
+     * CHAOS-4671 keyboard nav, multi-select page: ↑↓ moves focus, Enter
+     * TOGGLES the focused option (never auto-confirms — see
+     * `ClarificationPopup`'s own header for why a multi-select page needs an
+     * explicit "Continue" the way a single-select page does not).
+     */
+    it("↑↓ moves focus and Enter toggles the focused option on a multi-select page", async () => {
+        respondWith({ result: clarification });
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        const dialog = await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        const [first, second] = clarification.subject_resolution.candidates;
+        dialog.focus();
+        await user.keyboard("{ArrowDown}");
+        await user.keyboard("{Enter}");
+
+        expect(within(dialog).getByRole("button", { name: second!.subject.label })).toHaveAttribute(
+            "aria-pressed",
+            "true",
+        );
+        expect(within(dialog).getByRole("button", { name: first!.subject.label })).toHaveAttribute(
+            "aria-pressed",
+            "false",
+        );
+    });
 });
 
 /**
@@ -338,7 +483,9 @@ describe("the clarification chip is live only on the most recent assistant turn"
  * (asserted below via the second fetch call's body, unchanged from the
  * pre-existing tests above), but must not render as a second user bubble.
  * The compact record of what the re-run carried is the superseded turn's
- * own selection chips, already covered by the tests above.
+ * own selection chips, already covered by the tests above. Ported to
+ * popup interactions (CHAOS-4671) — the wire/bubble behavior under test is
+ * unchanged, only the UI path to trigger it moved.
  */
 describe("CHAOS-4670: a panel-selection re-ask does not render a second question bubble", () => {
     it("renders exactly ONE user bubble after a subject-candidate re-ask", async () => {
@@ -359,10 +506,8 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
         const candidate = clarification.subject_resolution.candidates[0]!;
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        await pickPopupOption(user, candidate.subject.label);
+        await user.click(continueButton());
 
         // The re-ask still ran for real, on the wire, unchanged.
         await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
@@ -390,8 +535,7 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
         await ask("How's the pipeline doing?");
         const user = userEvent.setup();
         const option = structureKind.structure_needs!.kind_options![1]!;
-        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        await pickPopupOption(user, option.label);
 
         await waitFor(() =>
             expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
@@ -424,11 +568,9 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
 
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+        await pickPopupOption(user, first!.subject.label);
+        await user.click(popupOptionButton(second!.subject.label));
+        await user.click(continueButton());
 
         await waitFor(() =>
             expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
@@ -439,8 +581,8 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
     });
 });
 
-describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)", () => {
-    it("renders the offers and sends the accumulated batch in ONE re-ask", async () => {
+describe("structure-needs offers (CHAOS-3927 P2, now popup-only per CHAOS-4671)", () => {
+    it("renders the kind offer as a single-select page and picking it fires the re-ask immediately", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -458,8 +600,15 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
         await ask("How's the pipeline doing?");
         const user = userEvent.setup();
         const option = structureKind.structure_needs!.kind_options![1]!;
-        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        // While the popup is live, there is NO duplicate inline offer panel
+        // in the transcript — the popup is the ONLY rendering of the offer.
+        await screen.findByRole("dialog", { name: "Which kind of thing is this about?" });
+        expect(
+            screen.queryByRole("region", { name: "More structure would narrow this" }),
+        ).toBeNull();
+        // A single-select page has no separate "Continue" — picking IS
+        // confirming, since it is the only page in this result.
+        await pickPopupOption(user, option.label);
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -477,17 +626,12 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
             { member: "expected_kind", outcome: "submitted" },
         ]);
 
-        // The superseded turn's panel is still visible but can no longer be
-        // confirmed — inspection only, same as ClarificationPanel's own rule.
-        expect(screen.getByTestId("cannot-confirm-structure-here")).toBeInTheDocument();
-
-        // codex review round 1, finding 3: the frozen turn's own echo must
-        // still show WHAT was submitted, not revert to "nothing selected"
-        // the instant a newer turn takes over the shared selection hook.
-        const frozenPanel = screen.getByRole("region", {
-            name: "More structure would narrow this",
-        });
-        expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
+        // The superseded turn renders a collapsed disclosure, no live
+        // controls — the old "shown for inspection only" dead control is
+        // gone entirely.
+        expect(screen.getByTestId("frozen-offers-disclosure")).toBeInTheDocument();
+        expect(screen.queryByTestId("cannot-confirm-structure-here")).toBeNull();
+        expect(screen.queryByRole("button", { name: option.label })).toBeNull();
     });
 
     /**
@@ -495,8 +639,8 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
      * flow: kind + window + N candidates land on the SAME `structure_needs`
      * disclosure): confirming N selected `candidate_options` entries fires N
      * independent turn-2 requests, each its own stacked panel — the SAME
-     * multi-select discipline `chooseCandidates` holds for
-     * `subject_resolution.candidates`, applied to this axis too.
+     * multi-select discipline the subject-resolution axis holds, applied to
+     * this axis's own popup page.
      */
     it("confirming 2 selected structure candidates fires 2 independent requests and renders 2 stacked panels", async () => {
         const [first, second] = structureCandidate.structure_needs!.candidate_options!;
@@ -521,9 +665,9 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
 
         await ask("What's going on with the flaky test work item?");
         const user = userEvent.setup();
-        await user.click(await screen.findByRole("button", { name: `Select ${first!.label}` }));
-        await user.click(screen.getByRole("button", { name: `Select ${second!.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        await pickPopupOption(user, first!.label);
+        await user.click(popupOptionButton(second!.label));
+        await user.click(continueButton());
 
         expect(
             await screen.findAllByRole("article", { name: "Deterministic answer" }),
@@ -557,26 +701,36 @@ describe("structure-needs chips (CHAOS-3927 P2, mounted as-is under a chat turn)
 
 /**
  * Mixed-receipt-family unification (CHAOS-3927 P2 follow-up, codex review
- * round 1 + round 2). Both orders in which a tester can act on a turn that
- * carries BOTH a subject-candidate clarification and a structure_needs
- * disclosure at once.
+ * round 1 + round 2), ported to the popup's multi-question stepper
+ * (CHAOS-4671): both orders in which a tester can act on a turn that carries
+ * BOTH a subject-candidate clarification and a structure_needs disclosure at
+ * once — now TWO pages in ONE popup, not two panels stacked in the
+ * transcript.
  */
-describe("mixed receipt families (subject-candidate clarification + structure_needs together)", () => {
-    it("renders both panels on the SAME turn", async () => {
+describe("mixed receipt families page through the SAME popup as a 2-question stepper", () => {
+    it("pages through both questions with an 'x of y' stepper", async () => {
         respondWith({ result: mixed });
         render(<ChatPage />);
 
         await ask("Who owns this?");
+        const user = userEvent.setup();
 
+        const page1 = await screen.findByRole("dialog", {
+            name: "Which kind of thing is this about?",
+        });
+        expect(within(page1).getByText("1 of 2")).toBeInTheDocument();
+        // No inline panel anywhere — this is the ONLY rendering of the offer.
         expect(
-            await screen.findByRole("region", { name: "Which subject did you mean?" }),
-        ).toBeInTheDocument();
-        expect(
-            screen.getByRole("region", { name: "More structure would narrow this" }),
-        ).toBeInTheDocument();
+            screen.queryByRole("region", { name: "More structure would narrow this" }),
+        ).toBeNull();
+
+        await user.click(screen.getByRole("button", { name: "Next question" }));
+
+        const page2 = await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        expect(within(page2).getByText("2 of 2")).toBeInTheDocument();
     });
 
-    it("subject-first: picking a candidate carries an unconfirmed structure pick along, not just the receipt", async () => {
+    it("subject-first: picking a kind option advances to the subject page, and confirming there carries BOTH families", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -594,10 +748,14 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
         await ask("Who owns this?");
         const user = userEvent.setup();
         const option = mixed.structure_needs!.kind_options![1]!;
-        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        // Page 1 (single-select, not last): picking auto-ADVANCES, never fires yet.
+        await pickPopupOption(user, option.label);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
         const candidate = mixed.subject_resolution.candidates[0]!;
-        await user.click(screen.getByRole("button", { name: `Select ${candidate.subject.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        await user.click(popupOptionButton(candidate.subject.label));
+        await user.click(continueButton());
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -610,31 +768,15 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
         expect(secondCallBody.priorKindReceipts).toEqual([
             { result_id: mixed.result_id, receipt_id: option.receipt_id },
         ]);
-
-        // codex round 2, finding 1: a request-fields-only assertion here is
-        // vacuous on its own — it can pass even if `submittedStructureBatch`
-        // were dropped from the FROZEN turn's own echo (the wire body only
-        // proves what THIS request sent, not what the superseded turn now
-        // displays). Mirrors the existing structure-only test's own
-        // "selected" badge check, and the mixed e2e's own round-2 fix.
-        const frozenPanel = screen.getByRole("region", {
-            name: "More structure would narrow this",
-        });
-        expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
     });
 
     /**
-     * codex round 2, finding 1: the exact reverse-order path was untested.
-     * `chooseStructure` cannot ALSO carry a subject receipt here — there is
-     * no candidate selected in this test, so there is nothing accumulated
-     * to carry (CHAOS-4343: `ClarificationPanel` now accumulates candidate
-     * picks too, but only picks that were actually made). What this DOES
-     * prove: confirming structure first sends only the structure family
-     * (correctly — there is nothing else pending), and freezes the SAME
-     * turn's subject chip too, exactly the existing "only the most recent
-     * turn is live" rule already applies everywhere else.
+     * codex round 2, finding 1's shape, ported: confirming the SUBJECT page
+     * with nothing picked there ("Continue without selecting") still sends
+     * the kind pick made on the earlier page — an unconfirmed pick from a
+     * page the tester already passed through is never silently dropped.
      */
-    it("structure-first: confirming structure sends only the structure family and freezes the turn's own subject chip too", async () => {
+    it("structure-first: continuing past the subject page unanswered still sends only the earlier kind pick", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -652,8 +794,9 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
         await ask("Who owns this?");
         const user = userEvent.setup();
         const option = mixed.structure_needs!.kind_options![1]!;
-        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+        await pickPopupOption(user, option.label);
+        await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        await user.click(continueButton());
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -665,11 +808,11 @@ describe("mixed receipt families (subject-candidate clarification + structure_ne
             { result_id: mixed.result_id, receipt_id: option.receipt_id },
         ]);
 
-        // The superseded turn's OWN subject chip is now read-only too — the
-        // same freeze rule every other re-ask already applies, now proven
-        // specifically for a turn that carried both families.
-        expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
-        expect(screen.getByTestId("cannot-confirm-structure-here")).toBeInTheDocument();
+        // The superseded turn shows no live controls for EITHER family — one
+        // collapsed disclosure per family (structure_needs, subject_resolution).
+        expect(screen.queryByTestId("cannot-choose-here")).toBeNull();
+        expect(screen.queryByTestId("cannot-confirm-structure-here")).toBeNull();
+        expect(screen.getAllByTestId("frozen-offers-disclosure")).toHaveLength(2);
     });
 });
 
@@ -746,10 +889,8 @@ describe("literal kind nouns bind as an explicit expectedKinds hint (CHAOS-4343 
         await ask("Which team owns this project?");
         const user = userEvent.setup();
         const candidate = clarification.subject_resolution.candidates[0]!;
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        await pickPopupOption(user, candidate.subject.label);
+        await user.click(continueButton());
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         const firstBody = JSON.parse(fetchSpy.mock.calls[0]![1]!.body as string) as Record<
@@ -767,18 +908,18 @@ describe("literal kind nouns bind as an explicit expectedKinds hint (CHAOS-4343 
 });
 
 /**
- * Codex review findings on CHAOS-4343's fan-out (items 1/2). Each test
- * reproduces the exact defect described, red-first against the pre-fix
- * shape, green with the fix.
+ * Codex review findings on CHAOS-4343's fan-out (items 1/2), ported to the
+ * popup. Each test reproduces the exact defect described, red-first against
+ * the pre-fix shape, green with the fix.
  */
 describe("fan-out correctness (codex review)", () => {
     /**
-     * High: a settled sibling's own panel must stay non-interactive while
+     * High: a settled sibling's own popup must stay non-interactive while
      * ANOTHER request from the SAME (or a later) batch is still in flight —
      * otherwise a tester could fire an overlapping action while state a
      * slower request still depends on is being reset out from under it.
      */
-    it("keeps a settled sibling panel's controls disabled while another fired request is still pending", async () => {
+    it("keeps a settled sibling's popup options disabled while another fired request is still pending", async () => {
         let resolveFirst!: (response: Response) => void;
         const firstResponse = new Promise<Response>((resolve) => {
             resolveFirst = resolve;
@@ -805,24 +946,24 @@ describe("fan-out correctness (codex review)", () => {
 
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
-        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+        await pickPopupOption(user, first!.subject.label);
+        await user.click(popupOptionButton(second!.subject.label));
+        await user.click(continueButton());
 
         expect(fetchSpy).toHaveBeenCalledTimes(3);
 
         // The LATEST (second-fired) sibling settles into a fresh, live
-        // clarification; the first-fired sibling is still "Investigating…".
-        await screen.findByRole("region", { name: "Which subject did you mean?" });
+        // popup; the first-fired sibling is still "Investigating…".
+        const dialog = await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
         expect(screen.getByText("Investigating…")).toBeInTheDocument();
 
-        // The settled sibling's OWN offer buttons must be disabled — a
-        // sibling is still pending, so nothing on screen may be actioned.
-        const selectButtons = screen.getAllByRole("button", { name: /^Select / });
-        expect(selectButtons.length).toBeGreaterThan(0);
-        for (const button of selectButtons) {
+        // The settled sibling's OWN popup option buttons must be disabled —
+        // a sibling is still pending, so nothing on screen may be actioned.
+        const optionButtons = within(dialog)
+            .getAllByRole("button")
+            .filter((button) => button.hasAttribute("aria-pressed"));
+        expect(optionButtons.length).toBeGreaterThan(0);
+        for (const button of optionButtons) {
             expect(button).toBeDisabled();
         }
 
@@ -839,11 +980,12 @@ describe("fan-out correctness (codex review)", () => {
     });
 
     /**
-     * Medium: a frozen (superseded) turn's own candidate panel must still
-     * show what was actually picked — the same snapshot discipline
-     * `submittedStructureBatch` already holds for kind/anchor/handle/window.
+     * Medium: a frozen (superseded) turn renders no live candidate controls
+     * at all (collapsed disclosure only) — the popup's own "confirm follows
+     * selection" model has nothing left to snapshot once a newer turn takes
+     * over, unlike the old inline echo this replaces.
      */
-    it("a frozen turn's candidate panel keeps its selected badges after a newer turn takes over", async () => {
+    it("a frozen turn shows the collapsed disclosure, not the popup or any live control", async () => {
         const candidate = clarification.subject_resolution.candidates[0]!;
         vi.spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -860,16 +1002,15 @@ describe("fan-out correctness (codex review)", () => {
 
         await ask("Is Atlas on track?");
         const user = userEvent.setup();
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        await pickPopupOption(user, candidate.subject.label);
+        await user.click(continueButton());
 
         expect(
             await screen.findAllByRole("article", { name: "Deterministic answer" }),
         ).toHaveLength(2);
-        const frozenPanel = screen.getByRole("region", { name: "Subject candidates" });
-        expect(within(frozenPanel).getByText("selected")).toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(screen.getByTestId("frozen-offers-disclosure")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: candidate.subject.label })).toBeNull();
     });
 
     /**
@@ -896,10 +1037,9 @@ describe("fan-out correctness (codex review)", () => {
         const user = userEvent.setup();
         const candidate = clarification.subject_resolution.candidates[0]!;
         // Toggled, then NEVER confirmed — the tester instead types a fresh
-        // question directly.
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
-        );
+        // question directly (the popup stays open but is simply ignored,
+        // exactly the "typing a normal reply is always allowed" rule).
+        await pickPopupOption(user, candidate.subject.label);
         await user.type(
             screen.getByLabelText("Ask a question"),
             "A completely different question?",
@@ -919,11 +1059,11 @@ describe("fan-out correctness (codex review)", () => {
     /**
      * Medium, codex review round 2: confirming ONE candidate axis used to
      * drop any pending-but-unconfirmed pick in the OTHER axis entirely. Both
-     * axes present on the same result; select one candidate from EACH,
-     * confirm only the subject-candidate one — the structure-candidate pick
-     * must still fire its own request.
+     * axes present on the same result as two popup pages; select one
+     * candidate on EACH, confirm only the LAST page — the earlier page's
+     * pick must still fire its own request.
      */
-    it("confirming one candidate axis still fires the other axis's pending pick", async () => {
+    it("confirming the last page still fires the other page's earlier pending pick", async () => {
         const subjectCandidate = mixedCandidates.subject_resolution.candidates[0]!;
         const structureCandidateOption = mixedCandidates.structure_needs!.candidate_options![0]!;
         const fetchSpy = vi
@@ -947,15 +1087,15 @@ describe("fan-out correctness (codex review)", () => {
 
         await ask("Who owns this?");
         const user = userEvent.setup();
-        // Pick one structure candidate, WITHOUT confirming it...
-        await user.click(
-            await screen.findByRole("button", { name: `Select ${structureCandidateOption.label}` }),
-        );
-        // ...then pick and confirm a SUBJECT candidate instead.
-        await user.click(
-            screen.getByRole("button", { name: `Select ${subjectCandidate.subject.label}` }),
-        );
-        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+        // Page 1 (structure-candidate axis, not last): pick one, then
+        // Continue WITHOUT firing yet — just advances to page 2.
+        await pickPopupOption(user, structureCandidateOption.label);
+        await user.click(continueButton());
+        // Page 2 (subject-resolution axis, IS last): pick one, Continue
+        // fires — carrying BOTH pages' picks.
+        await screen.findByRole("dialog", { name: CLARIFICATION_PROMPT });
+        await user.click(popupOptionButton(subjectCandidate.subject.label));
+        await user.click(continueButton());
 
         expect(
             await screen.findAllByRole("article", { name: "Deterministic answer" }),

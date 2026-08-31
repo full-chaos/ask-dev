@@ -23,6 +23,19 @@ export type ChatComposerHandle = {
      * component's own clearing logic entirely).
      */
     retry: (question: string) => void;
+    /**
+     * Moves focus to the composer's own input (codex review round 3,
+     * CHAOS-4671): this component's `pending`-transition effect below only
+     * refocuses when a turn SETTLES — Dismissing the clarification popup is
+     * not a pending transition at all, so a keyboard user who dismissed via
+     * a focused Dismiss button was left with focus dropped to
+     * `document.body` once the browser removed that button from the DOM
+     * (the standard "focused element unmounted" fallback). The page's own
+     * `onDismiss` calls this explicitly, synchronously, in the SAME click/
+     * keydown handler that removes the popup — before React has actually
+     * unmounted anything — so focus never has a gap to fall into.
+     */
+    focus: () => void;
 };
 
 /**
@@ -102,6 +115,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         retry: (retryQuestion: string) => {
             setQuestion(retryQuestion);
             void submitQuestion(retryQuestion);
+        },
+        focus: () => {
+            textareaRef.current?.focus();
         },
     }));
 

@@ -827,11 +827,298 @@ body {
        its own scroll region now (`.chat__timeline`), so the composer is
        just a fixed flex item below it. A low-alpha hairline replaces the
        old fade-to-background trick as the separator; the dark-theme
-       "no bright borders" rule holds here same as everywhere else. */
+       "no bright borders" rule holds here same as everywhere else.
+       `position: relative` anchors `.clarification-popup` below (CHAOS-4671)
+       — the popup is a DOM sibling of `.chat-composer`, absolutely
+       positioned OVER this bar's own top edge, never wrapping or covering
+       the composer itself. */
+    position: relative;
     flex: 0 0 auto;
     padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     background: var(--surface-0);
+}
+
+/* --- Clarification popup (CHAOS-4671) ---
+   The Claude app/web pattern: a card floating directly above the chat
+   input, replacing the old full-width inline offer panels. Elevated via
+   the same low-alpha shadow token `.chat__jump-to-latest` already uses; no
+   bright border, dark-theme rule holds. */
+
+.clarification-popup {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: calc(100% + 10px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 18px;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    background: var(--surface-1);
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+@media (prefers-color-scheme: light) {
+    .clarification-popup {
+        box-shadow: 0 4px 14px rgba(16, 22, 32, 0.1);
+    }
+}
+
+.clarification-popup:focus-visible {
+    outline: none;
+}
+
+.clarification-popup__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.clarification-popup__stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.clarification-popup__stepper-nav {
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.clarification-popup__stepper-nav:disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.clarification-popup__stepper-count {
+    font-variant-numeric: tabular-nums;
+}
+
+.clarification-popup__dismiss {
+    padding: 2px 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.clarification-popup__dismiss:hover {
+    color: var(--text-strong);
+}
+
+.clarification-popup__title {
+    margin: 0;
+    color: var(--text-strong);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.clarification-popup__options {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+.clarification-popup__option-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.clarification-popup__option-button:hover,
+.clarification-popup__option-button--focused {
+    background: var(--surface-2);
+}
+
+.clarification-popup__option-button[aria-pressed="true"] {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.clarification-popup__option-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.clarification-popup__option-button--other {
+    color: var(--text-muted);
+}
+
+.clarification-popup__option-number {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.clarification-popup__option-text {
+    flex: 1 1 auto;
+    overflow-wrap: anywhere;
+}
+
+/* codex round 1 finding 3: the structural value bound to the receipt,
+   shown alongside a model `phrasing` — never hidden behind it. */
+.clarification-popup__option-structural {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.clarification-popup__option-check {
+    flex: 0 0 auto;
+    color: var(--state-ok);
+}
+
+.clarification-popup__continue {
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.clarification-popup__continue:hover {
+    filter: brightness(1.15);
+}
+
+.clarification-popup__continue:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.clarification-popup__free-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+}
+
+.clarification-popup__free-text-icon {
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.clarification-popup__free-text-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--text-strong);
+    font: inherit;
+    font-size: 13px;
+}
+
+.clarification-popup__free-text-input:focus-visible {
+    outline: none;
+}
+
+.clarification-popup__skip {
+    flex: 0 0 auto;
+    padding: 3px 10px;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.clarification-popup__skip:hover {
+    color: var(--text-strong);
+}
+
+.clarification-popup__hint {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+}
+
+@media (max-width: 480px) {
+    .clarification-popup {
+        left: 14px;
+        right: 14px;
+    }
+}
+
+/* --- Chosen-answers summary card (CHAOS-4671) ---
+   Replaces the "Your selections were applied" chip panel on the chat
+   surface: question muted, answer emphasized, one compact card. */
+
+.chosen-answers__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.chosen-answers__row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.chosen-answers__question {
+    color: var(--text-muted);
+}
+
+.chosen-answers__question::after {
+    content: ":";
+}
+
+.chosen-answers__answer {
+    color: var(--text-strong);
+    font-weight: 600;
 }
 
 .chat-composer {
