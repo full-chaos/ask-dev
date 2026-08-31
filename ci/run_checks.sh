@@ -89,9 +89,9 @@ install_playwright_browser() {
 run_e2e() {
   rm -rf .next/dev
   if [[ ! -d .next ]]; then
-    run_step "build (required by e2e)" run_build
+    run_step "build (required by e2e)" run_build || return "$?"
   fi
-  run_step "playwright browser installation" install_playwright_browser
+  run_step "playwright browser installation" install_playwright_browser || return "$?"
   pnpm test:e2e
 }
 

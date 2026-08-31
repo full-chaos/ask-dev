@@ -52,8 +52,12 @@ STUB
 
   local out="${work}/out.log"
   local status=0
-  PATH="${bin}:${PATH}" CALL_LOG="${call_log}" FAIL_STEP="${fail_step}" \
-    bash "${run_checks}" ci >"${out}" 2>&1 || status=$?
+  # Run from an empty scratch cwd, never the real checkout: run_e2e does
+  # `rm -rf .next/dev` relative to cwd, which must never touch a real build.
+  local scratch="${work}/scratch"
+  mkdir -p "${scratch}"
+  (cd "${scratch}" && PATH="${bin}:${PATH}" CALL_LOG="${call_log}" FAIL_STEP="${fail_step}" \
+    bash "${run_checks}" ci >"${out}" 2>&1) || status=$?
 
   if [[ "${status}" -eq 0 ]]; then
     echo "FAIL: run_checks.sh ci exited 0 with a failing tier (${fail_step})" >&2
@@ -93,6 +97,15 @@ run_case "lint" \
   "format:check" "acr:contracts:check" \
   -- \
   "typecheck" "test:unit" "build" "test:e2e"
+
+# Case 3: a step NESTED inside run_e2e fails (`pnpm exec playwright install
+# ...`, first arg "exec"). run_e2e calls this via `run_step` without checking
+# its result, so a failure here must still stop the run before `pnpm
+# test:e2e` executes and must still make `run_checks.sh ci` exit non-zero.
+run_case "exec" \
+  "format:check" "acr:contracts:check" "lint" "typecheck" "test:unit" "build" \
+  -- \
+  "test:e2e"
 
 if [[ "${fail}" -ne 0 ]]; then
   echo "run_checks_fail_fast.test.sh: FAILED" >&2
