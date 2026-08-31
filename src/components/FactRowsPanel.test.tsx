@@ -505,7 +505,11 @@ describe("FactRowsPanels — a trend shape", () => {
         const trends = shipped.render_shapes?.filter((s) => s.selected_by === "dated_fact_trend");
         expect(trends).toBeDefined();
         expect(trends?.length).toBeGreaterThan(0);
-        expect(trends?.[0]).toMatchObject({ kind: "series", presentation: "line", axis_kind: "time" });
+        expect(trends?.[0]).toMatchObject({
+            kind: "series",
+            presentation: "line",
+            axis_kind: "time",
+        });
     });
 
     it("draws a trend beside the table it was derived from", () => {

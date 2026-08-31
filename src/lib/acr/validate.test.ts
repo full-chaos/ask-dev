@@ -116,7 +116,13 @@ describe("investigation result contract — claimed fact table declaration (CHAO
             renderShapesResult as { claimed_facts: Array<Record<string, unknown>> }
         ).claimed_facts.filter((claim) => "table" in claim);
         expect(tabled.length).toBeGreaterThan(0);
-        expect(tabled[0]?.table).toMatchObject({ field: expect.any(String), shape: expect.any(String), key: expect.any(Array) });
+        /* eslint-disable @typescript-eslint/no-unsafe-assignment -- vitest types expect.any()'s return as `any` by design; these are matchers, not real values. */
+        expect(tabled[0]?.table).toMatchObject({
+            field: expect.any(String),
+            shape: expect.any(String),
+            key: expect.any(Array),
+        });
+        /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
         const validation = validateContract(
             "context_fabric_investigation_result.v1.schema.json",
@@ -155,7 +161,11 @@ describe("investigation result contract — claimed fact table declaration (CHAO
         const priorCommonSchema = structuredClone(commonSchema) as unknown as {
             $defs: Record<string, { properties: Record<string, unknown> }>;
         };
-        delete priorCommonSchema.$defs.ClaimedFact.properties.table;
+        const claimedFactDef = priorCommonSchema.$defs.ClaimedFact;
+        if (claimedFactDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no ClaimedFact $def");
+        }
+        delete claimedFactDef.properties.table;
 
         const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
         ajv.addSchema(priorCommonSchema, "context_fabric_common.v1.schema.json");
