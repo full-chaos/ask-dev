@@ -272,11 +272,17 @@ test.describe("clarification chips", () => {
         await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_CLARIFICATION}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        await expect(
-            page.getByRole("region", { name: "Which subject did you mean?" }),
-        ).toBeVisible();
-        await expect(page.getByRole("button", { name: "Select Ask Dev" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Select Atlas" })).toBeVisible();
+        // CHAOS-4671: the offer now lives in the floating popup anchored
+        // above the composer (`role="dialog"`, `aria-label` = the fake-ACR
+        // double's own `clarification_prompt`), not an inline transcript
+        // region — see ClarificationPopup.tsx's own header and
+        // page.test.tsx's identical `popupOptionButton()` convention for
+        // why an option's accessible name is its bare label, never the old
+        // inline panels' "Select X".
+        const dialog = page.getByRole("dialog", { name: "Did you mean Ask Dev or Atlas?" });
+        await expect(dialog).toBeVisible();
+        await expect(page.getByRole("button", { name: "Ask Dev" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Atlas" })).toBeVisible();
 
         // Every DeterministicAnswerView turn shares the SAME `aria-label`
         // ("Deterministic answer") whether the result is a clarification or
@@ -289,12 +295,13 @@ test.describe("clarification chips", () => {
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
-        // Selecting leads, confirming follows (CHAOS-4343): the toggle alone
-        // must not fire a request — only the confirm below does, proving the
-        // chip is wired, not decorative.
-        await page.getByRole("button", { name: "Select Ask Dev" }).click();
+        // Selecting leads, confirming follows (CHAOS-4343): the subject
+        // page is multi-select (ClarificationPopup.tsx's `selectMode`), so
+        // the toggle alone must not fire a request — only "Continue with N
+        // selected" does, proving the popup is wired, not decorative.
+        await page.getByRole("button", { name: "Ask Dev" }).click();
         await expect(turns).toHaveCount(1);
-        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
+        await page.getByRole("button", { name: "Continue with 1 selected" }).click();
 
         await expect(turns).toHaveCount(2);
         // The first turn is frozen at its original (clarification) state...
@@ -307,13 +314,14 @@ test.describe("clarification chips", () => {
         // `prior_subject_receipts`).
         await expect(turns.last()).toHaveAttribute("data-state", "complete");
 
-        // No NEW clarification prompt reappeared — the live heading is gone.
-        await expect(page.getByRole("region", { name: "Which subject did you mean?" })).toHaveCount(
-            0,
-        );
+        // The popup closed — the decisive second turn carries nothing left
+        // to clarify, so no dialog remains anywhere on the page.
+        await expect(page.getByRole("dialog")).toHaveCount(0);
         // The superseded clarification turn is still on screen, but frozen:
-        // its own candidate list no longer offers a choice.
-        await expect(page.getByTestId("cannot-choose-here")).toBeVisible();
+        // a collapsed "how this was resolved" disclosure, not a live
+        // control — CHAOS-4671 replaces the old inert "shown for inspection
+        // only" panel (`cannot-choose-here`) with this.
+        await expect(turns.first().getByTestId("frozen-offers-disclosure")).toBeVisible();
     });
 
     test("NEGATIVE: a decisive answer renders no clarification chips", async ({ page }) => {
@@ -370,25 +378,28 @@ test.describe("structure needs chips", () => {
             .fill(`What's the status of this, ${TRIGGER_STRUCTURE_NEEDS}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const panel = page.getByRole("region", { name: "More structure would narrow this" });
-        await expect(panel).toBeVisible();
-        await expect(page.getByRole("button", { name: "Select Pull request" })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Select CI pipeline run" })).toBeVisible();
+        // CHAOS-4671: the kind offer lives in the floating popup, not the
+        // old inline "More structure would narrow this" region.
+        const dialog = page.getByRole("dialog", { name: "Which kind of thing is this about?" });
+        await expect(dialog).toBeVisible();
+        await expect(page.getByRole("button", { name: "Pull request" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "CI pipeline run" })).toBeVisible();
 
         // Discriminating, same rule as the clarification-chip control above:
-        // `data-state` mirrors the result's own `status`, so "the panel is
-        // present" cannot be conflated with "the panel is present AND the
+        // `data-state` mirrors the result's own `status`, so "the popup is
+        // present" cannot be conflated with "the popup is present AND the
         // result is actually non-decisive."
         const turns = page.getByRole("article", { name: "Deterministic answer" });
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
-        // Picking an offer and confirming re-asks with the CHOSEN receipt —
-        // proving the chip is wired all the way through the chat surface's
-        // shared selection hook, the server hop, and the fake-ACR double's
-        // own receipt check, not decorative.
-        await page.getByRole("button", { name: "Select Pull request" }).click();
-        await page.getByRole("button", { name: "Ask again with these selections" }).click();
+        // The kind page is single-select (ClarificationPopup.tsx's own
+        // `pick()`): picking an offer IS confirming — it advances/completes
+        // on its own, no separate confirm click — proving the chip is
+        // wired all the way through the chat surface's shared selection
+        // hook, the server hop, and the fake-ACR double's own receipt
+        // check, not decorative.
+        await page.getByRole("button", { name: "Pull request" }).click();
 
         await expect(turns).toHaveCount(2);
         // The first turn is frozen at its original (clarification) state...
@@ -399,22 +410,14 @@ test.describe("structure needs chips", () => {
         // clarification.
         await expect(turns.last()).toHaveAttribute("data-state", "complete");
 
-        // No NEW re-askable structure-needs panel appeared — the decisive
-        // second turn carries no `structure_needs`, so its own panel never
-        // renders at all. StructureNeedsPanel (unlike ClarificationPanel)
-        // keeps its heading even when frozen (only its footer action
-        // changes — see StructureNeedsPanel.tsx), so exactly ONE region
-        // remains: the superseded first turn's own frozen echo.
-        await expect(
-            page.getByRole("region", { name: "More structure would narrow this" }),
-        ).toHaveCount(1);
-        await expect(
-            page.getByRole("button", { name: "Ask again with these selections" }),
-        ).toHaveCount(0);
-        // The superseded turn's own panel is still on screen, but frozen:
-        // inspection only, same rule as ClarificationPanel's own
-        // `cannot-choose-here` echo.
-        await expect(page.getByTestId("cannot-confirm-structure-here")).toBeVisible();
+        // No new popup reappeared — the decisive second turn carries no
+        // `structure_needs`, so there is nothing left to ask.
+        await expect(page.getByRole("dialog")).toHaveCount(0);
+        // The superseded turn's own offer is still on screen, but frozen:
+        // a collapsed "how this was resolved" disclosure, not a live
+        // control — replaces the old inert `cannot-confirm-structure-here`
+        // panel.
+        await expect(turns.first().getByTestId("frozen-offers-disclosure")).toBeVisible();
     });
 
     /**
@@ -432,23 +435,25 @@ test.describe("structure needs chips", () => {
             .fill(`What's the status of this, ${TRIGGER_CANDIDATE_NEEDS}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const panel = page.getByRole("region", { name: "More structure would narrow this" });
-        await expect(panel).toBeVisible();
+        // CHAOS-4671: the candidate offers live in the floating popup, not
+        // the old inline "More structure would narrow this" region.
+        const dialog = page.getByRole("dialog", { name: "Did you mean one of these?" });
+        await expect(dialog).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Select WORK-9001: Investigate flaky test" }),
+            page.getByRole("button", { name: "WORK-9001: Investigate flaky test" }),
         ).toBeVisible();
         await expect(
-            page.getByRole("button", { name: "Select WORK-9002: Rotate signing key" }),
+            page.getByRole("button", { name: "WORK-9002: Rotate signing key" }),
         ).toBeVisible();
 
         const turns = page.getByRole("article", { name: "Deterministic answer" });
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
-        await page
-            .getByRole("button", { name: "Select WORK-9001: Investigate flaky test" })
-            .click();
-        await page.getByRole("button", { name: "Ask again with these selections" }).click();
+        // The candidate axis is multi-select (CHAOS-4343): picking toggles
+        // in place, and "Continue with N selected" fires the re-ask.
+        await page.getByRole("button", { name: "WORK-9001: Investigate flaky test" }).click();
+        await page.getByRole("button", { name: "Continue with 1 selected" }).click();
 
         await expect(turns).toHaveCount(2);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
@@ -456,6 +461,7 @@ test.describe("structure needs chips", () => {
         // if the fake-ACR double actually recognized the chosen candr_
         // receipt and returned a decisive result.
         await expect(turns.last()).toHaveAttribute("data-state", "complete");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
     });
 });
 
@@ -484,48 +490,51 @@ test.describe("mixed receipt families", () => {
         await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_MIXED}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        // Both panels render on the SAME turn — the co-presence this
-        // scenario exists to prove is reachable and rendered, not just
-        // schema-legal in the abstract.
-        await expect(
-            page.getByRole("region", { name: "Which subject did you mean?" }),
-        ).toBeVisible();
+        // CHAOS-4671: a turn carrying BOTH a subject-candidate
+        // clarification AND a structure_needs disclosure now pages through
+        // the SAME floating popup as a 2-question stepper ("x of y"), one
+        // question per page — not two panels stacked in the transcript.
+        // The co-presence this scenario exists to prove is reachable and
+        // rendered, not just schema-legal in the abstract.
+        const page1 = page.getByRole("dialog", { name: "Which kind of thing is this about?" });
+        await expect(page1).toBeVisible();
+        await expect(page1.getByText("1 of 2")).toBeVisible();
+        // No inline panel anywhere — the popup is the ONLY rendering of the
+        // offer.
         await expect(
             page.getByRole("region", { name: "More structure would narrow this" }),
-        ).toBeVisible();
+        ).toHaveCount(0);
 
         // Accumulate a structure pick WITHOUT confirming it — the exact
-        // state the bug dropped.
-        await page.getByRole("button", { name: "Select Pull request" }).click();
+        // state the bug dropped. The kind page is single-select, so picking
+        // auto-advances to the subject page rather than firing a request.
+        await page.getByRole("button", { name: "Pull request" }).click();
 
-        // Now resolve the subject instead of confirming structure. The
-        // fake-ACR double's mixed scenario (see fake-acr-server.mjs) only
-        // resolves decisively when BOTH `prior_subject_receipts` and a
-        // recognized `prior_kind_receipts` entry arrive on the SAME
-        // request — so this is a genuine mutation-provable positive
-        // control: revert `chooseCandidates` to sending only the subject
-        // receipt, and the second turn stays `clarification_required`
-        // instead of turning `complete`.
-        await page.getByRole("button", { name: "Select Ask Dev" }).click();
-        await page.getByRole("button", { name: "Ask about 1 selected candidate" }).click();
+        // Now resolve the subject instead of confirming structure on its
+        // own page. The fake-ACR double's mixed scenario (see
+        // fake-acr-server.mjs) only resolves decisively when BOTH
+        // `prior_subject_receipts` and a recognized `prior_kind_receipts`
+        // entry arrive on the SAME request — so this is a genuine
+        // mutation-provable positive control: revert `chooseStructure` to
+        // dropping the earlier-page structure pick, and the second turn
+        // stays `clarification_required` instead of turning `complete`.
+        const page2 = page.getByRole("dialog", { name: "Did you mean Ask Dev or Atlas?" });
+        await expect(page2).toBeVisible();
+        await expect(page2.getByText("2 of 2")).toBeVisible();
+        await page.getByRole("button", { name: "Ask Dev" }).click();
+        await page.getByRole("button", { name: "Continue with 1 selected" }).click();
 
         const turns = page.getByRole("article", { name: "Deterministic answer" });
         await expect(turns).toHaveCount(2);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
         await expect(turns.last()).toHaveAttribute("data-state", "complete");
+        await expect(page.getByRole("dialog")).toHaveCount(0);
 
-        // The superseded turn's own structure panel echoes what was
-        // actually submitted (not empty) — the codex round 1 finding 3
-        // discipline `chooseStructure` already held, now proven for
-        // `chooseCandidate`'s new carry-along path too. Asserted via the
-        // "selected" badge, not just "Pull request" being on screen —
-        // codex round 2, finding 2: every kind offer renders its own label
-        // regardless of selection state, so a bare text check would still
-        // pass even if `submittedStructureBatch` were dropped entirely.
-        const frozenStructurePanel = turns
-            .first()
-            .getByRole("region", { name: "More structure would narrow this" });
-        await expect(frozenStructurePanel.getByText("selected")).toBeVisible();
+        // The superseded turn shows no live controls for EITHER family —
+        // one collapsed "how this was resolved" disclosure per family
+        // (structure_needs, subject_resolution), the same rule
+        // page.test.tsx's identical unit-level scenario pins.
+        await expect(turns.first().getByTestId("frozen-offers-disclosure")).toHaveCount(2);
     });
 });
 
