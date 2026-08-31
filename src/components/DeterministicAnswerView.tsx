@@ -4,6 +4,7 @@ import { AnswerPanel } from "@/components/AnswerPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
+import { CompletenessPanel } from "@/components/CompletenessPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { DriversPanel } from "@/components/DriversPanel";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
@@ -217,6 +218,7 @@ export function DeterministicAnswerView({
                     selectedReceiptIds={selectedCandidateReceiptIds}
                 />
                 <CoveragePanel coverage={result.coverage} />
+                <CompletenessPanel completeness={result.completeness} />
                 {
                     // codex review round 2 (CHAOS-4581): extracting the old
                     // inline Limitations block into `LimitationsPanel`
@@ -299,6 +301,7 @@ export function DeterministicAnswerView({
             }
             <div className="strip">
                 <CoveragePanel coverage={result.coverage} />
+                <CompletenessPanel completeness={result.completeness} />
                 <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </div>
             {

@@ -207,7 +207,42 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `aa214606e70d9beb1cd2ea78d62a17bd4e680c3b` (acr main tip #326;
+Currently pinned: `f9d9688c72bf6843137778079f77bd8dde8da32e` (acr main tip #352;
+CHAOS-4642, bumping past CHAOS-4413/#344's `completeness` widening — the
+two-step-deploy consumer half of CHAOS-4623's own finding). ONE $def is
+added to `context_fabric_common.v1`: `AnswerCompleteness`
+(`terminal_status`/`terminal_reason`/`claimed_facts_count`/`rows_count`,
+`terminal_reason` conditionally required off `complete`), and
+`context_fabric_investigation_result.v1` grows a REQUIRED `completeness`
+field pointing at it. Nothing else in the CONSUMED surface (the four schemas
+`scripts/sync-acr-contracts.mjs` actually copies:
+`context_fabric_common.v1`, `context_fabric_investigation_request.v1`,
+`context_fabric_investigation_result.v1`, `error.v1`) changed between the
+prior pin (`6ac060ea`, still the shared rig's acr sha at bump time) and this
+one — verified directly against acr's own history: `git diff
+6ac060eac757ffcc795bbdc39f3fe0eb3879559e
+f9d9688c72bf6843137778079f77bd8dde8da32e -- contracts/jsonschema/v1/` in the
+acr worktree touches SIX files (also `context_fabric_answer_projection.v1`,
+`context_fabric_investigation_result.v2`, and the two `mcp_*_response.v1`
+schemas that embed the same `$defs`— none of which ask-dev pins), of which
+only`context_fabric_common.v1.schema.json`and`context_fabric_investigation_result.v1.schema.json`are in the four this
+repo consumes;`context_fabric_investigation_request.v1.schema.json`and`error.v1.schema.json`are byte-identical to the prior pin (confirmed by
+diffing each of the four consumed paths individually, not by this one
+broader command's file list). Rendered by the new`CompletenessPanel`
+(`terminal_status`as a
+badge reusing`statusTone`— the same closed vocabulary as`status`itself —
+plus the claimed-facts/row counts, plus`terminal_reason`verbatim when
+present) in`DeterministicAnswerView`'s coverage/limitations strip, on both
+the decisive and `clarification_required`branches (the field is
+unconditional on the result, unlike e.g.`cohort`).
+
+CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion to the public
+interpretation has **not** landed on acr main as of this pin — there is
+nothing on the wire yet to widen for on that front. This bump is
+CHAOS-4642's `completeness` widening only; a further pin bump follows once
+that lands.
+
+Previously pinned: `aa214606e70d9beb1cd2ea78d62a17bd4e680c3b` (acr main tip #326;
 CHAOS-4449, bumping past CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking
 surface). The whole widening lands in ONE schema: `context_fabric_common.v1`'s
 `CohortMember` grew `ranking_computed`, `attention_rank`, `score`,
