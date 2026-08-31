@@ -47,6 +47,21 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                                     {SURFACE_LABEL[primarySurface]}.
                                 </p>
                                 {/*
+                                 * codex round 5: `subjects` is independent, optional
+                                 * contract data — equal `claimed_fact_ids`/text does NOT
+                                 * guarantee equal subject scope (a primary about "Alpha"
+                                 * and a same-claim duplicate about "Beta" are both real).
+                                 * Same never-silently-drop reasoning as the evidence block
+                                 * below, just a different field.
+                                 */}
+                                {finding.subjects !== undefined && finding.subjects.length > 0 ? (
+                                    <p className="record__meta">
+                                        {finding.subjects
+                                            .map((subject) => subject.label)
+                                            .join(", ")}
+                                    </p>
+                                ) : null}
+                                {/*
                                  * codex round 2, finding 3: the cross-referenced primary
                                  * lives on a DIFFERENT `FindingsPanel` instance (a different
                                  * surface's own render), so this component has no way to

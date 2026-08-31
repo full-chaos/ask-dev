@@ -117,6 +117,38 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
     });
 
+    /**
+     * codex round 5, EXECUTED: `subjects` is independent, optional contract
+     * data — equal `claimed_fact_ids`/text does not guarantee equal subject
+     * scope (a readiness-gap primary about "Alpha" and a same-claim
+     * remaining-work duplicate about "Beta" are both real). The primary
+     * branch already renders `finding.subjects`; the duplicate branch
+     * silently dropped it — the same defect class as round 2's evidence
+     * finding, just a different field.
+     */
+    it("still renders a duplicate's own subjects, never silently drops them (codex round 5)", () => {
+        const duplicateWithOwnSubject: DedupedFinding = {
+            finding: {
+                finding_id: "finding_beta_subject",
+                kind: "readiness",
+                summary: "Release acceptance remains incomplete.",
+                evidence_ref_ids: ["evidence_0001"],
+                subjects: [{ kind: "team", canonical_id: "team_beta", label: "Beta" }],
+            },
+            isDuplicate: true,
+            primarySurface: "readiness_gaps",
+        };
+        render(
+            <FindingsPanel
+                title="Remaining work"
+                findings={[duplicateWithOwnSubject]}
+                emptyMessage="No remaining work was reported."
+            />,
+        );
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByText("Beta")).toBeInTheDocument();
+    });
+
     it("still says so explicitly when there are no findings", () => {
         render(
             <FindingsPanel
