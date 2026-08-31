@@ -47,6 +47,25 @@ function axisLabel(row: ClaimedFactRow, axis: ChartAxis): string {
     return cell === null ? "" : String(cell);
 }
 
+/**
+ * CHAOS-4672 (codex round 1, EXECUTED): a full ISO timestamp
+ * ("2026-01-01T12:34:56.000Z", 24 chars) at the axis-label tick still
+ * collided even after the tick-count and edge-anchor fixes — three ticks'
+ * worth of 24-char text does not fit inside a 300px small-multiples cell
+ * regardless of anchoring. A tick only needs enough resolution to place a
+ * point on the elapsed-time scale it is already drawn on; the full value
+ * (including any time component) stays exact and available on the mark's
+ * own `aria-label`/`<title>` (`axisLabel`, used unchanged for those). Safe
+ * to slice unconditionally: `fact-rows.ts`'s `isTimeColumn` only classifies
+ * an axis `kind: "time"` when EVERY row's value matches
+ * `ISO_DATE_PATTERN` — the first 10 characters are always the calendar
+ * date (`YYYY-MM-DD`) by the time this component receives `kind: "time"`.
+ */
+function axisTickLabel(row: ClaimedFactRow, axis: ChartAxis): string {
+    const full = axisLabel(row, axis);
+    return axis.kind === "time" ? full.slice(0, 10) : full;
+}
+
 function seriesValue(row: ClaimedFactRow, column: string): number | undefined {
     const value = row.fields[column];
     if (value === undefined) return undefined;
@@ -273,7 +292,7 @@ function SeriesChart({
                             x={xForIndex(index)}
                             y={height - 8}
                         >
-                            {axisLabel(row, axis)}
+                            {axisTickLabel(row, axis)}
                         </text>
                     ) : null,
                 )}

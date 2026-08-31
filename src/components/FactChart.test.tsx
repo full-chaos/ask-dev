@@ -173,4 +173,43 @@ describe("FactChart", () => {
             expect(tick.getAttribute("text-anchor")).toBe("middle");
         }
     });
+
+    /**
+     * CHAOS-4672 (codex round 1, EXECUTED repro): a full ISO timestamp axis
+     * ("2026-01-01T12:34:56.000Z", 24 chars) still collided after the
+     * tick-count and edge-anchor fixes — even 3 ticks' worth of 24-char text
+     * does not fit a 300px small-multiples cell. The tick text shortens to
+     * the calendar date; the mark's own accessible label keeps full
+     * precision (nothing is lost, only the AXIS TICK is more compact).
+     */
+    it("shortens a full-timestamp axis tick to the calendar date, keeping full precision on the mark itself", () => {
+        const rows = Array.from({ length: 90 }, (_, i) => {
+            const iso = new Date(Date.UTC(2026, 0, 1 + i, 12, 34, 56)).toISOString();
+            return row({ moment: { string: iso }, a: { integer: i }, b: { integer: i * 2 } });
+        });
+        const { container } = render(
+            <FactChart
+                axis={{ column: "moment", kind: "time" }}
+                chartKind="line"
+                rows={rows}
+                seriesColumns={["a", "b"]}
+            />,
+        );
+        const cell = container.querySelector(".fact-chart__cell")!;
+        const ticks = Array.from(cell.querySelectorAll('.fact-chart__axis-label[y="162"]'));
+        expect(ticks.length).toBeGreaterThanOrEqual(3);
+        for (const tick of ticks) {
+            expect(tick.textContent).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+        }
+        // Real minimum pixel gap, same threshold as the date-only test —
+        // the actual defect codex found (still colliding at 24 chars).
+        const xPositions = ticks.map((el) => Number(el.getAttribute("x"))).sort((a, b) => a - b);
+        const gaps = xPositions.slice(1).map((x, i) => x - xPositions[i]!);
+        expect(Math.min(...gaps)).toBeGreaterThanOrEqual(100);
+        // Full precision, including the time component, is still exact on
+        // the mark's own accessible title — never lost, only summarized on
+        // the tick.
+        const marks = container.querySelectorAll(".fact-chart__mark-group title");
+        expect(Array.from(marks).some((t) => t.textContent?.includes("12:34:56"))).toBe(true);
+    });
 });
