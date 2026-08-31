@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { ChatComposer, type ChatComposerHandle } from "@/components/chat/ChatComposer";
+import { ClarificationPopup } from "@/components/chat/ClarificationPopup";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
 import { subjectForReceipt } from "@/lib/clarification";
+import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarification-popup";
 import { buildConversationTurns } from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
@@ -264,6 +266,32 @@ export default function ChatPage() {
     // the other.
     const candidateSelections = useCandidateSelections();
     const structureCandidateSelections = useCandidateSelections();
+    // CHAOS-4671: the popup clarification flow's own two small pieces of
+    // state — everything ELSE it needs (what to render, what a pick means)
+    // stays derived from the three selection hooks above, exactly as the
+    // old inline panels already were.
+    //
+    // `dismissedPopupTurnId`: the assistant turn id whose popup the tester
+    // closed via X — "proceed without the selection" (ticket). Compared by
+    // id, not cleared explicitly: a fresh `ask()`/`confirmSelections()` call
+    // always mints a NEW turn id, so a stale dismissal can never suppress a
+    // later turn's popup by accident.
+    const [dismissedPopupTurnId, setDismissedPopupTurnId] = useState<number | undefined>(undefined);
+    // `popupAutoConfirmRef`/`popupAutoConfirmTick`: set by the popup's
+    // `onComplete` the instant the flow reaches its last page, INSTEAD of
+    // reading the selection hooks' `.batch` synchronously right there. A
+    // same-tick toggle-then-read would see the toggle's PRE-update value
+    // (React batches `setState` inside one event handler) — deferring the
+    // actual `chooseStructure` call to the effect below, which runs only
+    // after React has applied every batched update and re-rendered, is what
+    // keeps the LAST pick counted. The ref (not a second piece of state)
+    // carries WHICH turn to confirm; `popupAutoConfirmTick` only exists to
+    // give that effect a dependency to fire on — the effect clears the ref
+    // directly rather than calling `setState` on it, since a bare `setState`
+    // inside an effect body is exactly what `react-hooks/set-state-in-effect`
+    // flags, and a ref write is not state.
+    const popupAutoConfirmRef = useRef<number | undefined>(undefined);
+    const [popupAutoConfirmTick, setPopupAutoConfirmTick] = useState(0);
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<ChatComposerHandle>(null);
@@ -662,6 +690,70 @@ export default function ChatPage() {
         confirmSelections(result, pendingSubjectChoices, candidateReceipts, batch);
     }
 
+    /**
+     * CHAOS-4671: fires the SAME re-ask `StructureNeedsPanel`'s "Ask again
+     * with these selections" button always called — `chooseStructure`
+     * itself already folds in every OTHER axis's pending picks (the
+     * structure-candidate axis via `candidateReceipts` below, the
+     * subject-resolution axis internally via `candidateSelections.batch`),
+     * so this ONE call is correct regardless of which page(s) the tester
+     * actually interacted with. See the `popupAutoConfirmTurnId` effect
+     * below for why this runs on ITS OWN render rather than inline in the
+     * popup's click handler.
+     */
+    useEffect(() => {
+        const turnId = popupAutoConfirmRef.current;
+        if (turnId === undefined) return;
+        // Always consume the ref, even when it no longer names the latest
+        // answered turn (a new ask() started before this effect ran) — an
+        // effect that "consumes" by simply not going down the fire branch
+        // would re-fire on every later render. A ref write, unlike
+        // `setState`, is not itself flagged inside an effect body.
+        popupAutoConfirmRef.current = undefined;
+        if (
+            latestAssistantTurn?.role !== "assistant" ||
+            latestAssistantTurn.id !== turnId ||
+            latestAssistantTurn.outcome.kind !== "answered"
+        ) {
+            return;
+        }
+        const { result } = latestAssistantTurn.outcome;
+        chooseStructure(
+            structureSelections.batch,
+            structureCandidateReceiptsInAcrOrder(result, structureCandidateSelections.batch),
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- chooseStructure/structureCandidateReceiptsInAcrOrder are stable per-render closures over this component's own state, not external values that need their own dep entries (same pattern the file's other effects already follow).
+    }, [
+        popupAutoConfirmTick,
+        latestAssistantTurn,
+        structureSelections.batch,
+        structureCandidateSelections.batch,
+        candidateSelections.batch,
+    ]);
+
+    /** Applies one popup pick to whichever selection hook owns that offer's axis — zero wire changes, same three `toggle` functions the old inline panels already called. */
+    function applyPopupSelection(source: PopupOptionSource) {
+        if (source.kind === "structure") {
+            structureSelections.toggle(source.member, source.receipt);
+        } else if (source.kind === "structure-candidate") {
+            structureCandidateSelections.toggle(source.receipt.receipt_id);
+        } else {
+            candidateSelections.toggle(source.receiptId);
+        }
+    }
+
+    const popupPages =
+        latestAssistantTurn?.role === "assistant" &&
+        latestAssistantTurn.outcome.kind === "answered" &&
+        latestAssistantTurn.id !== dismissedPopupTurnId
+            ? buildClarificationPages(
+                  latestAssistantTurn.outcome.result,
+                  structureSelections.batch,
+                  structureCandidateSelections.batch,
+                  candidateSelections.batch,
+              )
+            : [];
+
     return (
         <main className="chat">
             <header className="chat__header">
@@ -780,6 +872,7 @@ export default function ChatPage() {
                                                     : (turn.submittedStructureCandidateReceiptIds ??
                                                       EMPTY_CANDIDATE_SELECTION_BATCH)
                                             }
+                                            offersPresentation="popup"
                                             pending={isPending}
                                             structureBatch={
                                                 isLatest
@@ -801,6 +894,28 @@ export default function ChatPage() {
             </div>
 
             <div className="chat__composer-bar">
+                {popupPages.length === 0 ? null : (
+                    // Floats above the composer via CSS (`.clarification-popup`
+                    // is `position: absolute`, this wrapper `position:
+                    // relative`) — a DOM SIBLING of `ChatComposer`, never a
+                    // wrapper around it, so the composer stays fully
+                    // interactive underneath exactly as the ticket requires
+                    // ("typing a normal reply is always allowed").
+                    <ClarificationPopup
+                        key={latestAssistantTurn?.id}
+                        onComplete={() => {
+                            if (latestAssistantTurn !== undefined) {
+                                popupAutoConfirmRef.current = latestAssistantTurn.id;
+                                setPopupAutoConfirmTick((tick) => tick + 1);
+                            }
+                        }}
+                        onDismiss={() => setDismissedPopupTurnId(latestAssistantTurn?.id)}
+                        onFreeText={(text) => void ask(text)}
+                        onSelect={applyPopupSelection}
+                        pages={popupPages}
+                        pending={isPending}
+                    />
+                )}
                 <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
             </div>
         </main>
