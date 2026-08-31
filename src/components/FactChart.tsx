@@ -251,7 +251,25 @@ function SeriesChart({
                         <text
                             className="fact-chart__axis-label"
                             key={`axis-${index}`}
-                            textAnchor="middle"
+                            // CHAOS-4672: `labelIndices` always includes row 0
+                            // and the LAST row, whose x sits exactly at the
+                            // plot's own left/right margin — a centered label
+                            // there overflows roughly half its own width past
+                            // the chart's viewBox, bleeding into the NEXT
+                            // small-multiple cell in the grid (the reported
+                            // defect: two charts' tick text visually running
+                            // together at the grid boundary, not two ticks
+                            // inside one chart). Anchoring the first/last
+                            // label to grow inward, away from the edge it
+                            // sits on, keeps every label within its own
+                            // chart's bounds regardless of grid gap.
+                            textAnchor={
+                                index === 0
+                                    ? "start"
+                                    : index === orderedRows.length - 1
+                                      ? "end"
+                                      : "middle"
+                            }
                             x={xForIndex(index)}
                             y={height - 8}
                         >

@@ -121,11 +121,11 @@ describe("FactChart", () => {
         );
         const cell = container.querySelector(".fact-chart__cell")!;
         // `.fact-chart__axis-label` also names the y-scale's max-value label
-        // (top-left, `text-anchor="start"`) — the x-axis ticks this defect
-        // is about are the `text-anchor="middle"` ones along the bottom.
-        const xPositions = Array.from(
-            cell.querySelectorAll('.fact-chart__axis-label[text-anchor="middle"]'),
-        )
+        // (top-left, `y = yForValue(maxValue) - 4`) — the x-axis ticks this
+        // defect is about all share ONE y (`height - 8` = 162 for
+        // `MULTIPLE_HEIGHT`), regardless of which of the three text-anchor
+        // values a given tick now uses (see the anchor test below).
+        const xPositions = Array.from(cell.querySelectorAll('.fact-chart__axis-label[y="162"]'))
             .map((el) => Number(el.getAttribute("x")))
             .sort((a, b) => a - b);
         expect(xPositions.length).toBeGreaterThanOrEqual(2);
@@ -135,5 +135,42 @@ describe("FactChart", () => {
         // glyphs touching — the real rig's 5-tick layout (~69px gaps) is
         // exactly what collided.
         expect(Math.min(...gaps)).toBeGreaterThanOrEqual(100);
+    });
+
+    /**
+     * CHAOS-4672, found live: a MIDDLE-anchored label at the first/last tick
+     * sits exactly at the chart's own left/right margin, so roughly half its
+     * own text extends past that chart's viewBox — into the NEXT small-
+     * multiples cell in the CSS grid. That is a second, distinct instance of
+     * the reported collision (across a grid boundary, not within one
+     * chart's ticks) that reducing the tick count alone does not fix: it
+     * reproduced live even with 3 ticks. Anchoring the first label to grow
+     * rightward and the last to grow leftward keeps both inside their own
+     * chart regardless of tick count or grid gap.
+     */
+    it("anchors the first and last small-multiples tick label inward, never centered on the chart's own edge", () => {
+        const rows = Array.from({ length: 90 }, (_, i) => {
+            const day = new Date(Date.UTC(2026, 4, 3 + i)).toISOString().slice(0, 10);
+            return row({ day: { string: day }, a: { integer: i }, b: { integer: i * 2 } });
+        });
+        const { container } = render(
+            <FactChart
+                axis={{ column: "day", kind: "time" }}
+                chartKind="line"
+                rows={rows}
+                seriesColumns={["a", "b"]}
+            />,
+        );
+        const cell = container.querySelector(".fact-chart__cell")!;
+        const ticks = Array.from(cell.querySelectorAll('.fact-chart__axis-label[y="162"]')).sort(
+            (a, b) => Number(a.getAttribute("x")) - Number(b.getAttribute("x")),
+        );
+        expect(ticks.length).toBeGreaterThanOrEqual(3);
+        expect(ticks[0]!.getAttribute("text-anchor")).toBe("start");
+        expect(ticks.at(-1)!.getAttribute("text-anchor")).toBe("end");
+        // Every INTERIOR tick keeps the original centered anchor.
+        for (const tick of ticks.slice(1, -1)) {
+            expect(tick.getAttribute("text-anchor")).toBe("middle");
+        }
     });
 });
