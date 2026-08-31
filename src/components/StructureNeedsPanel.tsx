@@ -19,6 +19,7 @@ import {
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { structureMemberLabel } from "@/lib/structure-disposition";
+import { CANNOT_REASK_HERE_COPY } from "@/lib/vocab-mapping";
 
 /**
  * Guided structure-elicitation prompts (CHAOS-3927 P2, design brief §2.2).
@@ -557,7 +558,7 @@ export function StructureNeedsPanel({
 
             {onConfirm === undefined ? (
                 <p className="record__meta" data-testid="cannot-confirm-structure-here">
-                    This context cannot re-ask, so the offers above are shown for inspection only.
+                    {CANNOT_REASK_HERE_COPY}
                 </p>
             ) : (
                 <button

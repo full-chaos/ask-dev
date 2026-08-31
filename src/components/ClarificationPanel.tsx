@@ -6,6 +6,7 @@ import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import type { InvestigationResult, SubjectCandidate } from "@/lib/contracts";
 import { candidateStateTone, formatConfidence, humanizeTerm } from "@/lib/presentation";
+import { CANNOT_REASK_HERE_COPY } from "@/lib/vocab-mapping";
 
 export type ClarificationChoice = {
     readonly result_id: string;
@@ -162,7 +163,7 @@ export function ClarificationPanel({
             )}
             {onConfirm === undefined ? (
                 <p className="record__meta" data-testid="cannot-choose-here">
-                    This context cannot re-ask, so the candidates are shown for inspection only.
+                    {CANNOT_REASK_HERE_COPY}
                 </p>
             ) : null}
 

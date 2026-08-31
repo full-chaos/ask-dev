@@ -1,9 +1,18 @@
 import { useId } from "react";
 
+import type { DedupedLimitation } from "@/lib/fact-dedup";
+import { SURFACE_LABEL } from "@/lib/fact-dedup";
 import type { InvestigationResult } from "@/lib/contracts";
 
 export type LimitationsPanelProps = {
-    readonly limitations: InvestigationResult["limitations"];
+    /**
+     * CHAOS-4669 defect 1: `@/lib/fact-dedup`'s dedup verdict, not a bare
+     * `string[]` — the same fact commonly reaches Limitations AND one of
+     * the three Finding-card surfaces (near-verbatim, per chris's own UX
+     * notes). Callers with nothing to dedupe against (the
+     * `clarification_required` branch) pass `identityLimitations(...)`.
+     */
+    readonly limitations: readonly DedupedLimitation[];
     readonly warnings: InvestigationResult["warnings"];
 };
 
@@ -32,11 +41,24 @@ export function LimitationsPanel({ limitations, warnings }: LimitationsPanelProp
                 <p className="panel__empty">The service reported no limitations.</p>
             ) : (
                 <ul className="stack stack--tight">
-                    {limitations.map((limitation) => (
-                        <li className="record" key={limitation}>
-                            {limitation}
-                        </li>
-                    ))}
+                    {limitations.map((limitation) =>
+                        limitation.isDuplicate ? (
+                            <li className="record record--reference" key={limitation.text}>
+                                {/*
+                                 * codex round 3, finding 3: this panel renders BEFORE
+                                 * the Findings panels on the decisive branch, so a
+                                 * limitation whose primary is `readiness_gaps` (etc.)
+                                 * has NOT been shown yet when this line renders —
+                                 * "Already" would be a false positional claim.
+                                 */}
+                                Also shown in full under {SURFACE_LABEL[limitation.primarySurface]}.
+                            </li>
+                        ) : (
+                            <li className="record" key={limitation.text}>
+                                {limitation.text}
+                            </li>
+                        ),
+                    )}
                 </ul>
             )}
             {warnings.length > 0 ? (

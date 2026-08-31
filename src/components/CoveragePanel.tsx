@@ -1,8 +1,14 @@
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
+import { Details } from "@/components/Details";
 import type { Coverage } from "@/lib/contracts";
 import { coverageStateTone, humanizeTerm } from "@/lib/presentation";
+import {
+    humanizeCoverageSourceName,
+    humanizeDegradedReason,
+    humanizeReasonBody,
+} from "@/lib/vocab-mapping";
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
@@ -55,41 +61,69 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             // The state is real, visible TEXT on every chip,
                             // not just a color or a hover.
                         }
-                        {coverage.sources.map((source) => (
-                            <Badge
-                                key={`${source.source}:${source.state}`}
-                                tone={coverageStateTone(source.state)}
-                                title={`${source.source}: ${source.state}`}
-                            >
-                                {source.source} · {humanizeTerm(source.state)}
-                            </Badge>
-                        ))}
+                        {coverage.sources.map((source) => {
+                            // CHAOS-4673: the chip is the always-visible
+                            // surface, so it carries the MAPPED name, never
+                            // the raw `canonical_fact:*`/`dev-health-ops:*`
+                            // identifier — that stays in "Source details"
+                            // below, inside the closed disclosure.
+                            const name = humanizeCoverageSourceName(source.source);
+                            return (
+                                <Badge
+                                    key={`${source.source}:${source.state}`}
+                                    tone={coverageStateTone(source.state)}
+                                    title={`${name.sentence}: ${source.state}`}
+                                >
+                                    {name.sentence} · {humanizeTerm(source.state)}
+                                </Badge>
+                            );
+                        })}
                     </div>
                     <details className="disclosure">
                         <summary>Source details</summary>
                         <div className="coverage">
-                            {coverage.sources.map((source) => (
-                                <div
-                                    className="coverage__source"
-                                    key={`${source.source}:${source.state}`}
-                                >
-                                    <span className="coverage__name">{source.source}</span>
-                                    <Badge
-                                        tone={coverageStateTone(source.state)}
-                                        title={source.state}
+                            {coverage.sources.map((source) => {
+                                const name = humanizeCoverageSourceName(source.source);
+                                const reason =
+                                    source.reason === undefined
+                                        ? undefined
+                                        : humanizeReasonBody(source.reason);
+                                return (
+                                    <div
+                                        className="coverage__source"
+                                        key={`${source.source}:${source.state}`}
                                     >
-                                        {humanizeTerm(source.state)}
-                                    </Badge>
-                                    {source.reason !== undefined ? (
-                                        <p className="coverage__reason">{source.reason}</p>
-                                    ) : null}
-                                    {source.observed_at !== undefined ? (
-                                        <p className="coverage__reason">
-                                            observed at {source.observed_at}
+                                        <span className="coverage__name">{name.sentence}</span>
+                                        <Badge
+                                            tone={coverageStateTone(source.state)}
+                                            title={source.state}
+                                        >
+                                            {humanizeTerm(source.state)}
+                                        </Badge>
+                                        {reason !== undefined ? (
+                                            <p className="coverage__reason">{reason.sentence}</p>
+                                        ) : null}
+                                        {source.observed_at !== undefined ? (
+                                            <p className="coverage__reason">
+                                                observed at {source.observed_at}
+                                            </p>
+                                        ) : null}
+                                        {/* Raw identifiers stay INSIDE this already-
+                                            collapsed "Source details" <details> (CHAOS-4673
+                                            acceptance: raw closed-vocabulary strings never
+                                            appear outside collapsed Details). */}
+                                        <p className="record__meta">
+                                            <code>{name.raw}</code>
+                                            {reason === undefined ? null : (
+                                                <>
+                                                    {" · "}
+                                                    <code>{reason.raw}</code>
+                                                </>
+                                            )}
                                         </p>
-                                    ) : null}
-                                </div>
-                            ))}
+                                    </div>
+                                );
+                            })}
                         </div>
                     </details>
                 </>
@@ -100,11 +134,22 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {degradedReasons.map((reason) => (
-                            <li className="record" key={reason}>
-                                {reason}
-                            </li>
-                        ))}
+                        {degradedReasons.map((reason) => {
+                            // CHAOS-4673: "every degraded reason reads as a
+                            // plain sentence" (acceptance) — the raw
+                            // `<kind>: unexpanded:<outcome>: ...` string
+                            // moves behind ▸Details, never on the lead
+                            // surface.
+                            const mapped = humanizeDegradedReason(reason);
+                            return (
+                                <li className="record" key={reason}>
+                                    <p className="record__body">{mapped.sentence}</p>
+                                    <Details data-testid="degraded-reason-raw" summary="Raw reason">
+                                        <code>{mapped.raw}</code>
+                                    </Details>
+                                </li>
+                            );
+                        })}
                     </ul>
                 </>
             ) : null}

@@ -26,6 +26,7 @@ import type {
     StructureNeedKind,
     SubjectRef,
 } from "@/lib/contracts";
+import { dedupeFindings, identityLimitations } from "@/lib/fact-dedup";
 import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     type StructureSelectionBatch,
@@ -196,6 +197,20 @@ export function DeterministicAnswerView({
     // drift.
     const disposition =
         chosenSubject === undefined ? undefined : choiceDisposition(result, chosenSubject);
+    // CHAOS-4669 defect 1: computed once, from the SAME four fields the
+    // decisive branch below already renders as separate cards — see
+    // `@/lib/fact-dedup`'s own header for why the answer prose itself is
+    // out of scope. Unused on the `clarification_required` branch (its own
+    // `LimitationsPanel` call below uses `identityLimitations` instead —
+    // that branch renders no Findings panels to dedupe against), but
+    // computing it unconditionally keeps this one hook call ahead of every
+    // early return, matching every other hook in this component.
+    const dedupedFindings = dedupeFindings({
+        remaining_work: result.remaining_work,
+        readiness_gaps: result.readiness_gaps,
+        conflicts: result.conflicts,
+        limitations: result.limitations,
+    });
     // Rendered in BOTH branches below. A dishonoured choice is invisible
     // otherwise: an answer reads as being about the chosen subject, and a second
     // clarification reads as an ordinary one.
@@ -349,7 +364,10 @@ export function DeterministicAnswerView({
                     // `DeterministicAnswerView.test.tsx`'s "clarification
                     // branch shows warnings" test.
                 }
-                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
+                <LimitationsPanel
+                    limitations={identityLimitations(result.limitations)}
+                    warnings={result.warnings}
+                />
             </article>
         );
     }
@@ -372,23 +390,31 @@ export function DeterministicAnswerView({
             {notice}
             {structureNeedsPanel}
             {
-                // CHAOS-4581: panels lead, prose follows — chris's own
-                // complaint was that the decision-carrying panels (ranked
-                // table, driver contributions, coverage) sat below a wall of
-                // text. Nothing here changes WHAT renders, only the order:
-                // every panel below still self-gates to null exactly as
-                // before, and `AnswerPanel`'s prose always renders last among
-                // the decision-carrying panels, never above them.
-                //
-                // codex review round 3: the ticket specifies TWO distinct
-                // sequences, not one shared order — a cohort answer wants
-                // "RANKED TEAMS ... then principal driver cards" (Drivers
-                // immediately after Ranked Teams), while a single-subject
-                // answer wants "health/flow tiles + rows table FIRST, prose
-                // after" (fact rows ahead of Drivers). `isCohortAnswer` uses
-                // the SAME gate `CohortRankingPanel`/`DriversPanel` already
-                // use, so this never drifts from what those panels actually
-                // decide to render.
+                // CHAOS-4669: the answer block IS the lead panel — chris's
+                // 08-31 UX notes ("the answer is buried under data
+                // references and charts") refine CHAOS-4581's own
+                // "panels lead, prose follows" bar rather than reversing
+                // it: 4581 was never "prose never leads", it was "prose
+                // does not read as a WALL ahead of the decision-carrying
+                // panels". `AnswerPanel` itself stayed short by
+                // construction the whole time (deterministic_answer +
+                // direct_judgment only; `current_state` already behind its
+                // own Details) — so leading with it is not reintroducing
+                // that wall, it is finishing the same fix: answer summary
+                // -> rich charts -> collapsed evidence.
+            }
+            <AnswerPanel result={result} />
+            {
+                // codex review round 3 (CHAOS-4581, preserved here): the
+                // ticket specifies TWO distinct sequences for the CHARTS
+                // that follow the answer, not one shared order — a cohort
+                // answer wants "RANKED TEAMS ... then principal driver
+                // cards" (Drivers immediately after Ranked Teams), while a
+                // single-subject answer wants fact rows ahead of Drivers.
+                // `isCohortIntent`/`rankingTable` use the SAME gate
+                // `CohortRankingPanel`/`DriversPanel` already use, so this
+                // never drifts from what those panels actually decide to
+                // render.
             }
             <CohortRankingPanel
                 cohort={result.cohort}
@@ -410,37 +436,39 @@ export function DeterministicAnswerView({
                 </>
             )}
             {
-                // Coverage / limitations, as a compact strip (CSS only —
-                // each panel is still a full, independently testable
-                // component; `.strip` just lays them out side by side and
-                // each keeps its own collapsed-by-default detail).
+                // Everything below here is the COLLAPSED EVIDENCE tier
+                // (CHAOS-4669): coverage/completeness/limitations as a
+                // compact strip (CSS only — each panel is still a full,
+                // independently testable component; `.strip` just lays
+                // them out side by side and each keeps its own
+                // collapsed-by-default detail), then plan provenance,
+                // selection provenance, subject resolution, findings, and
+                // raw evidence references.
             }
             <div className="strip">
                 <CoveragePanel coverage={result.coverage} />
                 <CompletenessPanel completeness={result.completeness} />
-                <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
+                <LimitationsPanel
+                    limitations={dedupedFindings.limitations}
+                    warnings={result.warnings}
+                />
             </div>
             <AnswerPlanPanel answerPlan={result.answer_plan} />
-            {
-                // The narrative prose — short by construction (see
-                // AnswerPanel), and never above the panels above it.
-            }
-            <AnswerPanel result={result} />
             {structureConfirmationNotice}
             <SubjectResolutionPanel resolution={result.subject_resolution} />
             <FindingsPanel
                 title="Remaining work"
-                findings={result.remaining_work}
+                findings={dedupedFindings.remaining_work}
                 emptyMessage="No remaining work was reported."
             />
             <FindingsPanel
                 title="Readiness gaps"
-                findings={result.readiness_gaps}
+                findings={dedupedFindings.readiness_gaps}
                 emptyMessage="No readiness gaps were reported."
             />
             <FindingsPanel
                 title="Conflicts"
-                findings={result.conflicts}
+                findings={dedupedFindings.conflicts}
                 emptyMessage="No conflicting evidence was reported."
             />
 
