@@ -138,6 +138,27 @@ function sourceAddressMatchesKind(
 const EXACT_INTEGER_BOUND = 2 ** 53;
 
 /**
+ * The one duplicate-identity rule, in one place.
+ *
+ * Everything this view resolves BY must be unique: a cohort member's
+ * canonical id, a claim id, a shape id, a series key, a point label within a
+ * series. acr rejects a duplicate of any of them, and a duplicate here is
+ * worse than a rejection — it is a silent choice. This view took the FIRST
+ * match while acr's resolvers build maps and take the last, so the same
+ * answer could show two readers different numbers.
+ *
+ * It exists as a shared helper because the alternative kept failing: this
+ * lane fixed duplicate CLAIM ids and left duplicate MEMBERS; fixed duplicate
+ * shape ids on the cohort selector and left the trend selector; checked
+ * duplicate point labels and left series keys. Three separate reviews, the
+ * same defect each time, because each fix was applied to exactly the case
+ * that was named. A rule that lives in one function cannot be half-applied.
+ */
+function hasDuplicate(values: readonly string[]): boolean {
+    return new Set(values).size !== values.length;
+}
+
+/**
  * True when every label is a REAL calendar date, not merely one `Date.parse`
  * accepts.
  *
@@ -163,20 +184,25 @@ function resolvePointSource(
 ): number | undefined {
     switch (source.kind) {
         case "cohort_member_score": {
-            const member = cohort?.members.find(
+            const matches = (cohort?.members ?? []).filter(
                 (candidate) => candidate.subject.canonical_id === source.subject_canonical_id,
             );
+            if (matches.length !== 1) return undefined;
+            const member = matches[0];
             // `score` is nullable on the wire and `null` is a real value
             // meaning "ranked, no score" — distinct from an absent member.
             // Neither can back a plotted bar.
             return member?.score ?? undefined;
         }
         case "cohort_driver_weight_contributed": {
-            const member = cohort?.members.find(
+            const members = (cohort?.members ?? []).filter(
                 (candidate) => candidate.subject.canonical_id === source.subject_canonical_id,
             );
-            const driver = member?.drivers?.find((candidate) => candidate.signal === source.signal);
-            return driver?.weight_contributed;
+            if (members.length !== 1) return undefined;
+            const drivers = (members[0]!.drivers ?? []).filter(
+                (candidate) => candidate.signal === source.signal,
+            );
+            return drivers.length === 1 ? drivers[0]!.weight_contributed : undefined;
         }
         case "claimed_fact_row": {
             if (source.claim_id === undefined || source.row_index === undefined) return undefined;
@@ -226,6 +252,7 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // spacing would draw evenly-spaced samples the observations do not have.
     if (shape.axis_kind === "time" && !everyLabelIsADate(shape)) return false;
 
+    if (hasDuplicate(shape.series.map((series) => series.key))) return false;
     for (const series of shape.series) {
         // One axis position, one value. Two points at one label is a table
         // drawn as a chart that silently overwrites itself — and the
@@ -264,16 +291,25 @@ export function renderShapesFor(
     result: InvestigationResult,
     rules: readonly RenderShapeRule[],
 ): VerifiedShapes {
-    const all = result.render_shapes ?? [];
-    // A shape id is opaque but unique within an answer — acr rejects a
-    // duplicate. Rendering two shapes under one React key makes the second
-    // silently replace the first, so a reader loses a chart with no notice
-    // (codex round 2). Both copies are withheld rather than one arbitrarily
-    // preferred.
-    const duplicated = new Set(
-        all.map((shape) => shape.shape_id).filter((id, index, ids) => ids.indexOf(id) !== index),
+    const candidates = (result.render_shapes ?? []).filter((shape) =>
+        rules.includes(shape.selected_by),
     );
-    const candidates = all.filter((shape) => rules.includes(shape.selected_by));
+    return admit(candidates, result);
+}
+
+/**
+ * The shared admission step for EVERY selector: a shape is drawn only if its
+ * id is unique across the whole answer and it verifies. Both copies of a
+ * duplicated id are withheld rather than one arbitrarily preferred — a React
+ * key collision would otherwise make the second silently replace the first,
+ * and a reader would lose a chart with no notice.
+ */
+function admit(candidates: readonly RenderShape[], result: InvestigationResult): VerifiedShapes {
+    const duplicated = new Set(
+        (result.render_shapes ?? [])
+            .map((shape) => shape.shape_id)
+            .filter((id, index, ids) => ids.indexOf(id) !== index),
+    );
     const shapes = candidates.filter(
         (shape) => !duplicated.has(shape.shape_id) && verifyRenderShape(shape, result),
     );
@@ -300,9 +336,12 @@ export function trendShapesForClaim(result: InvestigationResult, claimId: string
     const candidates = (result.render_shapes ?? []).filter(
         (shape) => shape.selected_by === "dated_fact_trend" && shapeMentionsClaim(shape, claimId),
     );
-    const shapes = candidates.filter(
-        (shape) => shapeCitesClaim(shape, claimId) && verifyRenderShape(shape, result),
-    );
+    // Candidacy is "mentions this claim"; ownership is "cites only this
+    // claim". A shape that mentions the claim but cites another too is a
+    // candidate that fails admission, so it is WITHHELD here rather than
+    // silently absent from every panel — the round-2 defect.
+    const owned = candidates.filter((shape) => shapeCitesClaim(shape, claimId));
+    const { shapes } = admit(owned, result);
     return { shapes, withheld: candidates.length - shapes.length };
 }
 
