@@ -3,8 +3,14 @@ import { useId } from "react";
 import { FactChart } from "@/components/FactChart";
 import { FactTable } from "@/components/FactTable";
 import { RenderShapeChart } from "@/components/RenderShapeChart";
-import type { ClaimedFact, InvestigationResult } from "@/lib/contracts";
-import { factRowTiles, factsWithRows, findRollupBasis, selectPresentation } from "@/lib/fact-rows";
+import type { ClaimedFact, InvestigationResult, RenderShape } from "@/lib/contracts";
+import {
+    factRowTiles,
+    factsWithRows,
+    findRollupBasis,
+    groupFactsByTable,
+    selectPresentation,
+} from "@/lib/fact-rows";
 import { trendShapesForClaim } from "@/lib/render-shapes";
 import { humanizeTerm } from "@/lib/presentation";
 
@@ -20,18 +26,32 @@ export type FactRowsPanelsProps = {
 };
 
 /**
- * One panel per claimed fact carrying a renderable `rows` table (CHAOS-4347),
+ * One panel per DISTINCT table a claimed fact's `rows` names (CHAOS-4347),
  * stacked under the answer text (CHAOS-4355). A fact with no `rows`, or an
- * empty `rows` array, renders nothing — an empty state here only ever means
- * "the service sent no table for this fact", never a missing feature.
+ * empty `rows` array, contributes nothing — an empty state here only ever
+ * means "the service sent no table for this fact", never a missing feature.
+ *
+ * CHAOS-4672: the service attaches the WHOLE table to every claim that cites
+ * it, so several claims (different `field`s, e.g. one measure per claim)
+ * commonly carry byte-identical `rows` — one row table, multiple claims. Such
+ * claims are grouped by `groupFactsByTable` and render ONE panel, not one
+ * each; the panel titled by whichever claim reached the table first lists
+ * the others as references rather than re-plotting their identical rows.
  */
 export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
     const withRows = factsWithRows(facts);
     if (withRows.length === 0) return null;
+    const groups = groupFactsByTable(withRows);
     return (
         <>
-            {withRows.map((fact) => (
-                <FactRowsPanel allFacts={facts} fact={fact} key={fact.claim_id} result={result} />
+            {groups.map((group) => (
+                <FactRowsPanel
+                    allFacts={facts}
+                    alsoClaims={group.alsoClaims}
+                    fact={group.primary}
+                    key={group.primary.claim_id}
+                    result={result}
+                />
             ))}
         </>
     );
@@ -39,11 +59,43 @@ export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
 
 type FactRowsPanelProps = {
     readonly fact: ClaimedFact;
+    /** Every other claim that cites the SAME table as `fact` (CHAOS-4672) — referenced, never re-plotted. */
+    readonly alsoClaims: readonly ClaimedFact[];
     readonly allFacts: readonly ClaimedFact[];
     readonly result: InvestigationResult | undefined;
 };
 
-function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
+/**
+ * Merges acr's own server-selected trend shapes across every claim in a
+ * CHAOS-4672 table group, not just the panel's primary claim — a shape
+ * `trendShapesForClaim` would have drawn for a claim that is now folded into
+ * `alsoClaims` must still be drawn HERE, on the one panel left standing for
+ * their shared table (never silently dropped by the dedupe). A shape is
+ * "owned" by at most one claim (`trendShapesForClaim`'s own ownership rule:
+ * every point cites ONLY that claim), so `shapes` from different claim ids
+ * are already disjoint — the `Map` below is defense in depth, not a real
+ * collision. `withheld` is summed per claim rather than deduplicated: the
+ * safe direction for a count whose whole purpose is "surface an answer-
+ * quality failure, never swallow it" is to over-report, not under-report,
+ * on the rare case a withheld candidate mentions more than one claim in the
+ * group.
+ */
+function trendsForGroup(
+    result: InvestigationResult | undefined,
+    claimIds: readonly string[],
+): { readonly shapes: readonly RenderShape[]; readonly withheld: number } {
+    if (result === undefined) return { shapes: [], withheld: 0 };
+    const shapeById = new Map<string, RenderShape>();
+    let withheld = 0;
+    for (const claimId of claimIds) {
+        const perClaim = trendShapesForClaim(result, claimId);
+        for (const shape of perClaim.shapes) shapeById.set(shape.shape_id, shape);
+        withheld += perClaim.withheld;
+    }
+    return { shapes: [...shapeById.values()], withheld };
+}
+
+function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProps) {
     const rows = fact.rows ?? [];
     // A WITHHELD trend suppresses the heuristic chart too, not just a
     // rendered one: falling back would draw a client-side chart for exactly
@@ -57,10 +109,7 @@ function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
     // this view can check. Where acr selected a trend, the heuristic chart is
     // replaced by it — never drawn beside it, which would show one fact's
     // numbers twice under two different selection rules.
-    const trends =
-        result === undefined
-            ? { shapes: [], withheld: 0 }
-            : trendShapesForClaim(result, fact.claim_id);
+    const trends = trendsForGroup(result, [fact.claim_id, ...alsoClaims.map((c) => c.claim_id)]);
     const presentation =
         trends.shapes.length > 0 || trends.withheld > 0
             ? { mode: "table" as const }
@@ -91,6 +140,15 @@ function FactRowsPanel({ fact, allFacts, result }: FactRowsPanelProps) {
                 {rollupBasis !== undefined ? ` · ${humanizeTerm(rollupBasis)}` : ""}
                 {` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
             </p>
+            {alsoClaims.length > 0 ? (
+                // CHAOS-4672: this table backs more than one claim. The
+                // OTHER claims are referenced here, not re-plotted as their
+                // own duplicate chart group — see `groupFactsByTable`.
+                <p className="fact-panel__caption" data-testid="fact-also-referenced">
+                    Also referenced by{" "}
+                    {alsoClaims.map((claim) => humanizeTerm(claim.field)).join(", ")}.
+                </p>
+            ) : null}
             {tiles.length > 0 ? (
                 // CHAOS-4581 pop-up-card reference: a single-row rollup's own
                 // numeric columns, shown as tiles ABOVE the same table — the

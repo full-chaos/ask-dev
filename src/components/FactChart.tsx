@@ -15,7 +15,14 @@ const MULTIPLE_WIDTH = 300;
 const MULTIPLE_HEIGHT = 170;
 const MARGIN = { top: 12, right: 12, bottom: 30, left: 12 };
 const MAX_AXIS_LABELS_SINGLE = 8;
-const MAX_AXIS_LABELS_MULTIPLE = 5;
+// CHAOS-4672: a small-multiple cell is MULTIPLE_WIDTH (300px) wide, margins
+// included — 5 evenly-spaced ISO-date labels ("2026-08-02", 10 chars) at
+// `.fact-chart__axis-label`'s 10px font left ~69px between label CENTERS,
+// which visibly collided on the real rig (two ticks' glyphs overlapping,
+// reported as run-together text). 3 ticks roughly doubles that gap; the
+// single full-width chart (640px, `MAX_AXIS_LABELS_SINGLE`) was not
+// reported as colliding and is untouched.
+const MAX_AXIS_LABELS_MULTIPLE = 3;
 
 // Fixed hue order (dataviz skill): series 1 always takes slot 1, never
 // reassigned by which columns happen to be present. `seriesColumns` is
@@ -38,6 +45,25 @@ function axisLabel(row: ClaimedFactRow, axis: ChartAxis): string {
     if (value === undefined) return "";
     const cell = cellValue(value);
     return cell === null ? "" : String(cell);
+}
+
+/**
+ * CHAOS-4672 (codex round 1, EXECUTED): a full ISO timestamp
+ * ("2026-01-01T12:34:56.000Z", 24 chars) at the axis-label tick still
+ * collided even after the tick-count and edge-anchor fixes — three ticks'
+ * worth of 24-char text does not fit inside a 300px small-multiples cell
+ * regardless of anchoring. A tick only needs enough resolution to place a
+ * point on the elapsed-time scale it is already drawn on; the full value
+ * (including any time component) stays exact and available on the mark's
+ * own `aria-label`/`<title>` (`axisLabel`, used unchanged for those). Safe
+ * to slice unconditionally: `fact-rows.ts`'s `isTimeColumn` only classifies
+ * an axis `kind: "time"` when EVERY row's value matches
+ * `ISO_DATE_PATTERN` — the first 10 characters are always the calendar
+ * date (`YYYY-MM-DD`) by the time this component receives `kind: "time"`.
+ */
+function axisTickLabel(row: ClaimedFactRow, axis: ChartAxis): string {
+    const full = axisLabel(row, axis);
+    return axis.kind === "time" ? full.slice(0, 10) : full;
 }
 
 function seriesValue(row: ClaimedFactRow, column: string): number | undefined {
@@ -244,11 +270,29 @@ function SeriesChart({
                         <text
                             className="fact-chart__axis-label"
                             key={`axis-${index}`}
-                            textAnchor="middle"
+                            // CHAOS-4672: `labelIndices` always includes row 0
+                            // and the LAST row, whose x sits exactly at the
+                            // plot's own left/right margin — a centered label
+                            // there overflows roughly half its own width past
+                            // the chart's viewBox, bleeding into the NEXT
+                            // small-multiple cell in the grid (the reported
+                            // defect: two charts' tick text visually running
+                            // together at the grid boundary, not two ticks
+                            // inside one chart). Anchoring the first/last
+                            // label to grow inward, away from the edge it
+                            // sits on, keeps every label within its own
+                            // chart's bounds regardless of grid gap.
+                            textAnchor={
+                                index === 0
+                                    ? "start"
+                                    : index === orderedRows.length - 1
+                                      ? "end"
+                                      : "middle"
+                            }
                             x={xForIndex(index)}
                             y={height - 8}
                         >
-                            {axisLabel(row, axis)}
+                            {axisTickLabel(row, axis)}
                         </text>
                     ) : null,
                 )}
