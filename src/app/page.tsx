@@ -909,7 +909,15 @@ export default function ChatPage() {
                                 setPopupAutoConfirmTick((tick) => tick + 1);
                             }
                         }}
-                        onDismiss={() => setDismissedPopupTurnId(latestAssistantTurn?.id)}
+                        onDismiss={() => {
+                            // codex round 3: move focus BEFORE the popup
+                            // unmounts (same synchronous handler that
+                            // removes it) — see `ChatComposerHandle.focus`'s
+                            // own doc comment for why a later effect is too
+                            // late.
+                            composerRef.current?.focus();
+                            setDismissedPopupTurnId(latestAssistantTurn?.id);
+                        }}
                         onFreeText={(text) => void ask(text)}
                         onSelect={applyPopupSelection}
                         pages={popupPages}

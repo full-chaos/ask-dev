@@ -387,6 +387,28 @@ describe("the clarification popup is live only on the most recent assistant turn
     });
 
     /**
+     * codex round 3 (chaos-4671-20260831T120929.md): Dismiss unmounts the
+     * popup but never restores focus, so a keyboard user's focus falls back
+     * to `document.body` — they must re-navigate (click, or Tab from the
+     * top) before they can keep typing. `ask()`'s own `userEvent.type` call
+     * would mask this (it focuses its target itself), so this test reads
+     * `document.activeElement` directly instead.
+     */
+    it("Dismiss returns focus to the composer, without the caller re-focusing it", async () => {
+        respondWith({ result: clarification });
+        render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        const dismissButton = await screen.findByRole("button", { name: "Dismiss" });
+        dismissButton.focus();
+        await user.keyboard("{Enter}");
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(document.activeElement).toBe(screen.getByLabelText("Ask a question"));
+    });
+
+    /**
      * CHAOS-4671 keyboard nav, single-select page: a number key picks AND
      * confirms in one keystroke (there is nothing else to accumulate on a
      * one-page, single-select result) — the ticket's own "1..N, selectable
