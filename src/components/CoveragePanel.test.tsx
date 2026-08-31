@@ -14,15 +14,22 @@ const coverage = mockScenarios().find((s) => s.id === "complete")!.result.covera
  * completeness").
  */
 describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
-    it("shows a chip per source and the summary sentence, always", () => {
+    it("shows a chip per source (mapped name, CHAOS-4673) and the summary sentence, always", () => {
         render(<CoveragePanel coverage={coverage} />);
 
         const panel = screen.getByTestId("coverage-panel");
         expect(within(panel).getByText("Complete — every source contributed.")).toBeInTheDocument();
         const chipRow = within(panel).getByTestId("coverage-chip-row");
+        // CHAOS-4673: the always-visible chip carries the MAPPED source
+        // name, never the raw `canonical_fact:*`/`dev-health-ops:*`
+        // identifier — that moves behind the closed "Source details"
+        // disclosure (see the test below).
         for (const source of coverage.sources) {
-            expect(chipRow).toHaveTextContent(source.source);
+            expect(chipRow).not.toHaveTextContent(source.source);
         }
+        expect(chipRow).toHaveTextContent("Dev Health — status");
+        expect(chipRow).toHaveTextContent("Dev Health — readiness");
+        expect(chipRow).toHaveTextContent("Canonical — workload");
     });
 
     /**
@@ -44,12 +51,16 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         };
         render(<CoveragePanel coverage={gapCoverage} />);
         const chipRow = screen.getByTestId("coverage-chip-row");
-        expect(chipRow).toHaveTextContent("canonical_fact:workload");
+        expect(chipRow).toHaveTextContent("Canonical — workload");
         expect(chipRow).toHaveTextContent("available");
-        expect(chipRow).toHaveTextContent("dev-health-ops:readiness");
+        expect(chipRow).toHaveTextContent("Dev Health — readiness");
         expect(chipRow).toHaveTextContent("unauthorized");
-        expect(chipRow).toHaveTextContent("canonical_fact:blockers");
+        expect(chipRow).toHaveTextContent("Canonical — blockers");
         expect(chipRow).toHaveTextContent("no data");
+        // The raw closed-vocabulary source names are not on the
+        // always-visible chip row at all (CHAOS-4673 acceptance).
+        expect(chipRow).not.toHaveTextContent("canonical_fact:");
+        expect(chipRow).not.toHaveTextContent("dev-health-ops:");
     });
 
     it("keeps the full per-source detail reachable behind a closed disclosure", () => {
@@ -82,5 +93,43 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         expect(first!.getAttribute("aria-labelledby")).not.toBe(
             second!.getAttribute("aria-labelledby"),
         );
+    });
+});
+
+/**
+ * CHAOS-4673: "every degraded reason reads as a plain sentence"; raw
+ * `<kind>: unexpanded:<outcome>: ...` strings stay behind a collapsed
+ * Details, never on the lead surface.
+ */
+describe("CoveragePanel — CHAOS-4673 degraded reasons read as plain sentences", () => {
+    const rawReason =
+        "blockers: unexpanded:policy_unavailable: no resolved subject holds this capability's facts directly and scope expansion did not reach them (origin: team; supported: work_item; policy: none; basis: activity_proxy)";
+
+    it("shows a mapped sentence on the lead surface and the raw reason only inside a collapsed Details", () => {
+        render(
+            <CoveragePanel
+                coverage={{ sources: [], partial: true, degraded_reasons: [rawReason] }}
+            />,
+        );
+
+        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        expect(screen.getByText(/no data-sharing policy is configured/)).toBeInTheDocument();
+
+        // The raw string exists ONLY inside a collapsed <details> — never as
+        // sibling text a reader would see without expanding it.
+        const raw = screen.getByText(rawReason);
+        const details = raw.closest("details")!;
+        expect(details).not.toBeNull();
+        expect(details).not.toHaveAttribute("open");
+        expect(details.getAttribute("data-testid")).toBe("degraded-reason-raw");
+
+        // The mapped sentence element itself carries none of the raw
+        // closed-vocabulary tokens (as opposed to some OTHER node in the
+        // same list, which the earlier whole-list check could not tell
+        // apart from this element).
+        const mappedSentence = screen.getByText(/no data-sharing policy is configured/);
+        expect(mappedSentence.closest("details")).toBeNull();
+        expect(mappedSentence.textContent).not.toContain("unexpanded:policy_unavailable");
+        expect(mappedSentence.textContent).not.toContain("activity_proxy");
     });
 });
