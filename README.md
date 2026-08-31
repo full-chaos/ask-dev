@@ -214,18 +214,27 @@ added to `context_fabric_common.v1`: `AnswerCompleteness`
 (`terminal_status`/`terminal_reason`/`claimed_facts_count`/`rows_count`,
 `terminal_reason` conditionally required off `complete`), and
 `context_fabric_investigation_result.v1` grows a REQUIRED `completeness`
-field pointing at it. Nothing else in the consumed surface changed between
-the prior pin (`6ac060ea`, still the shared rig's acr sha at bump time) and
-this one — verified directly against acr's own history
-(`git diff 6ac060eac757ffcc795bbdc39f3fe0eb3879559e f9d9688c72bf6843137778079f77bd8dde8da32e -- contracts/jsonschema/v1/`
-in the acr worktree touches only `context_fabric_common.v1.schema.json` and
-`context_fabric_investigation_result.v1.schema.json`, both exactly as
-described). Rendered by the new `CompletenessPanel` (`terminal_status` as a
-badge reusing `statusTone` — the same closed vocabulary as `status` itself —
-plus the claimed-facts/row counts, plus `terminal_reason` verbatim when
-present) in `DeterministicAnswerView`'s coverage/limitations strip, on both
-the decisive and `clarification_required` branches (the field is
-unconditional on the result, unlike e.g. `cohort`).
+field pointing at it. Nothing else in the CONSUMED surface (the four schemas
+`scripts/sync-acr-contracts.mjs` actually copies:
+`context_fabric_common.v1`, `context_fabric_investigation_request.v1`,
+`context_fabric_investigation_result.v1`, `error.v1`) changed between the
+prior pin (`6ac060ea`, still the shared rig's acr sha at bump time) and this
+one — verified directly against acr's own history: `git diff
+6ac060eac757ffcc795bbdc39f3fe0eb3879559e
+f9d9688c72bf6843137778079f77bd8dde8da32e -- contracts/jsonschema/v1/` in the
+acr worktree touches SIX files (also `context_fabric_answer_projection.v1`,
+`context_fabric_investigation_result.v2`, and the two `mcp_*_response.v1`
+schemas that embed the same `$defs`— none of which ask-dev pins), of which
+only`context_fabric_common.v1.schema.json`and`context_fabric_investigation_result.v1.schema.json`are in the four this
+repo consumes;`context_fabric_investigation_request.v1.schema.json`and`error.v1.schema.json`are byte-identical to the prior pin (confirmed by
+diffing each of the four consumed paths individually, not by this one
+broader command's file list). Rendered by the new`CompletenessPanel`
+(`terminal_status`as a
+badge reusing`statusTone`— the same closed vocabulary as`status`itself —
+plus the claimed-facts/row counts, plus`terminal_reason`verbatim when
+present) in`DeterministicAnswerView`'s coverage/limitations strip, on both
+the decisive and `clarification_required`branches (the field is
+unconditional on the result, unlike e.g.`cohort`).
 
 CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion to the public
 interpretation has **not** landed on acr main as of this pin — there is
