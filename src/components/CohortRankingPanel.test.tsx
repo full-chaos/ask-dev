@@ -92,7 +92,9 @@ describe("CohortRankingPanel", () => {
             ...cohort,
             members: [{ ...cohort.members[0]!, score: 32.666666666666664 }],
         };
-        render(<CohortRankingPanel cohort={rawFloat} result={undefined} shape="discovered_cohort" />);
+        render(
+            <CohortRankingPanel cohort={rawFloat} result={undefined} shape="discovered_cohort" />,
+        );
         const row = within(screen.getAllByTestId("ranking-row")[0]!);
 
         expect(row.getByText("32.7")).toBeInTheDocument();
@@ -109,7 +111,9 @@ describe("CohortRankingPanel", () => {
             ...cohort,
             members: [{ ...cohort.members[0]!, score: 0.004 }],
         };
-        render(<CohortRankingPanel cohort={tinyScore} result={undefined} shape="discovered_cohort" />);
+        render(
+            <CohortRankingPanel cohort={tinyScore} result={undefined} shape="discovered_cohort" />,
+        );
         const row = within(screen.getAllByTestId("ranking-row")[0]!);
         expect(row.queryByText("0.0")).not.toBeInTheDocument();
         expect(row.getByText("0.004")).toBeInTheDocument();
@@ -120,7 +124,9 @@ describe("CohortRankingPanel", () => {
             ...cohort,
             members: [{ ...cohort.members[0]!, score: 0 }],
         };
-        render(<CohortRankingPanel cohort={zeroScore} result={undefined} shape="discovered_cohort" />);
+        render(
+            <CohortRankingPanel cohort={zeroScore} result={undefined} shape="discovered_cohort" />,
+        );
         const row = within(screen.getAllByTestId("ranking-row")[0]!);
         expect(row.getByText("0.0")).toBeInTheDocument();
     });
