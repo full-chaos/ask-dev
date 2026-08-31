@@ -99,6 +99,32 @@ describe("CohortRankingPanel", () => {
         expect(row.queryByText("32.666666666666664")).not.toBeInTheDocument();
     });
 
+    it("never renders a real nonzero score as the same text as a literal zero (codex round 1)", () => {
+        // The schema's 0..100 bound accepts a real score arbitrarily close to
+        // zero. `(0.004).toFixed(1)` is "0.0" — byte-identical to a genuine
+        // score of exactly 0 — which would erase the distinction the contract
+        // draws between "a real, tiny score" and "a real, zero score" (both
+        // already distinct from "no score at all", the em dash).
+        const tinyScore: Cohort = {
+            ...cohort,
+            members: [{ ...cohort.members[0]!, score: 0.004 }],
+        };
+        render(<CohortRankingPanel cohort={tinyScore} result={undefined} shape="discovered_cohort" />);
+        const row = within(screen.getAllByTestId("ranking-row")[0]!);
+        expect(row.queryByText("0.0")).not.toBeInTheDocument();
+        expect(row.getByText("0.004")).toBeInTheDocument();
+    });
+
+    it("still renders a genuine zero score as 0.0, not confused with the tiny-nonzero case", () => {
+        const zeroScore: Cohort = {
+            ...cohort,
+            members: [{ ...cohort.members[0]!, score: 0 }],
+        };
+        render(<CohortRankingPanel cohort={zeroScore} result={undefined} shape="discovered_cohort" />);
+        const row = within(screen.getAllByTestId("ranking-row")[0]!);
+        expect(row.getByText("0.0")).toBeInTheDocument();
+    });
+
     it("shows the top two drivers behind the score, strongest first", () => {
         render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         const row = within(screen.getAllByTestId("ranking-row")[0]!);
