@@ -35,8 +35,23 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                     {findings.map(({ finding, isDuplicate, primarySurface }) =>
                         isDuplicate ? (
                             <li className="record record--reference" key={finding.finding_id}>
-                                {humanizeTerm(finding.kind)} — already shown in full under{" "}
-                                {SURFACE_LABEL[primarySurface]}.
+                                <p className="record__body">
+                                    {humanizeTerm(finding.kind)} — already shown in full under{" "}
+                                    {SURFACE_LABEL[primarySurface]}.
+                                </p>
+                                {/*
+                                 * codex round 2, finding 3: the cross-referenced primary
+                                 * lives on a DIFFERENT `FindingsPanel` instance (a different
+                                 * surface's own render), so this component has no way to
+                                 * diff this duplicate's evidence against it. Always
+                                 * rendering this occurrence's OWN evidence here — even when
+                                 * it duplicates the primary's — is the only way to never
+                                 * silently drop evidence unique to this occurrence.
+                                 */}
+                                <EvidenceReferences
+                                    evidenceRefIds={finding.evidence_ref_ids}
+                                    label="Evidence"
+                                />
                             </li>
                         ) : (
                             <li className="record" key={finding.finding_id}>

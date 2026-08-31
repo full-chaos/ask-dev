@@ -174,6 +174,67 @@ describe("dedupeFindings: CHAOS-4669 defect 1 (one fact, one primary rendering)"
         expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
     });
 
+    /**
+     * codex round 2, finding 1 (EXECUTED repro): matching on EITHER key
+     * (text OR facts) let two DISTINCT facts collide purely because their
+     * summaries happened to be worded identically, even though BOTH
+     * carried their own distinct `claimed_fact_ids`. An explicit,
+     * non-empty `claimed_fact_ids` on both sides is a stronger identity
+     * signal than shared wording and must win: text-only matching is now
+     * used ONLY when at least one side carries no id at all.
+     */
+    it("does NOT collapse two DIFFERENT facts that share identical text but carry distinct claimed_fact_ids (codex round 2, finding 1)", () => {
+        const a = finding({
+            finding_id: "finding_01",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_01"],
+        });
+        const b = finding({
+            finding_id: "finding_02",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_02"],
+        });
+        const result = dedupeFindings({
+            remaining_work: [b],
+            readiness_gaps: [a],
+            conflicts: [],
+            limitations: [],
+        });
+        expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
+        expect(result.remaining_work[0]!.isDuplicate).toBe(false);
+        expect(result.remaining_work[0]!.primarySurface).toBe("remaining_work");
+    });
+
+    /**
+     * codex round 2, finding 2 (EXECUTED repro): the old duplicate test was
+     * `owner !== surface`, so a SECOND occurrence of the exact same fact
+     * filed twice on the SAME surface resolved `owner === surface` and was
+     * wrongly marked `isDuplicate: false` — both rendered in full. Identity
+     * must collapse repeats within one surface too, not just across
+     * surfaces.
+     */
+    it("marks a second identical fact within the SAME surface as a duplicate too (codex round 2, finding 2)", () => {
+        const first = finding({
+            finding_id: "finding_01",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_01"],
+        });
+        const second = finding({
+            finding_id: "finding_02",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_01"],
+        });
+        const result = dedupeFindings({
+            remaining_work: [],
+            readiness_gaps: [first, second],
+            conflicts: [],
+            limitations: [],
+        });
+        expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
+        expect(result.readiness_gaps[1]!.isDuplicate).toBe(true);
+        expect(result.readiness_gaps[1]!.primarySurface).toBe("readiness_gaps");
+    });
+
     it("conflicts outranks limitations when both carry the same fact and no Finding list ranks higher", () => {
         const c = finding({ finding_id: "finding_c", summary: "Same fact." });
         const result = dedupeFindings({

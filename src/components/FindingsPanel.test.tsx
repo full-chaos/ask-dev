@@ -67,6 +67,36 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
     });
 
+    /**
+     * codex round 2, finding 3 (EXECUTED repro): a duplicate identified by
+     * shared `claimed_fact_ids`/text can still carry evidence its
+     * cross-referenced primary does not — the duplicate branch rendered
+     * only the reference sentence, silently dropping that unique evidence.
+     * AGENTS.md: a missing fact must never look like the service never
+     * sent it. The duplicate's own evidence must stay reachable.
+     */
+    it("still renders a duplicate's own evidence, never silently drops it (codex round 2, finding 3)", () => {
+        const duplicateWithOwnEvidence: DedupedFinding = {
+            finding: {
+                finding_id: "finding_extra_evidence",
+                kind: "readiness",
+                summary: "Release acceptance remains incomplete.",
+                evidence_ref_ids: ["acr:v1:pull-request:202"],
+            },
+            isDuplicate: true,
+            primarySurface: "readiness_gaps",
+        };
+        render(
+            <FindingsPanel
+                title="Remaining work"
+                findings={[duplicateWithOwnEvidence]}
+                emptyMessage="No remaining work was reported."
+            />,
+        );
+        expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByTestId("evidence-ref-raw-ids")).toBeInTheDocument();
+    });
+
     it("still says so explicitly when there are no findings", () => {
         render(
             <FindingsPanel

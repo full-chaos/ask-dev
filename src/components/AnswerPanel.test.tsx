@@ -132,6 +132,31 @@ describe("AnswerPanel — CHAOS-4669 defect 2: computation arithmetic moves behi
         expect(screen.getByText("More detail")).toBeInTheDocument();
     });
 
+    /**
+     * codex round 2, finding 4 (EXECUTED repro): when `direct_judgment` is
+     * ENTIRELY the arithmetic-template sentence, `splitLeadArithmetic`
+     * correctly extracts all of it, leaving `lead` empty — but the panel
+     * then treated an empty LEAD as an absent judgment and showed "The
+     * service returned no direct judgment," even though the field was
+     * non-empty and its content is sitting, verbatim, in More detail. The
+     * "no direct judgment" message must reflect the ORIGINAL field, not
+     * the post-extraction lead.
+     */
+    it("never claims 'no direct judgment' when direct_judgment is non-empty but entirely arithmetic (codex round 2, finding 4)", () => {
+        const arithmeticOnly =
+            "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points.";
+        const result: InvestigationResult = {
+            ...base,
+            direct_judgment: arithmeticOnly,
+        };
+        render(<AnswerPanel result={result} />);
+
+        expect(screen.queryByText("The service returned no direct judgment.")).toBeNull();
+        const details = screen.getByText("More detail").closest("details")!;
+        expect(screen.getByText(arithmeticOnly)).toBeInTheDocument();
+        expect(details).not.toHaveAttribute("open");
+    });
+
     it("does the same for direct_judgment, not just deterministic_answer", () => {
         const result: InvestigationResult = {
             ...base,

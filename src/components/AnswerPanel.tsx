@@ -45,7 +45,13 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     const idPrefix = useId();
     const deterministicAnswer = splitLeadArithmetic(result.deterministic_answer);
     const directJudgment = splitLeadArithmetic(result.direct_judgment);
-    const hasJudgment = directJudgment.lead.trim() !== "";
+    // codex round 2, finding 4: this must reflect the ORIGINAL field, not
+    // the post-extraction lead. An arithmetic-only `direct_judgment` is
+    // fully extracted into `More detail` (lossless — see this file's own
+    // doc comment), leaving `directJudgment.lead` empty; testing THAT for
+    // "no judgment" falsely claimed the service sent none, when its
+    // content is sitting, verbatim, one click away.
+    const hasJudgment = result.direct_judgment.trim() !== "";
     const hasCurrentState = result.current_state.trim() !== "";
     const arithmeticSentences = [...deterministicAnswer.extracted, ...directJudgment.extracted];
     const hasDetail = hasCurrentState || arithmeticSentences.length > 0;
@@ -58,13 +64,22 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-answer-title`}>
                 Answer
             </h2>
-            <p className="answer__judgment">
-                <SafeAnswerText text={deterministicAnswer.lead} />
-            </p>
-            {hasJudgment ? (
-                <p className="answer__body">
-                    <SafeAnswerText text={directJudgment.lead} />
+            {deterministicAnswer.lead !== "" ? (
+                <p className="answer__judgment">
+                    <SafeAnswerText text={deterministicAnswer.lead} />
                 </p>
+            ) : null}
+            {hasJudgment ? (
+                // `directJudgment.lead` can still be "" here when the whole
+                // field was the arithmetic template — its content already
+                // moved to `More detail` below (`arithmeticSentences`), so
+                // there is nothing left to show on the lead surface, and no
+                // empty paragraph is rendered either.
+                directJudgment.lead !== "" ? (
+                    <p className="answer__body">
+                        <SafeAnswerText text={directJudgment.lead} />
+                    </p>
+                ) : null
             ) : (
                 <p className="panel__empty">The service returned no direct judgment.</p>
             )}
