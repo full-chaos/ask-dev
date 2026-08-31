@@ -36,7 +36,14 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                         isDuplicate ? (
                             <li className="record record--reference" key={finding.finding_id}>
                                 <p className="record__body">
-                                    {humanizeTerm(finding.kind)} — already shown in full under{" "}
+                                    {/*
+                                     * codex round 3, finding 3: `primarySurface` is a
+                                     * DOMAIN ranking (see fact-dedup's `SURFACE_PRIORITY`
+                                     * doc comment), not this page's render order — the
+                                     * primary can render BELOW this reference. "already"
+                                     * would be a false positional claim in that case.
+                                     */}
+                                    {humanizeTerm(finding.kind)} — also shown in full under{" "}
                                     {SURFACE_LABEL[primarySurface]}.
                                 </p>
                                 {/*

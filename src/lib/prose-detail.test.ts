@@ -105,4 +105,26 @@ describe("splitLeadArithmetic: CHAOS-4669 defect 2 (computation arithmetic out o
         expect(result.extracted).toHaveLength(0);
         expect(result.lead).toBe(raw);
     });
+
+    /**
+     * codex round 3, finding 2 (EXECUTED repro): the splitter only breaks at
+     * `.`/`!`/`?` followed by whitespace, so a genuine conclusion joined to
+     * the scoring clause by a semicolon (no terminal punctuation between
+     * them) was ONE "sentence" as far as the splitter was concerned — the
+     * whole fragment, conclusion included, was swallowed into `extracted`,
+     * leaving `lead` empty even though a real, non-arithmetic judgment was
+     * right there. A semicolon is as much a fragment boundary as a period
+     * for this narrow, rule-based splitter (same decimal-safety argument
+     * applies: a semicolon is never adjacent to a digit either side of a
+     * decimal point).
+     */
+    it("keeps a real conclusion that shares a semicolon-joined fragment with the scoring clause (codex round 3, finding 2)", () => {
+        const raw =
+            "The release is blocked because approval is missing; principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Atlas's 46.7 attention points.";
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe("The release is blocked because approval is missing;");
+        expect(result.extracted).toEqual([
+            "principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Atlas's 46.7 attention points.",
+        ]);
+    });
 });

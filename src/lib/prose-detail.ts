@@ -52,18 +52,17 @@ const ARITHMETIC_SENTENCE_RE =
     /\(\s*weight\s+[\d.]+\s*,\s*value\s+[\d.]+\s*\)[\s\S]*?contributed\s+[\d.]+\s+of\s+[\s\S]*?[\d.]+\s+attention\s+points?/i;
 
 /**
- * Splits `text` into sentences at a sentence-ending punctuation mark
- * followed by whitespace AND an uppercase letter (or `$1`'s boundary is
- * simply "whitespace after `.`/`!`/`?`, before a capital"). Safe against
- * splitting inside a decimal number: `20.0 of` has a digit immediately
- * after the decimal point, never whitespace, so the lookahead for
- * whitespace never matches there — only a genuine sentence boundary
- * (`points. Fullchaos`) has both a space AND a following capital letter.
- * Not a general-purpose sentence tokenizer (an abbreviation like "e.g. "
- * followed by a capitalized word would still split) — the same trade-off
- * the rest of this codebase makes for light rule-based text handling
- * (e.g. `humanizeTerm`, `boundedCoverageSource`) rather than pulling in an
- * NLP dependency for one narrow, templated pattern.
+ * Splits `text` into fragments at a sentence- or clause-ending punctuation
+ * mark followed by whitespace. Safe against splitting inside a decimal
+ * number: `20.0 of` has a digit immediately after the decimal point, never
+ * whitespace, so the lookahead for whitespace never matches there — the
+ * same argument applies to a semicolon, which never sits adjacent to a
+ * digit on either side of a decimal point either. Not a general-purpose
+ * sentence tokenizer (an abbreviation like "e.g. " followed by a
+ * capitalized word would still split) — the same trade-off the rest of
+ * this codebase makes for light rule-based text handling (e.g.
+ * `humanizeTerm`, `boundedCoverageSource`) rather than pulling in an NLP
+ * dependency for one narrow, templated pattern.
  */
 function splitSentences(text: string): readonly string[] {
     if (text.trim() === "") return [];
@@ -76,7 +75,14 @@ function splitSentences(text: string): readonly string[] {
     // decimal point (`20.0`) is never followed by whitespace, only by
     // another digit, so plain "punctuation then whitespace" is already a
     // safe, sufficient sentence boundary.
-    return text.split(/(?<=[.!?])\s+/);
+    //
+    // codex round 3, finding 2: a genuine conclusion joined to the scoring
+    // clause by a SEMICOLON, with no `.`/`!`/`?` between them ("... missing;
+    // principal driver(s): ..."), was one undivided "sentence" here, so the
+    // arithmetic match swallowed the conclusion along with the scoring
+    // clause. A semicolon is as much a fragment boundary as a period for
+    // this splitter's purposes, and is exactly as decimal-safe.
+    return text.split(/(?<=[.!?;])\s+/);
 }
 
 /**

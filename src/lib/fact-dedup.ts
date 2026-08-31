@@ -49,7 +49,15 @@ const SURFACE_PRIORITY: readonly FindingSurface[] = [
 
 export type DedupedFinding = {
     readonly finding: Finding;
-    /** True when a HIGHER-priority surface already renders this same fact in full. */
+    /**
+     * True when a higher-priority surface renders this same fact in full.
+     * `SURFACE_PRIORITY` is a domain ranking, NOT the page's render order
+     * (codex round 3, finding 3: `readiness_gaps` outranks `remaining_work`
+     * here, but `remaining_work` renders FIRST on the page — a cross-
+     * reference wording that claimed the primary was "already" shown would
+     * be false whenever the primary's surface renders below this one).
+     * Callers must not phrase this as "already shown" or "shown above".
+     */
     readonly isDuplicate: boolean;
     /** The surface that owns the full rendering — this surface itself when `isDuplicate` is false. */
     readonly primarySurface: FindingSurface;
@@ -84,71 +92,77 @@ function normalizeText(text: string): string {
     return text.trim().toLowerCase().replaceAll(/\s+/g, " ");
 }
 
-/**
- * The identity key(s) used to MATCH `finding` against everything claimed so
- * far. When `claimed_fact_ids` is present it is AUTHORITATIVE — two
- * findings that both declare an explicit (and different) fact identity are
- * different facts, full stop, even if their summaries happen to read
- * identically (codex round 2, finding 1: two distinct facts with distinct
- * `claimed_fact_ids` collapsed because both also matched on shared text).
- * Only when a finding carries NO `claimed_fact_ids` does text become the
- * matching key — the weak signal used to catch a fact re-filed without its
- * id (codex round 1, finding 3).
- */
-function matchKeys(finding: Finding): readonly string[] {
+/** The facts key (`claimed_fact_ids`, sorted+joined) when present, else `undefined`. */
+function factsKeyOf(finding: Finding): string | undefined {
     const factIds = finding.claimed_fact_ids;
-    if (factIds !== undefined && factIds.length > 0) {
-        return [`facts:${[...factIds].sort().join(",")}`];
-    }
-    return [`text:${normalizeText(finding.summary)}`];
+    if (factIds === undefined || factIds.length === 0) return undefined;
+    return `facts:${[...factIds].sort().join(",")}`;
+}
+
+function textKeyOf(text: string): string {
+    return `text:${normalizeText(text)}`;
 }
 
 /**
- * The full set of keys `finding` REGISTERS once it becomes a primary — the
- * text key always (so a LATER id-less duplicate of the same wording can
- * still find it), plus the facts key when present. Distinct from
- * `matchKeys`: a fact WITH an id only ever matches by its id (above), but
- * it still donates its text key for others to match against.
+ * A registered claim: which surface owns the full rendering, and — for the
+ * TEXT key specifically — whether an explicit facts key claimed it (and
+ * which one). That second field is what makes matching order-independent
+ * (codex round 3, finding 1): whichever of an id-bearing/id-less pair of
+ * the same fact is processed FIRST, the other must still resolve to it.
  */
-function claimKeys(finding: Finding): readonly string[] {
-    const keys = [`text:${normalizeText(finding.summary)}`];
-    const factIds = finding.claimed_fact_ids;
-    if (factIds !== undefined && factIds.length > 0) {
-        keys.push(`facts:${[...factIds].sort().join(",")}`);
-    }
-    return keys;
-}
-
-function limitationMatchAndClaimKeys(text: string): readonly string[] {
-    return [`text:${normalizeText(text)}`];
-}
+type Claim = { readonly surface: FindingSurface; readonly ownerFactsKey: string | undefined };
 
 /**
- * Resolves one item against everything claimed SO FAR, using its own
- * `matchKeys` (identity-authoritative: facts key ONLY when present, else
- * the text key). A match makes this item a duplicate of the owner's
- * surface — REGARDLESS of whether the owner is this same surface or a
- * different one (codex round 2, finding 2: comparing `owner !== surface`
- * let a second identical fact filed twice on the SAME surface render in
- * full twice, since its own surface "owned" the key). Only when NO match is
- * found does this item become a new primary, claiming every one of
- * `claimKeys` — but never overwriting a key some earlier item already
- * claimed, so an explicit-id fact's text never steals a key a different
- * explicit-id fact already owns.
+ * Resolves one item against everything claimed SO FAR.
+ *
+ * - An id-LESS item (`factsKey` undefined) matches purely on text, against
+ *   ANY earlier claim of that text key — id-bearing or not. Text is the
+ *   only signal it has, so it is always authoritative for it (round 1: a
+ *   fact re-filed without its id still finds the id-bearing original).
+ * - An id-BEARING item first checks its OWN facts key: an exact match there
+ *   is unconditionally a duplicate (same explicit identity). Failing that,
+ *   it falls back to the text key — but ONLY treats a text match as the
+ *   same fact when that key's owner has NO explicit id of its own, or the
+ *   SAME id. A text match owned by a DIFFERENT explicit id is a conflict,
+ *   not evidence of sameness (round 2, finding 1: two distinct facts must
+ *   never collapse just because their wording matches) — this item becomes
+ *   its own primary instead.
+ *
+ * A match makes this item a duplicate of the owner's surface — REGARDLESS
+ * of whether the owner is this same surface or a different one (round 2,
+ * finding 2: comparing `owner !== surface` let a second identical fact
+ * filed twice on the SAME surface render in full twice). Only when no match
+ * is found does this item become a new primary: it claims its own facts
+ * key (if any) and the text key — but NEVER overwrites a text key an
+ * earlier, differently-identified item already claims (first-claim-wins),
+ * so a conflicting explicit id can never steal another fact's text slot.
  */
 function resolve(
-    claims: Map<string, FindingSurface>,
+    claims: Map<string, Claim>,
     surface: FindingSurface,
-    matching: readonly string[],
-    claiming: readonly string[],
+    factsKey: string | undefined,
+    textKey: string,
 ): { readonly isDuplicate: boolean; readonly primarySurface: FindingSurface } {
-    for (const key of matching) {
-        const owner = claims.get(key);
-        if (owner !== undefined) return { isDuplicate: true, primarySurface: owner };
+    if (factsKey === undefined) {
+        const byText = claims.get(textKey);
+        if (byText !== undefined) return { isDuplicate: true, primarySurface: byText.surface };
+        claims.set(textKey, { surface, ownerFactsKey: undefined });
+        return { isDuplicate: false, primarySurface: surface };
     }
-    for (const key of claiming) {
-        if (!claims.has(key)) claims.set(key, surface);
+
+    const byFacts = claims.get(factsKey);
+    if (byFacts !== undefined) return { isDuplicate: true, primarySurface: byFacts.surface };
+
+    const byText = claims.get(textKey);
+    if (
+        byText !== undefined &&
+        (byText.ownerFactsKey === undefined || byText.ownerFactsKey === factsKey)
+    ) {
+        return { isDuplicate: true, primarySurface: byText.surface };
     }
+
+    claims.set(factsKey, { surface, ownerFactsKey: factsKey });
+    if (!claims.has(textKey)) claims.set(textKey, { surface, ownerFactsKey: factsKey });
     return { isDuplicate: false, primarySurface: surface };
 }
 
@@ -162,7 +176,7 @@ function resolve(
  * tiebreak).
  */
 export function dedupeFindings(input: DedupedFindingsInput): DedupedFindingsResult {
-    const claims = new Map<string, FindingSurface>();
+    const claims = new Map<string, Claim>();
     const findingResults: Record<Exclude<FindingSurface, "limitations">, DedupedFinding[]> = {
         remaining_work: [],
         readiness_gaps: [],
@@ -176,8 +190,12 @@ export function dedupeFindings(input: DedupedFindingsInput): DedupedFindingsResu
     for (const surface of SURFACE_PRIORITY) {
         if (surface === "limitations") {
             limitations = input.limitations.map((text) => {
-                const keys = limitationMatchAndClaimKeys(text);
-                const { isDuplicate, primarySurface } = resolve(claims, surface, keys, keys);
+                const { isDuplicate, primarySurface } = resolve(
+                    claims,
+                    surface,
+                    undefined,
+                    textKeyOf(text),
+                );
                 return { text, isDuplicate, primarySurface };
             });
         } else {
@@ -185,8 +203,8 @@ export function dedupeFindings(input: DedupedFindingsInput): DedupedFindingsResu
                 const { isDuplicate, primarySurface } = resolve(
                     claims,
                     surface,
-                    matchKeys(finding),
-                    claimKeys(finding),
+                    factsKeyOf(finding),
+                    textKeyOf(finding.summary),
                 );
                 return { finding, isDuplicate, primarySurface };
             });

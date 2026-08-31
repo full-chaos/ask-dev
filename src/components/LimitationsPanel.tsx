@@ -44,8 +44,14 @@ export function LimitationsPanel({ limitations, warnings }: LimitationsPanelProp
                     {limitations.map((limitation) =>
                         limitation.isDuplicate ? (
                             <li className="record record--reference" key={limitation.text}>
-                                Already shown in full under{" "}
-                                {SURFACE_LABEL[limitation.primarySurface]}.
+                                {/*
+                                 * codex round 3, finding 3: this panel renders BEFORE
+                                 * the Findings panels on the decisive branch, so a
+                                 * limitation whose primary is `readiness_gaps` (etc.)
+                                 * has NOT been shown yet when this line renders —
+                                 * "Already" would be a false positional claim.
+                                 */}
+                                Also shown in full under {SURFACE_LABEL[limitation.primarySurface]}.
                             </li>
                         ) : (
                             <li className="record" key={limitation.text}>

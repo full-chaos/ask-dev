@@ -29,7 +29,30 @@ describe("LimitationsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
             />,
         );
         expect(screen.queryByText("Release acceptance remains incomplete.")).toBeNull();
-        expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
+    });
+
+    /**
+     * codex round 3, finding 3 (EXECUTED repro): `DeterministicAnswerView`
+     * renders `LimitationsPanel` BEFORE the Findings panels, so a
+     * limitation whose primary is `readiness_gaps` (etc.) has not rendered
+     * yet at this point on the page — "Already" would be a false
+     * positional claim.
+     */
+    it("never claims the primary was 'already' shown — LimitationsPanel can render above its primary", () => {
+        render(
+            <LimitationsPanel
+                limitations={[
+                    {
+                        text: "Release acceptance remains incomplete.",
+                        isDuplicate: true,
+                        primarySurface: "readiness_gaps",
+                    },
+                ]}
+                warnings={[]}
+            />,
+        );
+        expect(screen.queryByText(/already/i)).toBeNull();
     });
 
     it("still says so explicitly when there are no limitations", () => {

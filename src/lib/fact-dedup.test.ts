@@ -235,6 +235,40 @@ describe("dedupeFindings: CHAOS-4669 defect 1 (one fact, one primary rendering)"
         expect(result.readiness_gaps[1]!.primarySurface).toBe("readiness_gaps");
     });
 
+    /**
+     * codex round 3, finding 1 (EXECUTED repro): the round-2 fix matched an
+     * id-bearing finding ONLY by its facts key, ignoring text entirely —
+     * correct when the id-less occurrence was claimed FIRST and processed
+     * BEFORE the id-bearing one (the existing test below), but broken in
+     * the OTHER order: an id-less finding processed first only registers
+     * the text key, and a LATER id-bearing finding with the identical text
+     * checked its facts key alone, found nothing, and became its own
+     * (wrong) second primary. The merge must hold regardless of which
+     * occurrence — id-bearing or id-less — is processed first.
+     */
+    it("still merges an id-less fact with a LATER id-bearing occurrence of the same text (codex round 3, finding 1)", () => {
+        const idLessFirst = finding({
+            finding_id: "finding_id_less",
+            summary: "The release gate has not passed.",
+        });
+        const idBearingLater = finding({
+            finding_id: "finding_id_bearing",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_01"],
+        });
+        // remaining_work is processed before conflicts in SURFACE_PRIORITY,
+        // so the id-less occurrence claims first.
+        const result = dedupeFindings({
+            remaining_work: [idLessFirst],
+            readiness_gaps: [],
+            conflicts: [idBearingLater],
+            limitations: [],
+        });
+        expect(result.remaining_work[0]!.isDuplicate).toBe(false);
+        expect(result.conflicts[0]!.isDuplicate).toBe(true);
+        expect(result.conflicts[0]!.primarySurface).toBe("remaining_work");
+    });
+
     it("conflicts outranks limitations when both carry the same fact and no Finding list ranks higher", () => {
         const c = finding({ finding_id: "finding_c", summary: "Same fact." });
         const result = dedupeFindings({

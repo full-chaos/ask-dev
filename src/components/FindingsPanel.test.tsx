@@ -52,7 +52,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         );
         // The full sentence never appears a second time.
         expect(screen.queryByText("Release acceptance remains incomplete.")).toBeNull();
-        expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
     });
 
     it("a mixed list shows one full record and one reference, never two full copies", () => {
@@ -64,7 +64,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
             />,
         );
         expect(screen.getAllByText("Release acceptance remains incomplete.").length).toBe(1);
-        expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
     });
 
     /**
@@ -93,8 +93,28 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 emptyMessage="No remaining work was reported."
             />,
         );
-        expect(screen.getByText(/already shown in full under Readiness gaps/i)).toBeInTheDocument();
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
         expect(screen.getByTestId("evidence-ref-raw-ids")).toBeInTheDocument();
+    });
+
+    /**
+     * codex round 3, finding 3 (EXECUTED repro): `DeterministicAnswerView`
+     * renders "Remaining work" BEFORE "Readiness gaps" on the page, but
+     * `readiness_gaps` outranks `remaining_work` in the dedup priority — so
+     * a remaining_work reference can point at a primary that has not
+     * rendered yet. The wording must not claim a position it cannot
+     * guarantee.
+     */
+    it("never claims the primary was 'already' shown — the primary can render below this reference", () => {
+        render(
+            <FindingsPanel
+                title="Remaining work"
+                findings={[DUPLICATE]}
+                emptyMessage="No remaining work was reported."
+            />,
+        );
+        expect(screen.queryByText(/already/i)).toBeNull();
+        expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
     });
 
     it("still says so explicitly when there are no findings", () => {
