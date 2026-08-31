@@ -168,6 +168,20 @@ function hasDuplicate(values: readonly string[]): boolean {
  * `fact-rows.ts` already applies before it will call an axis a time axis, so
  * the two selection paths cannot disagree about what a date is.
  */
+/** True when every series' points are in strictly ascending time order. */
+function everySeriesAscendsInTime(shape: RenderShape): boolean {
+    for (const series of shape.series) {
+        let previous: number | null = null;
+        for (const point of series.points) {
+            const at = parseIsoDate(point.label);
+            if (at === null) return false;
+            if (previous !== null && at <= previous) return false;
+            previous = at;
+        }
+    }
+    return true;
+}
+
 function everyLabelIsADate(shape: RenderShape): boolean {
     for (const series of shape.series) {
         for (const point of series.points) {
@@ -231,26 +245,48 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // this is the last place a payload acr would never emit can be refused
     // (codex round 1, P1/P2). Each one, left unchecked, lets a chart draw
     // while saying something the answer does not.
-    if (shape.kind === "series") {
-        // A time axis is drawn by elapsed time only on a line; every other
-        // presentation routes through category (index) spacing, which would
-        // place a January and a December point one band apart (codex round
-        // 2). acr only ever emits `line` for a time axis.
-        if (shape.axis_kind === "time" && shape.presentation !== "line") return false;
-        // An encoding this view cannot read is not a default to guess at:
-        // rendering an unspecified presentation as bars picks one of three
-        // meanings on the reader's behalf.
-        if (
-            shape.presentation !== "bars" &&
-            shape.presentation !== "stacked_bars" &&
-            shape.presentation !== "line"
-        ) {
-            return false;
-        }
+    // A kind this view has no renderer for is REFUSED, not admitted.
+    //
+    // Verification used to check `presentation` only for "series", so a
+    // sankey passed, was admitted, and RenderShapeChart returned null for it:
+    // no chart AND no withheld notice. The reader saw nothing and was told
+    // nothing — the exact silent absence the notice exists to prevent
+    // (CHAOS-4641).
+    //
+    // The list is deliberately what this file can DRAW, not what the contract
+    // declares. acr's vocabulary declares eight kinds so a consumer can
+    // switch exhaustively; seven have no renderer here yet, and the honest
+    // response to one arriving is "withheld", not a blank space. When a
+    // renderer lands, its kind joins this list in the same change.
+    if (shape.kind !== "series") return false;
+    // A time axis is drawn by elapsed time only on a line; every other
+    // presentation routes through category (index) spacing, which would place
+    // a January and a December point one band apart. acr only ever emits
+    // `line` for a time axis.
+    if (shape.axis_kind === "time" && shape.presentation !== "line") return false;
+    // An encoding this view cannot read is not a default to guess at:
+    // rendering an unspecified presentation as bars picks one of three
+    // meanings on the reader's behalf.
+    if (
+        shape.presentation !== "bars" &&
+        shape.presentation !== "stacked_bars" &&
+        shape.presentation !== "line"
+    ) {
+        return false;
     }
     // A time axis is POSITIONED by elapsed time. Falling back to index
     // spacing would draw evenly-spaced samples the observations do not have.
     if (shape.axis_kind === "time" && !everyLabelIsADate(shape)) return false;
+    // ...and its points must ASCEND. Every value in an out-of-order series is
+    // correctly sourced and verifies individually; the LINE BETWEEN THEM is
+    // the lie, drawing April -> January -> March and inventing transitions
+    // that never happened (CHAOS-4641). Same class as CHAOS-4616, reached
+    // through segment order rather than through the axis.
+    //
+    // Refused rather than sorted. acr emits a trend in chronological order,
+    // so a document that violates it is malformed, and quietly reordering
+    // would hide a producer bug exactly the way drawing it hides a data one.
+    if (shape.axis_kind === "time" && !everySeriesAscendsInTime(shape)) return false;
 
     if (hasDuplicate(shape.series.map((series) => series.key))) return false;
     for (const series of shape.series) {
