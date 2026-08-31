@@ -59,17 +59,21 @@ describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clari
 });
 
 /**
- * CHAOS-4581: "panels lead" — chris's complaint was that the decision-
- * carrying panels (ranked table, driver contributions, coverage) sat below
- * a wall of prose. These pin the reordering directly: for a single-subject
- * (project-status-shaped) answer, the rows table leads and the prose comes
- * after; for a cohort answer, the ranked-teams panel leads.
+ * CHAOS-4581 established "panels lead, prose follows" against a wall of
+ * prose; CHAOS-4669 refines it (does not reverse it, per that ticket's own
+ * header): the ANSWER — short by construction, see `AnswerPanel`'s own doc
+ * comment — leads INTO the charts, and the evidence/driver/computation
+ * apparatus collapses behind it. Order: answer summary -> rich charts ->
+ * collapsed evidence. `AnswerPanel` itself is still the FIRST content
+ * panel, same "panels lead" BAR CHAOS-4581 set, because the answer block
+ * IS the lead panel (CHAOS-4669 acceptance) — this is not prose reading as
+ * a wall ahead of the panels, it is one short paragraph immediately
+ * followed by them.
  *
- * RED on origin/main: `AnswerPanel` used to render prose immediately, and
- * `FactRowsPanels`/`CohortRankingPanel` came directly under it — both of
- * these orderings fail against that code. GREEN on this branch.
+ * RED on origin/main pre-CHAOS-4669: `AnswerPanel` rendered AFTER the
+ * ranked table / driver cards / coverage strip. GREEN on this branch.
  */
-describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () => {
+describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAOS-4669)", () => {
     function panelOrder(article: HTMLElement) {
         const sections = Array.from(article.querySelectorAll("section.panel"));
         return {
@@ -85,17 +89,16 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
         };
     }
 
-    it("single-subject: the rows table leads, the drivers/coverage strip follows, prose is last", () => {
+    it("single-subject: the answer leads, then the rows table, then the drivers/coverage strip", () => {
         const result = mockScenarios().find((s) => s.id === "rows")!.result;
         render(<DeterministicAnswerView result={result} />);
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });
         const order = panelOrder(article);
-        expect(order.firstFactRows).toBeGreaterThanOrEqual(0);
+        expect(order.answer).toBe(0);
+        expect(order.firstFactRows).toBeGreaterThan(order.answer);
         expect(order.drivers).toBeGreaterThan(order.firstFactRows);
         expect(order.coverage).toBeGreaterThan(order.firstFactRows);
-        expect(order.answer).toBeGreaterThan(order.drivers);
-        expect(order.answer).toBeGreaterThan(order.coverage);
         // CHAOS-4364 pin bump (acr #303, ef303358): the pinned canonical
         // example itself carries a rows-bearing claimed fact
         // (readiness/release_ready), spread in FIRST by the "rows" scenario
@@ -106,7 +109,7 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
         );
     });
 
-    it("cohort answer: the ranked-teams panel leads, ahead of drivers/coverage/prose", () => {
+    it("cohort answer: the answer leads, then the ranked-teams panel leads the charts, ahead of drivers/coverage", () => {
         const base = mockScenarios().find((s) => s.id === "complete")!.result;
         // The pinned canonical example carries a real ranked cohort but is
         // interpreted `single_subject` (CohortRankingPanel's own rule 0
@@ -121,15 +124,14 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });
         const order = panelOrder(article);
-        expect(order.cohort).toBeGreaterThanOrEqual(0);
+        expect(order.answer).toBe(0);
+        expect(order.cohort).toBeGreaterThan(order.answer);
         expect(order.drivers).toBeGreaterThan(order.cohort);
         expect(order.coverage).toBeGreaterThan(order.cohort);
-        expect(order.answer).toBeGreaterThan(order.drivers);
-        expect(order.answer).toBeGreaterThan(order.coverage);
         if (order.firstFactRows >= 0) {
             // CohortRankingPanel is rendered ahead of FactRowsPanels in the
-            // view — the ranked-teams panel leads the whole answer, fact
-            // tables included, for a cohort-shaped question.
+            // view — the ranked-teams panel leads the charts, fact tables
+            // included, for a cohort-shaped question.
             expect(order.firstFactRows).toBeGreaterThan(order.cohort);
         }
     });
@@ -169,7 +171,7 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
      * real cohort AND `confirmed_structure`, so this is the exact scenario
      * codex flagged, not a constructed one.
      */
-    it("cohort answer: applied-selections chip row does not precede Ranked Teams", () => {
+    it("cohort answer: applied-selections chip row does not precede Ranked Teams (nor the answer)", () => {
         const base = mockScenarios().find((s) => s.id === "complete")!.result;
         expect(base.confirmed_structure?.length).toBeGreaterThan(0);
         const result: InvestigationResult = {
@@ -179,9 +181,21 @@ describe("DeterministicAnswerView: panels lead, prose follows (CHAOS-4581)", () 
         render(<DeterministicAnswerView result={result} />);
 
         const article = screen.getByRole("article", { name: "Deterministic answer" });
-        expect(screen.getByText("Your selections were applied")).toBeInTheDocument();
-        const firstPanel = article.querySelector("section.panel")!;
-        expect(firstPanel.getAttribute("data-testid")).toBe("cohort-ranking-panel");
+        const chipRowHeading = screen.getByRole("heading", {
+            name: "Your selections were applied",
+        });
+        const sections = Array.from(article.querySelectorAll("section.panel"));
+        const chipRowIndex = sections.findIndex((s) => s.contains(chipRowHeading));
+        const cohortIndex = sections.findIndex(
+            (s) => s.getAttribute("data-testid") === "cohort-ranking-panel",
+        );
+        const answerIndex = sections.findIndex(
+            (s) => s.getAttribute("data-testid") === "answer-panel",
+        );
+        expect(chipRowIndex).toBeGreaterThan(cohortIndex);
+        expect(chipRowIndex).toBeGreaterThan(answerIndex);
+        // CHAOS-4669: the answer itself is the true lead panel now.
+        expect(answerIndex).toBe(0);
     });
 
     it("renders no fact-rows panel for a result whose claimed facts carry no rows", () => {

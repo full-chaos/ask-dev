@@ -55,3 +55,73 @@ describe("SubjectResolutionPanel", () => {
         expect(screen.getByText("skipped stale graph epoch")).toBeInTheDocument();
     });
 });
+
+/**
+ * CHAOS-4669 defect 4 (standing empty-states rule): "SUBJECTS — Nothing
+ * committed. No candidates were proposed." is a contentless meta panel,
+ * not an empty state worth showing. chris's own UX notes named this exact
+ * panel.
+ */
+describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => {
+    it("renders nothing when there is no prompt, no committed subjects, no candidates, and no prior-receipt disclosure", () => {
+        const emptyResolution: SubjectResolution = { candidates: [], committed: [] };
+        const { container } = render(<SubjectResolutionPanel resolution={emptyResolution} />);
+        expect(container.firstChild).toBeNull();
+        expect(screen.queryByRole("heading", { name: "Subjects" })).toBeNull();
+    });
+
+    it("still renders when committed subjects exist, even with no candidates (BASE_RESOLUTION's own shape)", () => {
+        render(<SubjectResolutionPanel resolution={BASE_RESOLUTION} />);
+        expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
+        expect(screen.getByText(/Committed: atlas/)).toBeInTheDocument();
+    });
+
+    it("still renders when the ONLY content is a prior-receipt disclosure", () => {
+        const resolution: SubjectResolution = {
+            candidates: [],
+            committed: [],
+            prior_subject_receipt_dispositions: [
+                {
+                    prior_result_id: "result_prior_0001",
+                    receipt_id: "subr_0001",
+                    disposition: "applied",
+                },
+            ],
+        };
+        render(<SubjectResolutionPanel resolution={resolution} />);
+        expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+        ).toBeInTheDocument();
+    });
+
+    it("still renders when the ONLY content is a clarification prompt", () => {
+        const resolution: SubjectResolution = {
+            candidates: [],
+            committed: [],
+            clarification_prompt: "Which repository did you mean?",
+        };
+        render(<SubjectResolutionPanel resolution={resolution} />);
+        expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
+        expect(screen.getByText("Which repository did you mean?")).toBeInTheDocument();
+    });
+
+    it("still renders when there are candidates but no committed subjects", () => {
+        const resolution: SubjectResolution = {
+            committed: [],
+            candidates: [
+                {
+                    receipt_id: "subr_cand_0001",
+                    subject: { kind: "project", canonical_id: "project_atlas", label: "Atlas" },
+                    state: "proposed",
+                    confidence: 0.5,
+                    match_reasons: ["name similarity"],
+                    evidence_ref_ids: [],
+                },
+            ],
+        };
+        render(<SubjectResolutionPanel resolution={resolution} />);
+        expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
+        expect(screen.getByText("Atlas")).toBeInTheDocument();
+    });
+});
