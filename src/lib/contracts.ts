@@ -21,6 +21,10 @@ export type {
     AnchorOption,
     // CHAOS-4413/CHAOS-4642: the promoted answer-rate/terminal-state fields.
     AnswerCompleteness,
+    // CHAOS-4636/CHAOS-4668: what the question was planned to be answered
+    // with, produced between interpretation and discovery.
+    AnswerPlan,
+    AnswerPlanBudget,
     CandidateOption,
     ClaimedFact,
     // CHAOS-4355: a claimed fact's OPTIONAL renderable table (CHAOS-4347).
@@ -28,6 +32,8 @@ export type {
     // CHAOS-4449 (acr CHAOS-4398 PR3/PR3b): the cohort and its ranked members.
     Cohort,
     CohortMember,
+    // CHAOS-4636/CHAOS-4668: one group of a grouped cohort answer.
+    CohortGroup,
     CohortMemberDriver,
     ConfirmedStructureEntry,
     Coverage,
@@ -36,6 +42,9 @@ export type {
     HandleOption,
     InterpretedQuestion,
     KindOption,
+    // CHAOS-4636/CHAOS-4668: one recorded narrowing step ("showing 2 of 3
+    // teams" and why).
+    PlanNarrowing,
     PriorSubjectReceiptDispositionEntry,
     RelationshipPath,
     // CHAOS-4415: the service's own conditional render shapes and their
