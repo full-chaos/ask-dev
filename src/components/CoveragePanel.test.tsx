@@ -80,6 +80,34 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
     it("still says so explicitly when there are no sources at all", () => {
         render(<CoveragePanel coverage={{ sources: [], partial: true, degraded_reasons: [] }} />);
         expect(screen.getByText("No sources were recorded.")).toBeInTheDocument();
+        // CHAOS-4524/4568: the headline itself must be the no-sources
+        // state — a vacuous version of this test could pass merely because
+        // SOME element elsewhere said "No sources were recorded." while the
+        // headline above it still claimed "Partial"/"Complete".
+        expect(
+            screen.queryByText("Partial — some sources did not contribute."),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Complete — every source contributed.")).not.toBeInTheDocument();
+    });
+
+    /**
+     * CHAOS-4524 / CHAOS-4568: zero sources is absence of evidence, not
+     * completeness. `partial === false` over an empty source list must
+     * never render the "Complete — every source contributed." headline —
+     * that reads a known gap as apparent completeness, the one failure
+     * this panel's doc comment says it exists to prevent (AGENTS.md check
+     * 12: missing is not healthy).
+     */
+    it("never shows the Complete headline when zero sources were recorded, even with partial=false", () => {
+        render(<CoveragePanel coverage={{ sources: [], partial: false, degraded_reasons: [] }} />);
+        const panel = screen.getByTestId("coverage-panel");
+        expect(
+            within(panel).queryByText("Complete — every source contributed."),
+        ).not.toBeInTheDocument();
+        expect(
+            within(panel).queryByText("Partial — some sources did not contribute."),
+        ).not.toBeInTheDocument();
+        expect(within(panel).getByText("No sources were recorded.")).toBeInTheDocument();
     });
 
     it("gives each mounted instance its own heading id (CHAOS-4510)", () => {
