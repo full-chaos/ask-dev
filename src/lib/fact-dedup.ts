@@ -131,11 +131,29 @@ type Claim = { readonly surface: FindingSurface; readonly ownerFactsKey: string 
  * A match makes this item a duplicate of the owner's surface — REGARDLESS
  * of whether the owner is this same surface or a different one (round 2,
  * finding 2: comparing `owner !== surface` let a second identical fact
- * filed twice on the SAME surface render in full twice). Only when no match
- * is found does this item become a new primary: it claims its own facts
- * key (if any) and the text key — but NEVER overwrites a text key an
- * earlier, differently-identified item already claims (first-claim-wins),
- * so a conflicting explicit id can never steal another fact's text slot.
+ * filed twice on the SAME surface render in full twice).
+ *
+ * CHAIN PROPAGATION (codex R4 full-base round — the pairwise truth table
+ * missed this, since it only covers a leader/follower PAIR): every item
+ * that resolves to an EXISTING owner still donates every identity signal
+ * IT carries — not just the ones needed for its own match — so a THIRD
+ * item reaching the same fact through a DIFFERENT signal still finds it.
+ * Concretely: an id-bearing item that merges via the text bridge (its own
+ * facts key was unclaimed) still registers that facts key against the true
+ * owner, so a LATER item with the identical facts key finds it directly
+ * without depending on that specific text bridge still existing. Symmetric
+ * case: an id-bearing item that merges via its OWN facts key still donates
+ * its own text as a bridge, so a later id-LESS item matching THIS item's
+ * particular wording (not necessarily the original primary's wording)
+ * still resolves to the same fact. Both are guarded by `!claims.has(...)`
+ * (first-claim-wins) — donating a signal never overwrites an earlier,
+ * differently-identified item's claim to that same key.
+ *
+ * Only when no match is found at all does this item become a brand new
+ * primary: it claims its own facts key (if any) and the text key — again
+ * never overwriting a key an earlier, differently-identified item already
+ * claims, so a conflicting explicit id can never steal another fact's text
+ * slot.
  */
 function resolve(
     claims: Map<string, Claim>,
@@ -151,13 +169,29 @@ function resolve(
     }
 
     const byFacts = claims.get(factsKey);
-    if (byFacts !== undefined) return { isDuplicate: true, primarySurface: byFacts.surface };
+    if (byFacts !== undefined) {
+        // Donate this occurrence's own wording as a text bridge too, even
+        // though it matched via its facts key — a later id-less item using
+        // THIS wording (not necessarily the original primary's) must still
+        // find the same fact.
+        if (!claims.has(textKey)) {
+            claims.set(textKey, { surface: byFacts.surface, ownerFactsKey: factsKey });
+        }
+        return { isDuplicate: true, primarySurface: byFacts.surface };
+    }
 
     const byText = claims.get(textKey);
     if (
         byText !== undefined &&
         (byText.ownerFactsKey === undefined || byText.ownerFactsKey === factsKey)
     ) {
+        // Donate this occurrence's own facts key too, even though it
+        // matched via the text bridge — a later item sharing this exact
+        // explicit id must find the fact directly, without depending on
+        // this specific text bridge still being intact (codex R4).
+        if (!claims.has(factsKey)) {
+            claims.set(factsKey, { surface: byText.surface, ownerFactsKey: factsKey });
+        }
         return { isDuplicate: true, primarySurface: byText.surface };
     }
 

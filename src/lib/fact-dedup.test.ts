@@ -299,20 +299,18 @@ describe("dedupeFindings: CHAOS-4669 defect 1 (one fact, one primary rendering)"
  * id-less × identical text or not × (when both id-bearing) their id sets
  * EQUAL / DISJOINT / OVERLAPPING / SUBSET × same or different surface.
  *
- * AMBIGUOUS CELL, flagged rather than guessed (per standing instruction):
- * OVERLAPPING and SUBSET id sets with identical text. The current
- * implementation's identity model treats `claimed_fact_ids` as a single
- * opaque SET key — two DIFFERENT sets are a different identity full stop,
- * with no notion of "close enough" for a partial overlap or a subset. That
- * is a defensible reading (an overlapping-but-different citation set is
- * evidentially a different claim), but nothing in the schema or ticket
- * text confirms it, and it is a genuinely different question from the
- * DISJOINT-set cell (round 2, finding 1), which is unambiguous (visibly
- * unrelated ids sharing text must not collapse). The two cells below pin
- * the CURRENT behavior (not deduplicated) as the reviewed baseline, not as
- * a confirmed product decision — this is the cell to bring to chris if a
- * real investigation ever produces overlapping/subset `claimed_fact_ids`
- * with identical wording.
+ * RULED CELL (chris/orchestrator, 2026-08-31): OVERLAPPING and SUBSET id
+ * sets with identical text are NOT deduplicated — ruled fail-safe, not
+ * merely pinned-current. `claimed_fact_ids` is treated as one opaque SET
+ * key, so a partially-overlapping citation set is a genuinely different
+ * claim; rendering it in full is the fail-safe direction, because a
+ * cross-reference would hide whatever part of it is NOT shared with the
+ * other occurrence — the same duplicate-evidence principle round 2/round 3
+ * already established (never let a collapse hide content unique to one
+ * occurrence). This is a different question from the DISJOINT-set cell
+ * (round 2, finding 1), which was unambiguous on its own (visibly unrelated
+ * ids sharing text must not collapse) — the two cells below make the ruling
+ * explicit for overlap/subset specifically.
  */
 describe("dedupeFindings: exhaustive pairwise truth table (codex R4 pre-round sweep)", () => {
     function pairFinding(id: string, text: string, ids?: readonly string[]): Finding {
@@ -416,7 +414,7 @@ describe("dedupeFindings: exhaustive pairwise truth table (codex R4 pre-round sw
             expectDuplicate: false,
         },
         {
-            name: "id-bearing x id-bearing, OVERLAPPING ids ({A,B} vs {B,C}), same text — AMBIGUOUS, see describe-block note",
+            name: "id-bearing x id-bearing, OVERLAPPING ids ({A,B} vs {B,C}), same text — RULED fail-safe: partial overlap never hides content",
             leaderIds: ["A", "B"],
             followerIds: ["B", "C"],
             sameText: true,
@@ -430,7 +428,7 @@ describe("dedupeFindings: exhaustive pairwise truth table (codex R4 pre-round sw
             expectDuplicate: false,
         },
         {
-            name: "id-bearing x id-bearing, SUBSET ids ({A} vs {A,B}), same text — AMBIGUOUS, see describe-block note",
+            name: "id-bearing x id-bearing, SUBSET ids ({A} vs {A,B}), same text — RULED fail-safe: partial overlap never hides content",
             leaderIds: ["A"],
             followerIds: ["A", "B"],
             sameText: true,
@@ -466,6 +464,85 @@ describe("dedupeFindings: exhaustive pairwise truth table (codex R4 pre-round sw
         expect(resolvePair(cell.leaderIds, cell.followerIds, cell.sameText, true)).toBe(
             cell.expectDuplicate,
         );
+    });
+
+    /**
+     * codex R4, EXECUTED (the truth table above is PAIRWISE and misses
+     * a 3-OCCURRENCE CHAIN): id-less `R` claims text T. id-bearing `A`
+     * (facts key X) matches R via the TEXT BRIDGE (round 3, finding 1's
+     * mechanism) and returned as a duplicate WITHOUT ever registering its
+     * own facts key X — the pre-fix `resolve` only wrote `factsKey` on the
+     * "brand new primary" path, never on the "merged via text bridge" path.
+     * A THIRD item `A2`, id-bearing with the SAME facts key X but DIFFERENT
+     * text, then checked `claims.get("facts:X")`, found nothing, and became
+     * its own wrong second primary — even though X is the exact same
+     * explicit identity as A's. Fix: merging via the text bridge must still
+     * register the item's own facts key (pointing at the true owner), so a
+     * later exact-id match no longer depends on that specific text bridge
+     * still existing.
+     */
+    it("a THREE-occurrence chain: an id-bearing item that merges via the text bridge still registers its own facts key for a later same-id item (codex R4)", () => {
+        const idLess = finding({ finding_id: "r", summary: "The release gate has not passed." });
+        const bridging = finding({
+            finding_id: "a",
+            summary: "The release gate has not passed.", // same text as idLess -> merges via bridge
+            claimed_fact_ids: ["claim_x"],
+        });
+        const sameIdDifferentText = finding({
+            finding_id: "a2",
+            summary: "CI pipeline success rate dropped.", // different text, SAME claimed_fact_ids
+            claimed_fact_ids: ["claim_x"],
+        });
+        const result = dedupeFindings({
+            remaining_work: [bridging],
+            readiness_gaps: [idLess],
+            conflicts: [sameIdDifferentText],
+            limitations: [],
+        });
+        expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
+        expect(result.remaining_work[0]!.isDuplicate).toBe(true);
+        expect(result.remaining_work[0]!.primarySurface).toBe("readiness_gaps");
+        expect(result.conflicts[0]!.isDuplicate).toBe(true);
+        expect(result.conflicts[0]!.primarySurface).toBe("readiness_gaps");
+    });
+
+    /**
+     * Symmetric chain, found while fixing the above (not itself reported by
+     * codex, closed proactively so a hypothetical next round can't find its
+     * mirror image): an id-bearing item that merges via its OWN facts key
+     * match must still donate ITS OWN text as a bridge, so a LATER id-less
+     * occurrence using a DIFFERENT wording than the original primary — but
+     * matching this item's own restatement — is still found. Without this,
+     * only the very FIRST wording ever seen for a fact is discoverable by
+     * text; every later restatement of the same explicit fact was a dead
+     * end for a subsequent id-less lookup.
+     */
+    it("a THREE-occurrence chain: an id-bearing item that merges via its OWN facts key still donates its own text for a later id-less item", () => {
+        const original = finding({
+            finding_id: "a",
+            summary: "The release gate has not passed.",
+            claimed_fact_ids: ["claim_x"],
+        });
+        const sameIdRestated = finding({
+            finding_id: "a2",
+            summary: "CI pipeline success rate dropped.", // different wording, SAME id -> merges via facts key
+            claimed_fact_ids: ["claim_x"],
+        });
+        const idLessMatchingRestatedWording = finding({
+            finding_id: "r",
+            summary: "CI pipeline success rate dropped.", // matches a2's wording, not a's
+        });
+        const result = dedupeFindings({
+            remaining_work: [sameIdRestated],
+            readiness_gaps: [original],
+            conflicts: [idLessMatchingRestatedWording],
+            limitations: [],
+        });
+        expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
+        expect(result.remaining_work[0]!.isDuplicate).toBe(true);
+        expect(result.remaining_work[0]!.primarySurface).toBe("readiness_gaps");
+        expect(result.conflicts[0]!.isDuplicate).toBe(true);
+        expect(result.conflicts[0]!.primarySurface).toBe("readiness_gaps");
     });
 });
 
