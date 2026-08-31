@@ -9,7 +9,7 @@ import type {
     InterpretedShape,
     InvestigationResult,
 } from "@/lib/contracts";
-import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { formatCohortScore, isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "@/lib/render-shapes";
 import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "@/lib/presentation";
 
@@ -187,7 +187,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                         ) : row.score === null ? (
                                             "—"
                                         ) : (
-                                            row.score
+                                            formatCohortScore(row.score)
                                         )
                                     }
                                 </td>

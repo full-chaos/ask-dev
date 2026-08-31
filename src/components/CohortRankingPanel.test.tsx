@@ -82,6 +82,23 @@ describe("CohortRankingPanel", () => {
         expect(row.getByText("current")).toBeInTheDocument();
     });
 
+    it("rounds a raw float score to one decimal place, matching the narration layer (CHAOS-4533)", () => {
+        // acr does not round `CohortMember.score` before sending it — the
+        // captured live shape was `32.666666666666664`. The narration layer
+        // (acr's cohortDriverJudgmentSummary, CHAOS-4580) already says "32.7"
+        // for this same score, so this table must not disagree with it by
+        // printing 17 significant figures.
+        const rawFloat: Cohort = {
+            ...cohort,
+            members: [{ ...cohort.members[0]!, score: 32.666666666666664 }],
+        };
+        render(<CohortRankingPanel cohort={rawFloat} result={undefined} shape="discovered_cohort" />);
+        const row = within(screen.getAllByTestId("ranking-row")[0]!);
+
+        expect(row.getByText("32.7")).toBeInTheDocument();
+        expect(row.queryByText("32.666666666666664")).not.toBeInTheDocument();
+    });
+
     it("shows the top two drivers behind the score, strongest first", () => {
         render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
         const row = within(screen.getAllByTestId("ranking-row")[0]!);

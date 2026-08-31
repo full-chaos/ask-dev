@@ -115,6 +115,20 @@ export function topDriversByWeightContributed(
 }
 
 /**
+ * How a cohort member's score renders: one decimal place.
+ *
+ * acr sends `CohortMember.score` unrounded (CHAOS-4533 — a captured live
+ * value was `32.666666666666664`); this is presentation only, nothing is
+ * re-derived. One decimal matches acr's own narration layer
+ * (`cohortDriverJudgmentSummary`, CHAOS-4580), which already narrates this
+ * same score as "32.7" — so the table and the sentence describing it never
+ * disagree.
+ */
+export function formatCohortScore(score: number): string {
+    return score.toFixed(1);
+}
+
+/**
  * The ranking table for a cohort, or `null` when acr ranked no member of it.
  *
  * `null` is the "not computed" distinction `ranking_computed` itself makes,
