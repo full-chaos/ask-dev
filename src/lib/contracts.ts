@@ -19,6 +19,8 @@ export type {
     ACRContextFabricInvestigationResultV1 as InvestigationResult,
     AcceptedGrammar,
     AnchorOption,
+    // CHAOS-4413/CHAOS-4642: the promoted answer-rate/terminal-state fields.
+    AnswerCompleteness,
     CandidateOption,
     ClaimedFact,
     // CHAOS-4355: a claimed fact's OPTIONAL renderable table (CHAOS-4347).

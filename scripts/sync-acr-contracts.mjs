@@ -28,20 +28,25 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #336 (the conditional render-shape surface) and #340,
-// which WITHDREW the `dated_fact_trend` rule — a row table cannot say which
-// of its columns are measures, so any trend drawn from one was a claim
-// resting on a guess (CHAOS-4616; the declared-shape contract that brings it
-// back is CHAOS-4627). The kind and rule stay in the closed vocabulary with
-// no producer, so nothing in the generated types changes; what changes is
-// that no answer carries a trend shape. Two schemas widen — `context_fabric_common.v1` gains
-// the eight Render* $defs, and `context_fabric_investigation_result.v1`
-// gains the optional `render_shapes` array that references them. The new
-// render-shape EXAMPLE joins the copied set too, because the workbench's
-// chart tests must run against a document acr's own producer emitted rather
-// than a hand-authored fixture that could pass while the live shape
-// differed. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "6ac060eac757ffcc795bbdc39f3fe0eb3879559e";
+// acr main: pins past #344 (CHAOS-4413), which promotes the answer-rate/
+// terminal-state measurement (formerly acr's own trial-harness-only
+// telemetry) into the public contract as `AnswerCompleteness` -- see
+// CHAOS-4642. ONE $def is added to `context_fabric_common.v1`
+// (`AnswerCompleteness`: `terminal_status`/`terminal_reason`/
+// `claimed_facts_count`/`rows_count`, conditionally requiring
+// `terminal_reason` off `complete`), and `context_fabric_investigation_result.v1`
+// grows a REQUIRED `completeness` field pointing at it -- required, not
+// optional, so every future response from this pin onward carries it. No
+// other schema in the consumed surface changed between 6ac060ea and this
+// pin (verified: `git diff 6ac060eac757ffcc795bbdc39f3fe0eb3879559e f9d9688c72bf6843137778079f77bd8dde8da32e`
+// touches nothing else in `context_fabric_investigation_request.v1` or
+// `error.v1`). CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion has NOT
+// landed on acr main as of this pin -- there is nothing to widen for yet;
+// this bump is CHAOS-4642's completeness widening only. Two-step deploy
+// (CHAOS-4623): this consumer pin bump must be live BEFORE any acr server
+// carrying `completeness` serves the shared rig. Bump procedure lives in
+// README.md.
+export const SOURCE_COMMIT = "f9d9688c72bf6843137778079f77bd8dde8da32e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
