@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { FactRowsPanels } from "@/components/FactRowsPanel";
-import type { ClaimedFact } from "@/lib/contracts";
+import renderShapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
+import type { ClaimedFact, InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
 /** A claimed fact carrying no `rows` at all — the "nothing to render" case. */
@@ -26,7 +27,7 @@ const flowLandscapeResult = mockScenarios().find(
 
 describe("FactRowsPanels", () => {
     it("renders nothing when no claimed fact carries rows (empty state = no data, not a missing feature)", () => {
-        const { container } = render(<FactRowsPanels facts={[NO_ROWS_FACT]} />);
+        const { container } = render(<FactRowsPanels facts={[NO_ROWS_FACT]} result={undefined} />);
         expect(container).toBeEmptyDOMElement();
     });
 
@@ -35,14 +36,14 @@ describe("FactRowsPanels", () => {
         // carries a rows-bearing claimed fact — this is that fact, not a
         // fixture invention (see `investigations.ts`'s CHAOS-2225 house rule).
         expect(completeResult.claimed_facts.some((fact) => fact.rows !== undefined)).toBe(true);
-        render(<FactRowsPanels facts={completeResult.claimed_facts} />);
+        render(<FactRowsPanels facts={completeResult.claimed_facts} result={undefined} />);
         expect(
             screen.getByRole("heading", { name: /readiness.*release ready/i }),
         ).toBeInTheDocument();
     });
 
     it("renders one panel per claimed fact carrying rows", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         // Three facts in the fixture carry rows: the CI daily rollup, the
         // project's team_count claim (team_breakdown rows attached), and
         // the latency-percentiles table.
@@ -56,7 +57,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders a LINE chart for the time-axis CI rollup, plus a screen-reader-only data table", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", {
             name: /continuous integration.*pipelines count/i,
         });
@@ -72,7 +73,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders a BAR chart for the ordinal team_name breakdown (never the opaque team_id), with the rollup_basis caption", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /metrics.*team count/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("svg")).not.toBeNull();
@@ -93,7 +94,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("gives every chart mark an accessible label, not just a hover/mouse tooltip", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /metrics.*team count/i });
         const panel = heading.closest("section")!;
         const marks = panel.querySelectorAll(".fact-chart__mark-group");
@@ -105,7 +106,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("falls back to a TABLE when every row column is numeric", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /metrics.*latency percentiles/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("table")).not.toBeNull();
@@ -114,7 +115,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("always shows the subject and row count in the caption, even with no rollup_basis sibling", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", {
             name: /continuous integration.*pipelines count/i,
         });
@@ -161,7 +162,7 @@ describe("FactRowsPanels", () => {
                 },
             ],
         };
-        render(<FactRowsPanels facts={[manyColumnsFact]} />);
+        render(<FactRowsPanels facts={[manyColumnsFact]} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /metrics.*wide breakdown/i });
         const panel = heading.closest("section")!;
         expect(panel.textContent).toContain("1 more numeric column");
@@ -173,7 +174,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders a panel for the flow FactKind's team_count claim (team_id axis, since flow.go emits no team_name)", () => {
-        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
+        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} result={undefined} />);
         // The claim cites `team_count` (a real scalar sibling field) per
         // acr's own claim-grounding rule — `team_breakdown` itself carries
         // only Rows, no scalar (codex round 1, CHAOS-4364) — but the rows
@@ -192,7 +193,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders a panel for the landscape FactKind's team_count claim", () => {
-        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} />);
+        render(<FactRowsPanels facts={flowLandscapeResult.claimed_facts} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /^landscape · team count$/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("svg")).not.toBeNull();
@@ -221,8 +222,8 @@ describe("FactRowsPanels", () => {
         };
         render(
             <>
-                <FactRowsPanels facts={[fact]} />
-                <FactRowsPanels facts={[fact]} />
+                <FactRowsPanels facts={[fact]} result={undefined} />
+                <FactRowsPanels facts={[fact]} result={undefined} />
             </>,
         );
         const sections = Array.from(
@@ -247,7 +248,7 @@ describe("FactRowsPanels", () => {
             value: { integer: 1 },
             rows: [{ fields: { open_incidents: { integer: 2 }, mttr_hours: { number: 4.5 } } }],
         };
-        render(<FactRowsPanels facts={[fact]} />);
+        render(<FactRowsPanels facts={[fact]} result={undefined} />);
         const tiles = screen.getByTestId("fact-tiles");
         expect(tiles.textContent).toContain("2");
         expect(tiles.textContent).toContain("open incidents");
@@ -256,7 +257,7 @@ describe("FactRowsPanels", () => {
     });
 
     it("renders no tiles for a multi-row fact (a real series, not a single summary)", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} />);
+        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
         // The CI daily rollup is a real multi-day time series (3 rows) —
         // scoped to its own panel, since `rowsResult` also carries the
         // single-row latency-percentiles fact, which legitimately DOES
@@ -266,5 +267,174 @@ describe("FactRowsPanels", () => {
         });
         const panel = heading.closest("section")!;
         expect(panel.querySelector('[data-testid="fact-tiles"]')).toBeNull();
+    });
+});
+
+describe("FactRowsPanels — a trend shape, which no acr build currently emits", () => {
+    // acr WITHDREW `dated_fact_trend` (CHAOS-4616): a row table cannot say
+    // which of its columns are measures, so any trend it drew was a claim
+    // resting on a guess. The capability returns through CHAOS-4627, when a
+    // row table declares its own shape.
+    //
+    // These tests therefore use a SYNTHETIC shape, and say so rather than
+    // pretending otherwise. That is a deliberate, named weakness: they prove
+    // this panel routes and checks a trend correctly, and they cannot prove
+    // it does so for real server output, because there is no real server
+    // output to test against. The golden-example test directly below pins
+    // the fact that acr sends none.
+    //
+    // The rendering path is kept rather than deleted because it is
+    // REACHABLE, not dead: it is driven by whatever `render_shapes` the
+    // server sends, so an acr that starts emitting trends again is rendered
+    // correctly with no consumer change. That is the opposite of acr's own
+    // dead helpers, which nothing could call.
+    const factWithTrendRows = {
+        claim_id: "claim_trend",
+        kind: "flow",
+        subject: { kind: "team", canonical_id: "team:t", label: "t" },
+        field: "items_completed",
+        value: { number: 3 },
+        rows: [
+            { fields: { day: { string: "2026-07-20" }, items_completed: { number: 0 } } },
+            { fields: { day: { string: "2026-08-30" }, items_completed: { number: 3 } } },
+        ],
+    } as unknown as ClaimedFact;
+
+    function answerWithTrend(value = 0): InvestigationResult {
+        return {
+            claimed_facts: [factWithTrendRows],
+            render_shapes: [
+                {
+                    shape_id: "rs_t",
+                    kind: "series",
+                    presentation: "line",
+                    selected_by: "dated_fact_trend",
+                    title: "Items completed over time — t",
+                    axis_kind: "time",
+                    axis_label: "day",
+                    value_label: "Items completed",
+                    series: [
+                        {
+                            key: "items_completed",
+                            label: "Items completed",
+                            points: [
+                                {
+                                    label: "2026-07-20",
+                                    value,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_trend",
+                                        row_index: 0,
+                                        field: "items_completed",
+                                    },
+                                },
+                                {
+                                    label: "2026-08-30",
+                                    value: 3,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_trend",
+                                        row_index: 1,
+                                        field: "items_completed",
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        } as unknown as InvestigationResult;
+    }
+
+    it("the shipped golden example carries NO trend, because acr emits none", () => {
+        // The live-facing pin: whatever the synthetic tests below prove, the
+        // real contract example must show the withdrawal.
+        const shipped = renderShapesExample as unknown as InvestigationResult;
+        expect(shipped.render_shapes?.some((s) => s.selected_by === "dated_fact_trend")).toBe(
+            false,
+        );
+    });
+
+    it("draws a trend beside the table it was derived from", () => {
+        render(<FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend()} />);
+        expect(screen.getByRole("table", { name: /over time/i })).toBeInTheDocument();
+    });
+
+    it("REPLACES the client-side heuristic chart rather than drawing beside it", () => {
+        // One fact's numbers are never shown twice under two different
+        // selection rules.
+        const { container } = render(
+            <FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend()} />,
+        );
+        expect(container.querySelectorAll(".fact-chart")).toHaveLength(0);
+    });
+
+    it("WITHHOLDS a trend whose numbers disagree with the fact's own rows", () => {
+        render(<FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend(99)} />);
+        expect(screen.getByTestId("trend-shape-withheld")).toHaveTextContent(
+            /could not be checked against this fact/i,
+        );
+    });
+
+    it("shows the table, not a client-side chart, when a trend was refused", () => {
+        const { container } = render(
+            <FactRowsPanels facts={[factWithTrendRows]} result={answerWithTrend(99)} />,
+        );
+        expect(screen.getByTestId("trend-shape-withheld")).toBeInTheDocument();
+        expect(container.querySelectorAll(".fact-chart")).toHaveLength(0);
+    });
+});
+describe("chris's ruling: nothing disappears from the UI", () => {
+    // chris, 2026-08-30 14:24 PT: "I object to losing the charts and the data
+    // in front of people."
+    //
+    // acr withdrew its server-asserted `dated_fact_trend` (CHAOS-4616: a row
+    // table cannot say which of its columns are measures, so the trend was a
+    // claim resting on a guess). That removes a SERVER assertion. It must not
+    // remove a CHART: this panel's own CHAOS-4355 visualization keeps
+    // rendering the rows, presented as a view of them rather than as a trend
+    // the service vouches for.
+    //
+    // The distinction is the whole ruling, so it is pinned rather than
+    // assumed.
+    const rows = [
+        { fields: { day: { string: "2026-07-20" }, items_completed: { number: 0 } } },
+        { fields: { day: { string: "2026-08-30" }, items_completed: { number: 3 } } },
+    ];
+    const factWithRows = {
+        claim_id: "claim_flow",
+        kind: "flow",
+        subject: { kind: "team", canonical_id: "team:fullchaos", label: "fullchaos" },
+        field: "items_completed",
+        value: { number: 3 },
+        rows,
+    } as unknown as ClaimedFact;
+
+    it("still draws the heuristic chart when acr selects no trend", () => {
+        const answer = {
+            claimed_facts: [factWithRows],
+            // Post-withdrawal shape of a real answer: cohort shapes only,
+            // never a trend.
+            render_shapes: [],
+        } as unknown as InvestigationResult;
+        const { container } = render(<FactRowsPanels facts={[factWithRows]} result={answer} />);
+        expect(container.querySelectorAll(".fact-chart").length).toBeGreaterThan(0);
+        expect(screen.queryByTestId("trend-shape-withheld")).not.toBeInTheDocument();
+    });
+
+    it("draws it identically whether or not the answer carries a render_shapes field at all", () => {
+        // A pre-4415 answer and a post-withdrawal answer must look the same
+        // here — the field's absence and its emptiness are the same story for
+        // this panel.
+        const withField = {
+            claimed_facts: [factWithRows],
+            render_shapes: [],
+        } as unknown as InvestigationResult;
+        const withoutField = { claimed_facts: [factWithRows] } as unknown as InvestigationResult;
+        const a = render(<FactRowsPanels facts={[factWithRows]} result={withField} />);
+        const withCount = a.container.querySelectorAll(".fact-chart").length;
+        a.unmount();
+        const b = render(<FactRowsPanels facts={[factWithRows]} result={withoutField} />);
+        expect(b.container.querySelectorAll(".fact-chart").length).toBe(withCount);
     });
 });

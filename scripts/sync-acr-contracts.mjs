@@ -28,13 +28,20 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main (CHAOS-4449, PR4): pins to acr main tip #326 (aa214606), past
-// CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking surface. The whole
-// widening lands in ONE schema, `context_fabric_common.v1`'s `CohortMember`
-// and its new `CohortMemberDriver`; the investigation-result schema itself
-// is byte-identical to the prior pin, because `cohort` was already a result
-// field and only its member shape grew. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "aa214606e70d9beb1cd2ea78d62a17bd4e680c3b";
+// acr main: pins past #336 (the conditional render-shape surface) and #340,
+// which WITHDREW the `dated_fact_trend` rule — a row table cannot say which
+// of its columns are measures, so any trend drawn from one was a claim
+// resting on a guess (CHAOS-4616; the declared-shape contract that brings it
+// back is CHAOS-4627). The kind and rule stay in the closed vocabulary with
+// no producer, so nothing in the generated types changes; what changes is
+// that no answer carries a trend shape. Two schemas widen — `context_fabric_common.v1` gains
+// the eight Render* $defs, and `context_fabric_investigation_result.v1`
+// gains the optional `render_shapes` array that references them. The new
+// render-shape EXAMPLE joins the copied set too, because the workbench's
+// chart tests must run against a document acr's own producer emitted rather
+// than a hand-authored fixture that could pass while the live shape
+// differed. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "6ac060eac757ffcc795bbdc39f3fe0eb3879559e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -58,6 +65,13 @@ const SCHEMA_PATHS = [
 const EXAMPLE_PATHS = [
     "contracts/examples/v1/context_fabric_investigation_request.v1.json",
     "contracts/examples/v1/context_fabric_investigation_result.v1.json",
+    // CHAOS-4415: the render-shape example. Added because the workbench's
+    // chart tests must run against a document acr's OWN producer emitted --
+    // a hand-authored fixture would pass a renderer test while the live
+    // shape differed. The pre-4415 result example above carries a cohort
+    // under a single_subject interpretation and therefore no shapes at all,
+    // which is exactly why it cannot serve as this one.
+    "contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];

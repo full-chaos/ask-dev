@@ -1,11 +1,26 @@
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
-import type { Cohort, CohortMember, CohortMemberDriver, InterpretedShape } from "@/lib/contracts";
+import { RenderShapeChart } from "@/components/RenderShapeChart";
+import type {
+    Cohort,
+    CohortMember,
+    CohortMemberDriver,
+    InterpretedShape,
+    InvestigationResult,
+} from "@/lib/contracts";
 import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { COHORT_SHAPE_RULES, renderShapesFor } from "@/lib/render-shapes";
 import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "@/lib/presentation";
 
 export type CohortRankingPanelProps = {
+    /**
+     * CHAOS-4415: the whole answer, so the panel can read the render shapes
+     * acr selected for this cohort AND re-resolve every plotted number
+     * against the cohort in the same document. Optional: an answer from a
+     * pre-4415 acr carries none, and the panel is unchanged for it.
+     */
+    readonly result: InvestigationResult | undefined;
     readonly cohort: Cohort | undefined;
     /**
      * `interpretation.shape` — what the question actually asked for. Required,
@@ -76,7 +91,7 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
  *    team (AGENTS.md checks 11 and 12: completeness is a public contract
  *    field, and missing is not healthy).
  */
-export function CohortRankingPanel({ cohort, shape }: CohortRankingPanelProps) {
+export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanelProps) {
     // Several answered turns coexist on the chat surface, so a hardcoded id
     // would make the second panel's `aria-labelledby` resolve to the FIRST
     // panel's heading — the same multi-instance bug `DeterministicAnswerView`
@@ -88,6 +103,18 @@ export function CohortRankingPanel({ cohort, shape }: CohortRankingPanelProps) {
     if (rows === null) return null;
 
     const unranked = unrankedLabels(cohort.members);
+
+    // CHAOS-4415: the charts acr selected FOR THIS COHORT — the attention
+    // score bars and the per-driver contribution stack that explains them.
+    // Read, never decided: if acr selected none, none render, and this panel
+    // is byte-identical to its pre-4415 self. A shape whose numbers do not
+    // re-resolve against this same cohort is withheld and SAID, not dropped
+    // quietly, for the same reason a score with no drivers behind it is
+    // (rule 1 above).
+    const { shapes: cohortShapes, withheld: withheldShapes } =
+        result === undefined
+            ? { shapes: [], withheld: 0 }
+            : renderShapesFor(result, COHORT_SHAPE_RULES);
 
     return (
         <section
@@ -105,6 +132,22 @@ export function CohortRankingPanel({ cohort, shape }: CohortRankingPanelProps) {
                         : `The service did not report this cohort as complete, so this ranking may not cover every ${humanizeTerm(cohort.kind)}.`}
                 </p>
             )}
+            {
+                // Above the table: when the question asked for a ranking, the
+                // ranking IS the answer, and the score bars plus their
+                // breakdown are the fastest reading of it. The table stays
+                // directly below, carrying every value the chart shows plus
+                // the ones it does not.
+            }
+            {cohortShapes.map((cohortShape) => (
+                <RenderShapeChart key={cohortShape.shape_id} shape={cohortShape} />
+            ))}
+            {withheldShapes > 0 ? (
+                <p className="record__meta" data-testid="render-shapes-withheld">
+                    {withheldShapes === 1 ? "A chart was" : `${withheldShapes} charts were`}{" "}
+                    withheld: it could not be checked against the facts it cites in this answer.
+                </p>
+            ) : null}
             <div className="fact-table-wrap">
                 <table className="fact-table">
                     <thead>
