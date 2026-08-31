@@ -29,14 +29,16 @@ run_step() {
   local phase="$1"
   shift
   local started_at="${SECONDS}"
+  local status
   echo "==> ${phase} started"
   if "$@"; then
     echo "==> ${phase} passed in $((SECONDS - started_at))s"
     return 0
+  else
+    status=$?
+    echo "==> ${phase} failed in $((SECONDS - started_at))s (exit ${status})" >&2
+    return "${status}"
   fi
-  local status=$?
-  echo "==> ${phase} failed in $((SECONDS - started_at))s (exit ${status})" >&2
-  return "${status}"
 }
 
 run_format() {
@@ -103,13 +105,19 @@ case "$1" in
   e2e) run_step e2e run_e2e ;;
   ci)
     export CI=true
-    run_step format run_format
-    run_step contracts run_contracts
-    run_step lint run_lint
-    run_step typecheck run_typecheck
-    run_step unit run_unit
-    run_step build run_build
-    run_step e2e run_e2e
+    # Stop at the first failing tier. `set -e` would also catch a bare
+    # `run_step ...` failing here, but that relies on function-call errexit
+    # propagation, which has well-known gotchas (e.g. inside `&&`/`||`,
+    # command substitution, or a future edit to this case). Fail-fast is
+    # made explicit so a later failure can never be masked by tiers that
+    # run after it.
+    run_step format run_format || exit "$?"
+    run_step contracts run_contracts || exit "$?"
+    run_step lint run_lint || exit "$?"
+    run_step typecheck run_typecheck || exit "$?"
+    run_step unit run_unit || exit "$?"
+    run_step build run_build || exit "$?"
+    run_step e2e run_e2e || exit "$?"
     ;;
   *)
     usage
