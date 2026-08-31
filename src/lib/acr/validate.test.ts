@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import { isDateTimeFormatted, validateContract } from "@/lib/acr/validate";
 
 /**
@@ -95,5 +96,77 @@ describe("investigation result contract — completeness field (CHAOS-4413/CHAOS
         const validate = ajv.compile(priorSchema);
 
         expect(validate(canonicalResult)).toBe(false);
+    });
+});
+
+/**
+ * CHAOS-4637/CHAOS-4683 (S6 consumer pin): `context_fabric_common.v1`'s
+ * `ClaimedFact` $def carries `additionalProperties: false` (same class of
+ * root cause as the CHAOS-4413/CHAOS-4642 block above, one level down in
+ * the $ref closure). Before this pin, `ClaimedFact` had never heard of
+ * `table` -- a response whose claimed facts declare it is exactly the
+ * CHAOS-4623 failure mode: an additive field the pin does not know about is
+ * a hard `acr_contract_violation`, not a tolerated unknown property. Unlike
+ * `completeness`, `table` is schema-OPTIONAL (CHAOS-4656 doctrine) -- so
+ * this pin only needs to ACCEPT it, never require it.
+ */
+describe("investigation result contract — claimed fact table declaration (CHAOS-4637/CHAOS-4683)", () => {
+    it("a real acr-emitted response with `table`-bearing claims validates as-is", () => {
+        const tabled = (
+            renderShapesResult as { claimed_facts: Array<Record<string, unknown>> }
+        ).claimed_facts.filter((claim) => "table" in claim);
+        expect(tabled.length).toBeGreaterThan(0);
+        expect(tabled[0]?.table).toMatchObject({ field: expect.any(String), shape: expect.any(String), key: expect.any(Array) });
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            renderShapesResult,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("still validates with every claimed fact's `table` stripped — the field is OPTIONAL, not required", () => {
+        const withoutTable = structuredClone(renderShapesResult) as {
+            claimed_facts: Array<Record<string, unknown>>;
+        };
+        for (const claim of withoutTable.claimed_facts) delete claim.table;
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withoutTable,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (0a65f124, still on
+     * origin/main before this PR): the same real acr-emitted document, run
+     * against a `ClaimedFact` $def with `table` stripped from `properties`
+     * (it was never in `required`, so no `required` edit is needed) --
+     * exactly what an `additionalProperties: false` $def that has never
+     * heard of the field does with it. RED against that reproduction, GREEN
+     * against the real pinned schema above — this is the CHAOS-4623 failure
+     * mode, executed, one level down the $ref closure from the
+     * `completeness` case above.
+     */
+    it("EXECUTED repro: a `table`-bearing claim would 502 under the prior pin's own schema", () => {
+        const priorCommonSchema = structuredClone(commonSchema) as unknown as {
+            $defs: Record<string, { properties: Record<string, unknown> }>;
+        };
+        delete priorCommonSchema.$defs.ClaimedFact.properties.table;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(renderShapesResult)).toBe(false);
+        const tableRejections = (validate.errors ?? []).filter(
+            (error) =>
+                error.keyword === "additionalProperties" &&
+                error.params?.additionalProperty === "table",
+        );
+        expect(tableRejections.length).toBeGreaterThan(0);
     });
 });

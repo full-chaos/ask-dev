@@ -405,24 +405,34 @@ describe("FactRowsPanels — CHAOS-4672 table-identity dedupe", () => {
     });
 });
 
-describe("FactRowsPanels — a trend shape, which no acr build currently emits", () => {
-    // acr WITHDREW `dated_fact_trend` (CHAOS-4616): a row table cannot say
-    // which of its columns are measures, so any trend it drew was a claim
-    // resting on a guess. The capability returns through CHAOS-4627, when a
-    // row table declares its own shape.
+describe("FactRowsPanels — a trend shape", () => {
+    // acr WITHDREW `dated_fact_trend` (CHAOS-4616): a row table could not say
+    // which of its columns were measures, so any trend it drew was a claim
+    // resting on a guess. The capability RETURNED through CHAOS-4627/CHAOS-4637
+    // (acr #354, S6): a row table now declares its own shape, and selection
+    // reads that declaration instead of inferring one. CHAOS-4683 is this
+    // workbench's consumer pin for that acr tip (0f68cc7a) — it only widens
+    // the accepted schema (`ClaimedFact.table` / `ProjectedFact.table`,
+    // additive and OPTIONAL); it changes no rendering code, because this
+    // panel's rendering path already reads `render_shapes` generically
+    // (`trendShapesForClaim` filters on `selected_by`, not on the presence
+    // of a table declaration) and needed no consumer-side change to draw
+    // what acr now vouches for. The golden-example test directly below
+    // updates to match: acr's own shipped example now carries a real
+    // `dated_fact_trend` shape (previously it carried none, which is what
+    // this test used to pin).
     //
-    // These tests therefore use a SYNTHETIC shape, and say so rather than
-    // pretending otherwise. That is a deliberate, named weakness: they prove
-    // this panel routes and checks a trend correctly, and they cannot prove
-    // it does so for real server output, because there is no real server
-    // output to test against. The golden-example test directly below pins
-    // the fact that acr sends none.
+    // Most tests in this block still use a SYNTHETIC shape in addition to
+    // the golden-example one, and say so rather than pretending otherwise:
+    // they prove this panel routes and checks a trend correctly under
+    // shapes/values the one golden example does not happen to exercise
+    // (WITHHELD, a refused trend, a second series).
     //
-    // The rendering path is kept rather than deleted because it is
-    // REACHABLE, not dead: it is driven by whatever `render_shapes` the
-    // server sends, so an acr that starts emitting trends again is rendered
-    // correctly with no consumer change. That is the opposite of acr's own
-    // dead helpers, which nothing could call.
+    // The rendering path was kept rather than deleted while withdrawn
+    // because it was REACHABLE, not dead: it is driven by whatever
+    // `render_shapes` the server sends, so an acr that resumed emitting
+    // trends would be rendered correctly with no consumer change — which is
+    // exactly what happened here.
     const factWithTrendRows = {
         claim_id: "claim_trend",
         kind: "flow",
@@ -481,13 +491,21 @@ describe("FactRowsPanels — a trend shape, which no acr build currently emits",
         } as unknown as InvestigationResult;
     }
 
-    it("the shipped golden example carries NO trend, because acr emits none", () => {
-        // The live-facing pin: whatever the synthetic tests below prove, the
-        // real contract example must show the withdrawal.
+    it("the shipped golden example now carries a real dated_fact_trend shape (CHAOS-4637/CHAOS-4683, acr #354)", () => {
+        // The live-facing pin: whatever the synthetic tests elsewhere in this
+        // block prove, the real contract example is the ground truth. Before
+        // this pin bump the golden example carried NO dated_fact_trend shape
+        // (acr had withdrawn the rule); at 0f68cc7a acr's own example now
+        // ships one — a real "Commits count over time — Ask Dev" series,
+        // selected because the underlying claim now declares its own
+        // `table` (time_series/day/commits_count). This is proof the render
+        // path this describe block exercises synthetically is ALSO exercised
+        // by the real pinned contract now, with no consumer code change.
         const shipped = renderShapesExample as unknown as InvestigationResult;
-        expect(shipped.render_shapes?.some((s) => s.selected_by === "dated_fact_trend")).toBe(
-            false,
-        );
+        const trends = shipped.render_shapes?.filter((s) => s.selected_by === "dated_fact_trend");
+        expect(trends).toBeDefined();
+        expect(trends?.length).toBeGreaterThan(0);
+        expect(trends?.[0]).toMatchObject({ kind: "series", presentation: "line", axis_kind: "time" });
     });
 
     it("draws a trend beside the table it was derived from", () => {
