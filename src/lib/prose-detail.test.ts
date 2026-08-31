@@ -128,3 +128,93 @@ describe("splitLeadArithmetic: CHAOS-4669 defect 2 (computation arithmetic out o
         ]);
     });
 });
+
+/**
+ * codex R4 pre-round sweep (chris/orchestrator, 2026-08-31 ~12:35 PDT):
+ * three rounds each found a NEW edge case in this splitter (round 1: the
+ * capital-letter lookahead, the OR-vs-AND clause requirement; round 3: the
+ * semicolon boundary), so instead of a fourth narrow-diff round, this
+ * exhausts the decision space directly: boundary punctuation (`.`/`!`/`?`/
+ * `;`/none) x clause placement (arithmetic leads / conclusion leads / mid,
+ * with the arithmetic clause between two conclusions) x the decimal and
+ * lowercase-continuation hazards already covered above.
+ *
+ * ACCEPTED LIMITATION, flagged rather than silently left (per standing
+ * instruction to name rather than guess): a conclusion and the arithmetic
+ * clause joined with NO punctuation boundary at all (a bare conjunction —
+ * "... and the team continues investigating", "The release is blocked and
+ * readiness gap ... attention points.") is, by definition, not something a
+ * PUNCTUATION-boundary splitter can separate — there is no character to
+ * split on. `splitSentences`'s own doc comment already declines an NLP
+ * dependency for this module; the two cells below pin the current,
+ * accepted behavior (the whole fused run-on is extracted, including the
+ * conclusion) rather than leaving it as an unconsidered gap. This is a
+ * DIFFERENT class from round 3's semicolon finding — that one had a real,
+ * unhandled boundary character; these two have none.
+ */
+describe("splitLeadArithmetic: exhaustive boundary/placement truth table (codex R4 pre-round sweep)", () => {
+    const ARITH =
+        "readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points";
+    const CONCLUSION_A = "The release is blocked because approval is missing";
+    const CONCLUSION_B = "Fullchaos has an operational deficiency with severity warning";
+
+    it.each([
+        { boundary: ".", label: "period" },
+        { boundary: "!", label: "exclamation" },
+        { boundary: "?", label: "question mark" },
+    ])("arithmetic LEADS, conclusion TRAILS, joined by $label", ({ boundary }) => {
+        const raw = `Principal driver(s): ${ARITH}${boundary} ${CONCLUSION_B}.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe(`${CONCLUSION_B}.`);
+        expect(result.extracted).toEqual([`Principal driver(s): ${ARITH}${boundary}`]);
+    });
+
+    it("arithmetic LEADS, conclusion TRAILS, joined by a semicolon", () => {
+        const raw = `Principal driver(s): ${ARITH}; ${CONCLUSION_B}.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe(`${CONCLUSION_B}.`);
+        expect(result.extracted).toEqual([`Principal driver(s): ${ARITH};`]);
+    });
+
+    it("ACCEPTED LIMITATION: arithmetic LEADS, conclusion TRAILS, joined by NO punctuation (bare conjunction) — whole run-on is extracted", () => {
+        const raw = `Principal driver(s): ${ARITH} and the team continues investigating.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe("");
+        expect(result.extracted).toEqual([raw]);
+    });
+
+    it.each([
+        { boundary: ".", label: "period" },
+        { boundary: "!", label: "exclamation" },
+        { boundary: "?", label: "question mark" },
+    ])("conclusion LEADS, arithmetic TRAILS, joined by $label", ({ boundary }) => {
+        const raw = `${CONCLUSION_A}${boundary} Principal driver(s): ${ARITH}.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe(`${CONCLUSION_A}${boundary}`);
+        expect(result.extracted).toEqual([`Principal driver(s): ${ARITH}.`]);
+    });
+
+    // Conclusion-leads-via-semicolon is already pinned above (round 3, finding 2).
+
+    it("ACCEPTED LIMITATION: conclusion LEADS, arithmetic TRAILS, joined by NO punctuation (bare conjunction) — whole run-on is extracted", () => {
+        const raw = `The release is blocked and ${ARITH}.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe("");
+        expect(result.extracted).toEqual([raw]);
+    });
+
+    it("MID placement with MIXED boundaries composes correctly: conclusion, period, arithmetic, semicolon, conclusion", () => {
+        const raw = `${CONCLUSION_A}. Principal driver(s): ${ARITH}; ${CONCLUSION_B}.`;
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe(`${CONCLUSION_A}. ${CONCLUSION_B}.`);
+        expect(result.extracted).toEqual([`Principal driver(s): ${ARITH};`]);
+    });
+
+    it("a single-clause-only fragment next to a semicolon is still not extracted, and the text is untouched", () => {
+        const raw =
+            "The team's plan notes a (weight 15, value 1.00) placeholder; nothing has shipped yet.";
+        const result = splitLeadArithmetic(raw);
+        expect(result.extracted).toHaveLength(0);
+        expect(result.lead).toBe(raw);
+    });
+});

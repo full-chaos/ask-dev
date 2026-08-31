@@ -283,6 +283,192 @@ describe("dedupeFindings: CHAOS-4669 defect 1 (one fact, one primary rendering)"
     });
 });
 
+/**
+ * codex R4 pre-round sweep (chris/orchestrator, 2026-08-31 ~12:35 PDT):
+ * three rounds each found a NEW edge case in this module's identity
+ * matching, so instead of a fourth narrow-diff round, this exhausts the
+ * decision space directly. `resolve()`'s decision procedure is per-item and
+ * monotonic — each item is checked against the CURRENT claims map, built
+ * from every STRICTLY EARLIER item's own claim, and nothing about a third
+ * item's resolution depends on anything beyond "what has already been
+ * claimed". That decomposes the whole module into a PAIRWISE truth table:
+ * a `leader` (claims first) and a `follower` (resolves against whatever the
+ * leader claimed) — every cell below is one leader/follower pairing.
+ *
+ * Dimensions: leader id-bearing or id-less × follower id-bearing or
+ * id-less × identical text or not × (when both id-bearing) their id sets
+ * EQUAL / DISJOINT / OVERLAPPING / SUBSET × same or different surface.
+ *
+ * AMBIGUOUS CELL, flagged rather than guessed (per standing instruction):
+ * OVERLAPPING and SUBSET id sets with identical text. The current
+ * implementation's identity model treats `claimed_fact_ids` as a single
+ * opaque SET key — two DIFFERENT sets are a different identity full stop,
+ * with no notion of "close enough" for a partial overlap or a subset. That
+ * is a defensible reading (an overlapping-but-different citation set is
+ * evidentially a different claim), but nothing in the schema or ticket
+ * text confirms it, and it is a genuinely different question from the
+ * DISJOINT-set cell (round 2, finding 1), which is unambiguous (visibly
+ * unrelated ids sharing text must not collapse). The two cells below pin
+ * the CURRENT behavior (not deduplicated) as the reviewed baseline, not as
+ * a confirmed product decision — this is the cell to bring to chris if a
+ * real investigation ever produces overlapping/subset `claimed_fact_ids`
+ * with identical wording.
+ */
+describe("dedupeFindings: exhaustive pairwise truth table (codex R4 pre-round sweep)", () => {
+    function pairFinding(id: string, text: string, ids?: readonly string[]): Finding {
+        return finding({
+            finding_id: id,
+            summary: text,
+            ...(ids !== undefined ? { claimed_fact_ids: [...ids] } : {}),
+        });
+    }
+
+    /** `leader` is always placed on the higher-priority surface (readiness_gaps) so it claims first. */
+    function resolvePair(
+        leaderIds: readonly string[] | undefined,
+        followerIds: readonly string[] | undefined,
+        sameText: boolean,
+        sameSurface = false,
+    ): boolean {
+        const leaderText = "The release gate has not passed.";
+        const followerText = sameText ? leaderText : "CI pipeline success rate dropped.";
+        const leader = pairFinding("leader", leaderText, leaderIds);
+        const follower = pairFinding("follower", followerText, followerIds);
+        const result = sameSurface
+            ? dedupeFindings({
+                  remaining_work: [],
+                  readiness_gaps: [leader, follower],
+                  conflicts: [],
+                  limitations: [],
+              })
+            : dedupeFindings({
+                  remaining_work: [],
+                  readiness_gaps: [leader],
+                  conflicts: [follower],
+                  limitations: [],
+              });
+        return sameSurface
+            ? result.readiness_gaps[1]!.isDuplicate
+            : result.conflicts[0]!.isDuplicate;
+    }
+
+    type Cell = {
+        readonly name: string;
+        readonly leaderIds?: readonly string[];
+        readonly followerIds?: readonly string[];
+        readonly sameText: boolean;
+        readonly expectDuplicate: boolean;
+    };
+
+    const CROSS_SURFACE_CELLS: readonly Cell[] = [
+        { name: "id-less x id-less, same text", sameText: true, expectDuplicate: true },
+        { name: "id-less x id-less, different text", sameText: false, expectDuplicate: false },
+        {
+            name: "id-less leader x id-bearing follower, same text (round 3 finding 1)",
+            followerIds: ["A"],
+            sameText: true,
+            expectDuplicate: true,
+        },
+        {
+            name: "id-less leader x id-bearing follower, different text",
+            followerIds: ["A"],
+            sameText: false,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing leader x id-less follower, same text (round 1 finding 3)",
+            leaderIds: ["A"],
+            sameText: true,
+            expectDuplicate: true,
+        },
+        {
+            name: "id-bearing leader x id-less follower, different text",
+            leaderIds: ["A"],
+            sameText: false,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, EQUAL ids, same text",
+            leaderIds: ["A"],
+            followerIds: ["A"],
+            sameText: true,
+            expectDuplicate: true,
+        },
+        {
+            name: "id-bearing x id-bearing, EQUAL ids, different text (id wins over text)",
+            leaderIds: ["A"],
+            followerIds: ["A"],
+            sameText: false,
+            expectDuplicate: true,
+        },
+        {
+            name: "id-bearing x id-bearing, DISJOINT ids, same text (round 2 finding 1)",
+            leaderIds: ["A"],
+            followerIds: ["B"],
+            sameText: true,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, DISJOINT ids, different text",
+            leaderIds: ["A"],
+            followerIds: ["B"],
+            sameText: false,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, OVERLAPPING ids ({A,B} vs {B,C}), same text — AMBIGUOUS, see describe-block note",
+            leaderIds: ["A", "B"],
+            followerIds: ["B", "C"],
+            sameText: true,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, OVERLAPPING ids, different text",
+            leaderIds: ["A", "B"],
+            followerIds: ["B", "C"],
+            sameText: false,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, SUBSET ids ({A} vs {A,B}), same text — AMBIGUOUS, see describe-block note",
+            leaderIds: ["A"],
+            followerIds: ["A", "B"],
+            sameText: true,
+            expectDuplicate: false,
+        },
+        {
+            name: "id-bearing x id-bearing, SUBSET ids, different text",
+            leaderIds: ["A"],
+            followerIds: ["A", "B"],
+            sameText: false,
+            expectDuplicate: false,
+        },
+    ];
+
+    it.each(CROSS_SURFACE_CELLS)("cross-surface cell: $name", (cell) => {
+        expect(resolvePair(cell.leaderIds, cell.followerIds, cell.sameText)).toBe(
+            cell.expectDuplicate,
+        );
+    });
+
+    const SAME_SURFACE_CELLS: readonly Cell[] = [
+        { name: "id-less x id-less, same text", sameText: true, expectDuplicate: true },
+        {
+            name: "id-bearing x id-bearing, equal ids (round 2 finding 2)",
+            leaderIds: ["A"],
+            followerIds: ["A"],
+            sameText: true,
+            expectDuplicate: true,
+        },
+    ];
+
+    it.each(SAME_SURFACE_CELLS)("same-surface cell: $name", (cell) => {
+        expect(resolvePair(cell.leaderIds, cell.followerIds, cell.sameText, true)).toBe(
+            cell.expectDuplicate,
+        );
+    });
+});
+
 describe("identityLimitations: no cross-surface dedup context (clarification branch)", () => {
     it("marks every limitation as its own primary", () => {
         const result = identityLimitations(["a", "b"]);
