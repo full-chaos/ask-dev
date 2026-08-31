@@ -47,6 +47,23 @@ function anySelected(pages: readonly PopupPage[]): boolean {
     return pages.some((page) => page.options.some((option) => option.selected));
 }
 
+/**
+ * The digit that activates position `index` (0-based) via `handleKeyDown`'s
+ * own number-key branch below — "0" for the 10th item (index 9), matching
+ * the contract's own `maxItems: 10` bound on subject candidates (codex
+ * round 2 finding 3: showing "10" on a badge that only a TWO-keystroke
+ * sequence could match was a false affordance — single keystrokes only go
+ * up to 9, so "0" stands in for the 10th, the same convention browser
+ * tab-switch shortcuts use). Empty beyond that — no popup page is expected
+ * to carry more than 10 real options, and an option with no single-key
+ * hotkey is still reachable by click or ↑↓+Enter regardless.
+ */
+function hotkeyLabel(index: number): string {
+    if (index < 9) return String(index + 1);
+    if (index === 9) return "0";
+    return "";
+}
+
 function OptionRow({
     option,
     number,
@@ -55,7 +72,7 @@ function OptionRow({
     onPick,
 }: {
     readonly option: PopupOption;
-    readonly number: number;
+    readonly number: string;
     readonly focused: boolean;
     readonly pending: boolean;
     readonly onPick: () => void;
@@ -127,16 +144,26 @@ export function ClarificationPopup({
         if (!freeTextOpen) containerRef.current?.focus();
     }, [clampedIndex, freeTextOpen]);
 
-    // Reset the focused option whenever the page changes, adjusted DURING
+    // Reset per-page UI state whenever the page changes, adjusted DURING
     // RENDER (React's own documented escape hatch — see `page.tsx`'s
     // `syncedTurns`/`hasUnseenBelow` for the same idiom) rather than in an
     // effect: `react-hooks/set-state-in-effect` flags a bare `setState`
     // call inside an effect body, and this is exactly "derived state
     // changed" with nothing external to synchronize with.
+    //
+    // `freeText`/`freeTextOpen` reset here too (codex round 2 finding 1): a
+    // free-text DRAFT is per-question, so it must not survive Skip/Continue
+    // onto the NEXT page — and critically, a non-empty draft otherwise left
+    // `freeTextOpen` `true` forever (the `onBlur` handler below only clears
+    // it when the draft is EMPTY), which permanently suppressed the
+    // container-refocus effect above and, with it, every number/arrow/Enter
+    // hotkey on every page from that point on.
     const [lastPageIndex, setLastPageIndex] = useState(clampedIndex);
     if (clampedIndex !== lastPageIndex) {
         setLastPageIndex(clampedIndex);
         setFocusedOption(0);
+        setFreeText("");
+        setFreeTextOpen(false);
     }
 
     if (page === undefined) return null;
@@ -233,8 +260,14 @@ export function ClarificationPopup({
         // container div itself" — true only right after mount/page-change,
         // when nothing else has taken focus.
         if (event.target !== event.currentTarget) return;
-        if (event.key >= "1" && event.key <= "9") {
-            const index = Number(event.key) - 1;
+        if ((event.key >= "1" && event.key <= "9") || event.key === "0") {
+            // codex round 2 finding 3: the contract allows up to 10 subject
+            // candidates, but a single keystroke can only carry ONE digit —
+            // "0" conventionally stands for the 10th item (same convention
+            // as browser tab-switch shortcuts, Ctrl+1..9,0). `OptionRow`
+            // below renders the SAME mapping on the number badge, so the
+            // displayed key always matches what actually activates it.
+            const index = event.key === "0" ? 9 : Number(event.key) - 1;
             const option = currentPage.options[index];
             if (option !== undefined) {
                 event.preventDefault();
@@ -311,7 +344,7 @@ export function ClarificationPopup({
                     <OptionRow
                         focused={index === focusedOption}
                         key={option.id}
-                        number={index + 1}
+                        number={hotkeyLabel(index)}
                         onPick={() => pick(option)}
                         option={option}
                         pending={pending}

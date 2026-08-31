@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -149,5 +149,91 @@ describe("finding 3: a phrased option still shows its structural value", () => {
         renderPopup([SINGLE_PAGE_ONE_OPTION]);
 
         expect(screen.queryByText(/^structural:/)).toBeNull();
+    });
+});
+
+/**
+ * Codex round 2 (chaos-4671-20260831T104225.md) findings, same pin/mutate/
+ * revert discipline as round 1 above.
+ */
+
+describe("round 2 finding 1: a free-text draft must not permanently block hotkeys on a later page", () => {
+    const PAGE_ONE: PopupPage = { ...SINGLE_PAGE_ONE_OPTION, key: "page_one" };
+    const PAGE_TWO: PopupPage = {
+        key: "page_two",
+        title: "Second question",
+        selectMode: "multi",
+        options: [
+            {
+                id: "opt_2",
+                label: "second option",
+                displayText: "second option",
+                selected: false,
+                source: { kind: "subject-candidate", receiptId: "candr_2" },
+            },
+        ],
+    };
+
+    it("Skip past a non-empty free-text draft, then a number key on the NEXT page still picks (no explicit refocus)", async () => {
+        const user = userEvent.setup();
+        const { onSelect } = renderPopup([PAGE_ONE, PAGE_TWO]);
+
+        await user.click(screen.getByLabelText("Something else"));
+        await user.keyboard("a draft that is never submitted");
+        await user.click(screen.getByRole("button", { name: "Skip" }));
+        await screen.findByText("Second question");
+
+        // No explicit `.focus()` call here — this is exactly what
+        // regressed: the popup's own container-refocus effect must fire on
+        // its own once the stale draft is cleared by the page change.
+        await user.keyboard("1");
+
+        expect(onSelect).toHaveBeenCalledWith(PAGE_TWO.options[0]!.source);
+    });
+
+    it("an EMPTY free-text draft never blocked hotkeys in the first place (control)", async () => {
+        const user = userEvent.setup();
+        const { onSelect } = renderPopup([PAGE_ONE, PAGE_TWO]);
+
+        await user.click(screen.getByLabelText("Something else"));
+        await user.click(screen.getByRole("button", { name: "Skip" }));
+        await screen.findByText("Second question");
+        await user.keyboard("1");
+
+        expect(onSelect).toHaveBeenCalledWith(PAGE_TWO.options[0]!.source);
+    });
+});
+
+describe("round 2 finding 3: a 10th option is selectable by the '0' key, matching its own badge", () => {
+    const TEN_OPTIONS_PAGE: PopupPage = {
+        key: "subject_resolution",
+        title: "Which one?",
+        selectMode: "multi",
+        options: Array.from({ length: 10 }, (_, i) => ({
+            id: `opt_${i + 1}`,
+            label: `option ${i + 1}`,
+            displayText: `option ${i + 1}`,
+            selected: false,
+            source: { kind: "subject-candidate" as const, receiptId: `candr_${i + 1}` },
+        })),
+    };
+
+    it('shows "0" (never "10") on the 10th option\'s badge — a badge only ever names a REAL single keystroke', () => {
+        renderPopup([TEN_OPTIONS_PAGE]);
+
+        const tenthOption = screen.getByText("option 10").closest("li")!;
+        expect(within(tenthOption).getByText("0")).toBeInTheDocument();
+        expect(within(tenthOption).queryByText("10")).toBeNull();
+    });
+
+    it('pressing "0" picks the 10th option, not the 1st', async () => {
+        const user = userEvent.setup();
+        const { onSelect } = renderPopup([TEN_OPTIONS_PAGE]);
+
+        screen.getByRole("dialog").focus();
+        await user.keyboard("0");
+
+        expect(onSelect).toHaveBeenCalledWith(TEN_OPTIONS_PAGE.options[9]!.source);
+        expect(onSelect).not.toHaveBeenCalledWith(TEN_OPTIONS_PAGE.options[0]!.source);
     });
 });

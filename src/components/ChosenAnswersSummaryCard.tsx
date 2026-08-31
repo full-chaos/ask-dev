@@ -1,5 +1,6 @@
+import { StructureConfirmationRecords } from "@/components/StructureConfirmationNotice";
 import type { ChoiceDisposition } from "@/lib/clarification";
-import { structureMemberLabel } from "@/lib/structure-disposition";
+import { structureMemberLabel, summarizeConfirmedStructure } from "@/lib/structure-disposition";
 import type { ConfirmedStructureEntry, SubjectRef } from "@/lib/contracts";
 
 export type ChosenAnswersSummaryCardProps = {
@@ -24,6 +25,14 @@ type Row = { readonly key: string; readonly question: string; readonly answer: s
  * `StructureConfirmationNotice` verbatim whenever any entry was vetoed —
  * this card only covers the "everything applied cleanly" case, the one that
  * used to collapse to a quiet chip row.
+ *
+ * codex round 2 finding 2: the ticket's own acceptance ("selection
+ * receipts/details remain reachable from the answer's collapsed detail")
+ * means this card must not simply DROP the per-entry receipt/source/
+ * provenance detail `StructureConfirmationNotice`'s own collapsed
+ * "Selection details" `<details>` used to carry — it reuses that SAME
+ * record list (`StructureConfirmationRecords`, now exported for this) so
+ * the detail is reachable here too, not gone.
  */
 export function ChosenAnswersSummaryCard({
     confirmedStructure,
@@ -42,6 +51,15 @@ export function ChosenAnswersSummaryCard({
     }
     if (rows.length === 0) return null;
 
+    // Every entry reaching this component is already "applied" (the
+    // vetoed case routes to `StructureConfirmationNotice` instead — see
+    // this component's own header) — filtered again here defensively so a
+    // future caller change can't silently surface a veto's receipt detail
+    // through the wrong (non-alerted) surface.
+    const appliedSummaries = summarizeConfirmedStructure(confirmedStructure).filter(
+        (summary) => summary.applied,
+    );
+
     return (
         <section aria-label="Chosen answers" className="panel panel--compact chosen-answers">
             <h2 className="panel__title">Your answers</h2>
@@ -53,6 +71,12 @@ export function ChosenAnswersSummaryCard({
                     </li>
                 ))}
             </ul>
+            {appliedSummaries.length === 0 ? null : (
+                <details className="disclosure">
+                    <summary>Selection details</summary>
+                    <StructureConfirmationRecords summaries={appliedSummaries} />
+                </details>
+            )}
         </section>
     );
 }
