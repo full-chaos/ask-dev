@@ -82,6 +82,37 @@ describe("dedupeFindings: CHAOS-4669 defect 1 (one fact, one primary rendering)"
         expect(result.remaining_work[0]!.primarySurface).toBe("readiness_gaps");
     });
 
+    /**
+     * codex round 1, finding 3 (EXECUTED repro): keying EXCLUSIVELY on
+     * `claimed_fact_ids` when present, else EXCLUSIVELY on text, produced
+     * incompatible keys (`facts:*` vs `text:*`) for the identical fact when
+     * only ONE of the two occurrences carried the optional ids — codex's
+     * own repro was one finding with `claimed_fact_ids` and one identical
+     * summary WITHOUT it, rendering fully in both Remaining work and
+     * Readiness gaps. `findingKeys` now always computes the text key too
+     * and matches on ANY shared key.
+     */
+    it("matches by identical text even when only ONE occurrence carries claimed_fact_ids (codex round 1, finding 3)", () => {
+        const withIds = finding({
+            finding_id: "finding_with_ids",
+            summary: "Release acceptance remains incomplete.",
+            claimed_fact_ids: ["claim_readiness_0001"],
+        });
+        const withoutIds = finding({
+            finding_id: "finding_without_ids",
+            summary: "Release acceptance remains incomplete.",
+        });
+        const result = dedupeFindings({
+            remaining_work: [withoutIds],
+            readiness_gaps: [withIds],
+            conflicts: [],
+            limitations: [],
+        });
+        expect(result.readiness_gaps[0]!.isDuplicate).toBe(false);
+        expect(result.remaining_work[0]!.isDuplicate).toBe(true);
+        expect(result.remaining_work[0]!.primarySurface).toBe("readiness_gaps");
+    });
+
     it("collapses the SAME fact in the Limitations list too — the ticket's own 3-surface scenario", () => {
         const readinessGap = finding({
             finding_id: "finding_readiness_gap",

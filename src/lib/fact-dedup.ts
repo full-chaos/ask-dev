@@ -85,64 +85,101 @@ function normalizeText(text: string): string {
 }
 
 /**
- * `claimed_fact_ids` is the strongest possible signal — two Findings citing
- * the SAME underlying fact set are the same fact restated, regardless of
- * how differently they are worded. It is optional and frequently absent on
- * real data (the pinned canonical example's own `remaining_work` entry
- * carries none), so this falls back to normalized-summary-text equality,
- * which is what actually catches the ticket's "near-verbatim" case.
+ * Every key that identifies `finding` as "the same fact" — ALWAYS the
+ * normalized-text key, PLUS the `claimed_fact_ids` key when the finding
+ * carries one. `claimed_fact_ids` is optional and frequently absent on real
+ * data (the pinned canonical example's own `remaining_work` entry carries
+ * none), so a caller that keyed EXCLUSIVELY on whichever field happened to
+ * be present (codex round 1, finding 3) missed a real duplicate: the same
+ * fact filed once WITH `claimed_fact_ids` and once WITHOUT it produced two
+ * different keys (`facts:...` vs `text:...`) and rendered twice. Computing
+ * BOTH keys here and matching on EITHER (see `resolve` below) closes that
+ * gap regardless of which surface happens to carry the id.
  */
-function findingKey(finding: Finding): string {
+function findingKeys(finding: Finding): readonly string[] {
+    const keys = [`text:${normalizeText(finding.summary)}`];
     const factIds = finding.claimed_fact_ids;
     if (factIds !== undefined && factIds.length > 0) {
-        return `facts:${[...factIds].sort().join(",")}`;
+        keys.push(`facts:${[...factIds].sort().join(",")}`);
     }
-    return `text:${normalizeText(finding.summary)}`;
+    return keys;
 }
 
-function limitationKey(text: string): string {
-    return `text:${normalizeText(text)}`;
+function limitationKeys(text: string): readonly string[] {
+    return [`text:${normalizeText(text)}`];
+}
+
+/**
+ * Resolves one item against everything claimed SO FAR: if any of its own
+ * keys already has an owner, this item is a duplicate of that owner's
+ * surface (regardless of which specific key matched — a text-key match and
+ * a facts-key match are both "the same fact", per `findingKeys`'s own
+ * doc comment). Otherwise this item becomes the primary and claims EVERY
+ * one of its keys, so a LATER item reachable via any of them — even one
+ * that only shares the text key, or only the facts key — resolves to this
+ * item's surface too.
+ */
+function resolve(
+    claims: Map<string, FindingSurface>,
+    surface: FindingSurface,
+    keys: readonly string[],
+): { readonly isDuplicate: boolean; readonly primarySurface: FindingSurface } {
+    for (const key of keys) {
+        const owner = claims.get(key);
+        if (owner !== undefined) return { isDuplicate: owner !== surface, primarySurface: owner };
+    }
+    for (const key of keys) claims.set(key, surface);
+    return { isDuplicate: false, primarySurface: surface };
 }
 
 /**
  * Computes the primary-surface assignment for every Finding/limitation in
- * one result. First-claim-wins in `SURFACE_PRIORITY` order — deterministic
+ * one result. First-claim-wins, processed in `SURFACE_PRIORITY` order
+ * (readiness_gaps, remaining_work, conflicts, limitations) — deterministic
  * from the answer alone, never from array iteration order or a Map's
  * insertion order of some OTHER structure (the same discipline
  * `groupFactsByTable` in `fact-rows.ts` documents for its own first-seen
  * tiebreak).
  */
 export function dedupeFindings(input: DedupedFindingsInput): DedupedFindingsResult {
-    const primarySurfaceForKey = new Map<string, FindingSurface>();
-    function claim(surface: FindingSurface, key: string): void {
-        if (!primarySurfaceForKey.has(key)) primarySurfaceForKey.set(key, surface);
-    }
+    const claims = new Map<string, FindingSurface>();
+    const findingResults: Record<Exclude<FindingSurface, "limitations">, DedupedFinding[]> = {
+        remaining_work: [],
+        readiness_gaps: [],
+        conflicts: [],
+    };
+    let limitations: readonly DedupedLimitation[] = [];
+
+    // Driven by `SURFACE_PRIORITY` itself (not a hand-ordered sequence of
+    // calls) so the priority list stays the single source of truth for
+    // this order — nothing here can drift from what the const declares.
     for (const surface of SURFACE_PRIORITY) {
         if (surface === "limitations") {
-            for (const text of input.limitations) claim(surface, limitationKey(text));
+            limitations = input.limitations.map((text) => {
+                const { isDuplicate, primarySurface } = resolve(
+                    claims,
+                    surface,
+                    limitationKeys(text),
+                );
+                return { text, isDuplicate, primarySurface };
+            });
         } else {
-            for (const finding of input[surface]) claim(surface, findingKey(finding));
+            findingResults[surface] = input[surface].map((finding) => {
+                const { isDuplicate, primarySurface } = resolve(
+                    claims,
+                    surface,
+                    findingKeys(finding),
+                );
+                return { finding, isDuplicate, primarySurface };
+            });
         }
     }
 
-    function resolveFindings(
-        surface: FindingSurface,
-        findings: readonly Finding[],
-    ): readonly DedupedFinding[] {
-        return findings.map((finding) => {
-            const primarySurface = primarySurfaceForKey.get(findingKey(finding)) ?? surface;
-            return { finding, isDuplicate: primarySurface !== surface, primarySurface };
-        });
-    }
-
     return {
-        remaining_work: resolveFindings("remaining_work", input.remaining_work),
-        readiness_gaps: resolveFindings("readiness_gaps", input.readiness_gaps),
-        conflicts: resolveFindings("conflicts", input.conflicts),
-        limitations: input.limitations.map((text) => {
-            const primarySurface = primarySurfaceForKey.get(limitationKey(text)) ?? "limitations";
-            return { text, isDuplicate: primarySurface !== "limitations", primarySurface };
-        }),
+        remaining_work: findingResults.remaining_work,
+        readiness_gaps: findingResults.readiness_gaps,
+        conflicts: findingResults.conflicts,
+        limitations,
     };
 }
 

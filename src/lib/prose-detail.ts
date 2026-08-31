@@ -42,8 +42,14 @@ export type ProseSplit = {
  * removing it from the lead prose duplicates nothing — the structured
  * version is already one click away in "Drivers").
  */
+// codex round 1, finding 2: an OR of the two clauses matched a sentence
+// carrying EITHER one alone (a parenthesized weight/value with no
+// "contributed ... attention points", or vice versa) -- not necessarily
+// the templated scoring sentence at all, which could hide a genuine
+// judgment behind Details and falsely report "no direct judgment". Both
+// clauses must appear together, in that order, for a match now.
 const ARITHMETIC_SENTENCE_RE =
-    /\(\s*weight\s+[\d.]+\s*,\s*value\s+[\d.]+\s*\)|contributed\s+[\d.]+\s+of\s+.*?[\d.]+\s+attention\s+points?/i;
+    /\(\s*weight\s+[\d.]+\s*,\s*value\s+[\d.]+\s*\)[\s\S]*?contributed\s+[\d.]+\s+of\s+[\s\S]*?[\d.]+\s+attention\s+points?/i;
 
 /**
  * Splits `text` into sentences at a sentence-ending punctuation mark
@@ -61,7 +67,16 @@ const ARITHMETIC_SENTENCE_RE =
  */
 function splitSentences(text: string): readonly string[] {
     if (text.trim() === "") return [];
-    return text.split(/(?<=[.!?])\s+(?=[A-Z"“])/);
+    // codex round 1, finding 1: requiring the NEXT sentence to start with a
+    // capital (or quote) is not something the contract guarantees -- a
+    // contract-valid lowercase continuation ("... blocked. principal
+    // driver(s): ...") failed to split, so the arithmetic match consumed
+    // the PRECEDING conclusion sentence too, leaving the lead empty. No
+    // capital-letter lookahead is needed for decimal safety either: a
+    // decimal point (`20.0`) is never followed by whitespace, only by
+    // another digit, so plain "punctuation then whitespace" is already a
+    // safe, sufficient sentence boundary.
+    return text.split(/(?<=[.!?])\s+/);
 }
 
 /**

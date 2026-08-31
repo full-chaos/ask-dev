@@ -61,11 +61,6 @@ describe("splitLeadArithmetic: CHAOS-4669 defect 2 (computation arithmetic out o
     });
 
     it("handles multiple arithmetic sentences in one field, extracting all of them in order", () => {
-        // Each extracted sentence starts with a capital -- matching the
-        // live shape (`splitSentences`'s own sentence-boundary rule needs
-        // a capital after the whitespace to treat it as a NEW sentence,
-        // same as "Principal driver(s): ... Fullchaos has ..." in the live
-        // sample above).
         const raw =
             "Readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points. " +
             "Workload pressure (weight 10, value 1.00) contributed 13.3 of Fullchaos's 46.7 attention points.";
@@ -76,5 +71,38 @@ describe("splitLeadArithmetic: CHAOS-4669 defect 2 (computation arithmetic out o
 
     it("handles empty text", () => {
         expect(splitLeadArithmetic("")).toEqual({ lead: "", extracted: [] });
+    });
+
+    /**
+     * codex round 1, finding 1 (EXECUTED repro): a lowercase continuation
+     * after the conclusion sentence's period ("... blocked. principal
+     * driver(s): ...") is contract-valid but is not a signal this module
+     * can require — the fix drops the capital-letter lookahead entirely
+     * and relies only on "punctuation then whitespace" (still safe against
+     * decimals, which never have a space after the point).
+     */
+    it("splits a conclusion sentence from a LOWERCASE-continuing arithmetic sentence (codex round 1, finding 1)", () => {
+        const raw =
+            "The organization is blocked. principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Atlas's 46.7 attention points.";
+        const result = splitLeadArithmetic(raw);
+        expect(result.lead).toBe("The organization is blocked.");
+        expect(result.extracted).toEqual([
+            "principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Atlas's 46.7 attention points.",
+        ]);
+    });
+
+    /**
+     * codex round 1, finding 2 (EXECUTED repro): the old regex was an OR of
+     * the two clauses, so a sentence carrying ONLY a parenthesized
+     * weight/value (no "contributed ... attention points") was extracted
+     * too, even though it was not the templated scoring sentence — capable
+     * of hiding a genuine judgment sentence and falsely reporting "no
+     * direct judgment". Both clauses must now appear together.
+     */
+    it("does NOT extract a sentence carrying only a parenthesized weight/value with no 'contributed ... attention points' (codex round 1, finding 2)", () => {
+        const raw = "The team's plan notes a (weight 15, value 1.00) placeholder pending review.";
+        const result = splitLeadArithmetic(raw);
+        expect(result.extracted).toHaveLength(0);
+        expect(result.lead).toBe(raw);
     });
 });

@@ -230,7 +230,19 @@ export function humanizeCoverageSourceName(source: string): MappedText {
     for (const [prefix, prefixLabel] of SOURCE_PREFIX_LABELS) {
         if (!source.startsWith(prefix)) continue;
         const kind = source.slice(prefix.length);
-        if (kind === "") continue;
+        // codex round 1, finding 4 (EXECUTED repro): `coverage.sources[].source`
+        // is free text on the wire (schema types it as a 1..128 char string,
+        // not a closed enum — see `outcome.ts`'s own `boundedCoverageSource`
+        // doc comment), so treating ANY non-empty suffix after a recognized
+        // PREFIX as "mapped" let an unrecognized/malformed kind (e.g. one
+        // that itself embedded another closed-vocabulary prefix) leak onto
+        // the always-visible chip via `humanizeTerm`, which only replaces
+        // underscores — it does not validate the kind at all. Only a kind
+        // this schema actually declares (`FACT_KINDS`, the same allowlist
+        // `humanizeDegradedReason` already trusts) counts as mapped now;
+        // this mirrors `outcome.ts`'s own `boundedCoverageSource`, which
+        // validates the identical two prefixes against the identical set.
+        if (!FACT_KINDS.has(kind)) continue;
         return known(`${prefixLabel} — ${humanizeTerm(kind)}`, source);
     }
     return generic("Source", source);

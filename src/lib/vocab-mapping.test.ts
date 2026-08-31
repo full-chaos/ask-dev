@@ -171,6 +171,29 @@ describe("vocab-mapping: coverage source names", () => {
         expect(result.raw).toBe("some-future-source:x");
         expect(result.sentence).not.toContain("some-future-source:x");
     });
+
+    /**
+     * codex round 1, finding 4 (EXECUTED repro): `coverage.sources[].source`
+     * is free text on the wire (not a closed enum), so treating any
+     * non-empty suffix after `canonical_fact:` as "mapped" let a bogus kind
+     * leak onto the visible chip verbatim (codex's own repro embedded
+     * `unexpanded:policy_unavailable` as the "kind", and it survived
+     * straight through `humanizeTerm`, which only replaces underscores).
+     * Only a real, schema-declared FactKind counts as mapped now.
+     */
+    it("fails readable when the suffix after canonical_fact:/dev-health-ops: is not a real FactKind", () => {
+        const bogusKind = humanizeCoverageSourceName(
+            "canonical_fact:unexpanded:policy_unavailable",
+        );
+        expect(bogusKind.mapped).toBe(false);
+        expect(bogusKind.sentence).not.toContain("unexpanded:");
+        expect(bogusKind.sentence).not.toContain("policy_unavailable");
+        expect(bogusKind.raw).toBe("canonical_fact:unexpanded:policy_unavailable");
+
+        const bogusOpsKind = humanizeCoverageSourceName("dev-health-ops:not_a_real_capability");
+        expect(bogusOpsKind.mapped).toBe(false);
+        expect(bogusOpsKind.sentence).not.toContain("not_a_real_capability");
+    });
 });
 
 describe("vocab-mapping: evidence reference ids", () => {
