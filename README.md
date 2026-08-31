@@ -207,40 +207,59 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `f9d9688c72bf6843137778079f77bd8dde8da32e` (acr main tip #352;
-CHAOS-4642, bumping past CHAOS-4413/#344's `completeness` widening — the
-two-step-deploy consumer half of CHAOS-4623's own finding). ONE $def is
-added to `context_fabric_common.v1`: `AnswerCompleteness`
-(`terminal_status`/`terminal_reason`/`claimed_facts_count`/`rows_count`,
-`terminal_reason` conditionally required off `complete`), and
-`context_fabric_investigation_result.v1` grows a REQUIRED `completeness`
-field pointing at it. Nothing else in the CONSUMED surface (the four schemas
-`scripts/sync-acr-contracts.mjs` actually copies:
-`context_fabric_common.v1`, `context_fabric_investigation_request.v1`,
+Currently pinned: `0a65f124b1d70e2acc46542dc642e751f7932434` (acr main tip
+#353; CHAOS-4636 "S5" — the answer plan, three-stage budget, and grouped
+cohort — bumping past CHAOS-4642's `f9d9688c`/#352 pin per CHAOS-4668). Two
+files in the CONSUMED surface (the four schemas
+`scripts/sync-acr-contracts.mjs` actually copies: `context_fabric_common.v1`,
+`context_fabric_investigation_request.v1`,
 `context_fabric_investigation_result.v1`, `error.v1`) changed between the
-prior pin (`6ac060ea`, still the shared rig's acr sha at bump time) and this
-one — verified directly against acr's own history: `git diff
-6ac060eac757ffcc795bbdc39f3fe0eb3879559e
-f9d9688c72bf6843137778079f77bd8dde8da32e -- contracts/jsonschema/v1/` in the
-acr worktree touches SIX files (also `context_fabric_answer_projection.v1`,
-`context_fabric_investigation_result.v2`, and the two `mcp_*_response.v1`
-schemas that embed the same `$defs`— none of which ask-dev pins), of which
-only`context_fabric_common.v1.schema.json`and`context_fabric_investigation_result.v1.schema.json`are in the four this
-repo consumes;`context_fabric_investigation_request.v1.schema.json`and`error.v1.schema.json`are byte-identical to the prior pin (confirmed by
-diffing each of the four consumed paths individually, not by this one
-broader command's file list). Rendered by the new`CompletenessPanel`
-(`terminal_status`as a
-badge reusing`statusTone`— the same closed vocabulary as`status`itself —
-plus the claimed-facts/row counts, plus`terminal_reason`verbatim when
-present) in`DeterministicAnswerView`'s coverage/limitations strip, on both
-the decisive and `clarification_required`branches (the field is
-unconditional on the result, unlike e.g.`cohort`).
+prior pin and this one — verified per-file directly against acr's own
+history (`git diff f9d9688c72bf6843137778079f77bd8dde8da32e
+0a65f124b1d70e2acc46542dc642e751f7932434 -- contracts/jsonschema/v1/<file>`
+run once per consumed path, not as one combined command):
 
-CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion to the public
-interpretation has **not** landed on acr main as of this pin — there is
-nothing on the wire yet to widen for on that front. This bump is
-CHAOS-4642's `completeness` widening only; a further pin bump follows once
-that lands.
+- `context_fabric_common.v1.schema.json`: new `$defs` `AnswerPlan`,
+  `AnswerPlanBudget`, `PlanNarrowing`, `CohortGroup`, plus the closed
+  vocabularies they reference (question family, group/member kind,
+  narrowing stage/basis — the question-family one promoted from
+  CHAOS-4632's shadow-only vocabulary now that its false-emission rate is
+  measured). `Cohort` grows an optional `groups` property.
+- `context_fabric_investigation_result.v1.schema.json`: +3 lines, one new
+  OPTIONAL `answer_plan` property (not in the schema's `required` array).
+
+`context_fabric_investigation_request.v1.schema.json` and
+`error.v1.schema.json` are byte-identical to the prior pin. Every field this
+pin adds is schema-OPTIONAL (audited during S5's own review; reconfirmed
+here field-by-field against each new `$def`'s own `required` array) — per
+CHAOS-4656's doctrine this is a NORMAL two-step deploy (this consumer pin
+lands first; no atomic swap needed, unlike CHAOS-4642's REQUIRED
+`completeness`).
+
+CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion is only PARTIALLY on
+the wire at this pin: `AnswerPlan.family`/`.group_kind` (S5's own fields)
+give CHAOS-4644 its GroupKind half as a side effect, but `ScopeAnchorTerm`
+has zero hits anywhere in acr at `0a65f124` (`git grep` clean) — CHAOS-4644
+stays open, its ticket corrected accordingly.
+
+Rendered minimally, per CHAOS-4668's own scope note and CHAOS-4669 (answer
+leads, apparatus collapses) — no new lead panel:
+
+- `AnswerPlanPanel`: a single collapsed `<details>` (same shape as
+  `CoveragePanel`'s "Source details") naming the resolved question family,
+  the budget the plan was built against, and — when present — each
+  `narrowing` step's before/after counts and basis verbatim (the "showing 2
+  of 3 teams" disclosure North Star checks 5/12 ask for). Renders in both
+  `DeterministicAnswerView` branches, gated purely on `answer_plan`'s
+  presence (absent on every pre-S5 result, so this component is
+  byte-identical to not existing for one).
+- `CohortGroupsPanel`: a collapsed disclosure of each group's own
+  `complete`/`truncated` state, next to `CohortRankingPanel`. Gated on
+  `Cohort.groups`'s presence rather than `interpretation.shape` intent —
+  `groups` is itself the evidence a grouped answer was assembled. Per
+  lane-4636's measured finding (CHAOS-4668 ticket comment), `groups` does
+  not co-occur with a ranked cohort on real `dh_0830` data, so this panel's
+  own test suite is fixture-only — expected, not a gap.
 
 Previously pinned: `aa214606e70d9beb1cd2ea78d62a17bd4e680c3b` (acr main tip #326;
 CHAOS-4449, bumping past CHAOS-4398 PR3/PR3b (#322/#325) — the cohort ranking

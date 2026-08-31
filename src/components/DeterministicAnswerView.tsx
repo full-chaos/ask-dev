@@ -1,8 +1,10 @@
 import { useId } from "react";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
+import { AnswerPlanPanel } from "@/components/AnswerPlanPanel";
 import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
+import { CohortGroupsPanel } from "@/components/CohortGroupsPanel";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CompletenessPanel } from "@/components/CompletenessPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
@@ -219,6 +221,7 @@ export function DeterministicAnswerView({
                 />
                 <CoveragePanel coverage={result.coverage} />
                 <CompletenessPanel completeness={result.completeness} />
+                <AnswerPlanPanel answerPlan={result.answer_plan} />
                 {
                     // codex review round 2 (CHAOS-4581): extracting the old
                     // inline Limitations block into `LimitationsPanel`
@@ -280,6 +283,7 @@ export function DeterministicAnswerView({
                 result={result}
                 shape={result.interpretation.shape}
             />
+            <CohortGroupsPanel cohort={result.cohort} />
             {isCohortIntent(result.interpretation.shape) &&
             result.cohort !== undefined &&
             rankingTable(result.cohort.members) !== null ? (
@@ -304,6 +308,7 @@ export function DeterministicAnswerView({
                 <CompletenessPanel completeness={result.completeness} />
                 <LimitationsPanel limitations={result.limitations} warnings={result.warnings} />
             </div>
+            <AnswerPlanPanel answerPlan={result.answer_plan} />
             {
                 // The narrative prose — short by construction (see
                 // AnswerPanel), and never above the panels above it.

@@ -28,25 +28,28 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #344 (CHAOS-4413), which promotes the answer-rate/
-// terminal-state measurement (formerly acr's own trial-harness-only
-// telemetry) into the public contract as `AnswerCompleteness` -- see
-// CHAOS-4642. ONE $def is added to `context_fabric_common.v1`
-// (`AnswerCompleteness`: `terminal_status`/`terminal_reason`/
-// `claimed_facts_count`/`rows_count`, conditionally requiring
-// `terminal_reason` off `complete`), and `context_fabric_investigation_result.v1`
-// grows a REQUIRED `completeness` field pointing at it -- required, not
-// optional, so every future response from this pin onward carries it. No
-// other schema in the consumed surface changed between 6ac060ea and this
-// pin (verified: `git diff 6ac060eac757ffcc795bbdc39f3fe0eb3879559e f9d9688c72bf6843137778079f77bd8dde8da32e`
-// touches nothing else in `context_fabric_investigation_request.v1` or
-// `error.v1`). CHAOS-4644's own GroupKind/ScopeAnchorTerm promotion has NOT
-// landed on acr main as of this pin -- there is nothing to widen for yet;
-// this bump is CHAOS-4642's completeness widening only. Two-step deploy
-// (CHAOS-4623): this consumer pin bump must be live BEFORE any acr server
-// carrying `completeness` serves the shared rig. Bump procedure lives in
-// README.md.
-export const SOURCE_COMMIT = "f9d9688c72bf6843137778079f77bd8dde8da32e";
+// acr main: pins past #353 (CHAOS-4636, "S5"), which adds the pre-synthesis
+// AnswerPlan and the grouped-cohort axis to the public contract -- see
+// CHAOS-4668. Two files in the consumed surface changed between f9d9688c
+// (#352) and this pin (verified per-file:
+// `git diff f9d9688c72bf6843137778079f77bd8dde8da32e 0a65f124b1d70e2acc46542dc642e751f7932434 -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: new $defs `AnswerPlan`, `AnswerPlanBudget`,
+//     `PlanNarrowing`, `CohortGroup`, and five closed vocabularies (family,
+//     group_kind, member_kind, narrowing basis/stage). `AnswerPlan` carries
+//     `family`/`group_kind` on the wire -- this is CHAOS-4644's GroupKind
+//     half arriving as a side effect of S5, NOT a completed 4644 (its
+//     ScopeAnchorTerm half has zero hits in acr at this pin -- 4644 stays
+//     open). `Cohort` grows an optional `groups` property (not in Cohort's
+//     `required`).
+//   - `context_fabric_investigation_result.v1`: +3 lines, one new OPTIONAL
+//     property `answer_plan` (not in the schema's `required` array).
+// `context_fabric_investigation_request.v1` and `error.v1` are byte-identical
+// to the prior pin. Every new field here is schema-OPTIONAL (audited during
+// S5's own review, reconfirmed here) -- CHAOS-4656's doctrine, so unlike
+// CHAOS-4642's `completeness` this is a NORMAL two-step deploy (consumer
+// pin first, acr server second; no atomic swap required). Bump procedure
+// lives in README.md.
+export const SOURCE_COMMIT = "0a65f124b1d70e2acc46542dc642e751f7932434";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
