@@ -126,8 +126,56 @@ export function humanizeReasonBody(raw: string): MappedText {
         return known(withBasis, raw);
     }
 
+    // The relationship-graph reader (`falkorgraph/reader.go`) emits these
+    // FOUR bare, un-kind-prefixed codes straight into `degraded_reasons[]`
+    // (no `appendFactCoverage` involved, so no `"<kind>: "` prefix to
+    // split off first) — each is a fixed code, optionally with a trailing
+    // `:<count>`.
+    for (const [prefix, sentence] of GRAPH_READER_REASON_SENTENCES) {
+        if (!trimmed.startsWith(prefix)) continue;
+        const countMatch = /:(\d+)$/.exec(trimmed);
+        const count = countMatch?.[1];
+        return known(count === undefined ? sentence(undefined) : sentence(count), raw);
+    }
+
     return generic("This source didn't fully contribute; see details for the reason.", raw);
 }
+
+/**
+ * `internal/contextfabric/falkorgraph/reader.go`'s own `degradedReasons`
+ * vocabulary — checked longest-prefix-first isn't needed here since none of
+ * the four codes is a prefix of another. Each entry's sentence function
+ * receives the trailing `:<count>` when the raw string carries one.
+ */
+const GRAPH_READER_REASON_SENTENCES: ReadonlyArray<
+    readonly [string, (count: string | undefined) => string]
+> = [
+    [
+        "endpoint_lookup_failed",
+        (count) =>
+            count === undefined
+                ? "Some relationship links in the graph could not be resolved."
+                : `${count} relationship link${count === "1" ? "" : "s"} in the graph could not be resolved.`,
+    ],
+    [
+        "exact_name_candidates_truncated",
+        () => "More exact-name matches existed than could be shown; the list was cut off.",
+    ],
+    [
+        "cohort_denied_by_authorization",
+        (count) =>
+            count === undefined
+                ? "Some members of this group were left out because this account isn't authorized to see them."
+                : `${count} member${count === "1" ? "" : "s"} of this group ${count === "1" ? "was" : "were"} left out because this account isn't authorized to see ${count === "1" ? "it" : "them"}.`,
+    ],
+    [
+        "unknown_relationship_type",
+        (count) =>
+            count === undefined
+                ? "Some relationship edges used a type outside the recognized vocabulary and were dropped."
+                : `${count} relationship edge${count === "1" ? "" : "s"} used a type outside the recognized vocabulary and ${count === "1" ? "was" : "were"} dropped.`,
+    ],
+];
 
 /**
  * Humanizes one `coverage.degraded_reasons[]` entry — `"<fact kind>: "`
@@ -170,6 +218,14 @@ const SOURCE_PREFIX_LABELS: ReadonlyArray<readonly [string, string]> = [
 export function humanizeCoverageSourceName(source: string): MappedText {
     if (source === "context-fabric:graph") {
         return known("Relationship graph", source);
+    }
+    // A distinct, non-degrading source row the graph reader emits ONLY
+    // alongside a historical-axis answer (`falkorgraph/reader.go`, "a
+    // reader deserves to see [unbounded validity] separately from real
+    // degradation") — never `Partial`, so it needs its own name rather
+    // than folding into the plain "Relationship graph" row above.
+    if (source === "context-fabric:graph-validity-windows") {
+        return known("Relationship graph — undated elements", source);
     }
     for (const [prefix, prefixLabel] of SOURCE_PREFIX_LABELS) {
         if (!source.startsWith(prefix)) continue;

@@ -68,6 +68,35 @@ describe("vocab-mapping: degraded reasons", () => {
         expect(result.sentence).toMatch(/search to reach it failed/);
     });
 
+    /**
+     * `acr/internal/contextfabric/falkorgraph/reader.go` emits these FOUR
+     * codes straight into `degraded_reasons[]` with no `"<kind>: "` prefix
+     * (it does not route through `appendFactCoverage`) — a distinct shape
+     * from the fact-planner reasons above, easy to miss if only the
+     * kind-prefixed shape is tested.
+     */
+    it("maps the graph reader's own bare degraded-reason codes", () => {
+        const endpointFailed = humanizeReasonBody("endpoint_lookup_failed:3");
+        expect(endpointFailed.mapped).toBe(true);
+        expect(endpointFailed.sentence).toBe(
+            "3 relationship links in the graph could not be resolved.",
+        );
+
+        const truncated = humanizeReasonBody("exact_name_candidates_truncated");
+        expect(truncated.mapped).toBe(true);
+        expect(truncated.sentence).not.toContain("exact_name_candidates_truncated");
+
+        const deniedSingular = humanizeReasonBody("cohort_denied_by_authorization:1");
+        expect(deniedSingular.mapped).toBe(true);
+        expect(deniedSingular.sentence).toBe(
+            "1 member of this group was left out because this account isn't authorized to see it.",
+        );
+
+        const unknownRelType = humanizeReasonBody("unknown_relationship_type:2");
+        expect(unknownRelType.mapped).toBe(true);
+        expect(unknownRelType.sentence).toContain("2 relationship edges");
+    });
+
     it("fails READABLE (generic phrase + raw preserved), never leaky, on an unrecognized shape", () => {
         const raw = "some_future_acr_reason: nothing this module has ever seen";
         const degraded = humanizeDegradedReason(raw);
@@ -127,6 +156,13 @@ describe("vocab-mapping: coverage source names", () => {
         const result = humanizeCoverageSourceName("context-fabric:graph");
         expect(result.mapped).toBe(true);
         expect(result.sentence).toBe("Relationship graph");
+    });
+
+    it("maps the distinct context-fabric:graph-validity-windows source (falkorgraph/reader.go)", () => {
+        const result = humanizeCoverageSourceName("context-fabric:graph-validity-windows");
+        expect(result.mapped).toBe(true);
+        expect(result.sentence).not.toBe("Relationship graph");
+        expect(result.sentence).toContain("Relationship graph");
     });
 
     it("fails readable on an unrecognized source name", () => {
