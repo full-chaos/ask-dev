@@ -29,6 +29,10 @@ export type {
     ClaimedFact,
     // CHAOS-4355: a claimed fact's OPTIONAL renderable table (CHAOS-4347).
     ClaimedFactRow,
+    // CHAOS-4637/CHAOS-4683: a claimed fact's OPTIONAL declaration of what
+    // its `rows` table IS (shape/key/measures) -- the producer's own
+    // statement selection keys on instead of inferring row geometry.
+    ClaimedFactTable,
     // CHAOS-4449 (acr CHAOS-4398 PR3/PR3b): the cohort and its ranked members.
     Cohort,
     CohortMember,
