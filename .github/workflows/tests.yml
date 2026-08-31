@@ -14,6 +14,15 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
+    # Pins CHAOS-4509: a failing tier must make `run_checks.sh ci` exit
+    # non-zero and stop at the first failure. Pure bash, no toolchain needed.
+    run-checks-selftest:
+        name: run_checks.sh self-test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - run: bash ci/run_checks_fail_fast.test.sh
+
     # Every job runs the SAME entry point a developer runs locally
     # (ci/run_checks.sh <tier>), so a green local run means a green CI run.
     quality:
@@ -89,13 +98,14 @@ jobs:
     # to require no matter how the jobs above are split later.
     test:
         name: test
-        needs: [quality, unit, build, e2e]
+        needs: [run-checks-selftest, quality, unit, build, e2e]
         if: always()
         runs-on: ubuntu-latest
         steps:
             - name: Check every stage
               run: |
-                  if [[ "${{ needs.quality.result }}" != 'success' \
+                  if [[ "${{ needs.run-checks-selftest.result }}" != 'success' \
+                     || "${{ needs.quality.result }}" != 'success' \
                      || "${{ needs.unit.result }}" != 'success' \
                      || "${{ needs.build.result }}" != 'success' \
                      || "${{ needs.e2e.result }}" != 'success' ]]; then
