@@ -73,3 +73,78 @@ describe("AnswerPanel — the answer/judgment stay visible, only current_state c
         expect(second!.querySelector(`#${CSS.escape(secondId!)}`)).not.toBeNull();
     });
 });
+
+/**
+ * CHAOS-4669 defect 2. `LIVE_DETERMINISTIC_ANSWER` is verbatim from a real
+ * kiac investigation (org 70d529e0, "Which teams are struggling, and why?",
+ * acr 0a65f124, 2026-08-31) — captured live via Playwright against a
+ * private rig, not invented (screenshot:
+ * lane-4669-4673-q2-before-defect2-fix.png / -after-defect2-fix.png).
+ */
+describe("AnswerPanel — CHAOS-4669 defect 2: computation arithmetic moves behind Details", () => {
+    const LIVE_DETERMINISTIC_ANSWER =
+        "This investigation is partial: some canonical or graph coverage was unavailable. " +
+        "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points. " +
+        "Fullchaos has an operational deficiency with severity warning.";
+
+    it("never shows the raw scoring arithmetic in the always-visible lead paragraph", () => {
+        const result: InvestigationResult = {
+            ...base,
+            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
+        };
+        render(<AnswerPanel result={result} />);
+
+        const judgment = screen.getByText(/This investigation is partial/);
+        expect(judgment.textContent).not.toContain("weight 15");
+        expect(judgment.textContent).not.toContain("attention points");
+        // The non-arithmetic sentences survive, verbatim, on the lead surface.
+        expect(judgment.textContent).toContain(
+            "This investigation is partial: some canonical or graph coverage was unavailable.",
+        );
+        expect(judgment.textContent).toContain(
+            "Fullchaos has an operational deficiency with severity warning.",
+        );
+    });
+
+    it("keeps the extracted sentence reachable, verbatim, behind the collapsed More detail disclosure", () => {
+        const result: InvestigationResult = {
+            ...base,
+            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
+        };
+        render(<AnswerPanel result={result} />);
+
+        const details = screen.getByText("More detail").closest("details")!;
+        expect(details).not.toHaveAttribute("open");
+        expect(
+            screen.getByText(
+                "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points.",
+            ),
+        ).toBeInTheDocument();
+    });
+
+    it("opens the More detail disclosure even when current_state is empty, as long as arithmetic was extracted", () => {
+        const result: InvestigationResult = {
+            ...base,
+            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
+            current_state: "",
+        };
+        render(<AnswerPanel result={result} />);
+        expect(screen.getByText("More detail")).toBeInTheDocument();
+    });
+
+    it("does the same for direct_judgment, not just deterministic_answer", () => {
+        const result: InvestigationResult = {
+            ...base,
+            direct_judgment:
+                "Fullchaos is struggling. Operational deficiencies (weight 20, value 0.50) contributed 13.3 of Fullchaos's 46.7 attention points.",
+        };
+        render(<AnswerPanel result={result} />);
+        const judgment = screen.getByText(/Fullchaos is struggling\./);
+        expect(judgment.textContent).not.toContain("weight 20");
+        expect(
+            screen.getByText(
+                "Operational deficiencies (weight 20, value 0.50) contributed 13.3 of Fullchaos's 46.7 attention points.",
+            ),
+        ).toBeInTheDocument();
+    });
+});

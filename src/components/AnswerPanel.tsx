@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { InvestigationResult } from "@/lib/contracts";
+import { splitLeadArithmetic } from "@/lib/prose-detail";
 
 export type AnswerPanelProps = {
     readonly result: InvestigationResult;
@@ -23,6 +24,18 @@ export type AnswerPanelProps = {
  * importance, or filled with the workbench's own words.
  * `strongest_pressures` and `drivers` moved out to `DriversPanel`
  * (CHAOS-4581) — a panel, not prose.
+ *
+ * CHAOS-4669 defect 2 (confirmed LIVE, kiac org 70d529e0, "Which teams are
+ * struggling, and why?"): `deterministic_answer` itself can carry acr's
+ * driver-scoring TEMPLATE sentence verbatim — "readiness gap (weight 15,
+ * value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points." — a
+ * structured restatement of what `DriversPanel`'s own cards already state
+ * per driver, not narrative prose. `splitLeadArithmetic` pulls exactly that
+ * templated shape out of `deterministic_answer`/`direct_judgment`, LOSSLESS
+ * (every character preserved verbatim, just moved) into the SAME "More
+ * detail" fold `current_state` already uses — never paraphrased, dropped,
+ * or reworded, so this stays inside the "nothing summarized" boundary
+ * above: a presentational split of one field's own text, not a rewrite.
  */
 export function AnswerPanel({ result }: AnswerPanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
@@ -30,8 +43,12 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     // hardcoded heading id collided across turns and every later turn's
     // `aria-labelledby` resolved to the FIRST turn's heading.
     const idPrefix = useId();
-    const hasJudgment = result.direct_judgment.trim() !== "";
+    const deterministicAnswer = splitLeadArithmetic(result.deterministic_answer);
+    const directJudgment = splitLeadArithmetic(result.direct_judgment);
+    const hasJudgment = directJudgment.lead.trim() !== "";
     const hasCurrentState = result.current_state.trim() !== "";
+    const arithmeticSentences = [...deterministicAnswer.extracted, ...directJudgment.extracted];
+    const hasDetail = hasCurrentState || arithmeticSentences.length > 0;
     return (
         <section
             className="panel"
@@ -42,21 +59,32 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
                 Answer
             </h2>
             <p className="answer__judgment">
-                <SafeAnswerText text={result.deterministic_answer} />
+                <SafeAnswerText text={deterministicAnswer.lead} />
             </p>
             {hasJudgment ? (
                 <p className="answer__body">
-                    <SafeAnswerText text={result.direct_judgment} />
+                    <SafeAnswerText text={directJudgment.lead} />
                 </p>
             ) : (
                 <p className="panel__empty">The service returned no direct judgment.</p>
             )}
-            {hasCurrentState ? (
+            {hasDetail ? (
                 <details className="disclosure">
                     <summary>More detail</summary>
-                    <p className="answer__body">
-                        <SafeAnswerText text={result.current_state} />
-                    </p>
+                    {arithmeticSentences.length > 0 ? (
+                        <div data-testid="answer-arithmetic-detail">
+                            {arithmeticSentences.map((sentence) => (
+                                <p className="record__meta" key={sentence}>
+                                    <SafeAnswerText text={sentence} />
+                                </p>
+                            ))}
+                        </div>
+                    ) : null}
+                    {hasCurrentState ? (
+                        <p className="answer__body">
+                            <SafeAnswerText text={result.current_state} />
+                        </p>
+                    ) : null}
                 </details>
             ) : null}
         </section>
