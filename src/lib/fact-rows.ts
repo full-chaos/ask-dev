@@ -295,6 +295,7 @@ export function findRollupBasis(
     allFacts: readonly ClaimedFact[],
     fact: ClaimedFact,
 ): string | undefined {
+    const bases: string[] = [];
     for (const candidate of allFacts) {
         if (
             candidate.claim_id !== fact.claim_id &&
@@ -303,10 +304,20 @@ export function findRollupBasis(
             sameSubject(candidate.subject, fact.subject)
         ) {
             const value = cellValue(candidate.value);
-            if (typeof value === "string") return value;
+            if (typeof value === "string") bases.push(value);
         }
     }
-    return undefined;
+    // EXACTLY one, or none. Two sibling bases for one subject is an ambiguous
+    // document, and returning the first made the caption depend on the order
+    // the service happened to serialize its claims in -- the same answer
+    // could caption a table two different ways.
+    //
+    // This is the fourth instance of one rule that the render-shape lib
+    // states once (see `hasDuplicate` in render-shapes.ts): every identity
+    // this view resolves BY must be unique, everywhere it is resolved. It
+    // predates that lib, which is exactly why it was missed -- the rule was
+    // applied where a reviewer pointed rather than everywhere it holds.
+    return bases.length === 1 ? bases[0] : undefined;
 }
 
 /** The claimed facts a per-fact panel actually renders: non-empty `rows` only. */

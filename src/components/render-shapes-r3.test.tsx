@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { InvestigationResult, RenderShape } from "@/lib/contracts";
+import { findRollupBasis } from "@/lib/fact-rows";
 import { renderShapesFor, trendShapesForClaim, verifyRenderShape } from "@/lib/render-shapes";
 
 // codex round 3 on ask-dev. All three findings are the SAME defect in three
@@ -143,6 +144,42 @@ describe("R3-3 — a series key is an identity too", () => {
             claimed_facts: [],
         } as unknown as InvestigationResult;
         expect(verifyRenderShape(dup, result)).toBe(false);
+    });
+});
+
+describe("R4-1 — the fourth sibling, in a module that predates the rule", () => {
+    it("refuses an ambiguous rollup basis instead of picking the first", () => {
+        // `findRollupBasis` returned the first same-subject sibling, so the
+        // caption depended on the order the service happened to serialize
+        // its claims in — the same answer could caption a table two ways.
+        // It lives in fact-rows.ts, which predates the render-shape lib, and
+        // that is exactly why it was missed: the rule had been applied where
+        // reviewers pointed rather than everywhere it holds.
+        const subject = { kind: "team", canonical_id: "team:a", label: "a" };
+        const target = {
+            claim_id: "c0",
+            kind: "metrics",
+            subject,
+            field: "x",
+            value: { number: 1 },
+        };
+        const a = {
+            claim_id: "c1",
+            kind: "metrics",
+            subject,
+            field: "rollup_basis",
+            value: { string: "basis_a" },
+        };
+        const b = {
+            claim_id: "c2",
+            kind: "metrics",
+            subject,
+            field: "rollup_basis",
+            value: { string: "basis_b" },
+        };
+        expect(findRollupBasis([target, a, b] as never, target as never)).toBeUndefined();
+        // One basis still resolves — the control.
+        expect(findRollupBasis([target, a] as never, target as never)).toBe("basis_a");
     });
 });
 
