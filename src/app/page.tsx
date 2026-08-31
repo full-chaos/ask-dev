@@ -92,6 +92,23 @@ type Turn =
           readonly question: string;
           /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
           readonly createdAt: string;
+          /**
+           * CHAOS-4670: a receipt-carrying re-ask (a panel selection's
+           * turn-2 request) resends this SAME question text — the turn
+           * still runs for real on the wire (receipts/supersession
+           * unchanged, still threaded into `buildConversationTurns` below
+           * exactly as before), but showing it as a second user bubble
+           * reads as though the tester asked twice. `false` for every
+           * receipt-carrying re-ask (`confirmSelections`, and `ask()`'s own
+           * non-plain call from `chooseStructure`'s single-batch fallback);
+           * `true` for a plain composer ask or a plain-ask retry, which are
+           * genuinely new/repeated questions and must render. The compact
+           * record of what a silent re-run carried is the superseded
+           * assistant turn's own selection chips
+           * (`submittedStructureBatch`/`submittedCandidateReceiptIds`
+           * below), already rendered — nothing else needs to change.
+           */
+          readonly showBubble: boolean;
       }
     | {
           readonly role: "assistant";
@@ -347,7 +364,7 @@ export default function ChatPage() {
         const askedAt = new Date().toISOString();
         setTurns((current) => [
             ...current,
-            { role: "user", id: userTurnId, question, createdAt: askedAt },
+            { role: "user", id: userTurnId, question, createdAt: askedAt, showBubble: isPlainAsk },
             {
                 role: "assistant",
                 id: assistantTurnId,
@@ -492,7 +509,10 @@ export default function ChatPage() {
 
         setTurns((current) => [
             ...current,
-            { role: "user", id: userTurnId, question, createdAt: askedAt },
+            // CHAOS-4670: always silent — every `confirmSelections` call is
+            // a receipt-carrying re-ask of a question already shown as a
+            // user bubble on the turn(s) it supersedes.
+            { role: "user", id: userTurnId, question, createdAt: askedAt, showBubble: false },
             ...assistantTurns.map(({ id, item }) => ({
                 role: "assistant" as const,
                 id,
@@ -666,6 +686,10 @@ export default function ChatPage() {
                     ) : (
                         turns.map((turn) => {
                             if (turn.role === "user") {
+                                // CHAOS-4670: a silent receipt-carrying
+                                // re-ask renders nothing here — see
+                                // `Turn`'s `showBubble` doc comment.
+                                if (!turn.showBubble) return null;
                                 return (
                                     <div className="chat__turn chat__turn--user" key={turn.id}>
                                         <p className="chat__meta chat__meta--user">

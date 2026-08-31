@@ -259,11 +259,11 @@ describe("the clarification chip is live only on the most recent assistant turn"
         expect(secondCallBody.question).toBe(clarification.question);
         expect(thirdCallBody.question).toBe(clarification.question);
 
-        // Exactly ONE new user bubble for the whole batch action (not one per
-        // fired request) — plus the ORIGINAL ask's own bubble, which happens
-        // to carry the identical text here since the fixture's `question`
-        // matches what was typed.
-        expect(screen.getAllByText(clarification.question)).toHaveLength(2);
+        // CHAOS-4670: the batch action fires real requests (asserted above)
+        // but renders NO new user bubble at all — only the ORIGINAL ask's
+        // own bubble stays visible, for the whole batch, not one per fired
+        // request and not one for the batch as a whole either.
+        expect(screen.getAllByText(clarification.question)).toHaveLength(1);
 
         // Each panel's own choice notice proves it resolved to the RIGHT
         // candidate independently, since both requests share one question.
@@ -329,6 +329,113 @@ describe("the clarification chip is live only on the most recent assistant turn"
         // answered successfully — the failed candidate has no article at all.
         expect(articles).toHaveLength(2);
         expect(articles[1]).toHaveAttribute("data-state", answered.status);
+    });
+});
+
+/**
+ * CHAOS-4670: a panel selection's turn-2 request resends the SAME question
+ * text as the turn it supersedes — it still runs for real on the wire
+ * (asserted below via the second fetch call's body, unchanged from the
+ * pre-existing tests above), but must not render as a second user bubble.
+ * The compact record of what the re-run carried is the superseded turn's
+ * own selection chips, already covered by the tests above.
+ */
+describe("CHAOS-4670: a panel-selection re-ask does not render a second question bubble", () => {
+    it("renders exactly ONE user bubble after a subject-candidate re-ask", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const { container } = render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        const candidate = clarification.subject_resolution.candidates[0]!;
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${candidate.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: "Ask about 1 selected candidate" }));
+
+        // The re-ask still ran for real, on the wire, unchanged.
+        await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+        expect(await screen.findByText(clarification.question)).toBeInTheDocument();
+
+        // But it must render as the transcript's ONLY user bubble.
+        expect(container.querySelectorAll(".chat__turn--user")).toHaveLength(1);
+        expect(screen.getAllByText(clarification.question)).toHaveLength(1);
+    });
+
+    it("renders exactly ONE user bubble after a structure-batch re-ask (chooseStructure's single-batch fallback)", async () => {
+        vi.spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: structureKind }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const { container } = render(<ChatPage />);
+
+        await ask("How's the pipeline doing?");
+        const user = userEvent.setup();
+        const option = structureKind.structure_needs!.kind_options![1]!;
+        await user.click(await screen.findByRole("button", { name: `Select ${option.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask again with these selections" }));
+
+        await waitFor(() =>
+            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
+                2,
+            ),
+        );
+        expect(container.querySelectorAll(".chat__turn--user")).toHaveLength(1);
+        expect(screen.getAllByText("How's the pipeline doing?")).toHaveLength(1);
+    });
+
+    it("renders exactly ONE user bubble across 2 stacked panels from confirmSelections", async () => {
+        const [first, second] = clarification.subject_resolution.candidates;
+        vi.spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: clarification }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify({ result: answered }), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        const { container } = render(<ChatPage />);
+
+        await ask("Is Atlas on track?");
+        const user = userEvent.setup();
+        await user.click(
+            await screen.findByRole("button", { name: `Select ${first!.subject.label}` }),
+        );
+        await user.click(screen.getByRole("button", { name: `Select ${second!.subject.label}` }));
+        await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
+
+        await waitFor(() =>
+            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
+                3,
+            ),
+        );
+        expect(container.querySelectorAll(".chat__turn--user")).toHaveLength(1);
     });
 });
 

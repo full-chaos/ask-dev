@@ -270,6 +270,141 @@ describe("FactRowsPanels", () => {
     });
 });
 
+/**
+ * CHAOS-4672: the service attaches the WHOLE row table to every claim that
+ * cites it — "READINESS · ESTIMATE COVERAGE RATIO" and "READINESS ·
+ * UNESTIMATED COUNT" used to render the identical 4-column small-multiples
+ * TWICE, once per claim. One table now renders one chart group, regardless
+ * of how many claims cite it.
+ */
+describe("FactRowsPanels — CHAOS-4672 table-identity dedupe", () => {
+    const sharedReadinessRows: ClaimedFact["rows"] = [
+        {
+            fields: {
+                day: { string: "2026-08-01" },
+                backlog_size: { integer: 40 },
+                estimate_coverage_ratio: { number: 0.6 },
+                unestimated_count: { integer: 16 },
+            },
+        },
+        {
+            fields: {
+                day: { string: "2026-08-02" },
+                backlog_size: { integer: 42 },
+                estimate_coverage_ratio: { number: 0.62 },
+                unestimated_count: { integer: 16 },
+            },
+        },
+    ];
+    const coverageClaim: ClaimedFact = {
+        claim_id: "claim_coverage",
+        kind: "readiness",
+        subject: { kind: "team", canonical_id: "team:fullchaos", label: "Fullchaos" },
+        field: "estimate_coverage_ratio",
+        value: { number: 0.62 },
+        rows: sharedReadinessRows,
+    };
+    const unestimatedClaim: ClaimedFact = {
+        claim_id: "claim_unestimated",
+        kind: "readiness",
+        subject: { kind: "team", canonical_id: "team:fullchaos", label: "Fullchaos" },
+        field: "unestimated_count",
+        value: { integer: 16 },
+        rows: sharedReadinessRows,
+    };
+
+    it("renders exactly ONE panel for two claims over the identical table, not one per claim", () => {
+        render(<FactRowsPanels facts={[coverageClaim, unestimatedClaim]} result={undefined} />);
+        expect(screen.getAllByRole("heading", { name: /^readiness ·/i })).toHaveLength(1);
+        // The single surviving panel is titled by whichever claim reached
+        // the table first — the FIRST array element, `coverageClaim`.
+        expect(
+            screen.getByRole("heading", { name: /^readiness · estimate coverage ratio$/i }),
+        ).toBeInTheDocument();
+    });
+
+    it("references the secondary claim's measure instead of re-plotting it", () => {
+        render(<FactRowsPanels facts={[coverageClaim, unestimatedClaim]} result={undefined} />);
+        const note = screen.getByTestId("fact-also-referenced");
+        expect(note.textContent).toContain("unestimated count");
+    });
+
+    it("still renders TWO panels when the claims' rows genuinely differ (not a false merge)", () => {
+        const highVariance: ClaimedFact = {
+            claim_id: "claim_variance",
+            kind: "workload",
+            subject: { kind: "team", canonical_id: "team:fullchaos", label: "Fullchaos" },
+            field: "throughput_stddev",
+            value: { number: 1.2 },
+            rows: [
+                { fields: { day: { string: "2026-08-01" }, throughput_stddev: { number: 1.2 } } },
+            ],
+        };
+        const forecastP50: ClaimedFact = {
+            claim_id: "claim_forecast",
+            kind: "workload",
+            subject: { kind: "team", canonical_id: "team:fullchaos", label: "Fullchaos" },
+            field: "forecast_p50_days",
+            value: { number: 3 },
+            rows: [{ fields: { day: { string: "2026-08-01" }, forecast_p50_days: { number: 3 } } }],
+        };
+        render(<FactRowsPanels facts={[highVariance, forecastP50]} result={undefined} />);
+        expect(screen.getAllByRole("heading", { name: /^workload ·/i })).toHaveLength(2);
+        expect(screen.queryByTestId("fact-also-referenced")).not.toBeInTheDocument();
+    });
+
+    it("keeps parity: a server-selected trend shape citing the SECONDARY claim still renders on the merged panel", () => {
+        const trendAnswer = {
+            claimed_facts: [coverageClaim, unestimatedClaim],
+            render_shapes: [
+                {
+                    shape_id: "rs_secondary_trend",
+                    kind: "series",
+                    presentation: "line",
+                    selected_by: "dated_fact_trend",
+                    title: "Unestimated count over time",
+                    axis_kind: "time",
+                    axis_label: "day",
+                    value_label: "Unestimated count",
+                    series: [
+                        {
+                            key: "unestimated_count",
+                            label: "Unestimated count",
+                            points: [
+                                {
+                                    label: "2026-08-01",
+                                    value: 16,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_unestimated",
+                                        row_index: 0,
+                                        field: "unestimated_count",
+                                    },
+                                },
+                                {
+                                    label: "2026-08-02",
+                                    value: 16,
+                                    source: {
+                                        kind: "claimed_fact_row",
+                                        claim_id: "claim_unestimated",
+                                        row_index: 1,
+                                        field: "unestimated_count",
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        } as unknown as InvestigationResult;
+        render(<FactRowsPanels facts={[coverageClaim, unestimatedClaim]} result={trendAnswer} />);
+        // Still exactly one panel (the dedupe held) — and it shows the
+        // secondary claim's own server-selected trend, not silently dropped.
+        expect(screen.getAllByRole("heading", { name: /^readiness ·/i })).toHaveLength(1);
+        expect(screen.getByRole("table", { name: /over time/i })).toBeInTheDocument();
+    });
+});
+
 describe("FactRowsPanels — a trend shape, which no acr build currently emits", () => {
     // acr WITHDREW `dated_fact_trend` (CHAOS-4616): a row table cannot say
     // which of its columns are measures, so any trend it drew was a claim

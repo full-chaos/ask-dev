@@ -325,6 +325,63 @@ export function factsWithRows(facts: readonly ClaimedFact[]): ClaimedFact[] {
     return facts.filter((fact) => fact.rows !== undefined && fact.rows.length > 0);
 }
 
+/**
+ * CHAOS-4672: a table-identity fingerprint for a claimed fact's `rows`.
+ *
+ * The producer attaches the WHOLE row table to every claim that cites it —
+ * one measure names the claim's own `field`, but `rows` carries every
+ * numeric column regardless (`devhealthfacts`' rollup pattern, same one
+ * `findRollupBasis` above reads). Two claims whose `subject` + `kind` +
+ * `rows` all match byte-for-byte are the SAME table cited twice, not two
+ * tables — there is no separate wire-level table id (that is CHAOS-4627's
+ * job; this ticket is the client-side dedupe that composes with it, per the
+ * ticket's own sequencing note). `rows` reaches the client from Go's
+ * `encoding/json`, which marshals a map's keys in SORTED order (the same
+ * fact `ordinalAxisPreferenceScore`'s doc comment relies on), so the SAME
+ * underlying table serializes identically on every claim that carries it —
+ * `JSON.stringify` is a safe content fingerprint here, not a heuristic.
+ */
+export function tableIdentity(fact: ClaimedFact): string {
+    return JSON.stringify([fact.subject.kind, fact.subject.canonical_id, fact.kind, fact.rows]);
+}
+
+export type FactGroup = {
+    /** The first claim (first-seen order) to cite this table — its `kind`/`field` titles the panel. */
+    readonly primary: ClaimedFact;
+    /** Every OTHER claim citing the same table, first-seen order — referenced, never re-plotted. */
+    readonly alsoClaims: readonly ClaimedFact[];
+};
+
+/**
+ * CHAOS-4672: groups claims that cite the SAME table (`tableIdentity`) so a
+ * shared table renders its chart/table exactly ONCE, not once per claim.
+ * The group's `primary` is whichever claim reached the table FIRST, in the
+ * order `facts` was given (the order the service emitted them) — the same
+ * first-seen tiebreak this module already uses elsewhere (`columnOrder`,
+ * `selectPresentation`'s axis pick), so the panel a reader sees is
+ * deterministic from the answer alone, never from iteration order of a Map.
+ * Callers pass `factsWithRows(facts)` — a fact with no rows has no table to
+ * group by.
+ */
+export function groupFactsByTable(facts: readonly ClaimedFact[]): readonly FactGroup[] {
+    const order: string[] = [];
+    const groups = new Map<string, ClaimedFact[]>();
+    for (const candidate of facts) {
+        const key = tableIdentity(candidate);
+        const existing = groups.get(key);
+        if (existing === undefined) {
+            order.push(key);
+            groups.set(key, [candidate]);
+        } else {
+            existing.push(candidate);
+        }
+    }
+    return order.map((key) => {
+        const [primary, ...alsoClaims] = groups.get(key)!;
+        return { primary: primary!, alsoClaims };
+    });
+}
+
 export type FactRowTile = { readonly label: string; readonly value: Cell };
 
 /**

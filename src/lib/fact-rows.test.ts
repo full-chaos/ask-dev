@@ -8,7 +8,9 @@ import {
     factRowTiles,
     factsWithRows,
     findRollupBasis,
+    groupFactsByTable,
     selectPresentation,
+    tableIdentity,
 } from "@/lib/fact-rows";
 
 function row(fields: ClaimedFactRow["fields"]): ClaimedFactRow {
@@ -390,6 +392,84 @@ describe("factsWithRows", () => {
         const emptyRows = fact({ claim_id: "empty_rows", rows: [] });
         const noRows = fact({ claim_id: "no_rows" });
         expect(factsWithRows([withRows, emptyRows, noRows])).toEqual([withRows]);
+    });
+});
+
+/**
+ * CHAOS-4672: the producer attaches the WHOLE table to every claim that
+ * cites it, so two claims over one table (different `field`, identical
+ * `rows`) must group as ONE table, not two.
+ */
+describe("tableIdentity / groupFactsByTable", () => {
+    const sharedRows = [
+        row({ day: { string: "2026-08-01" }, backlog_size: { integer: 10 } }),
+        row({ day: { string: "2026-08-02" }, backlog_size: { integer: 12 } }),
+    ];
+
+    it("gives two claims over byte-identical rows the SAME identity", () => {
+        const a = fact({ claim_id: "claim_a", field: "estimate_coverage_ratio", rows: sharedRows });
+        const b = fact({ claim_id: "claim_b", field: "unestimated_count", rows: sharedRows });
+        expect(tableIdentity(a)).toBe(tableIdentity(b));
+    });
+
+    it("gives claims with DIFFERENT rows content different identities", () => {
+        const a = fact({ claim_id: "claim_a", rows: sharedRows });
+        const b = fact({
+            claim_id: "claim_b",
+            rows: [row({ day: { string: "2026-08-01" }, backlog_size: { integer: 99 } })],
+        });
+        expect(tableIdentity(a)).not.toBe(tableIdentity(b));
+    });
+
+    it("gives claims on the same rows but a DIFFERENT subject different identities", () => {
+        const a = fact({ claim_id: "claim_a", rows: sharedRows });
+        const b = fact({ claim_id: "claim_b", subject: OTHER_SUBJECT, rows: sharedRows });
+        expect(tableIdentity(a)).not.toBe(tableIdentity(b));
+    });
+
+    it("gives claims on the same rows but a DIFFERENT kind different identities", () => {
+        const a = fact({ claim_id: "claim_a", kind: "readiness", rows: sharedRows });
+        const b = fact({ claim_id: "claim_b", kind: "workload", rows: sharedRows });
+        expect(tableIdentity(a)).not.toBe(tableIdentity(b));
+    });
+
+    it("groups every claim over the same table under ONE primary, first-seen order, the rest as alsoClaims", () => {
+        const coverage = fact({
+            claim_id: "claim_coverage",
+            field: "estimate_coverage_ratio",
+            rows: sharedRows,
+        });
+        const unestimated = fact({
+            claim_id: "claim_unestimated",
+            field: "unestimated_count",
+            rows: sharedRows,
+        });
+        const unrelated = fact({
+            claim_id: "claim_other_table",
+            field: "throughput_mean",
+            rows: [row({ day: { string: "2026-08-01" }, throughput: { number: 4.2 } })],
+        });
+
+        const groups = groupFactsByTable([coverage, unestimated, unrelated]);
+
+        expect(groups).toHaveLength(2);
+        expect(groups[0]!.primary).toBe(coverage);
+        expect(groups[0]!.alsoClaims).toEqual([unestimated]);
+        expect(groups[1]!.primary).toBe(unrelated);
+        expect(groups[1]!.alsoClaims).toEqual([]);
+    });
+
+    it("returns one group per fact when no two facts share a table", () => {
+        const a = fact({ claim_id: "claim_a", rows: sharedRows });
+        const b = fact({
+            claim_id: "claim_b",
+            rows: [row({ day: { string: "2026-08-01" }, other: { integer: 1 } })],
+        });
+        const groups = groupFactsByTable([a, b]);
+        expect(groups).toEqual([
+            { primary: a, alsoClaims: [] },
+            { primary: b, alsoClaims: [] },
+        ]);
     });
 });
 

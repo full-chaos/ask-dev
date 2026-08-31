@@ -15,7 +15,14 @@ const MULTIPLE_WIDTH = 300;
 const MULTIPLE_HEIGHT = 170;
 const MARGIN = { top: 12, right: 12, bottom: 30, left: 12 };
 const MAX_AXIS_LABELS_SINGLE = 8;
-const MAX_AXIS_LABELS_MULTIPLE = 5;
+// CHAOS-4672: a small-multiple cell is MULTIPLE_WIDTH (300px) wide, margins
+// included — 5 evenly-spaced ISO-date labels ("2026-08-02", 10 chars) at
+// `.fact-chart__axis-label`'s 10px font left ~69px between label CENTERS,
+// which visibly collided on the real rig (two ticks' glyphs overlapping,
+// reported as run-together text). 3 ticks roughly doubles that gap; the
+// single full-width chart (640px, `MAX_AXIS_LABELS_SINGLE`) was not
+// reported as colliding and is untouched.
+const MAX_AXIS_LABELS_MULTIPLE = 3;
 
 // Fixed hue order (dataviz skill): series 1 always takes slot 1, never
 // reassigned by which columns happen to be present. `seriesColumns` is

@@ -94,4 +94,46 @@ describe("FactChart", () => {
         const gap2 = p3[0]! - p2[0]!;
         expect(gap2).toBeGreaterThan(gap1 * 10);
     });
+
+    /**
+     * CHAOS-4672: the reported defect was two x-axis tick labels visually
+     * overlapping in a small-multiples cell ("2026-08-02026-06-28" — two ISO
+     * dates whose glyphs ran together). A small-multiples cell is 300px wide
+     * (`MULTIPLE_WIDTH`, 12px margins each side); asserting a real minimum
+     * pixel gap between adjacent tick label x-positions ties the test to the
+     * actual defect (overlapping geometry), not just a tick count.
+     */
+    it("keeps small-multiples x-axis tick labels from colliding (real pixel gap, not just a lower count)", () => {
+        // 90 daily rows — the "last 90 days" window shape the real rig hit
+        // this on — with 2 numeric columns, which is what routes FactChart
+        // into the small-multiples grid layout (`showTitle`/per-cell axis).
+        const rows = Array.from({ length: 90 }, (_, i) => {
+            const day = new Date(Date.UTC(2026, 4, 3 + i)).toISOString().slice(0, 10);
+            return row({ day: { string: day }, a: { integer: i }, b: { integer: i * 2 } });
+        });
+        const { container } = render(
+            <FactChart
+                axis={{ column: "day", kind: "time" }}
+                chartKind="line"
+                rows={rows}
+                seriesColumns={["a", "b"]}
+            />,
+        );
+        const cell = container.querySelector(".fact-chart__cell")!;
+        // `.fact-chart__axis-label` also names the y-scale's max-value label
+        // (top-left, `text-anchor="start"`) — the x-axis ticks this defect
+        // is about are the `text-anchor="middle"` ones along the bottom.
+        const xPositions = Array.from(
+            cell.querySelectorAll('.fact-chart__axis-label[text-anchor="middle"]'),
+        )
+            .map((el) => Number(el.getAttribute("x")))
+            .sort((a, b) => a - b);
+        expect(xPositions.length).toBeGreaterThanOrEqual(2);
+        const gaps = xPositions.slice(1).map((x, i) => x - xPositions[i]!);
+        // A 10-character ISO date at the panel's 10px axis-label font does
+        // not fit inside a gap much narrower than 100px without adjacent
+        // glyphs touching — the real rig's 5-tick layout (~69px gaps) is
+        // exactly what collided.
+        expect(Math.min(...gaps)).toBeGreaterThanOrEqual(100);
+    });
 });
