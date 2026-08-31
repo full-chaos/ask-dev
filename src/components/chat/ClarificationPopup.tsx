@@ -76,7 +76,22 @@ function OptionRow({
                 <span className="clarification-popup__option-number" aria-hidden="true">
                     {number}
                 </span>
-                <span className="clarification-popup__option-text">{option.displayText}</span>
+                <span className="clarification-popup__option-text">
+                    {option.displayText}
+                    {
+                        // codex round 1 finding 3: offer VALUES stay
+                        // structural (chris 2026-08-24 10:04) — `label` is
+                        // what is actually bound to the receipt, so it is
+                        // always shown too, never hidden behind the
+                        // model's `phrasing`. Mirrors `StructureNeedsPanel`'s
+                        // own `OfferButton` "structural: {label}" line.
+                        option.displayText === option.label ? null : (
+                            <span className="clarification-popup__option-structural">
+                                structural: {option.label}
+                            </span>
+                        )
+                    }
+                </span>
                 {option.selected ? (
                     <span className="clarification-popup__option-check" aria-hidden="true">
                         ✓
@@ -134,6 +149,16 @@ export function ClarificationPopup({
     const isLastPage = clampedIndex === pages.length - 1;
     const selectedOnCurrentPage = currentPage.options.filter((option) => option.selected).length;
 
+    /**
+     * `pick()`'s own advance, single-select pages only: the pick just made
+     * IS the selection event, so reaching the end must always complete —
+     * NEVER gated by `anySelected(pages)`, which would still read the
+     * STALE pre-toggle `pages` prop in the very same synchronous click
+     * that makes this the first selection of the whole flow (`onSelect`
+     * only schedules the parent's state update; `pages` itself does not
+     * reflect it until the next render). Contrast `continuePastPage`
+     * below, which is never called synchronously with a fresh `onSelect`.
+     */
     function goToNextOrComplete() {
         if (isLastPage) {
             onComplete();
@@ -156,18 +181,29 @@ export function ClarificationPopup({
         onSelect(option.source);
     }
 
-    function skip() {
-        if (pending) return;
+    /**
+     * The multi-select page's own explicit "Continue"/Skip — unlike
+     * `pick()` above, NEITHER of these is itself a selection event (every
+     * toggle that led here was its own earlier, already-flushed click), so
+     * `pages` correctly reflects every pick made so far. Reaching the end
+     * with NOTHING selected on ANY page must not fire a receipt-less
+     * re-ask of the identical question — that would be a silent, pointless
+     * round trip (codex round 1 finding 1: "Continue without selecting"
+     * on the last page used to call `onComplete()` unconditionally).
+     * Something picked on an EARLIER page still gets submitted.
+     */
+    function continuePastPage() {
         if (isLastPage) {
-            // Reaching the end via Skip with nothing picked on ANY page
-            // must not fire a receipt-less re-ask of the identical
-            // question — that would be a silent, pointless round trip.
-            // Something picked on an EARLIER page still gets submitted.
             if (anySelected(pages)) onComplete();
             else onDismiss();
-            return;
+        } else {
+            setPageIndex((current) => current + 1);
         }
-        setPageIndex((current) => current + 1);
+    }
+
+    function skip() {
+        if (pending) return;
+        continuePastPage();
     }
 
     function submitFreeText() {
@@ -178,6 +214,25 @@ export function ClarificationPopup({
 
     function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
         if (pending) return;
+        if (event.key === "Escape") {
+            // Dismiss works from anywhere inside the popup, including a
+            // focused child control — the one hotkey that should.
+            event.preventDefault();
+            onDismiss();
+            return;
+        }
+        // codex round 1 finding 2: the number/arrow/Enter hotkeys below
+        // must NOT fire when a keydown bubbled up from a descendant
+        // control — the free-text `<input>` (typing "1" or pressing Enter
+        // there must reach the input, not hijack an option pick) and every
+        // native `<button>` in the popup (Dismiss/Skip/Continue/an option
+        // reached via Tab already get correct Enter/Space activation from
+        // the browser itself; re-intercepting it here doubles up and, for
+        // Dismiss, silently substitutes a wrong action). `event.target !==
+        // event.currentTarget` is exactly "this event originated on the
+        // container div itself" — true only right after mount/page-change,
+        // when nothing else has taken focus.
+        if (event.target !== event.currentTarget) return;
         if (event.key >= "1" && event.key <= "9") {
             const index = Number(event.key) - 1;
             const option = currentPage.options[index];
@@ -203,11 +258,6 @@ export function ClarificationPopup({
                 event.preventDefault();
                 pick(option);
             }
-            return;
-        }
-        if (event.key === "Escape") {
-            event.preventDefault();
-            onDismiss();
         }
     }
 
@@ -289,11 +339,14 @@ export function ClarificationPopup({
                 // an EXPLICIT confirm — picking toggles in place rather than
                 // auto-advancing, so there is no single "the pick" moment
                 // `goToNextOrComplete` can hang off implicitly the way a
-                // single-select page's own click already does.
+                // single-select page's own click already does. Uses
+                // `continuePastPage`, NOT `goToNextOrComplete` — see that
+                // function's own header for why only THIS call site needs
+                // the "was anything ever selected" guard.
                 <button
                     className="clarification-popup__continue"
                     disabled={pending}
-                    onClick={goToNextOrComplete}
+                    onClick={continuePastPage}
                     type="button"
                 >
                     {selectedOnCurrentPage === 0

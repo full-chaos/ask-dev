@@ -994,6 +994,15 @@ body {
     overflow-wrap: anywhere;
 }
 
+/* codex round 1 finding 3: the structural value bound to the receipt,
+   shown alongside a model `phrasing` — never hidden behind it. */
+.clarification-popup__option-structural {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
 .clarification-popup__option-check {
     flex: 0 0 auto;
     color: var(--state-ok);
