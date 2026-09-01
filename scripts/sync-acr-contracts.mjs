@@ -28,31 +28,36 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #361, FactTable's third declared column role. A
-// per-row categorical column (a severity label, an as-of date, a boolean
-// flag) had nowhere to go but `measures`, the same slot a numeric identity
-// column could hide in undetected; the new `observations` role gives it
-// somewhere else to go, which is what lets acr's producer-side validator
-// require every `measures` column to be numeric. ONE file in the consumed
-// surface changed between d261b265 (#356, the prior pin) and this pin
-// (verified per-file:
-// `git diff d261b265275a6945783496bfa7559dcfa451ba10 dbde584b41ddc6b89392344020b23cac7233559e -- contracts/jsonschema/v1/<file>`):
-//   - `context_fabric_common.v1`: `ClaimedFactTable` gains an optional
-//     `observations` property (string array, same bounds as the existing
-//     `measures`) alongside the pre-existing `field`/`shape`/`key`/
-//     `measures`/`order_by`.
-// `context_fabric_investigation_request.v1`, `context_fabric_investigation_result.v1`,
-// and `error.v1` are byte-identical to the prior pin. The field is
-// schema-OPTIONAL (omitted entirely from every table that declares no
-// observations) -- per CHAOS-4656's doctrine this is a NORMAL two-step
-// deploy (this consumer pin lands first; the acr-side rig serving builds
-// past this merge waits for it). One example changed:
+// acr main: pins past #369 (CHAOS-4682, S6.1 P2 dual-read cutover). A
+// `CanonicalFact` can carry BOTH a legacy breakdown/ranking table AND a
+// genuine `time_series` table at once (a project's per-team breakdown
+// alongside its daily series); the pre-existing `table`/`rows` pair always
+// serves the LEGACY field (CHAOS-4645's ruling, unchanged by this pin), so a
+// dual-table fact's time series existed at the producer, validated, and
+// never reached the wire. This pin adds the additive `time_series_table`/
+// `time_series_rows` pair so the workbench can finally read it. TWO files in
+// the consumed surface changed between dbde584b (#361, the prior pin) and
+// this pin (verified per-file:
+// `git diff dbde584b41ddc6b89392344020b23cac7233559e 9b2069de9495fca61433daebce65f773818281a5 -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: `ClaimedFact` gains two optional
+//     properties, `time_series_table` ($ref the existing `ClaimedFactTable`
+//     $def, same as `table`) and `time_series_rows` (array of the existing
+//     `ClaimedFactRow` $def, `maxItems: 64`, same bounds as `rows`) -- no
+//     new $defs. `table`/`rows` keep their current meaning and preference
+//     unconditionally; this pin is strictly additive. (An unrelated
+//     doc-comment-only change to `Cohort.groups`/`CohortGroup` -- CHAOS-4733,
+//     description text, no shape change -- rode along in the same file from
+//     an intervening acr commit; verified byte-for-byte that only
+//     `description` strings differ there.)
+// `context_fabric_investigation_request.v1` and `error.v1` are
+// byte-identical to the prior pin. One example changed:
 // `context_fabric_investigation_result_render_shapes.v1.json` gained a
-// `daily_health` declared table (time_series, `measures: [compounding_risk]`,
-// `observations: [severity]`) on the existing health claim, so the pinned
-// fixture itself proves the new property round-trips. Bump procedure lives
-// in README.md.
-export const SOURCE_COMMIT = "dbde584b41ddc6b89392344020b23cac7233559e";
+// `claim_workload_ask_dev_backlog` claim (a project workload fact carrying
+// BOTH a legacy `team_breakdown` table/rows AND a genuine `daily_workload`
+// time_series in the new pair) plus its own rendered trend shape (`rs_4`),
+// so the pinned fixture itself proves the dual-table case round-trips and
+// renders. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "9b2069de9495fca61433daebce65f773818281a5";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
