@@ -180,3 +180,76 @@ describe("investigation result contract — claimed fact table declaration (CHAO
         expect(tableRejections.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * acr d261b265 (consumer pin, this PR): the closed `NarrowingBasis` enum
+ * gains a fourth member, `overlap_aware_set_cover` -- the engine's
+ * overlap-aware grouped-narrowing selection now names its own order
+ * alongside the existing `canonical_id_lexical`/`largest_group_round_robin`/
+ * `attention_rank`. `NarrowingBasis` has no top-level document home in
+ * either example fixture (`answer_plan` is optional and absent from both),
+ * so these tests compile a targeted `$ref` to `AnswerPlanBudget` directly
+ * -- the same technique `validateContract` uses internally, scoped to the
+ * one $def this pin touches.
+ */
+describe("narrowing basis vocabulary — overlap_aware_set_cover (acr d261b265 consumer pin)", () => {
+    function budgetWithBasis(basis: string): Record<string, unknown> {
+        return {
+            max_items: 10,
+            max_serialized_bytes: 10_000,
+            max_members: 5,
+            synthesis_headroom: 2,
+            narrowing_basis: basis,
+        };
+    }
+
+    function compileAnswerPlanBudget(schema: unknown) {
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(schema as object, "context_fabric_common.v1.schema.json");
+        return ajv.compile({
+            $ref: "context_fabric_common.v1.schema.json#/$defs/AnswerPlanBudget",
+        });
+    }
+
+    it("every pre-existing basis still validates — old-shape tolerance", () => {
+        const validate = compileAnswerPlanBudget(commonSchema);
+        for (const basis of [
+            "canonical_id_lexical",
+            "largest_group_round_robin",
+            "attention_rank",
+        ]) {
+            expect(validate(budgetWithBasis(basis))).toBe(true);
+        }
+    });
+
+    it("the new value validates against the pinned schema — new-shape tolerance", () => {
+        const validate = compileAnswerPlanBudget(commonSchema);
+        expect(validate(budgetWithBasis("overlap_aware_set_cover"))).toBe(true);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (a6414816, still on
+     * origin/main before this PR): the same document, run against a
+     * `NarrowingBasis` $def with `overlap_aware_set_cover` stripped from its
+     * `enum` — exactly the `acr_contract_violation` 502 an acr response
+     * carrying the new value hits under the unbumped pin. RED against that
+     * reproduction, GREEN against the real pinned schema above.
+     */
+    it("EXECUTED repro: the new value would 502 under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: Record<string, { enum: string[] }>;
+        };
+        const narrowingBasisDef = priorSchema.$defs.NarrowingBasis;
+        if (narrowingBasisDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no NarrowingBasis $def");
+        }
+        narrowingBasisDef.enum = narrowingBasisDef.enum.filter(
+            (value) => value !== "overlap_aware_set_cover",
+        );
+
+        const validate = compileAnswerPlanBudget(priorSchema);
+        expect(validate(budgetWithBasis("overlap_aware_set_cover"))).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});

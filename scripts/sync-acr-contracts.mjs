@@ -28,36 +28,24 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #355 (CHAOS-4690, "disclosures speak user language
-// from the engine"), the sibling of CHAOS-4691 (this repo's own rip-out of
-// the vocab-mapping sentence tables and prose-detail.ts -- chris's
-// strike-three ruling that consumer-side phrasing tables cease to exist).
-// TWO files in the consumed surface changed between 0f68cc7a (#354, the
-// prior S6 pin) and this pin (verified per-file:
-// `git diff 0f68cc7a37202400e83c4c35d881f79d66fa3806 a6414816049df099dbe066290961897bf1420fa7 -- contracts/jsonschema/v1/<file>`):
-//   - `context_fabric_common.v1`: `Coverage.sources[]` items grow two
-//     optional properties, `label`/`state_label` (both <=160 chars, neither
-//     in the item's own `required`). `Coverage` itself grows an optional
-//     `details` array (<=100 items) of the new $def `CoverageDetail`
-//     (required `detail_id`/`source`/`code`/`degrading`/`label`; optional
-//     `fact_kind`/`source_state`/`scope_outcome`/`origin_kind`/
-//     `supported_kinds`/`skipped_kinds`/`policy`/`basis`/`count`/`narrowed`/
-//     `phrasing`(<=400 chars)/`raw`(<=2000 chars); `code` a closed 11-value
-//     enum).
-//   - `context_fabric_investigation_result.v1`: the result grows an
-//     optional top-level `evidence_ref_labels` map (ref id -> <=160-char
-//     display label, <=8192 entries), keyed to the result's own evidence-ref
-//     closure.
-// `context_fabric_investigation_request.v1` and `error.v1` are
-// byte-identical to the prior pin. Every new field here is schema-OPTIONAL
-// -- CHAOS-4656's doctrine (this pin must validate BOTH the old 0f68cc7a and
-// the new a6414816 acr response shapes) -- so this is a NORMAL two-step
-// deploy (consumer pin first, acr server second; no atomic swap required).
-// CHAOS-4691's rip-out (this same PR) is what actually reads the new
-// fields: `coverage.details[]`'s `phrasing`/`label`, `sources[].label`/
-// `.state_label`, and `evidence_ref_labels` replace the deleted consumer
-// phrasing tables. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "a6414816049df099dbe066290961897bf1420fa7";
+// acr main: pins past #356, the engine's overlap-aware grouped-narrowing and
+// projection-allowance merge (an exact minimum set-cover selection, guarded
+// to small group counts with an untouched greedy fallback beyond it). ONE
+// file in the consumed surface changed between a6414816 (#355, the prior
+// pin) and this pin (verified per-file:
+// `git diff a6414816049df099dbe066290961897bf1420fa7 d261b265275a6945783496bfa7559dcfa451ba10 -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: the closed `NarrowingBasis` enum gains
+//     `overlap_aware_set_cover` (a fourth declared narrowing order,
+//     alongside the existing `canonical_id_lexical`/
+//     `largest_group_round_robin`/`attention_rank`).
+// `context_fabric_investigation_request.v1`, `context_fabric_investigation_result.v1`,
+// and `error.v1` are byte-identical to the prior pin. The widening is a pure
+// enum-member addition -- schema-OPEN by construction relative to the prior
+// closed set only in the sense that a NEW value now validates where it
+// previously 502'd -- so this pin must validate BOTH an old-shape response
+// (no `overlap_aware_set_cover` anywhere) and a new-shape response carrying
+// it. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "d261b265275a6945783496bfa7559dcfa451ba10";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
