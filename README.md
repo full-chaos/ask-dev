@@ -207,7 +207,39 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `0a65f124b1d70e2acc46542dc642e751f7932434` (acr main tip
+Currently pinned: `d261b265275a6945783496bfa7559dcfa451ba10` (acr main tip
+#356, the engine's overlap-aware grouped-narrowing and projection-allowance
+merge — an exact minimum set-cover selection, guarded to small group counts
+with an untouched greedy fallback beyond it). ONE file in the CONSUMED
+surface changed between the prior pin and this one — verified per-file
+directly against acr's own history (`git diff
+a6414816049df099dbe066290961897bf1420fa7
+d261b265275a6945783496bfa7559dcfa451ba10 -- contracts/jsonschema/v1/<file>`
+run once per consumed path):
+
+- `context_fabric_common.v1.schema.json`: the closed `NarrowingBasis` enum
+  gains a fourth member, `overlap_aware_set_cover`, alongside the existing
+  `canonical_id_lexical`/`largest_group_round_robin`/`attention_rank`.
+
+`context_fabric_investigation_request.v1.schema.json`,
+`context_fabric_investigation_result.v1.schema.json`, and `error.v1.schema.json`
+are byte-identical to the prior pin. A widened closed enum is the
+CHAOS-4656-doctrine failure mode: the unbumped pin's Ajv validator rejects
+any response carrying the new value as `acr_contract_violation` (a hard
+502), not a tolerated unknown — so this is a consumer-first two-step deploy,
+proven both-shapes in `src/lib/acr/validate.test.ts` (every pre-existing
+basis still validates; the new value validates on this pin and is reproduced
+red against the prior pin's own `NarrowingBasis` enum). No UI change: the
+narrowing basis renders through `AnswerPlanPanel`'s generic
+`humanizeTerm(step.basis)` (mechanical `snake_case` -> spaced text, not a
+per-value lookup), so a new value renders without a code change.
+
+Previous pin `a6414816049df099dbe066290961897bf1420fa7` (acr main tip #355,
+CHAOS-4690/CHAOS-4691 — disclosures speak the engine's own language, and
+this repo's consumer-side phrasing tables were ripped out) landed without an
+entry here; noted for the record rather than reconstructed after the fact.
+
+Pin before that: `0a65f124b1d70e2acc46542dc642e751f7932434` (acr main tip
 #353; CHAOS-4636 "S5" — the answer plan, three-stage budget, and grouped
 cohort — bumping past CHAOS-4642's `f9d9688c`/#352 pin per CHAOS-4668). Two
 files in the CONSUMED surface (the four schemas
