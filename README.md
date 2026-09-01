@@ -207,37 +207,60 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `dbde584b41ddc6b89392344020b23cac7233559e` (acr main tip
-#361, `FactTable` gains a third declared column role, `observations`). A
-per-row categorical column (a severity label, an as-of date, a boolean
-flag) used to have nowhere to go but `measures`, the same slot a numeric
-identity column could hide in undetected — the new role gives it somewhere
-else to go, which is what lets acr's producer-side validator require every
-`measures` column to be numeric. ONE file in the CONSUMED surface changed
-between the prior pin and this one — verified per-file directly against
-acr's own history (`git diff
-d261b265275a6945783496bfa7559dcfa451ba10
-dbde584b41ddc6b89392344020b23cac7233559e -- contracts/jsonschema/v1/<file>`
+Currently pinned: `9b2069de9495fca61433daebce65f773818281a5` (acr main tip
+#369, CHAOS-4682 — §5.1 P2 dual-read cutover). A `CanonicalFact` can carry
+BOTH a legacy breakdown/ranking table and a genuine `time_series` table at
+once (a project's per-team breakdown alongside its daily series). The
+pre-existing `table`/`rows` pair always serves the LEGACY field (CHAOS-4645's
+ruling, unchanged by this pin), so a dual-table fact's time series existed at
+the producer, validated, and never reached the wire. This pin adds the
+additive `time_series_table`/`time_series_rows` pair so the workbench can
+finally read it. TWO files in the CONSUMED surface changed between the prior
+pin and this one — verified per-file directly against acr's own history
+(`git diff
+dbde584b41ddc6b89392344020b23cac7233559e
+9b2069de9495fca61433daebce65f773818281a5 -- contracts/jsonschema/v1/<file>`
 run once per consumed path):
 
-- `context_fabric_common.v1.schema.json`: `ClaimedFactTable` gains an
-  optional `observations` property (string array, `maxItems: 32`, same
-  per-item bounds as the existing `measures`), alongside the pre-existing
-  `field`/`shape`/`key`/`measures`/`order_by`.
+- `context_fabric_common.v1.schema.json`: `ClaimedFact` gains two optional
+  properties, `time_series_table` ($ref the SAME `ClaimedFactTable` $def
+  `table` already uses) and `time_series_rows` (array of the SAME
+  `ClaimedFactRow` $def `rows` already uses, `maxItems: 64`) — no new $defs.
+  `table`/`rows` keep their current meaning and preference unconditionally;
+  this pin is strictly additive. (An unrelated doc-comment-only change to
+  `Cohort.groups`/`CohortGroup` — CHAOS-4733, description text, no shape
+  change — rode along from an intervening acr commit; verified byte-for-byte
+  that only `description` strings differ there.)
 
-`context_fabric_investigation_request.v1.schema.json`,
-`context_fabric_investigation_result.v1.schema.json`, and `error.v1.schema.json`
-are byte-identical to the prior pin. The field is schema-OPTIONAL — per
-CHAOS-4656's doctrine this is a NORMAL two-step deploy (this consumer pin
-lands first; the acr-side rig serving builds past the merge waits for it),
-proven both-shapes in `src/lib/acr/validate.test.ts` (the real acr-emitted
-example, which now declares a health claim's table with a non-empty
-`observations`, validates as-is; the same document still validates with
-`observations` stripped; the new-shape document is reproduced red against
-the prior pin's own `ClaimedFactTable` $def). No UI change: the declared
+`context_fabric_investigation_request.v1.schema.json` and
+`error.v1.schema.json` are byte-identical to the prior pin. The pair is
+schema-OPTIONAL — per CHAOS-4656's doctrine this is a NORMAL two-step deploy
+(this consumer pin lands first; the acr-side rig serving builds past the
+merge waits for it), proven both-shapes in `src/lib/acr/validate.test.ts`
+(the real acr-emitted fixture, whose `claim_workload_ask_dev_backlog` claim
+now carries BOTH a legacy `team_breakdown` table/rows AND a genuine
+`daily_workload` time series in the new pair, validates as-is; the same
+document still validates with the new pair stripped from every claim; an
+unrecognized field on a claimed fact still rejects; the dual-table document
+is reproduced red against the prior pin's own `ClaimedFact` $def). UI
+change, this PR: the trend-chart resolver (`src/lib/render-shapes.ts`'s
+`renderableRowsSource`/`rowsFor`) now prefers `time_series_rows` over the
+legacy `rows` when resolving a `claimed_fact_row` point — mirroring acr's
+own `ContextFabricClaimedFact.renderableRows` exactly — so a dual-table
+fact's server-selected trend renders instead of being withheld as unsourced
+(its row indices point into `time_series_rows`, not the differently-shaped
+legacy `rows`). Telemetry: `dualTableTrendChartCount`/`legacyTrendChartCount`
+on the `workbench_investigation` event record which source served each
+rendered trend.
+
+Previous pin `dbde584b41ddc6b89392344020b23cac7233559e` (acr main tip #361,
+`FactTable` gains a third declared column role, `observations`) landed a
+per-row categorical column role (a severity label, an as-of date, a boolean
+flag) that used to have nowhere to go but `measures`, the same slot a
+numeric identity column could hide in undetected. No UI change: the declared
 table is not rendered by this workbench at all — `key`/`measures`/
-`order_by` are already unrendered structural fields Ask Dev does not draw a
-chart from in this view, and `observations` joins them on the same basis.
+`order_by`/`observations` are unrendered structural fields Ask Dev does not
+draw a chart from in this view.
 
 Previous pin `d261b265275a6945783496bfa7559dcfa451ba10` (acr main tip #356,
 the engine's overlap-aware grouped-narrowing and projection-allowance merge

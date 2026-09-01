@@ -274,6 +274,112 @@ describe("investigation result contract — declared table observations (acr dbd
  * -- the same technique `validateContract` uses internally, scoped to the
  * one $def this pin touches.
  */
+/**
+ * acr 9b2069de (consumer pin, this PR — CHAOS-4682, §5.1 P2 dual-read
+ * cutover): `ClaimedFact` gains an additive, optional pair —
+ * `time_series_table` ($ref the SAME `ClaimedFactTable` $def `table`
+ * already uses) and `time_series_rows` (array of the SAME `ClaimedFactRow`
+ * $def `rows` already uses, `maxItems: 64`) — no new $defs. The pair rides
+ * ALONGSIDE the legacy `table`/`rows`, which keep their current meaning
+ * unconditionally; this pin only teaches the schema the new pair exists.
+ * The fixture's own `claim_workload_ask_dev_backlog` claim carries BOTH
+ * pairs at once (a legacy `team_breakdown` table AND a genuine
+ * `daily_workload` time series), so the real acr-emitted document proves
+ * the dual-table (BOTH-SHAPES) case round-trips; these tests add the
+ * single-pair tolerance and the executed prior-pin repro, the same
+ * three-case shape the `table`/`observations` blocks above establish.
+ */
+describe("investigation result contract — additive time_series pair (acr 9b2069de consumer pin, CHAOS-4682)", () => {
+    it("a real acr-emitted response with a dual-table (BOTH-SHAPES) claim validates as-is", () => {
+        const dualTable = (
+            renderShapesResult as { claimed_facts: Array<Record<string, unknown>> }
+        ).claimed_facts.filter((claim) => "time_series_rows" in claim && "table" in claim);
+        expect(dualTable.length).toBeGreaterThan(0);
+        expect(dualTable[0]).toMatchObject({
+            // The legacy pair: unaffected, still present.
+            /* eslint-disable @typescript-eslint/no-unsafe-assignment -- vitest matchers */
+            table: expect.any(Object),
+            rows: expect.any(Array),
+            // The additive pair: present alongside it.
+            time_series_table: expect.any(Object),
+            time_series_rows: expect.any(Array),
+            /* eslint-enable @typescript-eslint/no-unsafe-assignment */
+        });
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            renderShapesResult,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("a single-table claim (the new pair entirely absent) still validates — old-shape tolerance", () => {
+        const withoutNewPair = structuredClone(renderShapesResult) as {
+            claimed_facts: Array<Record<string, unknown>>;
+        };
+        for (const claim of withoutNewPair.claimed_facts) {
+            delete claim.time_series_table;
+            delete claim.time_series_rows;
+        }
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withoutNewPair,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("an unrecognized field on a claimed fact still rejects — additionalProperties stays closed", () => {
+        const tampered = structuredClone(renderShapesResult) as {
+            claimed_facts: Array<Record<string, unknown>>;
+        };
+        tampered.claimed_facts[0]!.not_a_real_field = "anything";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (dbde584b, still on
+     * origin/main before this PR): the same real acr-emitted document, run
+     * against a `ClaimedFact` $def with `time_series_table`/
+     * `time_series_rows` stripped from its `properties` (neither was ever in
+     * `required`, so no `required` edit is needed) -- exactly what an
+     * `additionalProperties: false` $def that has never heard of either
+     * field does with them. RED against that reproduction, GREEN against the
+     * real pinned schema above.
+     */
+    it("EXECUTED repro: the dual-table claim would 502 under the prior pin's own schema", () => {
+        const priorCommonSchema = structuredClone(commonSchema) as unknown as {
+            $defs: Record<string, { properties: Record<string, unknown> }>;
+        };
+        const claimedFactDef = priorCommonSchema.$defs.ClaimedFact;
+        if (claimedFactDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no ClaimedFact $def");
+        }
+        delete claimedFactDef.properties.time_series_table;
+        delete claimedFactDef.properties.time_series_rows;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(renderShapesResult)).toBe(false);
+        const rejections = (validate.errors ?? []).filter(
+            (error) =>
+                error.keyword === "additionalProperties" &&
+                (error.params?.additionalProperty === "time_series_table" ||
+                    error.params?.additionalProperty === "time_series_rows"),
+        );
+        expect(rejections.length).toBeGreaterThan(0);
+    });
+});
+
 describe("narrowing basis vocabulary — overlap_aware_set_cover (acr d261b265 consumer pin)", () => {
     function budgetWithBasis(basis: string): Record<string, unknown> {
         return {

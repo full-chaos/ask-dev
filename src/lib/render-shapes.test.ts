@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { InvestigationResult, RenderShape } from "@/lib/contracts";
 import {
     COHORT_SHAPE_RULES,
     renderShapesFor,
+    renderableRowsSource,
+    trendChartSourceCounts,
     trendShapesForClaim,
     verifyRenderShape,
 } from "@/lib/render-shapes";
@@ -237,5 +240,297 @@ describe("trendShapesForClaim", () => {
         const result = answer([trendShape(0.99)]);
         expect(trendShapesForClaim(result, "claim_readiness_trend").withheld).toBe(1);
         expect(trendShapesForClaim(result, "claim_other").withheld).toBe(0);
+    });
+});
+
+/**
+ * CHAOS-4682 (§5.1 P2 dual-read cutover): acr can now serve a dual-table
+ * fact carrying BOTH a legacy `rows` (its breakdown/ranking table, unrelated
+ * row count and shape) AND the additive `time_series_rows` (a genuine
+ * time_series riding alongside it). acr's own `renderableRows` prefers
+ * `time_series_rows` whenever present for EVERY `claimed_fact_row`-sourced
+ * point, including the ones a trend shape cites — this is the wire-level
+ * mirror of that rule.
+ *
+ * Before this rule was mirrored here, `rowsFor` always read the legacy
+ * `rows` array. A trend shape citing `row_index` 1 or 2 against a legacy
+ * table with only ONE row resolved to `undefined` (index out of bounds),
+ * `verifyRenderShape` refused the point as unsourced, and the whole trend
+ * was WITHHELD — acr's dual-read cutover reaching the wire, then being
+ * silently dropped by this view. This is the red case that change fixes.
+ */
+function dualTableAnswer(): InvestigationResult {
+    return {
+        cohort: undefined,
+        claimed_facts: [
+            {
+                claim_id: "claim_workload_dual",
+                kind: "workload",
+                subject: { kind: "project", canonical_id: "project_x", label: "Project X" },
+                field: "backlog_size",
+                value: { integer: 12 },
+                // The legacy breakdown table: ONE row, a different shape and
+                // meaning entirely from the time series below.
+                rows: [
+                    {
+                        fields: {
+                            team_id: { string: "team_a" },
+                            backlog_size: { integer: 12 },
+                        },
+                    },
+                ],
+                table: {
+                    field: "team_breakdown",
+                    shape: "breakdown",
+                    key: ["team_id"],
+                    measures: ["backlog_size"],
+                },
+                // The additive time_series pair: three rows, riding alongside.
+                time_series_rows: [
+                    {
+                        fields: { day: { string: "2026-08-03" }, backlog_size: { integer: 9 } },
+                    },
+                    {
+                        fields: { day: { string: "2026-08-18" }, backlog_size: { integer: 11 } },
+                    },
+                    {
+                        fields: { day: { string: "2026-08-30" }, backlog_size: { integer: 12 } },
+                    },
+                ],
+                time_series_table: {
+                    field: "daily_workload",
+                    shape: "time_series",
+                    key: ["day"],
+                    measures: ["backlog_size"],
+                },
+            },
+        ],
+        render_shapes: [
+            {
+                shape_id: "rs_dual",
+                kind: "series",
+                presentation: "line",
+                selected_by: "dated_fact_trend",
+                title: "Backlog size over time — Project X",
+                axis_kind: "time",
+                axis_label: "day",
+                value_label: "Backlog size",
+                series: [
+                    {
+                        key: "backlog_size",
+                        label: "Backlog size",
+                        points: [
+                            {
+                                label: "2026-08-03",
+                                value: 9,
+                                source: {
+                                    kind: "claimed_fact_row",
+                                    claim_id: "claim_workload_dual",
+                                    row_index: 0,
+                                    field: "backlog_size",
+                                },
+                            },
+                            {
+                                label: "2026-08-18",
+                                value: 11,
+                                source: {
+                                    kind: "claimed_fact_row",
+                                    claim_id: "claim_workload_dual",
+                                    row_index: 1,
+                                    field: "backlog_size",
+                                },
+                            },
+                            {
+                                label: "2026-08-30",
+                                value: 12,
+                                source: {
+                                    kind: "claimed_fact_row",
+                                    claim_id: "claim_workload_dual",
+                                    row_index: 2,
+                                    field: "backlog_size",
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    } as unknown as InvestigationResult;
+}
+
+describe("renderableRowsSource (CHAOS-4682)", () => {
+    it("prefers time_series_rows when the fact carries a non-empty pair", () => {
+        const [fact] = dualTableAnswer().claimed_facts;
+        expect(renderableRowsSource(fact!)).toBe("time_series_rows");
+    });
+
+    it("falls back to the legacy rows when time_series_rows is absent", () => {
+        const [fact] = answer([]).claimed_facts;
+        expect(renderableRowsSource(fact!)).toBe("rows");
+    });
+
+    it("falls back to rows when time_series_rows is present but empty", () => {
+        const fact = { ...dualTableAnswer().claimed_facts[0]!, time_series_rows: [] };
+        expect(renderableRowsSource(fact)).toBe("rows");
+    });
+});
+
+describe("dual-table trend resolution (CHAOS-4682)", () => {
+    it("resolves a trend's points against time_series_rows, not the legacy rows", () => {
+        const result = dualTableAnswer();
+        // The row_index=1/2 points would be out of bounds against `rows`
+        // (length 1) — this only verifies if resolution reads
+        // `time_series_rows` (length 3), the exact regression this pin fixes.
+        expect(verifyRenderShape(result.render_shapes![0]!, result)).toBe(true);
+    });
+
+    it("admits the dual-table trend, not withholding it as unsourced", () => {
+        const result = dualTableAnswer();
+        const trends = trendShapesForClaim(result, "claim_workload_dual");
+        expect(trends.shapes).toHaveLength(1);
+        expect(trends.withheld).toBe(0);
+    });
+});
+
+describe("trendChartSourceCounts (CHAOS-4682 telemetry)", () => {
+    it("attributes an admitted dual-table trend to time_series_rows", () => {
+        const result = dualTableAnswer();
+        expect(trendChartSourceCounts(result)).toEqual({
+            dualTableTrendChartCount: 1,
+            legacyTrendChartCount: 0,
+        });
+    });
+
+    it("attributes an admitted single-table trend to the legacy rows", () => {
+        const result = answer([trendShape(0.41)]);
+        expect(trendChartSourceCounts(result)).toEqual({
+            dualTableTrendChartCount: 0,
+            legacyTrendChartCount: 1,
+        });
+    });
+
+    it("never counts a withheld/tampered trend under either source", () => {
+        // A trend that fails verification was drawn by neither source — it
+        // was not drawn at all — so it must not inflate either count.
+        const result = answer([trendShape(0.99)]);
+        expect(trendChartSourceCounts(result)).toEqual({
+            dualTableTrendChartCount: 0,
+            legacyTrendChartCount: 0,
+        });
+    });
+
+    /**
+     * codex round 1, P3 (EXECUTED): a shape whose points cite TWO different
+     * claims can be value-valid (each point resolves correctly against ITS
+     * OWN cited claim) and so passes `renderShapesFor`'s admission — but no
+     * panel draws it, because `trendShapesForClaim` requires EVERY point of
+     * a shape cite the ONE claim its panel is about (`shapeCitesClaim`).
+     * Attributing by the first point's claim id (the bug this fixes)
+     * reported one legacy-source chart drawn while EVERY panel reported
+     * `shapes:[] withheld:1` — a source attributed to a chart nobody saw.
+     */
+    it("counts a value-valid but MIXED-claim trend under neither source", () => {
+        const base = dualTableAnswer();
+        const otherClaim = {
+            claim_id: "claim_workload_other",
+            kind: "workload",
+            subject: { kind: "project", canonical_id: "project_y", label: "Project Y" },
+            field: "backlog_size",
+            value: { integer: 5 },
+            rows: [{ fields: { day: { string: "2026-08-04" }, backlog_size: { integer: 5 } } }],
+        };
+        const mixedShape = {
+            shape_id: "rs_mixed",
+            kind: "series",
+            presentation: "line",
+            selected_by: "dated_fact_trend",
+            title: "Mixed-claim trend",
+            axis_kind: "time",
+            axis_label: "day",
+            value_label: "Backlog size",
+            series: [
+                {
+                    key: "backlog_size",
+                    label: "Backlog size",
+                    points: [
+                        {
+                            label: "2026-08-03",
+                            value: 9,
+                            source: {
+                                kind: "claimed_fact_row",
+                                claim_id: "claim_workload_dual",
+                                row_index: 0,
+                                field: "backlog_size",
+                            },
+                        },
+                        {
+                            label: "2026-08-04",
+                            value: 5,
+                            source: {
+                                kind: "claimed_fact_row",
+                                claim_id: "claim_workload_other",
+                                row_index: 0,
+                                field: "backlog_size",
+                            },
+                        },
+                    ],
+                },
+            ],
+        } as unknown as RenderShape;
+        const result = {
+            ...base,
+            claimed_facts: [...base.claimed_facts, otherClaim],
+            render_shapes: [mixedShape],
+        } as unknown as InvestigationResult;
+
+        // Sanity: value-valid — each point resolves correctly against the
+        // claim IT cites — so it clears the value-correctness gate.
+        expect(verifyRenderShape(mixedShape, result)).toBe(true);
+        // But no panel draws it: neither claim's own panel admits a shape
+        // that also cites another claim.
+        expect(trendShapesForClaim(result, "claim_workload_dual").shapes).toHaveLength(0);
+        expect(trendShapesForClaim(result, "claim_workload_other").shapes).toHaveLength(0);
+
+        expect(trendChartSourceCounts(result)).toEqual({
+            dualTableTrendChartCount: 0,
+            legacyTrendChartCount: 0,
+        });
+    });
+
+    it("counts zero of both when the answer carries no trend at all", () => {
+        expect(trendChartSourceCounts(answer([]))).toEqual({
+            dualTableTrendChartCount: 0,
+            legacyTrendChartCount: 0,
+        });
+    });
+});
+
+/**
+ * EXECUTED proof against the REAL synced fixture (CHAOS-4682's own pin bump
+ * regenerated this file from acr's pinned commit — see
+ * scripts/sync-acr-contracts.mjs). `claim_workload_ask_dev_backlog` is the
+ * dual-table claim acr's own PR added: a legacy `team_breakdown` (one row)
+ * riding alongside a genuine `daily_workload` time series (three rows), with
+ * its own server-selected trend shape `rs_4`. This is not a hand-authored
+ * fixture — it is the actual shape the pinned acr commit emits, so a pass
+ * here proves the fix against the real wire document, not just a
+ * hand-built regression case.
+ */
+describe("real synced fixture — claim_workload_ask_dev_backlog (CHAOS-4682)", () => {
+    const fixture = renderShapesResult as unknown as InvestigationResult;
+
+    it("the fixture's dual-table claim carries a non-empty time_series_rows", () => {
+        const fact = fixture.claimed_facts.find(
+            (candidate) => candidate.claim_id === "claim_workload_ask_dev_backlog",
+        );
+        expect(fact).toBeDefined();
+        expect(renderableRowsSource(fact!)).toBe("time_series_rows");
+    });
+
+    it("its trend chart is admitted, not withheld, and reads the correct values", () => {
+        const trends = trendShapesForClaim(fixture, "claim_workload_ask_dev_backlog");
+        expect(trends.withheld).toBe(0);
+        expect(trends.shapes).toHaveLength(1);
+        expect(trends.shapes[0]!.series[0].points.map((point) => point.value)).toEqual([9, 11, 12]);
     });
 });

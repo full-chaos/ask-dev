@@ -2,6 +2,7 @@ import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.js
 import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
 import type { EnrichmentPredicate } from "@/lib/enrichment/validate";
+import { trendChartSourceCounts } from "@/lib/render-shapes";
 
 /**
  * Content-safe outcome telemetry (CHAOS-3738).
@@ -93,6 +94,17 @@ export type OutcomeEvent = {
     readonly truncatedPathCount: number;
     readonly driverCount: number;
     readonly claimedFactCount: number;
+
+    /**
+     * CHAOS-4682 (§5.1 P2 dual-read cutover): which source served every
+     * rendered trend chart — the additive `time_series_rows` pair (a
+     * dual-table fact) versus the legacy `rows` fallback. Counts only, and
+     * only over shapes this view actually verified and drew (see
+     * `trendChartSourceCounts`'s own doc comment) — never a claim id or
+     * field name.
+     */
+    readonly dualTableTrendChartCount: number;
+    readonly legacyTrendChartCount: number;
 
     /** Render result and, when it fell back, why. */
     readonly renderSurface: RenderSurface;
@@ -196,6 +208,7 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
     const result = input.result;
     const coverage = result?.coverage;
     const versions = result?.versions;
+    const trendChartSources = result === undefined ? undefined : trendChartSourceCounts(result);
 
     return {
         event: "workbench_investigation",
@@ -244,6 +257,9 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         truncatedPathCount: (result?.paths ?? []).filter((path) => path.truncated === true).length,
         driverCount: result?.drivers.length ?? 0,
         claimedFactCount: result?.claimed_facts.length ?? 0,
+
+        dualTableTrendChartCount: trendChartSources?.dualTableTrendChartCount ?? 0,
+        legacyTrendChartCount: trendChartSources?.legacyTrendChartCount ?? 0,
 
         renderSurface: input.renderSurface,
         enrichmentFellBack: input.enrichmentFellBack,

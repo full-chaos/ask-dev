@@ -56,6 +56,29 @@ function numericCell(value: ScalarValue | undefined): number | undefined {
 }
 
 /**
+ * CHAOS-4682 (§5.1 P2 dual-read cutover): which array a `claimed_fact_row`
+ * point resolves against. Mirrors acr's own `ContextFabricClaimedFact.
+ * renderableRows` exactly — the additive `time_series_rows` pair whenever
+ * non-empty (the only array acr's `datedFactTrendShape` ever addresses on a
+ * dual-table fact), falling back to the legacy `rows` otherwise. This is not
+ * a per-shape choice: it is the one deterministic rule every
+ * `claimed_fact_row`-sourced point in the system already follows, so
+ * resolving a `row_index` any other way would disagree with the answer that
+ * cited it.
+ */
+export type RenderableRowsSource = "time_series_rows" | "rows";
+
+export function renderableRowsSource(fact: ClaimedFact): RenderableRowsSource {
+    return (fact.time_series_rows?.length ?? 0) > 0 ? "time_series_rows" : "rows";
+}
+
+function renderableRows(fact: ClaimedFact): readonly ClaimedFactRow[] {
+    return renderableRowsSource(fact) === "time_series_rows"
+        ? fact.time_series_rows!
+        : (fact.rows ?? []);
+}
+
+/**
  * The rows of the ONE fact carrying `claimId`, or undefined.
  *
  * A duplicate claim id is a malformed document — acr rejects one outright —
@@ -69,7 +92,7 @@ function rowsFor(
     claimId: string,
 ): readonly ClaimedFactRow[] | undefined {
     const matches = facts.filter((fact) => fact.claim_id === claimId);
-    return matches.length === 1 ? (matches[0]!.rows ?? []) : undefined;
+    return matches.length === 1 ? renderableRows(matches[0]!) : undefined;
 }
 
 /**
@@ -386,6 +409,51 @@ function shapeMentionsClaim(shape: RenderShape, claimId: string): boolean {
     return shape.series.some((series) =>
         series.points.some((point) => point.source.claim_id === claimId),
     );
+}
+
+/**
+ * CHAOS-4682 telemetry (standing order: telemetry baked into new logic, same
+ * PR): for every trend chart a fact's own panel actually DRAWS, which array
+ * its points resolved against. Content-safe by construction — a count per
+ * closed-vocabulary source, never a claim id, field name, or value.
+ *
+ * Counts only shapes a panel actually draws — value-verified (`admit`'s
+ * `verifyRenderShape` gate) AND single-claim-owned (`trendShapesForClaim`'s
+ * own `shapeCitesClaim` gate). `renderShapesFor`'s admission checks value
+ * correctness only, not ownership: a value-valid `dated_fact_trend` whose
+ * points span two claims passes it, but is drawn by NEITHER claim's panel
+ * (`trendShapesForClaim` requires EVERY point cite the one claim it was
+ * asked about). Counting by the first point's claim id there attributes a
+ * source to a chart nobody saw — codex round 1, P3. A shape is therefore
+ * counted only when every point cites the SAME claim id, mirroring the
+ * panel's own ownership rule exactly.
+ */
+export type TrendChartSourceCounts = {
+    readonly dualTableTrendChartCount: number;
+    readonly legacyTrendChartCount: number;
+};
+
+/** The single claim id every point of `shape` cites, or undefined if none/mixed. */
+function soleOwningClaimId(shape: RenderShape): string | undefined {
+    const claimId = shape.series[0]?.points[0]?.source.claim_id;
+    return claimId !== undefined && shapeCitesClaim(shape, claimId) ? claimId : undefined;
+}
+
+export function trendChartSourceCounts(result: InvestigationResult): TrendChartSourceCounts {
+    const { shapes } = renderShapesFor(result, ["dated_fact_trend"]);
+    let dualTableTrendChartCount = 0;
+    let legacyTrendChartCount = 0;
+    for (const shape of shapes) {
+        const claimId = soleOwningClaimId(shape);
+        const fact =
+            claimId === undefined
+                ? undefined
+                : result.claimed_facts.find((candidate) => candidate.claim_id === claimId);
+        if (fact === undefined) continue;
+        if (renderableRowsSource(fact) === "time_series_rows") dualTableTrendChartCount += 1;
+        else legacyTrendChartCount += 1;
+    }
+    return { dualTableTrendChartCount, legacyTrendChartCount };
 }
 
 /**

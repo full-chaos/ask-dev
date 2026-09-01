@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import {
     boundedCoverageSource,
@@ -214,6 +215,41 @@ describe("outcome telemetry — what it does record", () => {
         expect(event.limitationCount).toBe(result.limitations.length);
         expect(event.evidenceRefCount).toBe(result.evidence_ref_ids.length);
         expect(event.driverCount).toBe(result.drivers.length);
+    });
+
+    /**
+     * CHAOS-4682 (§5.1 P2 dual-read cutover): the canonical example carries
+     * no render shapes at all, so this is the zero case — proven separately
+     * from the real dual-table/legacy-trend fixture below so a bug that
+     * always reports zero cannot pass by accident.
+     */
+    it("records zero trend-chart-source counts for an answer with no render shapes", () => {
+        const event = buildOutcomeEvent({
+            latencyMs: 1,
+            renderSurface: "deterministic",
+            result,
+        });
+
+        expect(event.dualTableTrendChartCount).toBe(0);
+        expect(event.legacyTrendChartCount).toBe(0);
+    });
+
+    /**
+     * The real synced render-shapes fixture (regenerated from acr's own
+     * pinned commit by this PR's pin bump) carries exactly one dual-table
+     * trend (`claim_workload_ask_dev_backlog`, reading `time_series_rows`)
+     * and one legacy trend (`claim_metrics_ask_dev_commits`, reading `rows`)
+     * — a real mixed answer, not a hand-built one.
+     */
+    it("attributes each of the fixture's two trend charts to its own source", () => {
+        const event = buildOutcomeEvent({
+            latencyMs: 1,
+            renderSurface: "deterministic",
+            result: renderShapesResult as unknown as InvestigationResult,
+        });
+
+        expect(event.dualTableTrendChartCount).toBe(1);
+        expect(event.legacyTrendChartCount).toBe(1);
     });
 
     it("records provenance versions", () => {
