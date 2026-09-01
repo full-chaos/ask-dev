@@ -2,7 +2,6 @@ import { useId } from "react";
 
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { InvestigationResult } from "@/lib/contracts";
-import { splitLeadArithmetic } from "@/lib/prose-detail";
 
 export type AnswerPanelProps = {
     readonly result: InvestigationResult;
@@ -25,17 +24,19 @@ export type AnswerPanelProps = {
  * `strongest_pressures` and `drivers` moved out to `DriversPanel`
  * (CHAOS-4581) — a panel, not prose.
  *
- * CHAOS-4669 defect 2 (confirmed LIVE, kiac org 70d529e0, "Which teams are
- * struggling, and why?"): `deterministic_answer` itself can carry acr's
- * driver-scoring TEMPLATE sentence verbatim — "readiness gap (weight 15,
- * value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points." — a
- * structured restatement of what `DriversPanel`'s own cards already state
- * per driver, not narrative prose. `splitLeadArithmetic` pulls exactly that
- * templated shape out of `deterministic_answer`/`direct_judgment`, LOSSLESS
- * (every character preserved verbatim, just moved) into the SAME "More
- * detail" fold `current_state` already uses — never paraphrased, dropped,
- * or reworded, so this stays inside the "nothing summarized" boundary
- * above: a presentational split of one field's own text, not a rewrite.
+ * CHAOS-4690/CHAOS-4691: `deterministic_answer`/`direct_judgment` used to
+ * need a client-side arithmetic-sentence-splitting pass (`prose-detail.ts`)
+ * because acr's own cohort recompose spliced a driver-scoring TEMPLATE sentence
+ * ("readiness gap (weight 15, value 1.00) contributed 20.0 of ... attention
+ * points.") into the lead prose (CHAOS-4669 defect 2, confirmed live). The
+ * sibling engine ticket removed that splice AT THE SOURCE — cohort lead
+ * recomposition now emits the status sentence alone, with the structured
+ * driver numbers staying exactly where `DriversPanel` already renders them
+ * — so there is nothing left to parse out of the field, and
+ * `prose-detail.ts` is deleted rather than hardened (chris's strike-three
+ * ruling on consumer-side text parsers). Both fields render in full, as
+ * the service sent them; `current_state` is the only field that still folds
+ * behind "More detail".
  */
 export function AnswerPanel({ result }: AnswerPanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
@@ -43,18 +44,10 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     // hardcoded heading id collided across turns and every later turn's
     // `aria-labelledby` resolved to the FIRST turn's heading.
     const idPrefix = useId();
-    const deterministicAnswer = splitLeadArithmetic(result.deterministic_answer);
-    const directJudgment = splitLeadArithmetic(result.direct_judgment);
-    // codex round 2, finding 4: this must reflect the ORIGINAL field, not
-    // the post-extraction lead. An arithmetic-only `direct_judgment` is
-    // fully extracted into `More detail` (lossless — see this file's own
-    // doc comment), leaving `directJudgment.lead` empty; testing THAT for
-    // "no judgment" falsely claimed the service sent none, when its
-    // content is sitting, verbatim, one click away.
-    const hasJudgment = result.direct_judgment.trim() !== "";
+    const deterministicAnswer = result.deterministic_answer.trim();
+    const directJudgment = result.direct_judgment.trim();
+    const hasJudgment = directJudgment !== "";
     const hasCurrentState = result.current_state.trim() !== "";
-    const arithmeticSentences = [...deterministicAnswer.extracted, ...directJudgment.extracted];
-    const hasDetail = hasCurrentState || arithmeticSentences.length > 0;
     return (
         <section
             className="panel"
@@ -64,42 +57,24 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-answer-title`}>
                 Answer
             </h2>
-            {deterministicAnswer.lead !== "" ? (
+            {deterministicAnswer !== "" ? (
                 <p className="answer__judgment">
-                    <SafeAnswerText text={deterministicAnswer.lead} />
+                    <SafeAnswerText text={deterministicAnswer} />
                 </p>
             ) : null}
             {hasJudgment ? (
-                // `directJudgment.lead` can still be "" here when the whole
-                // field was the arithmetic template — its content already
-                // moved to `More detail` below (`arithmeticSentences`), so
-                // there is nothing left to show on the lead surface, and no
-                // empty paragraph is rendered either.
-                directJudgment.lead !== "" ? (
-                    <p className="answer__body">
-                        <SafeAnswerText text={directJudgment.lead} />
-                    </p>
-                ) : null
+                <p className="answer__body">
+                    <SafeAnswerText text={directJudgment} />
+                </p>
             ) : (
                 <p className="panel__empty">The service returned no direct judgment.</p>
             )}
-            {hasDetail ? (
+            {hasCurrentState ? (
                 <details className="disclosure">
                     <summary>More detail</summary>
-                    {arithmeticSentences.length > 0 ? (
-                        <div data-testid="answer-arithmetic-detail">
-                            {arithmeticSentences.map((sentence) => (
-                                <p className="record__meta" key={sentence}>
-                                    <SafeAnswerText text={sentence} />
-                                </p>
-                            ))}
-                        </div>
-                    ) : null}
-                    {hasCurrentState ? (
-                        <p className="answer__body">
-                            <SafeAnswerText text={result.current_state} />
-                        </p>
-                    ) : null}
+                    <p className="answer__body">
+                        <SafeAnswerText text={result.current_state} />
+                    </p>
                 </details>
             ) : null}
         </section>

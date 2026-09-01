@@ -4,7 +4,12 @@ import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
-import type { DriverJudgment, InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type {
+    DriverJudgment,
+    EvidenceRefLabels,
+    InvestigationResult,
+    SubjectRef,
+} from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
 /**
@@ -70,9 +75,11 @@ export type DriversPanelProps = {
 function DriverCard({
     driver,
     membersWithFootnote,
+    evidenceRefLabels,
 }: {
     readonly driver: DriverJudgment;
     readonly membersWithFootnote: ReadonlySet<string>;
+    readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
     const isPrincipal = driver.standing === "principal";
     const isWithheld =
@@ -120,9 +127,14 @@ function DriverCard({
                         .map((subject) => `${subject.label} (${subject.kind})`)
                         .join(", ")}
                 </p>
-                <EvidenceReferences evidenceRefIds={driver.evidence_ref_ids} label="Evidence" />
+                <EvidenceReferences
+                    evidenceRefIds={driver.evidence_ref_ids}
+                    evidenceRefLabels={evidenceRefLabels}
+                    label="Evidence"
+                />
                 <EvidenceReferences
                     evidenceRefIds={driver.claimed_fact_ids}
+                    evidenceRefLabels={evidenceRefLabels}
                     label="Claimed facts"
                 />
             </details>
@@ -185,6 +197,7 @@ export function DriversPanel({ result }: DriversPanelProps) {
                     {result.drivers.map((driver) => (
                         <DriverCard
                             driver={driver}
+                            evidenceRefLabels={result.evidence_ref_labels}
                             key={driver.driver_id}
                             membersWithFootnote={membersWithFootnote}
                         />

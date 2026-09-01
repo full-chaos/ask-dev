@@ -4,9 +4,13 @@ import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
-import type { InvestigationResult, SubjectCandidate } from "@/lib/contracts";
-import { candidateStateTone, formatConfidence, humanizeTerm } from "@/lib/presentation";
-import { CANNOT_REASK_HERE_COPY } from "@/lib/vocab-mapping";
+import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "@/lib/contracts";
+import {
+    CANNOT_REASK_HERE_COPY,
+    candidateStateTone,
+    formatConfidence,
+    humanizeTerm,
+} from "@/lib/presentation";
 
 export type ClarificationChoice = {
     readonly result_id: string;
@@ -67,12 +71,14 @@ function CandidateRecord({
     pending,
     selected,
     onToggle,
+    evidenceRefLabels,
 }: {
     readonly candidate: SubjectCandidate;
     readonly rank: number;
     readonly pending: boolean;
     readonly selected: boolean;
     readonly onToggle: (() => void) | undefined;
+    readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
     return (
         <li className="record">
@@ -99,7 +105,11 @@ function CandidateRecord({
                     </li>
                 ))}
             </ul>
-            <EvidenceReferences evidenceRefIds={candidate.evidence_ref_ids} label="Evidence" />
+            <EvidenceReferences
+                evidenceRefIds={candidate.evidence_ref_ids}
+                evidenceRefLabels={evidenceRefLabels}
+                label="Evidence"
+            />
             <p className="record__meta">
                 receipt <code>{candidate.receipt_id}</code>
             </p>
@@ -180,6 +190,7 @@ export function ClarificationPanel({
                     {candidates.map((candidate, index) => (
                         <CandidateRecord
                             candidate={candidate}
+                            evidenceRefLabels={result.evidence_ref_labels}
                             key={candidate.receipt_id}
                             onToggle={
                                 onToggle === undefined

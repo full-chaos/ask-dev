@@ -34,6 +34,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("renders a non-duplicate finding in full (summary + evidence)", () => {
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Readiness gaps"
                 findings={[PRIMARY]}
                 emptyMessage="No readiness gaps were reported."
@@ -45,6 +46,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("renders a duplicate finding as a compact reference, not the full summary text", () => {
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[DUPLICATE]}
                 emptyMessage="No remaining work was reported."
@@ -58,6 +60,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("a mixed list shows one full record and one reference, never two full copies", () => {
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[PRIMARY, DUPLICATE]}
                 emptyMessage="No remaining work was reported."
@@ -88,6 +91,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         };
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[duplicateWithOwnEvidence]}
                 emptyMessage="No remaining work was reported."
@@ -108,6 +112,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("never claims the primary was 'already' shown — the primary can render below this reference", () => {
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[DUPLICATE]}
                 emptyMessage="No remaining work was reported."
@@ -140,6 +145,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         };
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[duplicateWithOwnSubject]}
                 emptyMessage="No remaining work was reported."
@@ -152,6 +158,7 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("still says so explicitly when there are no findings", () => {
         render(
             <FindingsPanel
+                evidenceRefLabels={undefined}
                 title="Conflicts"
                 findings={[]}
                 emptyMessage="No conflicting evidence was reported."

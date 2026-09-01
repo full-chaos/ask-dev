@@ -28,6 +28,7 @@ import canonicalResult from "@/contracts/examples/context_fabric_investigation_r
 import type {
     ClaimedFact,
     ConfirmedStructureEntry,
+    CoverageDetail,
     InvestigationResult,
     SubjectRef,
 } from "@/lib/contracts";
@@ -397,11 +398,89 @@ function flowLandscapeScenario(): InvestigationResult {
 }
 
 /**
+ * CHAOS-4690/CHAOS-4691: the `coverage.details[]` entries paired with
+ * `degradedScenario`'s own sources/`degraded_reasons`, traced from the real
+ * acr producers this ticket's own review read (never invented, CHAOS-2225):
+ *   - `applyCoverageDisplayLabels`/`ComposeCoverageDetailLabel`
+ *     (`internal/contracts/v1/context_fabric_display_labels.go`) compose
+ *     `label` from a detail's own structured fields — `Metrics facts may be
+ *     out of date` is `providerReportedLabel("metrics", stale)`;
+ *     `Incident facts are not authorized for this account` is
+ *     `providerReportedLabel("incident", unauthorized)`; `2 relationship
+ *     links could not be resolved` is `countPhrase(2, ...)` for
+ *     `graph_endpoint_lookup_failed`; `Workload facts do not apply to what
+ *     was asked` is the `fact_pruned` case.
+ *   - `cov-metrics-stale` carries no `phrasing` (the Label-floor path:
+ *     synthesis MAY phrase a disclosure, and telemetry-observed live runs
+ *     show it sometimes does not — CHAOS-4690's Done comment, `absent 0/2`).
+ *   - `cov-incidents-unauthorized` carries a `phrasing` (the model DOES
+ *     choose to phrase this one) obeying the synthesis guard's own rules
+ *     (`internal/contextfabric/chaos4690_synthesis_disclosures*.go`): no
+ *     digit (quantities stay the deterministic Label's job) and under the
+ *     400-rune bound.
+ *   - `raw` on each is the EXACT paired `degraded_reasons`/bare-code entry
+ *     `appendFactCoverage`/the graph reader emit (`detail.Raw = degradedEntry`
+ *     for a degrading observation) — never re-composed here.
+ *   - `cov-workload-pruned` is non-degrading (`factStateDegrades` excludes
+ *     `pruned`), so it does not appear in this panel's "Degraded reasons"
+ *     list — included anyway for a fixture that mirrors the real shape.
+ */
+const DEGRADED_SCENARIO_DETAILS: CoverageDetail[] = [
+    {
+        detail_id: "cov-metrics-stale",
+        source: "canonical_fact:metrics",
+        code: "fact_provider_reported",
+        degrading: true,
+        fact_kind: "metrics",
+        source_state: "stale",
+        label: "Metrics facts may be out of date",
+        raw: "metrics: canonical fact capability returned stale",
+    },
+    {
+        detail_id: "cov-incidents-unauthorized",
+        source: "canonical_fact:incidents",
+        code: "fact_provider_reported",
+        degrading: true,
+        fact_kind: "incidents",
+        source_state: "unauthorized",
+        label: "Incident facts are not authorized for this account",
+        phrasing: "Incident data wasn't authorized for this account, so it's left out here.",
+        raw: "incidents: canonical fact capability returned unauthorized",
+    },
+    {
+        detail_id: "cov-graph-endpoint-lookup-failed",
+        source: "context-fabric:graph",
+        code: "graph_endpoint_lookup_failed",
+        degrading: true,
+        count: 2,
+        label: "2 relationship links could not be resolved",
+        raw: "endpoint_lookup_failed:2",
+    },
+    {
+        detail_id: "cov-workload-pruned",
+        source: "canonical_fact:workload",
+        code: "fact_pruned",
+        degrading: false,
+        fact_kind: "workload",
+        label: "Workload facts do not apply to what was asked",
+        raw: "pruned:subject_kind_unsupported: no resolved subject has a kind this capability supports",
+    },
+];
+
+/**
  * Coverage that is partial: a stale capability, an unauthorized one, a
  * truncated one, and the pruned one the canonical example already carries.
  * This is the shape the service produces when retrieval loses material —
  * `status: "degraded"`, `coverage.partial: true`, and a `degraded_reasons`
  * entry for each loss.
+ *
+ * CHAOS-4690/CHAOS-4691: this is the NEW acr shape (post a6414816) — every
+ * source carries the engine's own `label`/`state_label`, coverage carries
+ * `details[]` (synthesis-phrased where the model chose to phrase, the
+ * deterministic Label floor otherwise), and the result carries
+ * `evidence_ref_labels`. `degradedLegacyScenario` below is the SAME
+ * investigation in the OLD (pre-4690) shape — the ruled exception this
+ * pin's consumer code renders via the generic floor, never by parsing.
  */
 function degradedScenario(): InvestigationResult {
     const result = canonical();
@@ -489,7 +568,27 @@ function degradedScenario(): InvestigationResult {
         paths: [],
         conflicts: [],
         claimed_facts: [],
-        evidence_ref_ids: ["evidence_project_identity", "evidence_release_acceptance"],
+        // CHAOS-4690: one `acr:v1:team:*` id alongside the scenario's own
+        // placeholder ids, to exercise the ENGINE-provided
+        // `evidence_ref_labels` entry a real `acr:v1:*` ref gets
+        // (`ContextFabricEvidenceRefLabel`, traced the same way
+        // vocab-mapping.ts's own now-deleted tests were: the exact
+        // "acr:v1:team:CHAOS" -> "Team: CHAOS" shape).
+        evidence_ref_ids: [
+            "evidence_project_identity",
+            "evidence_release_acceptance",
+            "acr:v1:team:CHAOS",
+        ],
+        // CHAOS-4690: on a fresh write the key set equals the result's own
+        // evidence-ref closure exactly (schema doc comment) — every id
+        // above, including the two placeholder ones (which fall through to
+        // the engine's OWN generic "Evidence" floor, same as a consumer
+        // never seeing them would, since they carry no `acr:v1:*` shape).
+        evidence_ref_labels: {
+            evidence_project_identity: "Evidence",
+            evidence_release_acceptance: "Evidence",
+            "acr:v1:team:CHAOS": "Team: CHAOS",
+        },
         deterministic_answer:
             "Two projects are slipping. Coverage is partial, so treat the ranking between them as provisional.",
         coverage: {
@@ -499,6 +598,8 @@ function degradedScenario(): InvestigationResult {
                     state: "available",
                     observed_at: "2026-08-11T16:00:02Z",
                     watermark: "status-wm-42",
+                    label: "Dev Health — status",
+                    state_label: "available",
                 },
                 {
                     source: "canonical_fact:metrics",
@@ -506,22 +607,30 @@ function degradedScenario(): InvestigationResult {
                     observed_at: "2026-08-09T04:12:00Z",
                     watermark: "metrics-wm-11",
                     reason: "canonical fact capability returned stale",
+                    label: "Canonical facts — metrics",
+                    state_label: "may be out of date",
                 },
                 {
                     source: "canonical_fact:incidents",
                     state: "unauthorized",
                     reason: "canonical fact capability returned unauthorized",
+                    label: "Canonical facts — incident",
+                    state_label: "not authorized",
                 },
                 {
                     source: "context-fabric:graph",
                     state: "truncated",
                     observed_at: "2026-08-11T16:00:02Z",
                     reason: "canonical fact capability returned truncated",
+                    label: "Relationship graph",
+                    state_label: "partially included",
                 },
                 {
                     source: "canonical_fact:workload",
                     state: "pruned",
                     reason: "pruned:subject_kind_unsupported: no resolved subject has a kind this capability supports",
+                    label: "Canonical facts — workload",
+                    state_label: "not needed",
                 },
             ],
             partial: true,
@@ -530,12 +639,59 @@ function degradedScenario(): InvestigationResult {
                 "incidents: canonical fact capability returned unauthorized",
                 "metrics: canonical fact capability returned stale",
             ],
+            // CHAOS-4690/CHAOS-4691: the structured replacement for the
+            // consumer-side sentence tables this ticket deletes — see
+            // `DEGRADED_SCENARIO_DETAILS`'s own doc comment for provenance.
+            // `degraded_reasons` above still ships (item 5 of the pin delta:
+            // "unchanged — ignore, never parse") — the renderer reads
+            // `details` instead whenever it is present.
+            details: DEGRADED_SCENARIO_DETAILS,
         },
         limitations: [
             "Metric evidence is stale, so slippage magnitude is not current.",
             "Incident evidence was not readable under this principal's authorization scope.",
         ],
         warnings: ["Coverage is partial; treat the ranking as provisional."],
+    };
+}
+
+/**
+ * CHAOS-4691's ruled legacy-stored-result exception (pin delta item 6): the
+ * SAME investigation as `degradedScenario`, in the OLD (pre-CHAOS-4690) acr
+ * shape — an immutable result stored before the engine-phrasing rollout.
+ * `coverage.details` is ABSENT (not `[]`), no source carries `label`/
+ * `state_label`, and the result carries no `evidence_ref_labels` at all.
+ * The pinned schema (this same pin bump) must accept this shape without
+ * requiring the new fields — that both-shapes tolerance is the CHAOS-4656
+ * deploy-safety doctrine this pin exists to prove — and the renderer must
+ * fall through to the deterministic generic floor for every one of them,
+ * never reconstruct the old sentence-table behavior by parsing the raw
+ * strings that are still, correctly, all this shape carries.
+ */
+function degradedLegacyScenario(): InvestigationResult {
+    const newShape = degradedScenario();
+    // `_evidenceRefLabels` is deliberately dropped: this scenario predates
+    // evidence_ref_labels entirely (see this function's own doc comment).
+    const { evidence_ref_labels: _evidenceRefLabels, ...legacyBase } = newShape;
+    return {
+        ...legacyBase,
+        result_id: "result_degraded_legacy_0001",
+        request_id: "request_degraded_legacy_0001",
+        question: "Which projects were slipping, and how confident could we be in that?",
+        evidence_ref_ids: newShape.evidence_ref_ids.filter((id) => id !== "acr:v1:team:CHAOS"),
+        coverage: {
+            sources: newShape.coverage.sources.map((source) => {
+                const legacySource = { ...source };
+                delete legacySource.label;
+                delete legacySource.state_label;
+                return legacySource;
+            }),
+            partial: newShape.coverage.partial,
+            degraded_reasons: newShape.coverage.degraded_reasons ?? [],
+            // `details` intentionally OMITTED (not an empty array) — this is
+            // the legacy-shape discriminator itself; see this function's own
+            // doc comment.
+        },
     };
 }
 
@@ -674,8 +830,16 @@ export function mockScenarios(): readonly MockScenario[] {
         {
             id: "degraded",
             question: "Which projects are slipping, and how confident can we be in that?",
-            demonstrates: "Partial coverage: stale, unauthorized, truncated, and pruned sources.",
+            demonstrates:
+                "Partial coverage (NEW acr shape, CHAOS-4690): stale, unauthorized, truncated, and pruned sources, engine-provided source labels, coverage.details[] with synthesis phrasing and the deterministic Label floor, and evidence_ref_labels.",
             result: degradedScenario(),
+        },
+        {
+            id: "degraded-legacy",
+            question: "Which projects were slipping, and how confident could we be in that?",
+            demonstrates:
+                "CHAOS-4691's ruled legacy-stored-result exception: the SAME investigation in the OLD (pre-4690) acr shape -- no coverage.details, no source labels, no evidence_ref_labels -- rendered via the deterministic generic floor, never reconstructed by parsing.",
+            result: degradedLegacyScenario(),
         },
         {
             id: "clarification",

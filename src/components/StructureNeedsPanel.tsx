@@ -13,13 +13,13 @@ import type {
     StructureNeeds,
     WindowOption,
 } from "@/lib/contracts";
+import { CANNOT_REASK_HERE_COPY } from "@/lib/presentation";
 import {
     structureReceiptHasExpectedNamespace,
     structureSelectionCount,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { structureMemberLabel } from "@/lib/structure-disposition";
-import { CANNOT_REASK_HERE_COPY } from "@/lib/vocab-mapping";
 
 /**
  * Guided structure-elicitation prompts (CHAOS-3927 P2, design brief §2.2).

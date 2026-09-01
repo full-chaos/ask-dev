@@ -1,11 +1,12 @@
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
-import type { SubjectResolution } from "@/lib/contracts";
+import type { EvidenceRefLabels, SubjectResolution } from "@/lib/contracts";
 import { candidateStateTone, formatConfidence, humanizeTerm } from "@/lib/presentation";
 
 export type SubjectResolutionPanelProps = {
     readonly resolution: SubjectResolution;
+    readonly evidenceRefLabels: EvidenceRefLabels;
 };
 
 /**
@@ -26,7 +27,10 @@ export type SubjectResolutionPanelProps = {
  * to begin with, and `CoveragePanel`/`LimitationsPanel` already own
  * disclosing what could not be read.
  */
-export function SubjectResolutionPanel({ resolution }: SubjectResolutionPanelProps) {
+export function SubjectResolutionPanel({
+    resolution,
+    evidenceRefLabels,
+}: SubjectResolutionPanelProps) {
     const hasPriorReceiptDisclosure =
         resolution.prior_subject_receipt_dispositions !== undefined &&
         resolution.prior_subject_receipt_dispositions.length > 0;
@@ -77,7 +81,10 @@ export function SubjectResolutionPanel({ resolution }: SubjectResolutionPanelPro
                                     </li>
                                 ))}
                             </ul>
-                            <EvidenceReferences evidenceRefIds={candidate.evidence_ref_ids} />
+                            <EvidenceReferences
+                                evidenceRefIds={candidate.evidence_ref_ids}
+                                evidenceRefLabels={evidenceRefLabels}
+                            />
                         </li>
                     ))}
                 </ul>

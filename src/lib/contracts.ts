@@ -36,6 +36,11 @@ export type {
     // CHAOS-4449 (acr CHAOS-4398 PR3/PR3b): the cohort and its ranked members.
     Cohort,
     CohortMember,
+    // CHAOS-4690/CHAOS-4691: one structured coverage observation -- the
+    // engine's own reason fields, deterministic `label` floor, and optional
+    // synthesis-phrased `phrasing`, replacing the consumer-side sentence
+    // tables this pin's rip-out deletes.
+    CoverageDetail,
     // CHAOS-4636/CHAOS-4668: one group of a grouped cohort answer.
     CohortGroup,
     CohortMemberDriver,
@@ -204,6 +209,18 @@ export type InterpretedShape =
 /** One entry of `coverage.sources`; the contract declares it inline. */
 export type CoverageSource =
     import("@/contracts/generated/investigation-result").Coverage["sources"][number];
+
+/**
+ * CHAOS-4690/CHAOS-4691: `InvestigationResult.evidence_ref_labels` — the
+ * engine's own display label per evidence ref id reachable on a result.
+ * Every `EvidenceReferences` call site threads this through by this one
+ * alias rather than a hand-rolled `Record<string, string>`, because the
+ * generated map's value type is `string | undefined` (an optional-properties
+ * index signature, not "every value present") — a hand-rolled `Record<string,
+ * string>` here would silently disagree with the wire type.
+ */
+export type EvidenceRefLabels =
+    import("@/contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1["evidence_ref_labels"];
 
 /** The closed coverage-state vocabulary, as declared by the contract. */
 export type CoverageState = CoverageSource["state"];

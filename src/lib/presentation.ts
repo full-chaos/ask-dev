@@ -153,3 +153,16 @@ export function humanizeTerm(term: string): string {
 export function formatConfidence(confidence: number): string {
     return `${Math.round(confidence * 100)}%`;
 }
+
+/**
+ * The "implementation-state" copy CHAOS-4673 named directly:
+ * StructureNeedsPanel's and ClarificationPanel's own text for when the
+ * surrounding surface has no `onConfirm`/`onToggle` to call — in practice, a
+ * frozen (superseded) chat turn, rendered read-only by design. This is the
+ * Workbench's OWN product chrome, not a vocabulary lookup over acr data
+ * (CHAOS-4691's rip-out deletes the sentence-table module this used to live
+ * in; this constant is presentation structure, not phrasing, and survives
+ * the deletion per the ticket's own carve-out). A named export so both call
+ * sites say the identical sentence rather than drifting.
+ */
+export const CANNOT_REASK_HERE_COPY = "These options can't be changed from this earlier message.";
