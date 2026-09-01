@@ -182,6 +182,88 @@ describe("investigation result contract — claimed fact table declaration (CHAO
 });
 
 /**
+ * acr dbde584b (consumer pin, this PR): `ClaimedFactTable` gains a third
+ * declared column role, `observations` -- a per-row categorical column (a
+ * severity label, an as-of date, a boolean flag) that used to have nowhere
+ * to go but `measures`, the same slot a numeric identity column could hide
+ * in undetected. The fixture's own health claim (`daily_health`) now
+ * declares `measures: ["compounding_risk"]` and `observations: ["severity"]`,
+ * so the real acr-emitted document already proves the new-shape half; these
+ * tests add the old-shape tolerance and the executed prior-pin repro, the
+ * same three-case shape the `table` declaration block above already
+ * establishes for `key`/`measures`.
+ */
+describe("investigation result contract — declared table observations (acr dbde584b consumer pin)", () => {
+    it("a real acr-emitted response with an `observations`-bearing table validates as-is", () => {
+        const observed = (
+            renderShapesResult as { claimed_facts: Array<Record<string, unknown>> }
+        ).claimed_facts.filter(
+            (claim) =>
+                "table" in claim &&
+                Array.isArray((claim.table as { observations?: unknown[] }).observations) &&
+                ((claim.table as { observations: unknown[] }).observations.length ?? 0) > 0,
+        );
+        expect(observed.length).toBeGreaterThan(0);
+        expect(observed[0]?.table).toMatchObject({ observations: ["severity"] });
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            renderShapesResult,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("still validates with every claimed fact's `table.observations` stripped — the field is OPTIONAL, not required", () => {
+        const withoutObservations = structuredClone(renderShapesResult) as {
+            claimed_facts: Array<{ table?: Record<string, unknown> }>;
+        };
+        for (const claim of withoutObservations.claimed_facts) {
+            if (claim.table !== undefined) delete claim.table.observations;
+        }
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withoutObservations,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (d261b265, still on
+     * origin/main before this PR): the same real acr-emitted document, run
+     * against a `ClaimedFactTable` $def with `observations` stripped from
+     * its `properties` (it was never in `required`, so no `required` edit
+     * is needed) -- exactly what an `additionalProperties: false` $def that
+     * has never heard of the field does with it. RED against that
+     * reproduction, GREEN against the real pinned schema above.
+     */
+    it("EXECUTED repro: an `observations`-bearing table would 502 under the prior pin's own schema", () => {
+        const priorCommonSchema = structuredClone(commonSchema) as unknown as {
+            $defs: Record<string, { properties: Record<string, unknown> }>;
+        };
+        const claimedFactTableDef = priorCommonSchema.$defs.ClaimedFactTable;
+        if (claimedFactTableDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no ClaimedFactTable $def");
+        }
+        delete claimedFactTableDef.properties.observations;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(renderShapesResult)).toBe(false);
+        const observationsRejections = (validate.errors ?? []).filter(
+            (error) =>
+                error.keyword === "additionalProperties" &&
+                error.params?.additionalProperty === "observations",
+        );
+        expect(observationsRejections.length).toBeGreaterThan(0);
+    });
+});
+
+/**
  * acr d261b265 (consumer pin, this PR): the closed `NarrowingBasis` enum
  * gains a fourth member, `overlap_aware_set_cover` -- the engine's
  * overlap-aware grouped-narrowing selection now names its own order

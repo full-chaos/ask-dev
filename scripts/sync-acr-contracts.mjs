@@ -28,24 +28,31 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #356, the engine's overlap-aware grouped-narrowing and
-// projection-allowance merge (an exact minimum set-cover selection, guarded
-// to small group counts with an untouched greedy fallback beyond it). ONE
-// file in the consumed surface changed between a6414816 (#355, the prior
-// pin) and this pin (verified per-file:
-// `git diff a6414816049df099dbe066290961897bf1420fa7 d261b265275a6945783496bfa7559dcfa451ba10 -- contracts/jsonschema/v1/<file>`):
-//   - `context_fabric_common.v1`: the closed `NarrowingBasis` enum gains
-//     `overlap_aware_set_cover` (a fourth declared narrowing order,
-//     alongside the existing `canonical_id_lexical`/
-//     `largest_group_round_robin`/`attention_rank`).
+// acr main: pins past #361, FactTable's third declared column role. A
+// per-row categorical column (a severity label, an as-of date, a boolean
+// flag) had nowhere to go but `measures`, the same slot a numeric identity
+// column could hide in undetected; the new `observations` role gives it
+// somewhere else to go, which is what lets acr's producer-side validator
+// require every `measures` column to be numeric. ONE file in the consumed
+// surface changed between d261b265 (#356, the prior pin) and this pin
+// (verified per-file:
+// `git diff d261b265275a6945783496bfa7559dcfa451ba10 dbde584b41ddc6b89392344020b23cac7233559e -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: `ClaimedFactTable` gains an optional
+//     `observations` property (string array, same bounds as the existing
+//     `measures`) alongside the pre-existing `field`/`shape`/`key`/
+//     `measures`/`order_by`.
 // `context_fabric_investigation_request.v1`, `context_fabric_investigation_result.v1`,
-// and `error.v1` are byte-identical to the prior pin. The widening is a pure
-// enum-member addition -- schema-OPEN by construction relative to the prior
-// closed set only in the sense that a NEW value now validates where it
-// previously 502'd -- so this pin must validate BOTH an old-shape response
-// (no `overlap_aware_set_cover` anywhere) and a new-shape response carrying
-// it. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "d261b265275a6945783496bfa7559dcfa451ba10";
+// and `error.v1` are byte-identical to the prior pin. The field is
+// schema-OPTIONAL (omitted entirely from every table that declares no
+// observations) -- per CHAOS-4656's doctrine this is a NORMAL two-step
+// deploy (this consumer pin lands first; the acr-side rig serving builds
+// past this merge waits for it). One example changed:
+// `context_fabric_investigation_result_render_shapes.v1.json` gained a
+// `daily_health` declared table (time_series, `measures: [compounding_risk]`,
+// `observations: [severity]`) on the existing health claim, so the pinned
+// fixture itself proves the new property round-trips. Bump procedure lives
+// in README.md.
+export const SOURCE_COMMIT = "dbde584b41ddc6b89392344020b23cac7233559e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
