@@ -207,32 +207,45 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `d261b265275a6945783496bfa7559dcfa451ba10` (acr main tip
-#356, the engine's overlap-aware grouped-narrowing and projection-allowance
-merge — an exact minimum set-cover selection, guarded to small group counts
-with an untouched greedy fallback beyond it). ONE file in the CONSUMED
-surface changed between the prior pin and this one — verified per-file
-directly against acr's own history (`git diff
-a6414816049df099dbe066290961897bf1420fa7
-d261b265275a6945783496bfa7559dcfa451ba10 -- contracts/jsonschema/v1/<file>`
+Currently pinned: `dbde584b41ddc6b89392344020b23cac7233559e` (acr main tip
+#361, `FactTable` gains a third declared column role, `observations`). A
+per-row categorical column (a severity label, an as-of date, a boolean
+flag) used to have nowhere to go but `measures`, the same slot a numeric
+identity column could hide in undetected — the new role gives it somewhere
+else to go, which is what lets acr's producer-side validator require every
+`measures` column to be numeric. ONE file in the CONSUMED surface changed
+between the prior pin and this one — verified per-file directly against
+acr's own history (`git diff
+d261b265275a6945783496bfa7559dcfa451ba10
+dbde584b41ddc6b89392344020b23cac7233559e -- contracts/jsonschema/v1/<file>`
 run once per consumed path):
 
-- `context_fabric_common.v1.schema.json`: the closed `NarrowingBasis` enum
-  gains a fourth member, `overlap_aware_set_cover`, alongside the existing
-  `canonical_id_lexical`/`largest_group_round_robin`/`attention_rank`.
+- `context_fabric_common.v1.schema.json`: `ClaimedFactTable` gains an
+  optional `observations` property (string array, `maxItems: 32`, same
+  per-item bounds as the existing `measures`), alongside the pre-existing
+  `field`/`shape`/`key`/`measures`/`order_by`.
 
 `context_fabric_investigation_request.v1.schema.json`,
 `context_fabric_investigation_result.v1.schema.json`, and `error.v1.schema.json`
-are byte-identical to the prior pin. A widened closed enum is the
-CHAOS-4656-doctrine failure mode: the unbumped pin's Ajv validator rejects
-any response carrying the new value as `acr_contract_violation` (a hard
-502), not a tolerated unknown — so this is a consumer-first two-step deploy,
-proven both-shapes in `src/lib/acr/validate.test.ts` (every pre-existing
-basis still validates; the new value validates on this pin and is reproduced
-red against the prior pin's own `NarrowingBasis` enum). No UI change: the
-narrowing basis renders through `AnswerPlanPanel`'s generic
-`humanizeTerm(step.basis)` (mechanical `snake_case` -> spaced text, not a
-per-value lookup), so a new value renders without a code change.
+are byte-identical to the prior pin. The field is schema-OPTIONAL — per
+CHAOS-4656's doctrine this is a NORMAL two-step deploy (this consumer pin
+lands first; the acr-side rig serving builds past the merge waits for it),
+proven both-shapes in `src/lib/acr/validate.test.ts` (the real acr-emitted
+example, which now declares a health claim's table with a non-empty
+`observations`, validates as-is; the same document still validates with
+`observations` stripped; the new-shape document is reproduced red against
+the prior pin's own `ClaimedFactTable` $def). No UI change: the declared
+table is not rendered by this workbench at all — `key`/`measures`/
+`order_by` are already unrendered structural fields Ask Dev does not draw a
+chart from in this view, and `observations` joins them on the same basis.
+
+Previous pin `d261b265275a6945783496bfa7559dcfa451ba10` (acr main tip #356,
+the engine's overlap-aware grouped-narrowing and projection-allowance merge
+— an exact minimum set-cover selection, guarded to small group counts with
+an untouched greedy fallback beyond it) landed the closed `NarrowingBasis`
+enum's fourth member, `overlap_aware_set_cover`, in
+`context_fabric_common.v1.schema.json` alone; proven both-shapes the same
+way, in the same test file.
 
 Previous pin `a6414816049df099dbe066290961897bf1420fa7` (acr main tip #355,
 CHAOS-4690/CHAOS-4691 — disclosures speak the engine's own language, and
