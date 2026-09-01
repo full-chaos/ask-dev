@@ -13,12 +13,19 @@ export type CoveragePanelProps = {
 const GENERIC_SOURCE_LABEL = "Source";
 
 /**
- * The deterministic fail-readable floor for the LEGACY exception below: a
- * fixed, content-independent sentence, never derived from the raw reason
- * text it accompanies (CHAOS-4691's pin delta item 6 rules out
- * "reconstruct by parsing" as a path even for old data).
+ * The deterministic fail-readable floor for a degraded reason with no
+ * usable text at all: a fixed, content-independent sentence, never derived
+ * from the raw reason text it accompanies (CHAOS-4691's pin delta item 6
+ * rules out "reconstruct by parsing" as a path even for old data). Used
+ * for the LEGACY exception below (a pre-4690 `degraded_reasons[]` entry,
+ * which this module never parses), AND — codex round 2, P2, EXECUTED — as
+ * the ultimate fallback when a NEW-shape `CoverageDetail.phrasing` AND its
+ * contract-required `label` are BOTH schema-valid but whitespace-only
+ * (`label`'s only wire bound is `minLength: 1`, which a lone space
+ * satisfies; there is nothing further to fall back to once even the
+ * deterministic floor itself is blank).
  */
-const GENERIC_LEGACY_DEGRADED_REASON_SENTENCE =
+const GENERIC_DEGRADED_REASON_SENTENCE =
     "This source didn't fully contribute; see details for the reason.";
 
 /**
@@ -187,7 +194,9 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     deterministic Label floor — never both
                                     blank (`label` is contract-required). */}
                                 <p className="record__body">
-                                    {nonBlank(detail.phrasing) ?? detail.label}
+                                    {nonBlank(detail.phrasing) ??
+                                        nonBlank(detail.label) ??
+                                        GENERIC_DEGRADED_REASON_SENTENCE}
                                 </p>
                                 {detail.raw === undefined ? null : (
                                     <Details data-testid="degraded-reason-raw" summary="Raw reason">
@@ -207,9 +216,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                     <ul className="stack stack--tight">
                         {legacyDegradedReasons.map((reason) => (
                             <li className="record" key={reason}>
-                                <p className="record__body">
-                                    {GENERIC_LEGACY_DEGRADED_REASON_SENTENCE}
-                                </p>
+                                <p className="record__body">{GENERIC_DEGRADED_REASON_SENTENCE}</p>
                                 <Details data-testid="degraded-reason-raw" summary="Raw reason">
                                     <code>{reason}</code>
                                 </Details>

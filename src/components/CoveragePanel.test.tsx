@@ -295,4 +295,37 @@ describe("CoveragePanel — codex round 1 P2: blank engine strings fall through 
         render(<CoveragePanel coverage={coverage} />);
         expect(screen.getByText("Metrics facts may be out of date")).toBeInTheDocument();
     });
+
+    /**
+     * codex round 2, P2, EXECUTED: `CoverageDetail.label` is contract-
+     * required, but its only wire bound is `minLength: 1` (no
+     * non-whitespace requirement), so a schema-valid detail can carry
+     * `label: " "` — the same shape `phrasing` can carry. When BOTH are
+     * blank there is nothing left to fall back to except the generic
+     * sentence (never a blank paragraph on the always-visible surface).
+     */
+    it("falls back to the generic sentence when BOTH phrasing and the required label are blank/whitespace-only", () => {
+        const coverage = {
+            sources: [],
+            partial: true,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-blank-everything",
+                    source: "canonical_fact:metrics",
+                    code: "fact_provider_reported" as const,
+                    degrading: true,
+                    label: " ",
+                    phrasing: " ",
+                },
+            ],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        expect(
+            screen.getByText("This source didn't fully contribute; see details for the reason."),
+        ).toBeInTheDocument();
+        // Never a lone blank paragraph in the degraded-reasons list.
+        const list = screen.getByRole("heading", { name: "Degraded reasons" }).closest("section")!;
+        expect(list.querySelector(".record__body")!.textContent.trim()).not.toBe("");
+    });
 });
