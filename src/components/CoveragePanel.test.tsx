@@ -232,6 +232,60 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
         expect(screen.queryByText(/no data-sharing policy is configured/)).toBeNull();
         expect(screen.queryByText(/Incident facts are not authorized/)).toBeNull();
     });
+
+    /**
+     * codex round 3, P2, EXECUTED: `coverage.details` being PRESENT (even
+     * as an empty array) previously suppressed rendering of a non-empty
+     * `coverage.degraded_reasons[]` entirely -- `isLegacyShape` was `false`
+     * for `details: []`, so `legacyDegradedReasons` was forced to `[]`
+     * regardless of what `degraded_reasons` carried, silently dropping real
+     * degraded-reason data on a schema-valid (if internally inconsistent)
+     * response. The fallback to the generic-sentence rendering must trigger
+     * whenever there are no DEGRADING details to show, not only when
+     * `details` is literally `undefined`.
+     */
+    it("falls back to the generic degraded-reason rendering when details is present-but-empty and degraded_reasons is not (never silently drops it)", () => {
+        const coverage = {
+            sources: [],
+            partial: true,
+            degraded_reasons: ["blockers: unexpanded:failed", "incidents: pruned"],
+            details: [],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+
+        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        const genericSentences = screen.getAllByText(
+            "This source didn't fully contribute; see details for the reason.",
+        );
+        expect(genericSentences.length).toBe(2);
+        expect(screen.getByText("blockers: unexpanded:failed")).toBeInTheDocument();
+        expect(screen.getByText("incidents: pruned")).toBeInTheDocument();
+    });
+
+    it("prefers structured details over degraded_reasons when both are present and details actually cover the degradation", () => {
+        const coverage = {
+            sources: [],
+            partial: true,
+            degraded_reasons: ["metrics: canonical fact capability returned stale"],
+            details: [
+                {
+                    detail_id: "cov-01",
+                    source: "canonical_fact:metrics",
+                    code: "fact_provider_reported" as const,
+                    degrading: true,
+                    label: "Metrics facts may be out of date",
+                },
+            ],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        expect(screen.getByText("Metrics facts may be out of date")).toBeInTheDocument();
+        // The raw degraded_reasons string is never rendered when a
+        // degrading detail already covers the same gap.
+        expect(screen.queryByText("metrics: canonical fact capability returned stale")).toBeNull();
+        expect(
+            screen.queryByText("This source didn't fully contribute; see details for the reason."),
+        ).toBeNull();
+    });
 });
 
 /**

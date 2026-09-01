@@ -155,24 +155,43 @@ export function formatConfidence(confidence: number): string {
 }
 
 /**
- * `undefined` unless `value` is a defined string with non-whitespace
+ * Zero-width FORMAT characters (Unicode category Cf): invisible when
+ * rendered, but NOT matched by `\s`/`String.prototype.trim()`, which strip
+ * WHITESPACE (categories Zs/Zl/Zp) only. codex round 3, P2, EXECUTED: a
+ * schema-valid `label` consisting of only U+200B satisfies a wire field's
+ * `minLength: 1` while rendering as nothing at all — `trim() !== ""` alone
+ * missed it. Written as explicit `\u` escapes, never the literal glyphs, so
+ * this stays reviewable: U+200B ZERO WIDTH SPACE, U+200C ZERO WIDTH
+ * NON-JOINER, U+200D ZERO WIDTH JOINER, U+FEFF ZERO WIDTH NO-BREAK SPACE
+ * (also the UTF-8 BOM), U+2060 WORD JOINER — the characters actually
+ * observed to cause this class of bug, not an attempt at a general
+ * "is this glyph visible" classifier.
+ */
+// eslint-disable-next-line no-misleading-character-class -- intentional: U+200C/U+200D are listed as two ORDINARY disjunction members of this character class (each matched individually, stripped independently), not as a joiner sequence the class could be misread as.
+const ZERO_WIDTH_FORMAT_CHARACTERS = /[\u200b\u200c\u200d\ufeff\u2060]/g;
+
+/**
+ * `undefined` unless `value` is a defined string with visible, non-blank
  * content.
  *
  * codex round 1 (CHAOS-4690/CHAOS-4691 consumer pin), P2, EXECUTED: an
  * optional engine-provided display string (`Coverage.sources[].label`/
  * `.state_label`, `CoverageDetail.phrasing`) has no `minLength` on the
  * wire, so `""` is schema-valid; `evidence_ref_labels`' values carry
- * `minLength: 1` but that still admits a lone space. A bare `?? fallback`
- * only catches `undefined`/`null`, not an empty or whitespace-only string —
- * so a malformed-but-schema-valid engine response could render a blank
- * chip, a blank degraded-reason sentence in place of its required `label`,
- * or blank evidence text, instead of falling through to the deterministic
- * generic floor every other absent-field path already uses. This is a pure
- * PRESENCE check, never a content guess: it returns `value` unchanged when
- * non-blank, exactly like a plain `?? fallback` would.
+ * `minLength: 1` but that still admits a lone space (round 1) or a lone
+ * zero-width character (round 3). A bare `?? fallback` only catches
+ * `undefined`/`null`, not a blank string — so a malformed-but-schema-valid
+ * engine response could render a blank chip, a blank degraded-reason
+ * sentence in place of its required `label`, or blank evidence text,
+ * instead of falling through to the deterministic generic floor every
+ * other absent-field path already uses. This is a pure PRESENCE check,
+ * never a content guess: it returns `value` UNCHANGED (never stripped) when
+ * it has any visible content, exactly like a plain `?? fallback` would.
  */
 export function nonBlank(value: string | undefined): string | undefined {
-    return value !== undefined && value.trim() !== "" ? value : undefined;
+    if (value === undefined) return undefined;
+    const visible = value.replaceAll(ZERO_WIDTH_FORMAT_CHARACTERS, "").trim();
+    return visible !== "" ? value : undefined;
 }
 
 /**

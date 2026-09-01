@@ -61,20 +61,31 @@ const GENERIC_DEGRADED_REASON_SENTENCE =
  * legacy result instead gets a fixed, content-independent generic sentence
  * per degraded reason (never derived from what the raw reason text says)
  * with the raw string still one click away in Details — degraded, not
- * silently dropped or leaked.
+ * silently dropped or leaked. codex round 3: this generic-sentence
+ * rendering is triggered by "no DEGRADING detail covers this" — `details`
+ * absent (the true legacy shape) OR merely insufficient (present but empty,
+ * or present without a matching degrading entry) both count, so a
+ * schema-valid but internally inconsistent response can never silently
+ * drop a real `degraded_reasons[]` entry either.
  */
 export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
     const idPrefix = useId();
-    // `details` being absent (not merely empty) is the legacy-shape
-    // discriminator — see this component's own doc comment above.
-    const isLegacyShape = coverage.details === undefined;
-    const degradingDetails: readonly CoverageDetail[] = isLegacyShape
-        ? []
-        : coverage.details!.filter((detail) => detail.degrading);
-    const legacyDegradedReasons = isLegacyShape ? (coverage.degraded_reasons ?? []) : [];
+    const degradingDetails: readonly CoverageDetail[] =
+        coverage.details?.filter((detail) => detail.degrading) ?? [];
+    // codex round 3, P2, EXECUTED: gated on `details === undefined` alone,
+    // this silently dropped a non-empty `degraded_reasons[]` whenever
+    // `details` was PRESENT but had no degrading entries (e.g. `details:
+    // []`) — a schema-valid, if internally inconsistent, response. The
+    // fallback to the generic-sentence rendering (never a parsed one — see
+    // this component's own doc comment above) now triggers whenever the
+    // structured details don't already cover any degradation, regardless
+    // of whether `details` is absent (the true legacy shape) or merely
+    // insufficient — never a silent drop either way.
+    const legacyDegradedReasons =
+        degradingDetails.length === 0 ? (coverage.degraded_reasons ?? []) : [];
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
     // observed was dropped" — it says nothing about whether anything was

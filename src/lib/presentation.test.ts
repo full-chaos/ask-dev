@@ -10,6 +10,7 @@ import {
     candidateStateTone,
     coverageStateTone,
     formatConfidence,
+    nonBlank,
     priorSubjectReceiptDispositionTone,
 } from "@/lib/presentation";
 
@@ -73,5 +74,47 @@ describe("presentation tone maps", () => {
         expect(formatConfidence(1)).toBe("100%");
         expect(formatConfidence(0.96)).toBe("96%");
         expect(formatConfidence(0)).toBe("0%");
+    });
+});
+
+/**
+ * codex round 3, P2, EXECUTED: `String.prototype.trim()` strips ASCII/
+ * Unicode WHITESPACE, but NOT zero-width format characters (U+200B ZERO
+ * WIDTH SPACE, U+200C/U+200D joiners, U+FEFF BOM/ZERO WIDTH NO-BREAK
+ * SPACE, U+2060 WORD JOINER) — those satisfy a wire field's `minLength: 1`
+ * while rendering as nothing at all. A schema-valid label consisting of
+ * only U+200B passed the old `.trim() !== ""` check as "present" and
+ * would have rendered an invisible chip/sentence/evidence item instead of
+ * falling to the generic floor.
+ */
+describe("nonBlank", () => {
+    it("treats a defined, visibly non-empty string as present", () => {
+        expect(nonBlank("Team: CHAOS")).toBe("Team: CHAOS");
+    });
+
+    it("treats undefined as absent", () => {
+        expect(nonBlank(undefined)).toBeUndefined();
+    });
+
+    it("treats an empty string as absent", () => {
+        expect(nonBlank("")).toBeUndefined();
+    });
+
+    it("treats ASCII/Unicode whitespace-only strings as absent", () => {
+        expect(nonBlank(" ")).toBeUndefined();
+        expect(nonBlank("\t\n  ")).toBeUndefined();
+    });
+
+    it("treats a string of ONLY zero-width/format characters as absent", () => {
+        expect(nonBlank("\u200B")).toBeUndefined();
+        expect(nonBlank("\u200C\u200D")).toBeUndefined();
+        expect(nonBlank("\uFEFF")).toBeUndefined();
+        expect(nonBlank("\u2060")).toBeUndefined();
+        expect(nonBlank(" \u200B \uFEFF ")).toBeUndefined();
+    });
+
+    it("still returns the ORIGINAL string (not stripped) when it has real visible content alongside zero-width characters", () => {
+        const withZeroWidth = "Team\u200B: CHAOS";
+        expect(nonBlank(withZeroWidth)).toBe(withZeroWidth);
     });
 });
