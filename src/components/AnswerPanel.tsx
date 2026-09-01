@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { InvestigationResult } from "@/lib/contracts";
+import { nonBlank } from "@/lib/presentation";
 
 export type AnswerPanelProps = {
     readonly result: InvestigationResult;
@@ -44,10 +45,20 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     // hardcoded heading id collided across turns and every later turn's
     // `aria-labelledby` resolved to the FIRST turn's heading.
     const idPrefix = useId();
+    // Displayed text is COSMETICALLY trimmed (leading/trailing ASCII
+    // whitespace only, matching the field's own pre-4691 display
+    // convention) — a purely visual tidy-up, independent of the render
+    // DECISION below, which routes through the same `nonBlank` predicate
+    // every other blank-content judgment in this ticket's diff uses (team-
+    // lead ruling, round 3 close-out: one swept predicate, not a
+    // per-field `.trim() !== ""` reimplementation that would miss the
+    // same zero-width/combining-mark categories `nonBlank` already
+    // covers).
     const deterministicAnswer = result.deterministic_answer.trim();
     const directJudgment = result.direct_judgment.trim();
-    const hasJudgment = directJudgment !== "";
-    const hasCurrentState = result.current_state.trim() !== "";
+    const hasDeterministicAnswer = nonBlank(result.deterministic_answer) !== undefined;
+    const hasJudgment = nonBlank(result.direct_judgment) !== undefined;
+    const hasCurrentState = nonBlank(result.current_state) !== undefined;
     return (
         <section
             className="panel"
@@ -57,7 +68,7 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-answer-title`}>
                 Answer
             </h2>
-            {deterministicAnswer !== "" ? (
+            {hasDeterministicAnswer ? (
                 <p className="answer__judgment">
                     <SafeAnswerText text={deterministicAnswer} />
                 </p>

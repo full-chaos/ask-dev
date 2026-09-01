@@ -123,3 +123,22 @@ describe("AnswerPanel — CHAOS-4690/4691: deterministic_answer/direct_judgment 
         expect(screen.queryByText("More detail")).toBeNull();
     });
 });
+
+/**
+ * Team-lead ruling (round 3 close-out): every render-site blank-content
+ * decision in this ticket's diff routes through `nonBlank` (`@/lib/
+ * presentation`), which itself carries the exhaustive category sweep
+ * (`presentation.test.ts`'s own `nonBlank` table). This proves the WIRING
+ * at this specific terminus — `direct_judgment` consisting of only a
+ * zero-width character is schema-valid (`minLength` absent on this field)
+ * and must fall to the honest "no direct judgment" message, never render
+ * an invisible paragraph.
+ */
+describe("AnswerPanel — codex round 3/4 close-out: blank-content decisions route through nonBlank", () => {
+    it("treats a direct_judgment consisting of only invisible characters as absent (falls to the honest message)", () => {
+        const result: InvestigationResult = { ...base, direct_judgment: "\u200B\u2066" };
+        render(<AnswerPanel result={result} />);
+        expect(screen.getByText("The service returned no direct judgment.")).toBeInTheDocument();
+        expect(screen.queryByText("\u200B\u2066")).toBeNull();
+    });
+});

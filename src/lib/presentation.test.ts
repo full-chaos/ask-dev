@@ -78,14 +78,16 @@ describe("presentation tone maps", () => {
 });
 
 /**
- * codex round 3, P2, EXECUTED: `String.prototype.trim()` strips ASCII/
- * Unicode WHITESPACE, but NOT zero-width format characters (U+200B ZERO
- * WIDTH SPACE, U+200C/U+200D joiners, U+FEFF BOM/ZERO WIDTH NO-BREAK
- * SPACE, U+2060 WORD JOINER) — those satisfy a wire field's `minLength: 1`
- * while rendering as nothing at all. A schema-valid label consisting of
- * only U+200B passed the old `.trim() !== ""` check as "present" and
- * would have rendered an invisible chip/sentence/evidence item instead of
- * falling to the generic floor.
+ * Team-lead ruling (round 3 close-out): codex kept re-finding cells of ONE
+ * class -- "blank-ish content bypasses the fallback guard" -- because each
+ * round's fix patched the specific cell it was shown (ASCII space, then
+ * zero-width Unicode) rather than sweeping the class. `nonBlank` now
+ * routes every category through a single normative predicate
+ * (`INVISIBLE_CONTENT`, `@/lib/presentation`'s own doc comment on it); this
+ * table is that sweep's proof -- EVERY Unicode character category the
+ * predicate claims to cover, exhaustively, each as its own row so a
+ * regression in any one category shows up as a named failure, not a
+ * vanished assertion buried in a combined string.
  */
 describe("nonBlank", () => {
     it("treats a defined, visibly non-empty string as present", () => {
@@ -96,25 +98,39 @@ describe("nonBlank", () => {
         expect(nonBlank(undefined)).toBeUndefined();
     });
 
-    it("treats an empty string as absent", () => {
-        expect(nonBlank("")).toBeUndefined();
+    describe.each([
+        ["empty string", ""],
+        ["a single ASCII space", " "],
+        ["ASCII tab/newline/carriage-return", "\t\n\r  "],
+        ["Unicode Zs: NO-BREAK SPACE (U+00A0)", "\u00A0"],
+        ["Unicode Zs: EN SPACE (U+2002)", "\u2002"],
+        ["Unicode Zs: EM SPACE (U+2003)", "\u2003"],
+        ["Unicode Zs: THIN SPACE (U+2009)", "\u2009"],
+        ["Unicode Zs: IDEOGRAPHIC SPACE (U+3000)", "\u3000"],
+        ["Unicode Zs: OGHAM SPACE MARK (U+1680)", "\u1680"],
+        ["Unicode Zl: LINE SEPARATOR (U+2028)", "\u2028"],
+        ["Unicode Zp: PARAGRAPH SEPARATOR (U+2029)", "\u2029"],
+        ["Unicode Cf: ZERO WIDTH SPACE (U+200B)", "\u200B"],
+        ["Unicode Cf: ZERO WIDTH NON-JOINER + JOINER (U+200C U+200D)", "\u200C\u200D"],
+        ["Unicode Cf: ZERO WIDTH NO-BREAK SPACE / BOM (U+FEFF)", "\uFEFF"],
+        ["Unicode Cf: WORD JOINER (U+2060)", "\u2060"],
+        ["Unicode Cf: LEFT-TO-RIGHT / RIGHT-TO-LEFT MARKS (U+200E U+200F)", "\u200E\u200F"],
+        ["Unicode Cf: ARABIC LETTER MARK (U+061C)", "\u061C"],
+        ["Unicode Cf: bidi embedding/pop (U+202A U+202C)", "\u202A\u202C"],
+        ["Unicode Mn: bare COMBINING ACUTE ACCENT (U+0301)", "\u0301"],
+        ["Unicode Mn: bare COMBINING GRAVE + DIAERESIS (U+0300 U+0308)", "\u0300\u0308"],
+        [
+            "a mix of every category above, still nothing visible",
+            " \t\u00A0\u3000\u2028\u200B\uFEFF\u200E\u0301 ",
+        ],
+    ])("category: %s", (_label, sample) => {
+        it("is treated as absent", () => {
+            expect(nonBlank(sample)).toBeUndefined();
+        });
     });
 
-    it("treats ASCII/Unicode whitespace-only strings as absent", () => {
-        expect(nonBlank(" ")).toBeUndefined();
-        expect(nonBlank("\t\n  ")).toBeUndefined();
-    });
-
-    it("treats a string of ONLY zero-width/format characters as absent", () => {
-        expect(nonBlank("\u200B")).toBeUndefined();
-        expect(nonBlank("\u200C\u200D")).toBeUndefined();
-        expect(nonBlank("\uFEFF")).toBeUndefined();
-        expect(nonBlank("\u2060")).toBeUndefined();
-        expect(nonBlank(" \u200B \uFEFF ")).toBeUndefined();
-    });
-
-    it("still returns the ORIGINAL string (not stripped) when it has real visible content alongside zero-width characters", () => {
-        const withZeroWidth = "Team\u200B: CHAOS";
-        expect(nonBlank(withZeroWidth)).toBe(withZeroWidth);
+    it("still returns the ORIGINAL string (not stripped) when it has real visible content alongside invisible characters from every category", () => {
+        const withInvisibleNoise = " \u00A0Team\u200B:\u0301 CHAOS\uFEFF ";
+        expect(nonBlank(withInvisibleNoise)).toBe(withInvisibleNoise);
     });
 });

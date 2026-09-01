@@ -155,20 +155,33 @@ export function formatConfidence(confidence: number): string {
 }
 
 /**
- * Zero-width FORMAT characters (Unicode category Cf): invisible when
- * rendered, but NOT matched by `\s`/`String.prototype.trim()`, which strip
- * WHITESPACE (categories Zs/Zl/Zp) only. codex round 3, P2, EXECUTED: a
- * schema-valid `label` consisting of only U+200B satisfies a wire field's
- * `minLength: 1` while rendering as nothing at all — `trim() !== ""` alone
- * missed it. Written as explicit `\u` escapes, never the literal glyphs, so
- * this stays reviewable: U+200B ZERO WIDTH SPACE, U+200C ZERO WIDTH
- * NON-JOINER, U+200D ZERO WIDTH JOINER, U+FEFF ZERO WIDTH NO-BREAK SPACE
- * (also the UTF-8 BOM), U+2060 WORD JOINER — the characters actually
- * observed to cause this class of bug, not an attempt at a general
- * "is this glyph visible" classifier.
+ * Every Unicode character CATEGORY that renders as no visible glyph on its
+ * own, as a single normative predicate (team-lead ruling, round 3
+ * close-out: codex kept finding new CELLS of one class -- "blank-ish
+ * content bypasses the fallback guard" -- because round 1's fix patched
+ * ASCII whitespace pointwise instead of sweeping the class; this is that
+ * sweep):
+ *   - `\p{White_Space}` -- the Unicode `White_Space` property. A superset
+ *     of `\s`/`trim()`'s own coverage: every Zs (space separator, e.g.
+ *     U+00A0 NBSP, U+3000 IDEOGRAPHIC SPACE) and Zl/Zp (line/paragraph
+ *     separator) code point, plus the ASCII control whitespace `\s`
+ *     already covered.
+ *   - `\p{Cf}` -- FORMAT characters: zero-width space/joiner/non-joiner,
+ *     the BOM (= zero-width no-break space), the word joiner, and the
+ *     bidirectional marks/embeddings/isolates -- every member of the
+ *     category round 3's zero-width finding named a hand-picked SUBSET of.
+ *   - `\p{Mn}` -- nonspacing COMBINING marks (e.g. a bare combining acute
+ *     accent). With no preceding base character to combine onto, a
+ *     combining-mark-only string renders as nothing (or an orphaned
+ *     diacritic over whitespace) -- not meaningfully readable content.
+ * Written with Unicode property escapes (`\p{...}`, the `u` flag), never a
+ * hand-picked character list and never a literal invisible glyph in this
+ * file's own source -- both the failure mode this predicate exists to
+ * close AND the failure mode that bit round 3's first attempt at writing
+ * this exact kind of regex (literal invisible characters silently
+ * mis-copied into the source by an intermediate tool).
  */
-// eslint-disable-next-line no-misleading-character-class -- intentional: U+200C/U+200D are listed as two ORDINARY disjunction members of this character class (each matched individually, stripped independently), not as a joiner sequence the class could be misread as.
-const ZERO_WIDTH_FORMAT_CHARACTERS = /[\u200b\u200c\u200d\ufeff\u2060]/g;
+const INVISIBLE_CONTENT = /[\p{White_Space}\p{Cf}\p{Mn}]/gu;
 
 /**
  * `undefined` unless `value` is a defined string with visible, non-blank
@@ -178,20 +191,22 @@ const ZERO_WIDTH_FORMAT_CHARACTERS = /[\u200b\u200c\u200d\ufeff\u2060]/g;
  * optional engine-provided display string (`Coverage.sources[].label`/
  * `.state_label`, `CoverageDetail.phrasing`) has no `minLength` on the
  * wire, so `""` is schema-valid; `evidence_ref_labels`' values carry
- * `minLength: 1` but that still admits a lone space (round 1) or a lone
- * zero-width character (round 3). A bare `?? fallback` only catches
- * `undefined`/`null`, not a blank string — so a malformed-but-schema-valid
- * engine response could render a blank chip, a blank degraded-reason
- * sentence in place of its required `label`, or blank evidence text,
- * instead of falling through to the deterministic generic floor every
- * other absent-field path already uses. This is a pure PRESENCE check,
- * never a content guess: it returns `value` UNCHANGED (never stripped) when
- * it has any visible content, exactly like a plain `?? fallback` would.
+ * `minLength: 1` but that still admits a single character from ANY of the
+ * invisible categories `INVISIBLE_CONTENT` enumerates (round 1: ASCII
+ * space; round 3: zero-width Unicode -- see that constant's own doc
+ * comment for why this is now ONE swept predicate, not a per-round patch).
+ * A bare `?? fallback` only catches `undefined`/`null`, not a blank
+ * string — so a malformed-but-schema-valid engine response could render a
+ * blank chip, a blank degraded-reason sentence in place of its required
+ * `label`, or blank evidence text, instead of falling through to the
+ * deterministic generic floor every other absent-field path already uses.
+ * This is a pure PRESENCE check, never a content guess: it returns `value`
+ * UNCHANGED (never stripped) when it has any visible content, exactly like
+ * a plain `?? fallback` would.
  */
 export function nonBlank(value: string | undefined): string | undefined {
     if (value === undefined) return undefined;
-    const visible = value.replaceAll(ZERO_WIDTH_FORMAT_CHARACTERS, "").trim();
-    return visible !== "" ? value : undefined;
+    return value.replace(INVISIBLE_CONTENT, "") !== "" ? value : undefined;
 }
 
 /**
