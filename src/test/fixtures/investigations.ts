@@ -755,6 +755,14 @@ function clarificationScenario(): InvestigationResult {
         paths: [],
         conflicts: [],
         claimed_facts: [],
+        // CHAOS-4693: a clarification turn hasn't read any source yet — ACR
+        // genuinely emits `sources: []` + `partial: false` here, not the
+        // canonical example's inherited 3-source coverage. Inheriting the
+        // canonical shape left the CHAOS-4524/4568 defect (a bare
+        // `partial === false` check rendering "Complete — every source
+        // contributed." over zero sources) unreachable by any consumer of
+        // this fixture — see CoveragePanel.tsx's own `hasSources` guard.
+        coverage: { sources: [], partial: false, degraded_reasons: [] },
         limitations: ["No judgment was formed because the subject is unresolved."],
         deterministic_answer: "The subject is ambiguous, so no judgment was formed.",
         warnings: [],

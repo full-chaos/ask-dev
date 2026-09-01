@@ -324,6 +324,39 @@ test.describe("clarification chips", () => {
         await expect(turns.first().getByTestId("frozen-offers-disclosure")).toBeVisible();
     });
 
+    /**
+     * CHAOS-4693: a clarification turn hasn't read any source yet — ACR
+     * genuinely emits `coverage: { sources: [], partial: false }` here (see
+     * `fake-acr-server.mjs`'s `clarificationResult` override). Before this
+     * fixture change the double inherited the canonical example's 3-source
+     * coverage instead, so the CHAOS-4524/4568 defect (`CoveragePanel.tsx`'s
+     * `hasSources` guard: a bare `partial === false` check rendering
+     * "Complete — every source contributed." over zero sources) was
+     * unreachable through this real HTTP round trip — only a hand-written
+     * component test could catch it. This is the standing-suite proof that
+     * class is now reachable.
+     */
+    test("the coverage panel shows the no-sources state, never Complete, on a real clarification turn", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_CLARIFICATION}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turn).toHaveAttribute("data-state", "clarification_required");
+
+        const coveragePanel = turn.getByTestId("coverage-panel");
+        await expect(coveragePanel.getByText("No sources were recorded.")).toBeVisible();
+        await expect(coveragePanel.getByText("Complete — every source contributed.")).toHaveCount(
+            0,
+        );
+        await expect(
+            coveragePanel.getByText("Partial — some sources did not contribute."),
+        ).toHaveCount(0);
+    });
+
     test("NEGATIVE: a decisive answer renders no clarification chips", async ({ page }) => {
         await page.goto("/");
 
