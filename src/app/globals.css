@@ -846,6 +846,11 @@ body {
    bright border, dark-theme rule holds. */
 
 .clarification-popup {
+    /* No `max-width`/`margin: auto` (CHAOS-4695): `left`/`right: 20px` here
+       match `.chat__composer-bar`'s own horizontal padding exactly, so the
+       popup spans the SAME content width as its DOM sibling `.chat-composer`
+       — the chat column's width, not a fixed intrinsic one that floats
+       narrower and off-center. */
     position: absolute;
     left: 20px;
     right: 20px;
@@ -857,8 +862,6 @@ body {
     border: 1px solid var(--border-strong);
     border-radius: 14px;
     background: var(--surface-1);
-    max-width: 480px;
-    margin: 0 auto;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
 }
 

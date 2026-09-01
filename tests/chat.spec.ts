@@ -356,6 +356,47 @@ test.describe("clarification chips", () => {
 });
 
 /**
+ * Popup width vs the chat column (CHAOS-4695).
+ *
+ * chris's live screenshot (2026-08-31 16:30) showed the popup rendering
+ * narrower than the chat surface and visibly off-center against the
+ * composer and the answer cards above it. `ClarificationPopup.tsx`'s own
+ * header states the popup is a DOM SIBLING of `ChatComposer` inside the
+ * same `.chat__composer-bar` — so the two must share the same layout width
+ * at desktop widths, not a fixed intrinsic max-width that floats narrower.
+ */
+test.describe("clarification popup width (CHAOS-4695)", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("the popup spans the same width as the chat composer, not a fixed intrinsic width", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_CLARIFICATION}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const dialog = page.getByRole("dialog", { name: "Did you mean Ask Dev or Atlas?" });
+        await expect(dialog).toBeVisible();
+
+        const composer = page.locator(".chat-composer");
+        const [dialogBox, composerBox] = await Promise.all([
+            dialog.boundingBox(),
+            composer.boundingBox(),
+        ]);
+        if (dialogBox === null || composerBox === null) {
+            throw new Error("expected both the popup and the composer to have a layout box");
+        }
+
+        // Same left edge and same width — not just "close enough to
+        // overlap". A fixed intrinsic max-width narrower than the composer
+        // is exactly the CHAOS-4695 defect this pins.
+        expect(dialogBox.width).toBeCloseTo(composerBox.width, 0);
+        expect(dialogBox.x).toBeCloseTo(composerBox.x, 0);
+    });
+});
+
+/**
  * Structure-needs-chip POSITIVE control (CHAOS-3927 P1/P2). Same discipline
  * and same fake-ACR double as "clarification chips" above — see
  * `tests/support/fake-acr-server.mjs`'s own header for why a real HTTP
