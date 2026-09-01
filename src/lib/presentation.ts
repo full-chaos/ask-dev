@@ -155,6 +155,27 @@ export function formatConfidence(confidence: number): string {
 }
 
 /**
+ * `undefined` unless `value` is a defined string with non-whitespace
+ * content.
+ *
+ * codex round 1 (CHAOS-4690/CHAOS-4691 consumer pin), P2, EXECUTED: an
+ * optional engine-provided display string (`Coverage.sources[].label`/
+ * `.state_label`, `CoverageDetail.phrasing`) has no `minLength` on the
+ * wire, so `""` is schema-valid; `evidence_ref_labels`' values carry
+ * `minLength: 1` but that still admits a lone space. A bare `?? fallback`
+ * only catches `undefined`/`null`, not an empty or whitespace-only string —
+ * so a malformed-but-schema-valid engine response could render a blank
+ * chip, a blank degraded-reason sentence in place of its required `label`,
+ * or blank evidence text, instead of falling through to the deterministic
+ * generic floor every other absent-field path already uses. This is a pure
+ * PRESENCE check, never a content guess: it returns `value` unchanged when
+ * non-blank, exactly like a plain `?? fallback` would.
+ */
+export function nonBlank(value: string | undefined): string | undefined {
+    return value !== undefined && value.trim() !== "" ? value : undefined;
+}
+
+/**
  * The "implementation-state" copy CHAOS-4673 named directly:
  * StructureNeedsPanel's and ClarificationPanel's own text for when the
  * surrounding surface has no `onConfirm`/`onToggle` to call — in practice, a

@@ -233,3 +233,66 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
         expect(screen.queryByText(/Incident facts are not authorized/)).toBeNull();
     });
 });
+
+/**
+ * codex round 1, P2, EXECUTED: `Coverage.sources[].label`/`.state_label`
+ * carry no `minLength` on the wire, and `CoverageDetail.phrasing` likewise
+ * — so `""` is schema-valid for all three. A bare `?? fallback` only
+ * catches `undefined`, not an empty/whitespace-only string, so a
+ * schema-valid but malformed engine response could render a blank chip or
+ * a blank degraded-reason sentence instead of falling through to the
+ * deterministic generic floor. `nonBlank` (`@/lib/presentation`) closes
+ * that gap; these tests pin it at the render boundary, mutable back to
+ * `??` to prove they fail for the right reason.
+ */
+describe("CoveragePanel — codex round 1 P2: blank engine strings fall through to the generic floor", () => {
+    it("falls back to the generic 'Source' floor when label is present but blank/whitespace-only", () => {
+        const coverage = {
+            sources: [
+                { source: "canonical_fact:workload", state: "available" as const, label: "   " },
+            ],
+            partial: false,
+            degraded_reasons: [],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        const chipRow = screen.getByTestId("coverage-chip-row");
+        expect(chipRow).toHaveTextContent("Source · available");
+        expect(chipRow.textContent).not.toMatch(/^\s*·/); // never a blank name before the separator
+    });
+
+    it("falls back to humanizeTerm(state) when state_label is present but blank", () => {
+        const coverage = {
+            sources: [
+                {
+                    source: "canonical_fact:workload",
+                    state: "unauthorized" as const,
+                    state_label: "",
+                },
+            ],
+            partial: false,
+            degraded_reasons: [],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        expect(screen.getByTestId("coverage-chip-row")).toHaveTextContent("Source · unauthorized");
+    });
+
+    it("falls back to the deterministic Label when phrasing is present but blank/whitespace-only", () => {
+        const coverage = {
+            sources: [],
+            partial: true,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-blank-phrasing",
+                    source: "canonical_fact:metrics",
+                    code: "fact_provider_reported" as const,
+                    degrading: true,
+                    label: "Metrics facts may be out of date",
+                    phrasing: " ",
+                },
+            ],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        expect(screen.getByText("Metrics facts may be out of date")).toBeInTheDocument();
+    });
+});

@@ -67,6 +67,23 @@ describe("EvidenceReferences: CHAOS-4690/4691 raw acr:v1 ids stay collapsed, lab
         expect(screen.getByText("acr:v1:pull-request:482")).toBeInTheDocument();
     });
 
+    /**
+     * codex round 1, P2, EXECUTED: `evidence_ref_labels`' values carry
+     * `minLength: 1` on the wire, which still admits a lone space. A bare
+     * `?? fallback` only catches `undefined`, not a whitespace-only string,
+     * so a schema-valid but malformed engine response could render blank
+     * evidence text instead of the generic "Evidence" floor.
+     */
+    it("falls back to the generic 'Evidence' floor when the mapped label is present but whitespace-only", () => {
+        render(
+            <EvidenceReferences
+                evidenceRefIds={["acr:v1:team:CHAOS"]}
+                evidenceRefLabels={{ "acr:v1:team:CHAOS": " " }}
+            />,
+        );
+        expect(screen.getByText("Evidence")).toBeInTheDocument();
+    });
+
     it("renders nothing for an empty or undefined id list", () => {
         const { container: empty } = render(
             <EvidenceReferences evidenceRefIds={[]} evidenceRefLabels={undefined} />,

@@ -1,5 +1,6 @@
 import { Details } from "@/components/Details";
 import type { EvidenceRefLabels } from "@/lib/contracts";
+import { nonBlank } from "@/lib/presentation";
 
 export type EvidenceReferencesProps = {
     readonly evidenceRefIds: readonly string[] | undefined;
@@ -47,7 +48,7 @@ export function EvidenceReferences({
     if (evidenceRefIds === undefined || evidenceRefIds.length === 0) return null;
     const mapped = evidenceRefIds.map((refId) => ({
         refId,
-        display: evidenceRefLabels?.[refId] ?? GENERIC_EVIDENCE_LABEL,
+        display: nonBlank(evidenceRefLabels?.[refId]) ?? GENERIC_EVIDENCE_LABEL,
     }));
     return (
         <>

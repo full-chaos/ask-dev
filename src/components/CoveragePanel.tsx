@@ -3,7 +3,7 @@ import { useId } from "react";
 import { Badge } from "@/components/Badge";
 import { Details } from "@/components/Details";
 import type { Coverage, CoverageDetail } from "@/lib/contracts";
-import { coverageStateTone, humanizeTerm } from "@/lib/presentation";
+import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
@@ -112,8 +112,9 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             // `canonical_fact:*`/`dev-health-ops:*`
                             // identifier — that stays in "Source details"
                             // below, inside the closed disclosure.
-                            const name = source.label ?? GENERIC_SOURCE_LABEL;
-                            const stateText = source.state_label ?? humanizeTerm(source.state);
+                            const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                            const stateText =
+                                nonBlank(source.state_label) ?? humanizeTerm(source.state);
                             return (
                                 <Badge
                                     key={`${source.source}:${source.state}`}
@@ -129,8 +130,9 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         <summary>Source details</summary>
                         <div className="coverage">
                             {coverage.sources.map((source) => {
-                                const name = source.label ?? GENERIC_SOURCE_LABEL;
-                                const stateText = source.state_label ?? humanizeTerm(source.state);
+                                const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                                const stateText =
+                                    nonBlank(source.state_label) ?? humanizeTerm(source.state);
                                 return (
                                     <div
                                         className="coverage__source"
@@ -184,7 +186,9 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     the model chose to phrase it, else the
                                     deterministic Label floor — never both
                                     blank (`label` is contract-required). */}
-                                <p className="record__body">{detail.phrasing ?? detail.label}</p>
+                                <p className="record__body">
+                                    {nonBlank(detail.phrasing) ?? detail.label}
+                                </p>
                                 {detail.raw === undefined ? null : (
                                     <Details data-testid="degraded-reason-raw" summary="Raw reason">
                                         <code>{detail.raw}</code>
