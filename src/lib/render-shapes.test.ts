@@ -419,6 +419,84 @@ describe("trendChartSourceCounts (CHAOS-4682 telemetry)", () => {
         });
     });
 
+    /**
+     * codex round 1, P3 (EXECUTED): a shape whose points cite TWO different
+     * claims can be value-valid (each point resolves correctly against ITS
+     * OWN cited claim) and so passes `renderShapesFor`'s admission — but no
+     * panel draws it, because `trendShapesForClaim` requires EVERY point of
+     * a shape cite the ONE claim its panel is about (`shapeCitesClaim`).
+     * Attributing by the first point's claim id (the bug this fixes)
+     * reported one legacy-source chart drawn while EVERY panel reported
+     * `shapes:[] withheld:1` — a source attributed to a chart nobody saw.
+     */
+    it("counts a value-valid but MIXED-claim trend under neither source", () => {
+        const base = dualTableAnswer();
+        const otherClaim = {
+            claim_id: "claim_workload_other",
+            kind: "workload",
+            subject: { kind: "project", canonical_id: "project_y", label: "Project Y" },
+            field: "backlog_size",
+            value: { integer: 5 },
+            rows: [{ fields: { day: { string: "2026-08-04" }, backlog_size: { integer: 5 } } }],
+        };
+        const mixedShape = {
+            shape_id: "rs_mixed",
+            kind: "series",
+            presentation: "line",
+            selected_by: "dated_fact_trend",
+            title: "Mixed-claim trend",
+            axis_kind: "time",
+            axis_label: "day",
+            value_label: "Backlog size",
+            series: [
+                {
+                    key: "backlog_size",
+                    label: "Backlog size",
+                    points: [
+                        {
+                            label: "2026-08-03",
+                            value: 9,
+                            source: {
+                                kind: "claimed_fact_row",
+                                claim_id: "claim_workload_dual",
+                                row_index: 0,
+                                field: "backlog_size",
+                            },
+                        },
+                        {
+                            label: "2026-08-04",
+                            value: 5,
+                            source: {
+                                kind: "claimed_fact_row",
+                                claim_id: "claim_workload_other",
+                                row_index: 0,
+                                field: "backlog_size",
+                            },
+                        },
+                    ],
+                },
+            ],
+        } as unknown as RenderShape;
+        const result = {
+            ...base,
+            claimed_facts: [...base.claimed_facts, otherClaim],
+            render_shapes: [mixedShape],
+        } as unknown as InvestigationResult;
+
+        // Sanity: value-valid — each point resolves correctly against the
+        // claim IT cites — so it clears the value-correctness gate.
+        expect(verifyRenderShape(mixedShape, result)).toBe(true);
+        // But no panel draws it: neither claim's own panel admits a shape
+        // that also cites another claim.
+        expect(trendShapesForClaim(result, "claim_workload_dual").shapes).toHaveLength(0);
+        expect(trendShapesForClaim(result, "claim_workload_other").shapes).toHaveLength(0);
+
+        expect(trendChartSourceCounts(result)).toEqual({
+            dualTableTrendChartCount: 0,
+            legacyTrendChartCount: 0,
+        });
+    });
+
     it("counts zero of both when the answer carries no trend at all", () => {
         expect(trendChartSourceCounts(answer([]))).toEqual({
             dualTableTrendChartCount: 0,

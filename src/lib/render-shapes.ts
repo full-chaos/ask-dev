@@ -413,29 +413,38 @@ function shapeMentionsClaim(shape: RenderShape, claimId: string): boolean {
 
 /**
  * CHAOS-4682 telemetry (standing order: telemetry baked into new logic, same
- * PR): for every VERIFIED `dated_fact_trend` shape this answer carries, which
- * array its points actually resolved against. Content-safe by construction —
- * a count per closed-vocabulary source, never a claim id, field name, or
- * value.
+ * PR): for every trend chart a fact's own panel actually DRAWS, which array
+ * its points resolved against. Content-safe by construction — a count per
+ * closed-vocabulary source, never a claim id, field name, or value.
  *
- * Counts only ADMITTED shapes (the same `admit` gate every panel draws
- * from), not raw candidates: a withheld/tampered trend was never drawn by
- * either source, so it would misattribute a source to a chart nobody saw.
+ * Counts only shapes a panel actually draws — value-verified (`admit`'s
+ * `verifyRenderShape` gate) AND single-claim-owned (`trendShapesForClaim`'s
+ * own `shapeCitesClaim` gate). `renderShapesFor`'s admission checks value
+ * correctness only, not ownership: a value-valid `dated_fact_trend` whose
+ * points span two claims passes it, but is drawn by NEITHER claim's panel
+ * (`trendShapesForClaim` requires EVERY point cite the one claim it was
+ * asked about). Counting by the first point's claim id there attributes a
+ * source to a chart nobody saw — codex round 1, P3. A shape is therefore
+ * counted only when every point cites the SAME claim id, mirroring the
+ * panel's own ownership rule exactly.
  */
 export type TrendChartSourceCounts = {
     readonly dualTableTrendChartCount: number;
     readonly legacyTrendChartCount: number;
 };
 
+/** The single claim id every point of `shape` cites, or undefined if none/mixed. */
+function soleOwningClaimId(shape: RenderShape): string | undefined {
+    const claimId = shape.series[0]?.points[0]?.source.claim_id;
+    return claimId !== undefined && shapeCitesClaim(shape, claimId) ? claimId : undefined;
+}
+
 export function trendChartSourceCounts(result: InvestigationResult): TrendChartSourceCounts {
     const { shapes } = renderShapesFor(result, ["dated_fact_trend"]);
     let dualTableTrendChartCount = 0;
     let legacyTrendChartCount = 0;
     for (const shape of shapes) {
-        // Every admitted `dated_fact_trend` shape cites exactly one claim
-        // (`shapeCitesClaim`'s own invariant, enforced by `admit`/
-        // `verifyRenderShape` upstream) — the first point's claim id names it.
-        const claimId = shape.series[0]?.points[0]?.source.claim_id;
+        const claimId = soleOwningClaimId(shape);
         const fact =
             claimId === undefined
                 ? undefined
