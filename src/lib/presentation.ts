@@ -153,3 +153,71 @@ export function humanizeTerm(term: string): string {
 export function formatConfidence(confidence: number): string {
     return `${Math.round(confidence * 100)}%`;
 }
+
+/**
+ * Every Unicode character CATEGORY that renders as no visible glyph on its
+ * own, as a single normative predicate (team-lead ruling, round 3
+ * close-out: codex kept finding new CELLS of one class -- "blank-ish
+ * content bypasses the fallback guard" -- because round 1's fix patched
+ * ASCII whitespace pointwise instead of sweeping the class; this is that
+ * sweep):
+ *   - `\p{White_Space}` -- the Unicode `White_Space` property. A superset
+ *     of `\s`/`trim()`'s own coverage: every Zs (space separator, e.g.
+ *     U+00A0 NBSP, U+3000 IDEOGRAPHIC SPACE) and Zl/Zp (line/paragraph
+ *     separator) code point, plus the ASCII control whitespace `\s`
+ *     already covered.
+ *   - `\p{Cf}` -- FORMAT characters: zero-width space/joiner/non-joiner,
+ *     the BOM (= zero-width no-break space), the word joiner, and the
+ *     bidirectional marks/embeddings/isolates -- every member of the
+ *     category round 3's zero-width finding named a hand-picked SUBSET of.
+ *   - `\p{Mn}` -- nonspacing COMBINING marks (e.g. a bare combining acute
+ *     accent). With no preceding base character to combine onto, a
+ *     combining-mark-only string renders as nothing (or an orphaned
+ *     diacritic over whitespace) -- not meaningfully readable content.
+ * Written with Unicode property escapes (`\p{...}`, the `u` flag), never a
+ * hand-picked character list and never a literal invisible glyph in this
+ * file's own source -- both the failure mode this predicate exists to
+ * close AND the failure mode that bit round 3's first attempt at writing
+ * this exact kind of regex (literal invisible characters silently
+ * mis-copied into the source by an intermediate tool).
+ */
+const INVISIBLE_CONTENT = /[\p{White_Space}\p{Cf}\p{Mn}]/gu;
+
+/**
+ * `undefined` unless `value` is a defined string with visible, non-blank
+ * content.
+ *
+ * codex round 1 (CHAOS-4690/CHAOS-4691 consumer pin), P2, EXECUTED: an
+ * optional engine-provided display string (`Coverage.sources[].label`/
+ * `.state_label`, `CoverageDetail.phrasing`) has no `minLength` on the
+ * wire, so `""` is schema-valid; `evidence_ref_labels`' values carry
+ * `minLength: 1` but that still admits a single character from ANY of the
+ * invisible categories `INVISIBLE_CONTENT` enumerates (round 1: ASCII
+ * space; round 3: zero-width Unicode -- see that constant's own doc
+ * comment for why this is now ONE swept predicate, not a per-round patch).
+ * A bare `?? fallback` only catches `undefined`/`null`, not a blank
+ * string — so a malformed-but-schema-valid engine response could render a
+ * blank chip, a blank degraded-reason sentence in place of its required
+ * `label`, or blank evidence text, instead of falling through to the
+ * deterministic generic floor every other absent-field path already uses.
+ * This is a pure PRESENCE check, never a content guess: it returns `value`
+ * UNCHANGED (never stripped) when it has any visible content, exactly like
+ * a plain `?? fallback` would.
+ */
+export function nonBlank(value: string | undefined): string | undefined {
+    if (value === undefined) return undefined;
+    return value.replace(INVISIBLE_CONTENT, "") !== "" ? value : undefined;
+}
+
+/**
+ * The "implementation-state" copy CHAOS-4673 named directly:
+ * StructureNeedsPanel's and ClarificationPanel's own text for when the
+ * surrounding surface has no `onConfirm`/`onToggle` to call — in practice, a
+ * frozen (superseded) chat turn, rendered read-only by design. This is the
+ * Workbench's OWN product chrome, not a vocabulary lookup over acr data
+ * (CHAOS-4691's rip-out deletes the sentence-table module this used to live
+ * in; this constant is presentation structure, not phrasing, and survives
+ * the deletion per the ticket's own carve-out). A named export so both call
+ * sites say the identical sentence rather than drifting.
+ */
+export const CANNOT_REASK_HERE_COPY = "These options can't be changed from this earlier message.";

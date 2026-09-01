@@ -1,5 +1,6 @@
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
+import type { EvidenceRefLabels } from "@/lib/contracts";
 import type { DedupedFinding } from "@/lib/fact-dedup";
 import { SURFACE_LABEL } from "@/lib/fact-dedup";
 import { humanizeTerm } from "@/lib/presentation";
@@ -8,6 +9,7 @@ export type FindingsPanelProps = {
     readonly title: string;
     readonly findings: readonly DedupedFinding[];
     readonly emptyMessage: string;
+    readonly evidenceRefLabels: EvidenceRefLabels;
 };
 
 /**
@@ -21,7 +23,12 @@ export type FindingsPanelProps = {
  * whichever surface owns the full record — never a second full copy, and
  * never silently dropped either.
  */
-export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelProps) {
+export function FindingsPanel({
+    title,
+    findings,
+    emptyMessage,
+    evidenceRefLabels,
+}: FindingsPanelProps) {
     const titleId = `findings-${title.toLowerCase().replaceAll(" ", "-")}`;
     return (
         <section className="panel" aria-labelledby={titleId}>
@@ -72,6 +79,7 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                                  */}
                                 <EvidenceReferences
                                     evidenceRefIds={finding.evidence_ref_ids}
+                                    evidenceRefLabels={evidenceRefLabels}
                                     label="Evidence"
                                 />
                             </li>
@@ -95,6 +103,7 @@ export function FindingsPanel({ title, findings, emptyMessage }: FindingsPanelPr
                                 </p>
                                 <EvidenceReferences
                                     evidenceRefIds={finding.evidence_ref_ids}
+                                    evidenceRefLabels={evidenceRefLabels}
                                     label="Evidence"
                                 />
                             </li>

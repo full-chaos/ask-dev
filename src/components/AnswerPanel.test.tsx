@@ -75,101 +75,70 @@ describe("AnswerPanel — the answer/judgment stay visible, only current_state c
 });
 
 /**
- * CHAOS-4669 defect 2. `LIVE_DETERMINISTIC_ANSWER` is verbatim from a real
- * kiac investigation (org 70d529e0, "Which teams are struggling, and why?",
- * acr 0a65f124, 2026-08-31) — captured live via Playwright against a
- * private rig, not invented (screenshot:
- * lane-4669-4673-q2-before-defect2-fix.png / -after-defect2-fix.png).
+ * CHAOS-4690/CHAOS-4691. CHAOS-4669 defect 2 fixed this at the CLIENT — a
+ * sentence-splitting helper in the module this ticket deletes entirely
+ * (`prose-detail.ts`) stripped acr's driver-scoring TEMPLATE sentence out of
+ * `deterministic_answer`/`direct_judgment` (live-confirmed on org 70d529e0,
+ * acr 0a65f124). The sibling engine ticket fixed it at the SOURCE instead:
+ * acr's cohort lead recomposition no longer splices that template into
+ * either field, so the client-side parser has nothing left to do — and it
+ * is deleted (chris's strike-three ruling: a consumer-side text parser over
+ * the service's own prose does not get hardened a second time, it ceases to
+ * exist). `deterministic_answer`/`direct_judgment` now render in FULL,
+ * verbatim, exactly as the field arrived — proven here by a string carrying
+ * the OLD arithmetic shape and asserting it is untouched, which would fail
+ * the moment an equivalent sentence-splitting pass is reintroduced.
  */
-describe("AnswerPanel — CHAOS-4669 defect 2: computation arithmetic moves behind Details", () => {
-    const LIVE_DETERMINISTIC_ANSWER =
+describe("AnswerPanel — CHAOS-4690/4691: deterministic_answer/direct_judgment render whole, unparsed", () => {
+    const ARITHMETIC_SHAPED_ANSWER =
         "This investigation is partial: some canonical or graph coverage was unavailable. " +
         "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points. " +
         "Fullchaos has an operational deficiency with severity warning.";
 
-    it("never shows the raw scoring arithmetic in the always-visible lead paragraph", () => {
+    it("renders deterministic_answer in full on the lead surface, including an arithmetic-shaped sentence, never split into a fold", () => {
         const result: InvestigationResult = {
             ...base,
-            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
-        };
-        render(<AnswerPanel result={result} />);
-
-        const judgment = screen.getByText(/This investigation is partial/);
-        expect(judgment.textContent).not.toContain("weight 15");
-        expect(judgment.textContent).not.toContain("attention points");
-        // The non-arithmetic sentences survive, verbatim, on the lead surface.
-        expect(judgment.textContent).toContain(
-            "This investigation is partial: some canonical or graph coverage was unavailable.",
-        );
-        expect(judgment.textContent).toContain(
-            "Fullchaos has an operational deficiency with severity warning.",
-        );
-    });
-
-    it("keeps the extracted sentence reachable, verbatim, behind the collapsed More detail disclosure", () => {
-        const result: InvestigationResult = {
-            ...base,
-            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
-        };
-        render(<AnswerPanel result={result} />);
-
-        const details = screen.getByText("More detail").closest("details")!;
-        expect(details).not.toHaveAttribute("open");
-        expect(
-            screen.getByText(
-                "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points.",
-            ),
-        ).toBeInTheDocument();
-    });
-
-    it("opens the More detail disclosure even when current_state is empty, as long as arithmetic was extracted", () => {
-        const result: InvestigationResult = {
-            ...base,
-            deterministic_answer: LIVE_DETERMINISTIC_ANSWER,
+            deterministic_answer: ARITHMETIC_SHAPED_ANSWER,
             current_state: "",
         };
         render(<AnswerPanel result={result} />);
-        expect(screen.getByText("More detail")).toBeInTheDocument();
+
+        expect(screen.getByText(ARITHMETIC_SHAPED_ANSWER)).toBeInTheDocument();
+        // No "More detail" disclosure is minted for this alone — the field
+        // has nowhere to be split to now that there is no parser.
+        expect(screen.queryByText("More detail")).toBeNull();
     });
 
-    /**
-     * codex round 2, finding 4 (EXECUTED repro): when `direct_judgment` is
-     * ENTIRELY the arithmetic-template sentence, `splitLeadArithmetic`
-     * correctly extracts all of it, leaving `lead` empty — but the panel
-     * then treated an empty LEAD as an absent judgment and showed "The
-     * service returned no direct judgment," even though the field was
-     * non-empty and its content is sitting, verbatim, in More detail. The
-     * "no direct judgment" message must reflect the ORIGINAL field, not
-     * the post-extraction lead.
-     */
-    it("never claims 'no direct judgment' when direct_judgment is non-empty but entirely arithmetic (codex round 2, finding 4)", () => {
-        const arithmeticOnly =
-            "Principal driver(s): readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 46.7 attention points.";
+    it("renders direct_judgment in full too, not just deterministic_answer", () => {
+        const arithmeticJudgment =
+            "Fullchaos is struggling. Operational deficiencies (weight 20, value 0.50) contributed 13.3 of Fullchaos's 46.7 attention points.";
         const result: InvestigationResult = {
             ...base,
-            direct_judgment: arithmeticOnly,
+            direct_judgment: arithmeticJudgment,
+            current_state: "",
         };
         render(<AnswerPanel result={result} />);
 
-        expect(screen.queryByText("The service returned no direct judgment.")).toBeNull();
-        const details = screen.getByText("More detail").closest("details")!;
-        expect(screen.getByText(arithmeticOnly)).toBeInTheDocument();
-        expect(details).not.toHaveAttribute("open");
+        expect(screen.getByText(arithmeticJudgment)).toBeInTheDocument();
+        expect(screen.queryByText("More detail")).toBeNull();
     });
+});
 
-    it("does the same for direct_judgment, not just deterministic_answer", () => {
-        const result: InvestigationResult = {
-            ...base,
-            direct_judgment:
-                "Fullchaos is struggling. Operational deficiencies (weight 20, value 0.50) contributed 13.3 of Fullchaos's 46.7 attention points.",
-        };
+/**
+ * Team-lead ruling (round 3 close-out): every render-site blank-content
+ * decision in this ticket's diff routes through `nonBlank` (`@/lib/
+ * presentation`), which itself carries the exhaustive category sweep
+ * (`presentation.test.ts`'s own `nonBlank` table). This proves the WIRING
+ * at this specific terminus — `direct_judgment` consisting of only a
+ * zero-width character is schema-valid (`minLength` absent on this field)
+ * and must fall to the honest "no direct judgment" message, never render
+ * an invisible paragraph.
+ */
+describe("AnswerPanel — codex round 3/4 close-out: blank-content decisions route through nonBlank", () => {
+    it("treats a direct_judgment consisting of only invisible characters as absent (falls to the honest message)", () => {
+        const result: InvestigationResult = { ...base, direct_judgment: "\u200B\u2066" };
         render(<AnswerPanel result={result} />);
-        const judgment = screen.getByText(/Fullchaos is struggling\./);
-        expect(judgment.textContent).not.toContain("weight 20");
-        expect(
-            screen.getByText(
-                "Operational deficiencies (weight 20, value 0.50) contributed 13.3 of Fullchaos's 46.7 attention points.",
-            ),
-        ).toBeInTheDocument();
+        expect(screen.getByText("The service returned no direct judgment.")).toBeInTheDocument();
+        expect(screen.queryByText("\u200B\u2066")).toBeNull();
     });
 });

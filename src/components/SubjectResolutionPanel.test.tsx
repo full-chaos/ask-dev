@@ -11,7 +11,9 @@ const BASE_RESOLUTION: SubjectResolution = {
 
 describe("SubjectResolutionPanel", () => {
     it("renders no prior-receipt section when the result carries none", () => {
-        render(<SubjectResolutionPanel resolution={BASE_RESOLUTION} />);
+        render(
+            <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
+        );
 
         expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
     });
@@ -41,7 +43,7 @@ describe("SubjectResolutionPanel", () => {
             ],
         };
 
-        render(<SubjectResolutionPanel resolution={resolution} />);
+        render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
 
         expect(
             screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
@@ -65,13 +67,17 @@ describe("SubjectResolutionPanel", () => {
 describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => {
     it("renders nothing when there is no prompt, no committed subjects, no candidates, and no prior-receipt disclosure", () => {
         const emptyResolution: SubjectResolution = { candidates: [], committed: [] };
-        const { container } = render(<SubjectResolutionPanel resolution={emptyResolution} />);
+        const { container } = render(
+            <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={emptyResolution} />,
+        );
         expect(container.firstChild).toBeNull();
         expect(screen.queryByRole("heading", { name: "Subjects" })).toBeNull();
     });
 
     it("still renders when committed subjects exist, even with no candidates (BASE_RESOLUTION's own shape)", () => {
-        render(<SubjectResolutionPanel resolution={BASE_RESOLUTION} />);
+        render(
+            <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
+        );
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(screen.getByText(/Committed: atlas/)).toBeInTheDocument();
     });
@@ -88,7 +94,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
                 },
             ],
         };
-        render(<SubjectResolutionPanel resolution={resolution} />);
+        render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(
             screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
@@ -101,7 +107,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
             committed: [],
             clarification_prompt: "Which repository did you mean?",
         };
-        render(<SubjectResolutionPanel resolution={resolution} />);
+        render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(screen.getByText("Which repository did you mean?")).toBeInTheDocument();
     });
@@ -120,7 +126,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
                 },
             ],
         };
-        render(<SubjectResolutionPanel resolution={resolution} />);
+        render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(screen.getByText("Atlas")).toBeInTheDocument();
     });

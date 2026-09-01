@@ -1,7 +1,12 @@
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
-import type { InvestigationResult, RelationshipPath, SubjectRef } from "@/lib/contracts";
+import type {
+    EvidenceRefLabels,
+    InvestigationResult,
+    RelationshipPath,
+    SubjectRef,
+} from "@/lib/contracts";
 import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
 export type CanonicalResultInspectorProps = {
@@ -12,7 +17,13 @@ function subjectLabel(subject: SubjectRef): string {
     return `${subject.label} · ${subject.kind} · ${subject.canonical_id}`;
 }
 
-function PathRecord({ path }: { readonly path: RelationshipPath }) {
+function PathRecord({
+    path,
+    evidenceRefLabels,
+}: {
+    readonly path: RelationshipPath;
+    readonly evidenceRefLabels: EvidenceRefLabels;
+}) {
     return (
         <li className="record">
             <div className="record__head">
@@ -35,7 +46,11 @@ function PathRecord({ path }: { readonly path: RelationshipPath }) {
                     </li>
                 ))}
             </ul>
-            <EvidenceReferences evidenceRefIds={path.evidence_ref_ids} label="Evidence" />
+            <EvidenceReferences
+                evidenceRefIds={path.evidence_ref_ids}
+                evidenceRefLabels={evidenceRefLabels}
+                label="Evidence"
+            />
         </li>
     );
 }
@@ -231,7 +246,11 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                 ) : (
                     <ul className="stack">
                         {result.paths.map((path) => (
-                            <PathRecord key={path.path_id} path={path} />
+                            <PathRecord
+                                evidenceRefLabels={result.evidence_ref_labels}
+                                key={path.path_id}
+                                path={path}
+                            />
                         ))}
                     </ul>
                 )}

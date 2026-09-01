@@ -25,6 +25,10 @@ describe("mock investigation fixtures", () => {
             // confirmed_structure source, not a new status either.
             "complete",
             "degraded",
+            // CHAOS-4691: "degraded-legacy" is a second `degraded` scenario --
+            // the SAME investigation in the pre-CHAOS-4690 acr shape (the
+            // ruled legacy-stored-result exception), not a new status.
+            "degraded",
             "clarification_required",
             "no_match",
         ]);

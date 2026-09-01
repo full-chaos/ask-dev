@@ -455,18 +455,24 @@ export function DeterministicAnswerView({
             </div>
             <AnswerPlanPanel answerPlan={result.answer_plan} />
             {structureConfirmationNotice}
-            <SubjectResolutionPanel resolution={result.subject_resolution} />
+            <SubjectResolutionPanel
+                evidenceRefLabels={result.evidence_ref_labels}
+                resolution={result.subject_resolution}
+            />
             <FindingsPanel
+                evidenceRefLabels={result.evidence_ref_labels}
                 title="Remaining work"
                 findings={dedupedFindings.remaining_work}
                 emptyMessage="No remaining work was reported."
             />
             <FindingsPanel
+                evidenceRefLabels={result.evidence_ref_labels}
                 title="Readiness gaps"
                 findings={dedupedFindings.readiness_gaps}
                 emptyMessage="No readiness gaps were reported."
             />
             <FindingsPanel
+                evidenceRefLabels={result.evidence_ref_labels}
                 title="Conflicts"
                 findings={dedupedFindings.conflicts}
                 emptyMessage="No conflicting evidence was reported."
@@ -479,7 +485,10 @@ export function DeterministicAnswerView({
                 {result.evidence_ref_ids.length === 0 ? (
                     <p className="panel__empty">No evidence was referenced.</p>
                 ) : (
-                    <EvidenceReferences evidenceRefIds={result.evidence_ref_ids} />
+                    <EvidenceReferences
+                        evidenceRefIds={result.evidence_ref_ids}
+                        evidenceRefLabels={result.evidence_ref_labels}
+                    />
                 )}
             </section>
         </article>

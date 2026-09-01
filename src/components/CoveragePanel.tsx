@@ -2,17 +2,31 @@ import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
 import { Details } from "@/components/Details";
-import type { Coverage } from "@/lib/contracts";
-import { coverageStateTone, humanizeTerm } from "@/lib/presentation";
-import {
-    humanizeCoverageSourceName,
-    humanizeDegradedReason,
-    humanizeReasonBody,
-} from "@/lib/vocab-mapping";
+import type { Coverage, CoverageDetail } from "@/lib/contracts";
+import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
 };
+
+/** The deterministic fail-readable floor for a source absent a `label` (never a guess at what the raw name means). */
+const GENERIC_SOURCE_LABEL = "Source";
+
+/**
+ * The deterministic fail-readable floor for a degraded reason with no
+ * usable text at all: a fixed, content-independent sentence, never derived
+ * from the raw reason text it accompanies (CHAOS-4691's pin delta item 6
+ * rules out "reconstruct by parsing" as a path even for old data). Used
+ * for the LEGACY exception below (a pre-4690 `degraded_reasons[]` entry,
+ * which this module never parses), AND — codex round 2, P2, EXECUTED — as
+ * the ultimate fallback when a NEW-shape `CoverageDetail.phrasing` AND its
+ * contract-required `label` are BOTH schema-valid but whitespace-only
+ * (`label`'s only wire bound is `minLength: 1`, which a lone space
+ * satisfies; there is nothing further to fall back to once even the
+ * deterministic floor itself is blank).
+ */
+const GENERIC_DEGRADED_REASON_SENTENCE =
+    "This source didn't fully contribute; see details for the reason.";
 
 /**
  * Shows what the investigation could and could not read.
@@ -25,13 +39,53 @@ export type CoveragePanelProps = {
  * one-line summary plus a tone-coded chip per source is always on screen,
  * and the full per-source reason/observed-at breakdown is one click away in
  * a `<details>`, not removed.
+ *
+ * CHAOS-4690/CHAOS-4691: the source name/state chip text and the "Degraded
+ * reasons" sentences are no longer derived here — this panel used to run a
+ * consumer-side sentence-table parser (`vocab-mapping.ts`'s
+ * `humanizeCoverageSourceName`/`humanizeDegradedReason`/`humanizeReasonBody`)
+ * over acr's raw closed-vocabulary strings. That module is deleted (chris's
+ * strike-three ruling: consumer phrasing tables cease to exist). The chip
+ * text now renders the engine's own contract-carried `source.label`/
+ * `.state_label` (a totality-tested display-label registry, not a
+ * consumer-side guess); the degraded-reason sentences render the engine's
+ * own `coverage.details[]` — synthesis-phrased (`.phrasing`) when the model
+ * chose to phrase it, the deterministic `.label` floor otherwise (never
+ * both blank — `.label` is contract-required on every detail).
+ *
+ * NAMED EXCEPTION (pin delta item 6, chris-ruled): an immutable result
+ * stored before CHAOS-4690 carries `coverage.sources[]`/`degraded_reasons[]`
+ * but NONE of the new fields — `coverage.details` is simply absent, not an
+ * empty array. Rendering it via the SAME sentence-table parser this ticket
+ * deletes would be exactly the banned "reconstruct by parsing" shape, so a
+ * legacy result instead gets a fixed, content-independent generic sentence
+ * per degraded reason (never derived from what the raw reason text says)
+ * with the raw string still one click away in Details — degraded, not
+ * silently dropped or leaked. codex round 3: this generic-sentence
+ * rendering is triggered by "no DEGRADING detail covers this" — `details`
+ * absent (the true legacy shape) OR merely insufficient (present but empty,
+ * or present without a matching degrading entry) both count, so a
+ * schema-valid but internally inconsistent response can never silently
+ * drop a real `degraded_reasons[]` entry either.
  */
 export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
     const idPrefix = useId();
-    const degradedReasons = coverage.degraded_reasons ?? [];
+    const degradingDetails: readonly CoverageDetail[] =
+        coverage.details?.filter((detail) => detail.degrading) ?? [];
+    // codex round 3, P2, EXECUTED: gated on `details === undefined` alone,
+    // this silently dropped a non-empty `degraded_reasons[]` whenever
+    // `details` was PRESENT but had no degrading entries (e.g. `details:
+    // []`) — a schema-valid, if internally inconsistent, response. The
+    // fallback to the generic-sentence rendering (never a parsed one — see
+    // this component's own doc comment above) now triggers whenever the
+    // structured details don't already cover any degradation, regardless
+    // of whether `details` is absent (the true legacy shape) or merely
+    // insufficient — never a silent drop either way.
+    const legacyDegradedReasons =
+        degradingDetails.length === 0 ? (coverage.degraded_reasons ?? []) : [];
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
     // observed was dropped" — it says nothing about whether anything was
@@ -70,19 +124,22 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             // not just a color or a hover.
                         }
                         {coverage.sources.map((source) => {
-                            // CHAOS-4673: the chip is the always-visible
-                            // surface, so it carries the MAPPED name, never
-                            // the raw `canonical_fact:*`/`dev-health-ops:*`
+                            // CHAOS-4673/CHAOS-4690: the chip is the
+                            // always-visible surface, so it carries the
+                            // engine's own display label, never the raw
+                            // `canonical_fact:*`/`dev-health-ops:*`
                             // identifier — that stays in "Source details"
                             // below, inside the closed disclosure.
-                            const name = humanizeCoverageSourceName(source.source);
+                            const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                            const stateText =
+                                nonBlank(source.state_label) ?? humanizeTerm(source.state);
                             return (
                                 <Badge
                                     key={`${source.source}:${source.state}`}
                                     tone={coverageStateTone(source.state)}
-                                    title={`${name.sentence}: ${source.state}`}
+                                    title={`${name}: ${source.state}`}
                                 >
-                                    {name.sentence} · {humanizeTerm(source.state)}
+                                    {name} · {stateText}
                                 </Badge>
                             );
                         })}
@@ -91,26 +148,21 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         <summary>Source details</summary>
                         <div className="coverage">
                             {coverage.sources.map((source) => {
-                                const name = humanizeCoverageSourceName(source.source);
-                                const reason =
-                                    source.reason === undefined
-                                        ? undefined
-                                        : humanizeReasonBody(source.reason);
+                                const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                                const stateText =
+                                    nonBlank(source.state_label) ?? humanizeTerm(source.state);
                                 return (
                                     <div
                                         className="coverage__source"
                                         key={`${source.source}:${source.state}`}
                                     >
-                                        <span className="coverage__name">{name.sentence}</span>
+                                        <span className="coverage__name">{name}</span>
                                         <Badge
                                             tone={coverageStateTone(source.state)}
                                             title={source.state}
                                         >
-                                            {humanizeTerm(source.state)}
+                                            {stateText}
                                         </Badge>
-                                        {reason !== undefined ? (
-                                            <p className="coverage__reason">{reason.sentence}</p>
-                                        ) : null}
                                         {source.observed_at !== undefined ? (
                                             <p className="coverage__reason">
                                                 observed at {source.observed_at}
@@ -119,13 +171,17 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                         {/* Raw identifiers stay INSIDE this already-
                                             collapsed "Source details" <details> (CHAOS-4673
                                             acceptance: raw closed-vocabulary strings never
-                                            appear outside collapsed Details). */}
+                                            appear outside collapsed Details). The raw
+                                            `reason` string is shown verbatim, never parsed
+                                            into a sentence here (CHAOS-4690/4691: that job
+                                            belongs to "Degraded reasons" below, sourced from
+                                            the engine's own `coverage.details[]`). */}
                                         <p className="record__meta">
-                                            <code>{name.raw}</code>
-                                            {reason === undefined ? null : (
+                                            <code>{source.source}</code>
+                                            {source.reason === undefined ? null : (
                                                 <>
                                                     {" · "}
-                                                    <code>{reason.raw}</code>
+                                                    <code>{source.reason}</code>
                                                 </>
                                             )}
                                         </p>
@@ -136,31 +192,50 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                     </details>
                 </>
             )}
-            {degradedReasons.length > 0 ? (
+            {degradingDetails.length === 0 ? null : (
                 <>
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {degradedReasons.map((reason) => {
-                            // CHAOS-4673: "every degraded reason reads as a
-                            // plain sentence" (acceptance) — the raw
-                            // `<kind>: unexpanded:<outcome>: ...` string
-                            // moves behind ▸Details, never on the lead
-                            // surface.
-                            const mapped = humanizeDegradedReason(reason);
-                            return (
-                                <li className="record" key={reason}>
-                                    <p className="record__body">{mapped.sentence}</p>
+                        {degradingDetails.map((detail) => (
+                            <li className="record" key={detail.detail_id}>
+                                {/* CHAOS-4690: synthesis-phrased sentence when
+                                    the model chose to phrase it, else the
+                                    deterministic Label floor — never both
+                                    blank (`label` is contract-required). */}
+                                <p className="record__body">
+                                    {nonBlank(detail.phrasing) ??
+                                        nonBlank(detail.label) ??
+                                        GENERIC_DEGRADED_REASON_SENTENCE}
+                                </p>
+                                {detail.raw === undefined ? null : (
                                     <Details data-testid="degraded-reason-raw" summary="Raw reason">
-                                        <code>{mapped.raw}</code>
+                                        <code>{detail.raw}</code>
                                     </Details>
-                                </li>
-                            );
-                        })}
+                                )}
+                            </li>
+                        ))}
                     </ul>
                 </>
-            ) : null}
+            )}
+            {legacyDegradedReasons.length === 0 ? null : (
+                <>
+                    <h3 className="panel__title" style={{ marginTop: 14 }}>
+                        Degraded reasons
+                    </h3>
+                    <ul className="stack stack--tight">
+                        {legacyDegradedReasons.map((reason) => (
+                            <li className="record" key={reason}>
+                                <p className="record__body">{GENERIC_DEGRADED_REASON_SENTENCE}</p>
+                                <Details data-testid="degraded-reason-raw" summary="Raw reason">
+                                    <code>{reason}</code>
+                                </Details>
+                            </li>
+                        ))}
+                    </ul>
+                </>
+            )}
         </section>
     );
 }
