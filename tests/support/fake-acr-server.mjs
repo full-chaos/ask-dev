@@ -211,6 +211,14 @@ function clarificationResult(question) {
         paths: [],
         conflicts: [],
         claimed_facts: [],
+        // CHAOS-4693: mirrors `src/test/fixtures/investigations.ts`'s own
+        // `clarificationScenario` override again — a clarification turn
+        // hasn't read any source yet, so ACR genuinely emits `sources: []`
+        // + `partial: false` here, not the canonical example's inherited
+        // 3-source coverage. Without this override the real HTTP round trip
+        // this double exists to prove never exercised the CHAOS-4524/4568
+        // defect shape (CoveragePanel.tsx's `hasSources` guard) at all.
+        coverage: { sources: [], partial: false, degraded_reasons: [] },
         limitations: ["No judgment was formed because the subject is unresolved."],
         deterministic_answer: "The subject is ambiguous, so no judgment was formed.",
         warnings: [],

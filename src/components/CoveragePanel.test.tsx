@@ -6,6 +6,8 @@ import { mockScenarios } from "@/test/fixtures/investigations";
 
 const degradedCoverage = mockScenarios().find((s) => s.id === "degraded")!.result.coverage;
 const legacyCoverage = mockScenarios().find((s) => s.id === "degraded-legacy")!.result.coverage;
+const clarificationCoverage = mockScenarios().find((s) => s.id === "clarification")!.result
+    .coverage;
 
 /**
  * CHAOS-4581: coverage becomes a compact strip — a one-line summary plus a
@@ -126,6 +128,28 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         ).not.toBeInTheDocument();
         expect(
             within(panel).queryByText("Partial — some sources did not contribute."),
+        ).not.toBeInTheDocument();
+        expect(within(panel).getByText("No sources were recorded.")).toBeInTheDocument();
+    });
+
+    /**
+     * CHAOS-4693: the SAME assertion as the two hand-inlined tests above,
+     * but through the shared `mockScenarios()` "clarification" fixture
+     * every other consumer (`ClarificationPanel.test.tsx`,
+     * `EnrichmentView.test.tsx`, `page.test.tsx`, etc.) renders from — not a
+     * hand-rolled `coverage` literal. Before this fixture's own `coverage`
+     * override, `clarificationScenario()` inherited the canonical example's
+     * 3-source coverage, so this exact real-world zero-source clarification
+     * shape was unreachable through the shared fixture even though the two
+     * tests above already pinned it as a bare literal.
+     */
+    it("never shows Complete on the shared clarification fixture's own coverage (real zero-source shape)", () => {
+        expect(clarificationCoverage.sources).toEqual([]);
+        expect(clarificationCoverage.partial).toBe(false);
+        render(<CoveragePanel coverage={clarificationCoverage} />);
+        const panel = screen.getByTestId("coverage-panel");
+        expect(
+            within(panel).queryByText("Complete — every source contributed."),
         ).not.toBeInTheDocument();
         expect(within(panel).getByText("No sources were recorded.")).toBeInTheDocument();
     });
