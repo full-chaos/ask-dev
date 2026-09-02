@@ -3020,6 +3020,14 @@
         "reason": {
           "type": "string",
           "maxLength": 2000
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "state_label": {
+          "type": "string",
+          "maxLength": 160
         }
       },
       "required": [
@@ -4558,7 +4566,8 @@
             "graph_exact_name_candidates_truncated",
             "graph_cohort_denied_by_authorization",
             "graph_unknown_relationship_type",
-            "graph_validity_unbounded"
+            "graph_validity_unbounded",
+            "reuse_auxiliary_refs_stripped"
           ]
         },
         "degrading": {

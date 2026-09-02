@@ -441,3 +441,129 @@ describe("narrowing basis vocabulary — overlap_aware_set_cover (acr d261b265 c
         expect(enumRejections.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * CHAOS-4836 (acr 9e2bbede consumer pin, containing #382 CHAOS-4825 and #383
+ * CHAOS-4831): `CoverageDetail.code`'s closed enum gains a 12th value,
+ * `reuse_auxiliary_refs_stripped`. Answer reuse never hit on the live org
+ * because its evidence-containment recheck refused outright on ANY missing
+ * auxiliary (non-cited) ref (CHAOS-4831); the fix strips the unverifiable
+ * auxiliary refs and serves a narrowed answer instead, disclosing the
+ * narrowing with this code plus a required `count`
+ * (`internal/contextfabric/answer_reuse_degrade.go:603-611`,
+ * `internal/contracts/v1/context_fabric_coverage_detail.go:282` --
+ * `requireCount: true` for this code). Without this bump a degraded reuse
+ * answer fails CLOSED here with `acr_contract_violation` and reads as a rig
+ * failure, not a pin gap -- exactly the failure mode this ticket exists to
+ * close.
+ */
+describe("coverage detail code — reuse_auxiliary_refs_stripped (acr 9e2bbede consumer pin, CHAOS-4836/CHAOS-4831)", () => {
+    function reuseDegradedResult(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            coverage: { partial: boolean; degraded_reasons: string[]; details?: unknown[] };
+            evidence_ref_ids: string[];
+        };
+        result.coverage.partial = true;
+        result.coverage.degraded_reasons = [
+            "Some supporting evidence was no longer visible and was removed.",
+        ];
+        result.coverage.details = [
+            {
+                detail_id: "cov-reuse-01",
+                source: "context-fabric:answer-reuse",
+                code: "reuse_auxiliary_refs_stripped",
+                degrading: true,
+                count: 1,
+                label: "1 supporting item is no longer visible to you and were removed",
+            },
+        ];
+        return {
+            ...result,
+            // CHAOS-4690: a fresh write's evidence_ref_labels key set equals
+            // the result's own evidence-ref closure exactly.
+            evidence_ref_labels: Object.fromEntries(
+                result.evidence_ref_ids.map((ref) => [ref, ref]),
+            ),
+        };
+    }
+
+    it("a reuse-degraded response validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            reuseDegradedResult(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized coverage detail code still rejects — the enum stays closed", () => {
+        const tampered = reuseDegradedResult() as {
+            coverage: { details: Array<Record<string, unknown>> };
+        };
+        tampered.coverage.details[0]!.code = "reuse_bogus_code";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (9b2069de, still on
+     * origin/main before this PR): the same reuse-degraded document, run
+     * against a `CoverageDetail` $def with `reuse_auxiliary_refs_stripped`
+     * stripped from its `code` enum -- exactly the `acr_contract_violation`
+     * a degraded reuse answer hits under the unbumped pin, which is what
+     * made CHAOS-4836 read as a rig failure rather than a pin gap. RED
+     * against that reproduction, GREEN against the real pinned schema
+     * above.
+     */
+    it("EXECUTED repro: a reuse-degraded answer would 502 under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { CoverageDetail: { properties: { code: { enum: string[] } } } };
+        };
+        const codeDef = priorSchema.$defs.CoverageDetail?.properties.code;
+        if (codeDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no CoverageDetail.code property");
+        }
+        codeDef.enum = codeDef.enum.filter((value) => value !== "reuse_auxiliary_refs_stripped");
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(reuseDegradedResult())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});
+
+/**
+ * CHAOS-4836 / CHAOS-4825 (rode the same acr 9e2bbede pin): `$defs.SourceObservation`
+ * gained optional `label`/`state_label`, but that NAMED $def has zero $refs
+ * anywhere in acr and validates nothing on the wire (the ticket's own
+ * finding -- a definition nobody validates through went stale for a whole
+ * release cycle without any test noticing). What actually reaches ask-dev is
+ * the INLINE copy of the same shape at `Coverage.properties.sources.items`,
+ * which already carried `label`/`state_label` before this bump and is
+ * unchanged by it. This test exercises that inline, wire-facing copy so the
+ * accept path for a labelled coverage source has coverage of its own,
+ * exactly per the suggestion on CHAOS-4836's comment thread.
+ */
+describe("coverage source label/state_label (inline SourceObservation shape, unchanged by acr 9e2bbede)", () => {
+    it("a coverage source carrying label and state_label validates", () => {
+        const labelled = structuredClone(canonicalResult) as {
+            coverage: { sources: Array<Record<string, unknown>> };
+        };
+        labelled.coverage.sources[0]!.label = "Delivery status";
+        labelled.coverage.sources[0]!.state_label = "Available";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            labelled,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+});
