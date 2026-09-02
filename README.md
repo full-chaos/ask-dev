@@ -207,7 +207,43 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `9b2069de9495fca61433daebce65f773818281a5` (acr main tip
+Currently pinned: `9e2bbede5447843ad35eb2083c9c98465fb767bd` (acr main tip
+#382, CHAOS-4825 — anchor the published JSON Schemas to the Go wire structs;
+contains #383, CHAOS-4831 — the answer-reuse evidence-containment degrade
+fix, which merged first onto the same tip). ONE file in the CONSUMED surface
+changed between the prior pin and this one — verified per-file directly
+against acr's own history (`git diff
+9b2069de9495fca61433daebce65f773818281a5
+9e2bbede5447843ad35eb2083c9c98465fb767bd -- contracts/jsonschema/v1/<file>`
+run once per consumed path):
+
+- `context_fabric_common.v1.schema.json`, two additive changes:
+    1. (#383) `CoverageDetail.code`'s closed enum gains a 12th value,
+       `reuse_auxiliary_refs_stripped`. Answer reuse never hit on the live org
+       because its evidence-containment recheck refused on ANY missing
+       auxiliary (non-cited) ref; the fix now strips unverifiable auxiliary
+       refs and serves a narrowed answer instead of refusing outright,
+       disclosing the narrowing with this code and a required `count`. Without
+       this bump a degraded reuse answer fails CLOSED here with
+       `acr_contract_violation` and reads as a rig failure, not a pin gap —
+       the failure mode this ticket (CHAOS-4836) exists to close, proven
+       red-then-green in `src/lib/acr/validate.test.ts`.
+    2. (#382) `$defs.SourceObservation` gains two optional properties,
+       `label` and `state_label` (`maxLength: 160` each), matching the INLINE
+       copy of the same shape at `Coverage.properties.sources.items`, which
+       already carried both — this producer has emitted them since the
+       CHAOS-4690 display-label work. `SourceObservation` has zero `$ref`s
+       anywhere in acr (canonical schemas, embedded MCP copies, or the OpenAPI
+       document), so nothing validates through the NAMED `$def` and this is a
+       byte change to a vendored artifact, not a behavior change. Ridden along
+       in this same bump per the orchestrator's ruling rather than forcing a
+       second re-vendor.
+
+`context_fabric_investigation_request.v1.schema.json`,
+`context_fabric_investigation_result.v1.schema.json`, and `error.v1.schema.json`
+are byte-identical to the prior pin, as are all four pinned examples.
+
+Previous pin `9b2069de9495fca61433daebce65f773818281a5` (acr main tip
 #369, CHAOS-4682 — §5.1 P2 dual-read cutover). A `CanonicalFact` can carry
 BOTH a legacy breakdown/ranking table and a genuine `time_series` table at
 once (a project's per-team breakdown alongside its daily series). The

@@ -28,36 +28,33 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #369 (CHAOS-4682, S6.1 P2 dual-read cutover). A
-// `CanonicalFact` can carry BOTH a legacy breakdown/ranking table AND a
-// genuine `time_series` table at once (a project's per-team breakdown
-// alongside its daily series); the pre-existing `table`/`rows` pair always
-// serves the LEGACY field (CHAOS-4645's ruling, unchanged by this pin), so a
-// dual-table fact's time series existed at the producer, validated, and
-// never reached the wire. This pin adds the additive `time_series_table`/
-// `time_series_rows` pair so the workbench can finally read it. TWO files in
-// the consumed surface changed between dbde584b (#361, the prior pin) and
-// this pin (verified per-file:
-// `git diff dbde584b41ddc6b89392344020b23cac7233559e 9b2069de9495fca61433daebce65f773818281a5 -- contracts/jsonschema/v1/<file>`):
-//   - `context_fabric_common.v1`: `ClaimedFact` gains two optional
-//     properties, `time_series_table` ($ref the existing `ClaimedFactTable`
-//     $def, same as `table`) and `time_series_rows` (array of the existing
-//     `ClaimedFactRow` $def, `maxItems: 64`, same bounds as `rows`) -- no
-//     new $defs. `table`/`rows` keep their current meaning and preference
-//     unconditionally; this pin is strictly additive. (An unrelated
-//     doc-comment-only change to `Cohort.groups`/`CohortGroup` -- CHAOS-4733,
-//     description text, no shape change -- rode along in the same file from
-//     an intervening acr commit; verified byte-for-byte that only
-//     `description` strings differ there.)
-// `context_fabric_investigation_request.v1` and `error.v1` are
-// byte-identical to the prior pin. One example changed:
-// `context_fabric_investigation_result_render_shapes.v1.json` gained a
-// `claim_workload_ask_dev_backlog` claim (a project workload fact carrying
-// BOTH a legacy `team_breakdown` table/rows AND a genuine `daily_workload`
-// time_series in the new pair) plus its own rendered trend shape (`rs_4`),
-// so the pinned fixture itself proves the dual-table case round-trips and
-// renders. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "9b2069de9495fca61433daebce65f773818281a5";
+// acr main: pins past #382 (CHAOS-4825, "anchor the published JSON Schemas
+// to the Go wire structs"), which contains #383 (CHAOS-4831, the answer-reuse
+// evidence-containment degrade fix) -- #383 landed first, #382 rode the same
+// tip out after it. ONE file in the consumed surface changed between
+// 9b2069de (the prior pin) and this pin (verified per-file:
+// `git diff 9b2069de9495fca61433daebce65f773818281a5 9e2bbede5447843ad35eb2083c9c98465fb767bd -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: two changes, both additive.
+//     1. (#383) `CoverageDetail.code`'s closed enum gains a 12th value,
+//        `reuse_auxiliary_refs_stripped` -- disclosed, with a required
+//        `count`, when a reused answer's auxiliary (non-cited) evidence
+//        refs could not be reproven visible and were stripped rather than
+//        refusing the whole answer. Fails CLOSED without this bump: any
+//        degraded reuse answer is rejected by ask-dev with
+//        `acr_contract_violation` and reads as a rig failure, not a pin gap.
+//     2. (#382) `$defs.SourceObservation` gains two optional properties,
+//        `label` and `state_label` (`maxLength: 160` each, same shape as the
+//        existing INLINE copy at `Coverage.properties.sources.items`, which
+//        already carried both). `SourceObservation` itself has zero `$ref`s
+//        anywhere in acr's canonical schemas, embedded MCP copies, or
+//        OpenAPI document -- nothing validates through the named `$def` --
+//        so this is a byte change to a vendored artifact, not a behavior
+//        change; included here only so one re-vendor covers both merges
+//        (per the orchestrator's ruling on CHAOS-4836).
+// `context_fabric_investigation_request.v1`, `context_fabric_investigation_result.v1`,
+// and `error.v1` are byte-identical to the prior pin, as are all four pinned
+// examples. Bump procedure lives in README.md.
+export const SOURCE_COMMIT = "9e2bbede5447843ad35eb2083c9c98465fb767bd";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
