@@ -24,3 +24,16 @@ overrides:
     # the full gate (build + e2e) after regenerating the lockfile.
     sharp: ">=0.35.0"
     postcss: ">=8.5.18"
+    # Dependency-audit fix (pre-existing red, unrelated to CHAOS-4836's
+    # contract-pin bump -- same class as the sharp/postcss overrides above).
+    # fast-uri@3.1.5 is pulled in transitively by ajv/ajv-formats and is
+    # below its patched floor for four high-severity advisories: host
+    # confusion via skipped IDN canonicalization (GHSA-5jgf-p345-68v8), SSRF
+    # via malformed IPv6 normalization (GHSA-f65p-4m7j-42xc), SSRF via
+    # repeated hostname percent-decoding (GHSA-fph4-wmhf-6fwf), and host
+    # confusion via percent-encoded scheme normalization
+    # (GHSA-jqff-g426-hqxp). All four are patched at fast-uri>=3.1.6, a
+    # semver-patch bump within ajv's own pinned major, verified empirically
+    # via the full unit suite (ajv/ajv-formats validate every ACR contract
+    # schema in this repo) after regenerating the lockfile.
+    fast-uri: ">=3.1.6"
