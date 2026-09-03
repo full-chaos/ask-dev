@@ -44,107 +44,109 @@ jobs:
             - run: bash ci/run_checks.sh lint
             - run: bash ci/run_checks.sh typecheck
 
-    # Runner-routing contract v1.5.1 pilot (CHAOS-4904, second repo). Behind
-    # the repo variable SELF_HOSTED_RUNNERS (unset == off, the fail-safe
-    # default): the wait step below is skipped outright, no API call is
-    # made, and this job runs precisely as it always has. Mirrors
-    # dev-health-acr's race-devhealthschema job byte-for-byte in shape; see
-    # .github/workflows/ci-self-hosted.yml for the attempt leg this polls.
-    #
-    # When the switch IS on, the wait step polls the sibling run
-    # (scripts/ci/self-hosted-attempt.sh holds the logic) and reports one of
-    # three outcomes:
-    #   unclaimed        the attempt never left the queue inside the 5-minute
-    #                    bound -- this leg does the work itself, so a dead or
-    #                    saturated self-hosted pool costs latency, never a red
-    #                    build.
-    #   claimed-success  the attempt passed; this leg skips its own work and
-    #                    reports that success.
-    #   claimed-failure  the attempt actually ran and did not pass; this leg
-    #                    FAILS -- an attempt that ran and failed found
-    #                    something, and re-running it on a hosted runner would
-    #                    mask exactly the arm64 behaviour this routing exists
-    #                    to learn about. Only a never-started attempt is taken
-    #                    over.
-    unit:
+    # Runner-routing contract v1.6. Repo variable SELF_HOSTED_RUNNERS gates
+    # which of the two jobs below runs; both carry the same `name: Unit
+    # tests` so the check reported to a PR is stable across the flip. The
+    # `if:` pair is an exact complement (never both true, never both
+    # false), so exactly one leg runs on every workflow run, including fork
+    # PRs, which always fall back to hosted regardless of the switch. No
+    # poller: same-workflow jobs read each other's result via `needs`
+    # directly, so there is nothing to wait on or claim.
+    unit-hosted:
         name: Unit tests
         runs-on: ubuntu-latest
-        # Narrower than the workflow default (contents only): this job pulls
-        # no packages, and needs `actions: read` only to see the sibling
-        # run's job list.
-        permissions:
-            contents: read
-            actions: read
+        if: >-
+            vars.SELF_HOSTED_RUNNERS != 'enabled'
+            || (github.event_name == 'pull_request'
+            && github.event.pull_request.head.repo.full_name != github.repository)
         steps:
-            # Unconditional, and FIRST, because the wait step below runs
-            # scripts/ci/self-hosted-attempt.sh out of this workspace --
-            # gating the checkout on the outcome of a step that needs the
-            # checkout is a cycle. It costs a few seconds on the path where
-            # the self-hosted attempt already did the work, which is the
-            # cheapest part of this job by a wide margin.
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-            # Contract v1.5.1's two gates, identical to the sibling
-            # workflow's: the variable must be the literal string `enabled`,
-            # and fork pull requests never reach self-hosted capacity.
-            # Skipping this step (rather than branching inside it) is what
-            # makes the switch-off path cost nothing at all -- no token use,
-            # no API call, no added wall-clock.
-            - name: Wait for the self-hosted attempt, or claim the work here
-              id: wait
-              if: >-
-                  vars.SELF_HOSTED_RUNNERS == 'enabled'
-                  && (github.event_name != 'pull_request'
-                  || github.event.pull_request.head.repo.full_name == github.repository)
-              env:
-                  GH_TOKEN: ${{ github.token }}
-                  REPOSITORY: ${{ github.repository }}
-                  # The PR head SHA on a pull request, the pushed SHA
-                  # otherwise -- always the full 40 characters, which the
-                  # script re-validates before it queries.
-                  HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-                  EVENT: ${{ github.event_name }}
-                  REF: ${{ github.head_ref || github.ref_name }}
-                  WORKFLOW_NAME: ci-self-hosted
-                  WORKFLOW_PATH: .github/workflows/ci-self-hosted.yml
-                  JOB_NAME: unit-self-hosted
-                  QUEUE_TIMEOUT_MINUTES: 5
-                  # Kept in sync by hand with the attempt job's own
-                  # timeout-minutes in ci-self-hosted.yml; the script allows
-                  # this plus three minutes of reporting lag before calling a
-                  # started-but-unfinished attempt a failure.
-                  ATTEMPT_TIMEOUT_MINUTES: 10
-              run: scripts/ci/self-hosted-attempt.sh wait
-            # An empty outcome means the step above was skipped -- switch
-            # off, or a fork PR -- which is the same instruction as
-            # `unclaimed`: do the work.
-            - name: Decide whether this leg owns the real work
-              id: own
-              env:
-                  OUTCOME: ${{ steps.wait.outputs.outcome }}
-              run: |
-                  set -euo pipefail
-                  if [ -z "${OUTCOME}" ] || [ "${OUTCOME}" = unclaimed ]; then
-                    echo "run_here=true" >>"$GITHUB_OUTPUT"
-                  else
-                    echo "run_here=false" >>"$GITHUB_OUTPUT"
-                    printf 'self-hosted attempt reached a terminal state (%s); not repeating its work here\n' "${OUTCOME}"
-                  fi
-            - name: Fail this leg if the self-hosted attempt itself failed
-              if: steps.own.outputs.run_here == 'false' && steps.wait.outputs.outcome == 'claimed-failure'
-              run: |
-                  echo "the self-hosted attempt (unit-self-hosted in the ci-self-hosted workflow) did not succeed; failing this leg so the required gate reflects it" >&2
-                  exit 1
             - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
-              if: steps.own.outputs.run_here == 'true'
             - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-              if: steps.own.outputs.run_here == 'true'
               with:
                   node-version-file: .nvmrc
                   cache: pnpm
             - run: pnpm install --frozen-lockfile
-              if: steps.own.outputs.run_here == 'true'
             - run: bash ci/run_checks.sh unit
-              if: steps.own.outputs.run_here == 'true'
+
+    # The self-hosted leg. Same acceptance bar as the pilot that shipped
+    # this job (host-only, no docker/browser install, >=1 minute on
+    # hosted): measured wall time on the pool is 37s end-to-end (setup-node
+    # 5s, corepack 1s, cold `pnpm install` 7s, `run_checks.sh unit` 16s), so
+    # 10 minutes leaves ample headroom over the pool's observed variance.
+    unit-self-hosted:
+        name: Unit tests
+        runs-on: [self-hosted, oci-arc-runners]
+        if: >-
+            vars.SELF_HOSTED_RUNNERS == 'enabled'
+            && (github.event_name != 'pull_request'
+            || github.event.pull_request.head.repo.full_name == github.repository)
+        timeout-minutes: 10
+        steps:
+            # actions/checkout v7.0.1 -- the same pin the hosted leg uses. On
+            # a pull request this checks out the merge ref, exactly as the
+            # hosted leg does, so both legs test the identical tree.
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with: { persist-credentials: false }
+
+            # A mislabeled or reassigned runner would make this job's result
+            # mean something other than what it claims. The pool is
+            # arm64-only by construction (OCI Ampere), so anything else is a
+            # misconfiguration to fail loudly on, not to quietly validate the
+            # wrong architecture.
+            - name: Confirm this runner is actually arm64
+              run: |
+                  set -euo pipefail
+                  uname -m
+                  arch="$(uname -m)"
+                  if [ "${arch}" != "arm64" ] && [ "${arch}" != "aarch64" ]; then
+                    echo "expected an arm64 runner on oci-arc-runners, got '${arch}'" >&2
+                    exit 1
+                  fi
+
+            # The pool image has no node preinstalled (contract's declared
+            # toolset). actions/setup-node downloads a Node binary directly
+            # rather than relying on an OS package manager, so it works
+            # regardless of what the image ships. Same pin the hosted leg
+            # uses.
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version-file: .nvmrc
+
+            # pnpm via corepack (bundled with the node setup-node just
+            # installed) rather than pnpm/action-setup's own standalone
+            # installer -- corepack ships with node itself, so it carries no
+            # separate network/arch dependency to prove out on this pool.
+            # Version pinned to package.json's own `packageManager` field so
+            # this can never silently drift from what the hosted leg
+            # installs.
+            - name: Enable corepack and activate the repo's pinned pnpm
+              run: |
+                  set -euo pipefail
+                  corepack enable
+                  pnpm_version="$(node -p "require('./package.json').packageManager" | sed -E 's/^pnpm@//')"
+                  corepack prepare "pnpm@${pnpm_version}" --activate
+
+            # Cold-store install time on an ephemeral runner: every pool pod
+            # is freshly provisioned, so there is no persistent pnpm store to
+            # warm -- unlike the hosted leg's actions/setup-node cache: pnpm,
+            # which this leg deliberately does not use, since a cache keyed
+            # to a pool that discards its filesystem after one job buys
+            # nothing.
+            - name: Install dependencies (cold store)
+              run: |
+                  set -euo pipefail
+                  start="$(date +%s)"
+                  pnpm install --frozen-lockfile
+                  printf 'pnpm install --frozen-lockfile: %ss (cold store)\n' "$(( $(date +%s) - start ))"
+
+            # The real work: the SAME `bash ci/run_checks.sh unit` invocation
+            # the hosted leg runs -- deliberately the shared entry point
+            # rather than a bare `pnpm test:unit`, so the two legs cannot
+            # drift apart on flags or environment (run_checks.sh owns
+            # TZ/LANG/NODE_ENV).
+            - name: Run unit tests on arm64
+              run: bash ci/run_checks.sh unit
 
     build:
         name: Build
@@ -187,7 +189,7 @@ jobs:
     # to require no matter how the jobs above are split later.
     test:
         name: test
-        needs: [run-checks-selftest, quality, unit, build, e2e]
+        needs: [run-checks-selftest, quality, unit-hosted, unit-self-hosted, build, e2e]
         if: always()
         runs-on: ubuntu-latest
         steps:
@@ -195,8 +197,27 @@ jobs:
               run: |
                   if [[ "${{ needs.run-checks-selftest.result }}" != 'success' \
                      || "${{ needs.quality.result }}" != 'success' \
-                     || "${{ needs.unit.result }}" != 'success' \
                      || "${{ needs.build.result }}" != 'success' \
                      || "${{ needs.e2e.result }}" != 'success' ]]; then
+                    exit 1
+                  fi
+                  # Runner-routing contract v1.6: unit-hosted and
+                  # unit-self-hosted carry mutually exclusive, exhaustive
+                  # `if:` gates, so exactly one of the two runs `unit` tests
+                  # and the other is `skipped`. Require the one that ran to
+                  # have succeeded, and guard against both ever being
+                  # skipped (which would mean unit tests never ran at all).
+                  unit_hosted="${{ needs.unit-hosted.result }}"
+                  unit_self_hosted="${{ needs.unit-self-hosted.result }}"
+                  if [[ "$unit_hosted" != 'success' && "$unit_hosted" != 'skipped' ]]; then
+                    echo "unit-hosted: ${unit_hosted}" >&2
+                    exit 1
+                  fi
+                  if [[ "$unit_self_hosted" != 'success' && "$unit_self_hosted" != 'skipped' ]]; then
+                    echo "unit-self-hosted: ${unit_self_hosted}" >&2
+                    exit 1
+                  fi
+                  if [[ "$unit_hosted" == 'skipped' && "$unit_self_hosted" == 'skipped' ]]; then
+                    echo "neither unit-hosted nor unit-self-hosted ran" >&2
                     exit 1
                   fi
