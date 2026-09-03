@@ -189,8 +189,7 @@ jobs:
     # to require no matter how the jobs above are split later.
     test:
         name: test
-        needs:
-            [run-checks-selftest, quality, unit-hosted, unit-self-hosted, build, e2e]
+        needs: [run-checks-selftest, quality, unit-hosted, unit-self-hosted, build, e2e]
         if: always()
         runs-on: ubuntu-latest
         steps:
