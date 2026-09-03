@@ -28,6 +28,12 @@ name: ci-self-hosted
     pull_request:
     push:
         branches: [main]
+    # tests.yml also triggers on merge_group (CHAOS-4904 pilot 2, round 1
+    # finding): without this, a merge-queue run's wait step in tests.yml
+    # would still fire (its `if:` accepts every non-pull_request event) but
+    # find no sibling ever dispatched, burning the full 5-minute queue bound
+    # before falling back -- correct in outcome, needlessly slow.
+    merge_group:
 
 permissions:
     contents: read
