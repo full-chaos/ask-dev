@@ -567,3 +567,179 @@ describe("coverage source label/state_label (inline SourceObservation shape, unc
         expect(validation.valid).toBe(true);
     });
 });
+
+/**
+ * acr 7c6eda59 consumer pin (#422, S7c "say what became of each requirement,
+ * and narrow instead of refusing" -- outcome-driven assembly):
+ * `AnswerCompleteness` gains an optional `outcomes[]` array of the new closed
+ * `$defs.PlanRequirementOutcomeRow` (required `stage`/`outcome`/`impact`/
+ * `cause_observed`/`served`/`declared`) and a `state` field that moves from
+ * ABSENT to REQUIRED -- a closed 4-value vocabulary
+ * (`not_derived`/`complete`/`partial`/`degraded`) derived from the outcome
+ * set, never authored independently. Unlike every prior bump in this file,
+ * the breaking half here is `state` becoming required, not a new value
+ * joining an existing enum -- so the old-shape/new-shape pair below is
+ * "missing state now rejects" / "state present validates", the mirror image
+ * of the usual "old shape still tolerated" case.
+ */
+describe("investigation result contract — outcome-driven completeness (acr 7c6eda59 consumer pin, #422/S7c)", () => {
+    function outcomeRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+        return {
+            stage: "reuse",
+            outcome: "narrowed",
+            impact: "depth",
+            cause_overrun: "items",
+            cause_observed: true,
+            served: 13,
+            declared: 18,
+            ...overrides,
+        };
+    }
+
+    function resultWithOutcomes(outcomes: unknown[], state = "partial"): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            completeness: Record<string, unknown>;
+        };
+        result.completeness.state = state;
+        result.completeness.outcomes = outcomes;
+        return result;
+    }
+
+    it("the pinned canonical example (as regenerated) carries a required state and validates", () => {
+        expect(canonicalResult).toHaveProperty("completeness.state", "not_derived");
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            canonicalResult,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("REJECTS a response missing completeness.state — it is required as of this pin", () => {
+        const withoutState = structuredClone(canonicalResult) as {
+            completeness: Record<string, unknown>;
+        };
+        delete withoutState.completeness.state;
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withoutState,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("an outcome set including the new `reuse` stage validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow({ stage: "reuse" })]),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("every outcome stage validates — planning, assembled_result, projection, reuse", () => {
+        for (const stage of ["planning", "assembled_result", "projection", "reuse"]) {
+            const validation = validateContract(
+                "context_fabric_investigation_result.v1.schema.json",
+                resultWithOutcomes([outcomeRow({ stage })]),
+            );
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("an empty outcome set with state not_derived validates — the vacuous-complete trap closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([], "not_derived"),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("REJECTS an unrecognized `stage` — the outcome stage vocabulary stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow({ stage: "not_a_real_stage" })]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("REJECTS an unrecognized `outcome` — the requirement-outcome vocabulary stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow({ outcome: "not_a_real_outcome" })]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("REJECTS an unrecognized `impact` — the impact vocabulary stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow({ impact: "not_a_real_impact" })]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("REJECTS an unrecognized `cause_overrun` — the overrun-cause vocabulary stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow({ cause_overrun: "not_a_real_cause" })]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("REJECTS an unrecognized `state` — the completeness-state vocabulary stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([outcomeRow()], "not_a_real_state"),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("REJECTS an outcome row missing a required field (declared) — additionalProperties stays closed on the row shape too", () => {
+        const incomplete = outcomeRow();
+        delete incomplete.declared;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            resultWithOutcomes([incomplete]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (9e2bbede, still on
+     * origin/main before this PR): the same regenerated canonical example
+     * (which now carries `completeness.state`), run against an
+     * `AnswerCompleteness` $def with `state` stripped from `properties` and
+     * `required` -- exactly what an `additionalProperties: false` schema
+     * that has never heard of the field does with it. RED against that
+     * reproduction, GREEN against the real pinned schema above.
+     */
+    it("EXECUTED repro: a state-bearing completeness block would 502 under the prior pin's own schema", () => {
+        const priorCommonSchema = structuredClone(commonSchema) as unknown as {
+            $defs: Record<string, { properties: Record<string, unknown>; required: string[] }>;
+        };
+        const answerCompletenessDef = priorCommonSchema.$defs.AnswerCompleteness;
+        if (answerCompletenessDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no AnswerCompleteness $def");
+        }
+        delete answerCompletenessDef.properties.state;
+        delete answerCompletenessDef.properties.outcomes;
+        answerCompletenessDef.required = answerCompletenessDef.required.filter(
+            (name) => name !== "state",
+        );
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(canonicalResult)).toBe(false);
+        const stateRejections = (validate.errors ?? []).filter(
+            (error) =>
+                error.keyword === "additionalProperties" &&
+                error.params?.additionalProperty === "state",
+        );
+        expect(stateRejections.length).toBeGreaterThan(0);
+    });
+});
