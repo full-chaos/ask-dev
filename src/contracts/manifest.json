@@ -1,5 +1,5 @@
 {
-  "source_commit": "7c6eda591fb56cd30206fb223efdc10cc805ed79",
+  "source_commit": "5a3ab55b588faa5091fa8f6b15b864cec5055f04",
   "source_repository": "full-chaos/dev-health-acr",
   "files": [
     {
@@ -24,7 +24,7 @@
     },
     {
       "path": "schemas/context_fabric_investigation_request.v1.schema.json",
-      "sha256": "14b9c32f1bab1a81d956584ae95723e57ed826c66ff42cd8a7d6d5f6af18f54d"
+      "sha256": "db34def69344d0293cbd5e6373735bada695bbfdcaf40af2222c6456e6bb6486"
     },
     {
       "path": "schemas/context_fabric_investigation_result.v1.schema.json",
