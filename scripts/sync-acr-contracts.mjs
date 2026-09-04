@@ -28,33 +28,31 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #382 (CHAOS-4825, "anchor the published JSON Schemas
-// to the Go wire structs"), which contains #383 (CHAOS-4831, the answer-reuse
-// evidence-containment degrade fix) -- #383 landed first, #382 rode the same
-// tip out after it. ONE file in the consumed surface changed between
-// 9b2069de (the prior pin) and this pin (verified per-file:
-// `git diff 9b2069de9495fca61433daebce65f773818281a5 9e2bbede5447843ad35eb2083c9c98465fb767bd -- contracts/jsonschema/v1/<file>`):
-//   - `context_fabric_common.v1`: two changes, both additive.
-//     1. (#383) `CoverageDetail.code`'s closed enum gains a 12th value,
-//        `reuse_auxiliary_refs_stripped` -- disclosed, with a required
-//        `count`, when a reused answer's auxiliary (non-cited) evidence
-//        refs could not be reproven visible and were stripped rather than
-//        refusing the whole answer. Fails CLOSED without this bump: any
-//        degraded reuse answer is rejected by ask-dev with
-//        `acr_contract_violation` and reads as a rig failure, not a pin gap.
-//     2. (#382) `$defs.SourceObservation` gains two optional properties,
-//        `label` and `state_label` (`maxLength: 160` each, same shape as the
-//        existing INLINE copy at `Coverage.properties.sources.items`, which
-//        already carried both). `SourceObservation` itself has zero `$ref`s
-//        anywhere in acr's canonical schemas, embedded MCP copies, or
-//        OpenAPI document -- nothing validates through the named `$def` --
-//        so this is a byte change to a vendored artifact, not a behavior
-//        change; included here only so one re-vendor covers both merges
-//        (per the orchestrator's ruling on CHAOS-4836).
-// `context_fabric_investigation_request.v1`, `context_fabric_investigation_result.v1`,
-// and `error.v1` are byte-identical to the prior pin, as are all four pinned
-// examples. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "9e2bbede5447843ad35eb2083c9c98465fb767bd";
+// acr main: pins past #422 (S7c, "say what became of each requirement, and
+// narrow instead of refusing" -- outcome-driven assembly). A single-subject
+// investigation that overran the item ceiling used to be refused outright;
+// it is now narrowed (candidates only, the one charged collection nothing in
+// the composed answer cites) and the answer DISCLOSES what happened to each
+// requirement instead of silently shrinking. ONE file in the consumed
+// surface changed between 9e2bbede (the prior pin) and this pin (verified
+// per-file: `git diff 9e2bbede5447843ad35eb2083c9c98465fb767bd
+// 7c6eda591fb56cd30206fb223efdc10cc805ed79 -- contracts/jsonschema/v1/<file>`):
+//   - `context_fabric_common.v1`: `AnswerCompleteness` gains an array field
+//     `outcomes` (<=200 items) of the new closed `$defs.PlanRequirementOutcomeRow`
+//     (required `stage`/`outcome`/`impact`/`cause_observed`/`served`/`declared`;
+//     optional `requirement`/`obligation`/`cause_overrun`/`cause_coverage`/
+//     `cause_narrowing`) and a REQUIRED (newly, not optional) `state` field,
+//     a closed 4-value vocabulary -- `not_derived`/`complete`/`partial`/
+//     `degraded` -- derived from the outcome set, never authored
+//     independently. `state` moving into `required` means every hand-built
+//     completeness fixture in this repo's own tests must now carry it, and
+//     the two pinned examples do (`not_derived`, correctly: neither example
+//     document carries any outcome rows).
+// `context_fabric_investigation_request.v1` and `error.v1` are byte-identical
+// to the prior pin. Every OTHER new field is schema-OPTIONAL and additive;
+// only `outcomes[]`'s enclosing `state` is now mandatory. Bump procedure
+// lives in README.md.
+export const SOURCE_COMMIT = "7c6eda591fb56cd30206fb223efdc10cc805ed79";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

@@ -17,6 +17,7 @@ describe("CompletenessPanel", () => {
             terminal_status: "complete",
             claimed_facts_count: 4,
             rows_count: 2,
+            state: "not_derived",
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
@@ -28,6 +29,7 @@ describe("CompletenessPanel", () => {
             terminal_status: "complete",
             claimed_facts_count: 4,
             rows_count: 2,
+            state: "not_derived",
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
@@ -40,6 +42,7 @@ describe("CompletenessPanel", () => {
             terminal_status: "complete",
             claimed_facts_count: 1,
             rows_count: 1,
+            state: "not_derived",
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
@@ -58,6 +61,7 @@ describe("CompletenessPanel", () => {
             terminal_status: "complete",
             claimed_facts_count: 4,
             rows_count: 2,
+            state: "not_derived",
         };
         render(<CompletenessPanel completeness={completeness} />);
         expect(screen.queryByTestId("completeness-terminal-reason")).not.toBeInTheDocument();
@@ -74,6 +78,7 @@ describe("CompletenessPanel", () => {
             terminal_reason: "limitation_disclosed",
             claimed_facts_count: 2,
             rows_count: 0,
+            state: "partial",
         };
         render(<CompletenessPanel completeness={completeness} />);
         expect(screen.getByTestId("completeness-terminal-reason")).toHaveTextContent(
