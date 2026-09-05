@@ -1,5 +1,6 @@
 import {
     describeBudgetOverrun,
+    NARROWER_REASK_PENDING_LABEL,
     narrowerContinuationCopy,
 } from "@/lib/acr/narrower-continuation-copy";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
@@ -58,7 +59,7 @@ export function NarrowerReask({
                 style={{ marginTop: 10 }}
                 type="button"
             >
-                {pending ? "Asking…" : copy.actionLabel}
+                {pending ? NARROWER_REASK_PENDING_LABEL : copy.actionLabel}
             </button>
         </div>
     );

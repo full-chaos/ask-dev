@@ -585,6 +585,28 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
     });
 
     /**
+     * codex review round 1, P2: `Number.isInteger` accepts any value beyond
+     * `Number.MAX_SAFE_INTEGER` that JSON.parse rounded to a whole number —
+     * rendering it as a count presents a rounded value as an exact one.
+     */
+    it("drops an unsafe (beyond MAX_SAFE_INTEGER) measured_items/max_items", async () => {
+        // Computed, not a literal: a literal one past MAX_SAFE_INTEGER trips
+        // eslint's no-loss-of-precision rule (correctly — that IS the point
+        // being tested), so the value is built at runtime instead.
+        const unsafeInteger = Number.MAX_SAFE_INTEGER + 2;
+        respondWith(
+            budgetRefusalPayload({
+                measured_items: unsafeInteger,
+                narrower_continuation: { family: "trend", axis: "evidence_window" },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.measuredItems).toBeUndefined();
+    });
+
+    /**
      * C1 (client.ts's own upstream-prose rule) extended to the budget-refusal
      * shape specifically: `error.message` is exactly the kind of ACR-authored
      * sentence this file must never carry, even when it arrives alongside a

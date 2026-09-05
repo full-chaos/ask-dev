@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { NarrowerReask } from "@/components/NarrowerReask";
+import { NARROWER_REASK_PENDING_LABEL } from "@/lib/acr/narrower-continuation-copy";
 
 /**
  * CHAOS-5107 (CHAOS-4735's client half): the renderer for a 413 budget
@@ -74,7 +75,14 @@ describe("NarrowerReask", () => {
         expect(screen.getByText(/would have included 42 items; only 25 fit/i)).toBeInTheDocument();
     });
 
-    it("disables the button while pending", () => {
+    /**
+     * codex review round 1, P2: the pending label was a literal inside this
+     * component, outside the one file this module's header comment claims
+     * holds every word of copy. Asserting against the EXPORTED constant
+     * (not a re-typed literal) fails if the component ever drifts back to
+     * its own hardcoded string.
+     */
+    it("disables the button while pending, sourcing the label from the copy module", () => {
         render(
             <NarrowerReask
                 narrowerContinuation={{ axis: "scope_anchor", family: "scoped_cohort_status" }}
@@ -84,7 +92,7 @@ describe("NarrowerReask", () => {
             />,
         );
 
-        expect(screen.getByRole("button", { name: "Asking…" })).toBeDisabled();
+        expect(screen.getByRole("button", { name: NARROWER_REASK_PENDING_LABEL })).toBeDisabled();
     });
 
     it("never renders the corpus/example question — only the tester's own text feeds the narrowed question", async () => {

@@ -28,6 +28,14 @@ export type NarrowerContinuationCopy = {
     readonly narrowQuestion: (originalQuestion: string) => string;
 };
 
+/**
+ * The button's label while the narrowed re-ask is in flight. Lives here,
+ * not as a literal inside `NarrowerReask.tsx`, so every word the tester sees
+ * for this feature stays in the one file this header comment promises —
+ * codex review round 1 caught the literal living in the component instead.
+ */
+export const NARROWER_REASK_PENDING_LABEL = "Asking…";
+
 /** Strips a trailing `?`/`.`/`!` run so an appended clause reads naturally. */
 function withoutTrailingPunctuation(question: string): string {
     const trimmed = question.trim();

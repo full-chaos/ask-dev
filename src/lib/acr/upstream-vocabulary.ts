@@ -152,7 +152,17 @@ export function boundedBudgetOverrun(overrun: string | undefined): string | unde
  * be a non-negative integer" is not a guarantee any more than "should be an
  * identifier" was for `code`/`request_id` above — an upstream that put
  * something else there must not have it rendered as a count regardless.
+ *
+ * `Number.isSafeInteger`, not `Number.isInteger`: a value beyond
+ * `Number.MAX_SAFE_INTEGER` (e.g. `9007199254740993`) is still
+ * integer-VALUED as a float but has already lost precision in the JSON
+ * parse that produced it — rendering it as a count would present a rounded
+ * number as an exact one. `-0` is rejected explicitly (`Object.is`, not
+ * `===`, since `-0 === 0` is true in JS) — it satisfies every other check
+ * here and has no business being "a count."
  */
 export function boundedNonNegativeInteger(value: unknown): number | undefined {
-    return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : undefined;
+    if (typeof value !== "number" || !Number.isSafeInteger(value)) return undefined;
+    if (Object.is(value, -0)) return undefined;
+    return value >= 0 ? value : undefined;
 }

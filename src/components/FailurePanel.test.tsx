@@ -67,6 +67,24 @@ describe("FailurePanel — CHAOS-5107 narrower re-ask wiring", () => {
         expect(screen.queryByRole("button", { name: "Ask for fewer results" })).toBeNull();
     });
 
+    /**
+     * codex review round 1, P2: an empty (or whitespace-only) original
+     * question passed the old `!== undefined` gate and would have built a
+     * re-ask question that is just the appended clause with nothing in
+     * front of it.
+     */
+    it("renders nothing when the original question is empty or whitespace-only", () => {
+        render(
+            <FailurePanel
+                failure={budgetRefusalFailure}
+                onNarrowerReask={vi.fn()}
+                originalQuestion="   "
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "Ask for fewer results" })).toBeNull();
+    });
+
     it("calls onNarrowerReask with a narrowed question, never the bare original, on click", async () => {
         const user = userEvent.setup();
         const onNarrowerReask = vi.fn();

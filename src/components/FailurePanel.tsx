@@ -81,7 +81,8 @@ export function FailurePanel({
             )}
             {failure.narrowerContinuation === undefined ||
             onNarrowerReask === undefined ||
-            originalQuestion === undefined ? null : (
+            originalQuestion === undefined ||
+            originalQuestion.trim() === "" ? null : (
                 <NarrowerReask
                     maxItems={failure.maxItems}
                     measuredItems={failure.measuredItems}
