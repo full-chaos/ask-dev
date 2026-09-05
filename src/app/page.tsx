@@ -154,6 +154,17 @@ type Turn =
            * `FailurePanel` gets no retry action at all.
            */
           readonly retryQuestion: string | undefined;
+          /**
+           * CHAOS-5107 (codex review round 3): the tester's ORIGINAL typed
+           * question that started this exchange, carried forward across a
+           * CHAIN of narrower re-asks — distinct from `retryQuestion`,
+           * which is the exact (possibly already-narrowed) text this turn
+           * itself sent. Without this, a second consecutive budget refusal
+           * would narrow the ALREADY-narrowed text ("…, top 5 only, top 5
+           * only?") instead of narrowing the tester's real question again.
+           * Set ONLY alongside `retryQuestion` (same plain-ask condition).
+           */
+          readonly rootQuestion: string | undefined;
       };
 
 function isFailure(value: unknown): value is WorkbenchFailure {
@@ -295,6 +306,18 @@ export default function ChatPage() {
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const composerRef = useRef<ChatComposerHandle>(null);
+    // CHAOS-5107 (codex review round 3): set by a narrower re-ask's own
+    // click handler, immediately before it calls `composerRef.current.
+    // retry(narrowedQuestion)`, and consumed synchronously at the START of
+    // the resulting `ask()` call, before any `await` — a ref rather than
+    // state for the same reason `popupAutoConfirmRef` above is a ref: `ask`
+    // runs inside the SAME synchronous call stack `retry` starts, well
+    // before React could apply a `setState`, so a state variable read here
+    // would still see its PRE-update value. Carries the chain's ORIGINAL
+    // question through any number of consecutive narrower re-asks; a plain
+    // composer ask (typed by hand, or a bare Retry) never sets it, so `ask`
+    // falls back to the text actually being sent.
+    const pendingNarrowingRootRef = useRef<string | undefined>(undefined);
     const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
     const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
     // Mirrors `turns` so the block below can tell "new content just landed"
@@ -378,6 +401,10 @@ export default function ChatPage() {
             priorSubjectReceipts.length === 0 &&
             chosen === undefined &&
             structureSelectionsToSend === undefined;
+        // Consumed ONCE, synchronously, before anything else in this
+        // function can yield — see the ref's own doc comment.
+        const narrowingRoot = pendingNarrowingRootRef.current;
+        pendingNarrowingRootRef.current = undefined;
         // Captured from the CURRENT timeline, BEFORE the pending pair below
         // is appended — a re-ask's own not-yet-answered turn must never be
         // threaded as its own prior context.
@@ -403,6 +430,7 @@ export default function ChatPage() {
                 submittedCandidateReceiptIds: undefined,
                 submittedStructureCandidateReceiptIds: undefined,
                 retryQuestion: isPlainAsk ? question : undefined,
+                rootQuestion: isPlainAsk ? (narrowingRoot ?? question) : undefined,
             },
         ]);
 
@@ -557,6 +585,7 @@ export default function ChatPage() {
                 submittedCandidateReceiptIds: undefined,
                 submittedStructureCandidateReceiptIds: undefined,
                 retryQuestion: undefined,
+                rootQuestion: undefined,
             })),
         ]);
 
@@ -815,7 +844,7 @@ export default function ChatPage() {
                                         <FailurePanel
                                             failure={turn.outcome.failure}
                                             pending={isPending}
-                                            originalQuestion={turn.retryQuestion}
+                                            originalQuestion={turn.rootQuestion}
                                             onRetry={
                                                 isLatest &&
                                                 turn.retryQuestion !== undefined &&
@@ -843,10 +872,22 @@ export default function ChatPage() {
                                                 // when this fires. Through the same composer
                                                 // submit path as retry, for the same reason.
                                                 isLatest &&
-                                                turn.retryQuestion !== undefined &&
+                                                turn.rootQuestion !== undefined &&
                                                 turn.outcome.failure.narrowerContinuation !==
                                                     undefined
                                                     ? (narrowedQuestion: string) => {
+                                                          // CHAOS-5107 (codex review round 3):
+                                                          // carries the CHAIN's root forward so a
+                                                          // second consecutive budget refusal
+                                                          // narrows the tester's real question
+                                                          // again, not the already-narrowed text
+                                                          // this turn itself sent. Set BEFORE
+                                                          // `retry`, consumed synchronously at
+                                                          // the start of the `ask()` call it
+                                                          // triggers — see the ref's own doc
+                                                          // comment.
+                                                          pendingNarrowingRootRef.current =
+                                                              turn.rootQuestion;
                                                           composerRef.current?.retry(
                                                               narrowedQuestion,
                                                           );

@@ -154,6 +154,77 @@ describe("a failure renders as a failure, in its own turn", () => {
     });
 });
 
+/**
+ * CHAOS-5107, codex review round 3 (ARGUED, executed here to confirm): a
+ * narrower re-ask sends the tester's typed question plus one appended
+ * clause. Without root tracking, a SECOND consecutive budget refusal would
+ * narrow the ALREADY-narrowed text sent for the first re-ask, compounding
+ * the clause ("…, top 5 only, top 5 only?") instead of narrowing the
+ * tester's real question again.
+ */
+describe("a chain of narrower re-asks always narrows the tester's ORIGINAL question (CHAOS-5107, codex review round 3)", () => {
+    function budgetRefusalFailure(): Record<string, unknown> {
+        return {
+            failure: {
+                code: "acr_rejected_request",
+                httpStatus: 413,
+                maxItems: 5,
+                measuredItems: 40,
+                message: "ACR rejected the investigation request.",
+                narrowerContinuation: { axis: "result_count", family: "discovered_cohort_ranking" },
+                overrun: "items",
+                retryable: false,
+            },
+        };
+    }
+
+    it("narrows the ORIGINAL question again on a second consecutive refusal, not the already-narrowed text", async () => {
+        const fetchSpy = vi
+            .spyOn(globalThis, "fetch")
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify(budgetRefusalFailure()), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            )
+            .mockResolvedValueOnce(
+                new Response(JSON.stringify(budgetRefusalFailure()), {
+                    headers: { "Content-Type": "application/json" },
+                }),
+            );
+        render(<ChatPage />);
+
+        await ask("Which teams are struggling, and why?");
+        const firstReaskButton = await screen.findByRole("button", {
+            name: "Ask for fewer results",
+        });
+        const user = userEvent.setup();
+        await user.click(firstReaskButton);
+
+        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        expect(secondCallBody.question).toBe("Which teams are struggling, and why, top 5 only?");
+
+        // A second refusal on the ALREADY-narrowed question offers narrowing
+        // again — only the LATEST turn's button is live, so there is
+        // exactly one in the DOM at any point.
+        const secondReaskButton = await screen.findByRole("button", {
+            name: "Ask for fewer results",
+        });
+        await user.click(secondReaskButton);
+
+        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
+            string,
+            unknown
+        >;
+        // Narrowed from the ORIGINAL question again — never
+        // "…, top 5 only, top 5 only?".
+        expect(thirdCallBody.question).toBe("Which teams are struggling, and why, top 5 only?");
+        expect(thirdCallBody.question).not.toContain("top 5 only, top 5 only");
+    });
+});
+
 describe("the clarification popup is live only on the most recent assistant turn (CHAOS-4671)", () => {
     it("floats a popup above the composer with the candidates as numbered options", async () => {
         respondWith({ result: clarification });
