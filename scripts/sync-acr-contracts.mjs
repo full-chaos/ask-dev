@@ -28,28 +28,41 @@ import { format } from "prettier";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 
-// acr main: pins past #426 ("Count the resolved member set on the server,
-// and say so on the answer" -- claimed no wire change) and #428 ("Contain
-// same-question carry at one choke point per axis" -- chain identity).
-// TWO commits landed between 7c6eda59 (the prior pin) and this pin; only
-// #428 touches the consumed contract surface (verified over the full
-// `contracts/` tree: `git diff 7c6eda591fb56cd30206fb223efdc10cc805ed79
-// 5a3ab55b588faa5091fa8f6b15b864cec5055f04 -- contracts/` shows exactly two
-// files, both from #428; #426 is confirmed wire-inert):
-//   - `context_fabric_investigation_request.v1`: gains an optional
-//     `parent_result_id` field (string, 8-256 chars) -- the result id of the
-//     investigation this turn follows, seeding the same-conversation carry
-//     walk only; it never binds the named result's subjects into this turn.
-//     Bounded identically to `prior_*_receipts[].result_id`.
-//   - `mcp_investigate_question_request.v1` (NEW schema, MCP surface) also
-//     gains `parent_result_id`, plus the schema itself is new -- but it is
-//     NOT part of this repo's consumed surface (SCHEMA_PATHS below), so it
-//     is not vendored here.
-// `context_fabric_common.v1`, `context_fabric_investigation_result.v1`, and
-// `error.v1` are byte-identical to the prior pin. ask-dev does not send
-// `parent_result_id` yet -- the new field is additive/optional and inert
-// until a caller sets it. Bump procedure lives in README.md.
-export const SOURCE_COMMIT = "5a3ab55b588faa5091fa8f6b15b864cec5055f04";
+// acr main: pins past #427 ("Say what an answer's charged items were
+// about"), #429 (devhealthfacts subject-shape disclosure), #431/#433
+// (design-doc updates only) and #430 ("Publish the derived requirement
+// rows, and say what refined each"). Of the commits between the prior pin
+// and this one, only #430 touches the consumed contract surface (verified
+// over the full `contracts/` tree: `git diff
+// 5a3ab55b588faa5091fa8f6b15b864cec5055f04
+// 0a172f937c27364d717313478845827aa081e875 -- contracts/` shows four files
+// changed; only one, context_fabric_common.v1, is part of this repo's
+// vendored surface -- the other three (context_fabric_answer_projection.v1,
+// mcp_investigate_question_response.v1, mcp_investigation_result_response.v1)
+// are MCP/answer-projection schemas this repo does not vendor):
+//   - `context_fabric_common.v1` grows two new $defs, both
+//     `additionalProperties:false`: `RequirementRefinement` (one reduction
+//     step -- stage/basis/overrun/coverage/before/after) and
+//     `PlanRequirement` (one derived requirement row --
+//     obligation/role/subject/kind/scope/quantifier, plus computed-step
+//     detail -- fact_kinds/step/step_execution/input_class/
+//     input_fact_kinds -- and an `unavailable` reason). `AnswerPlan` grows
+//     an optional `requirements[]` (<=200) of `PlanRequirement`. The
+//     outcome-row object (required stage/outcome/impact/cause_observed/
+//     served/declared) grows an optional `refinements[]` (<=4) of
+//     `RequirementRefinement`. The degrading-cause enum gains one member,
+//     `answer_terminated_before_attempt` (a veto exit's gap rows; wired at
+//     acr internal/contextfabric/requirement_outcomes.go:120,159, already
+//     live at this pin).
+// Every new field is schema-OPTIONAL and the new enum member is additive --
+// this pin validates BOTH the old 5a3ab55b and the new 0a172f93 acr
+// response shapes -- so this is a NORMAL two-step deploy (consumer pin
+// first, acr server second). Bumped now, ahead of the acr rig leg advance,
+// because `answer_terminated_before_attempt` is already emitted on live
+// veto-exit paths at this acr sha: without this bump the rig's ask-dev leg
+// would reject those responses with `acr_contract_violation`. Bump
+// procedure lives in README.md.
+export const SOURCE_COMMIT = "0a172f937c27364d717313478845827aa081e875";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
