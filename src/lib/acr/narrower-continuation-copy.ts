@@ -43,6 +43,20 @@ function withoutTrailingPunctuation(question: string): string {
     return stripped.length > 0 ? stripped : trimmed;
 }
 
+/**
+ * Reports whether `question` has no content worth narrowing.
+ *
+ * codex review round 2, P2: a question consisting ONLY of whitespace and/or
+ * the punctuation `withoutTrailingPunctuation` strips (e.g. `"???"`) passed
+ * a bare `.trim() !== ""` check, then rendered a re-ask button whose built
+ * question was that same punctuation with a clause appended — nothing
+ * meaningful was ever there to narrow. A question counts as blank here when
+ * it has no character other than whitespace or `!`/`.`/`?`.
+ */
+export function isBlankQuestion(question: string): boolean {
+    return !/[^\s!.?]/u.test(question);
+}
+
 export const narrowerContinuationCopy: Record<NarrowingContinuationAxis, NarrowerContinuationCopy> =
     {
         evidence_window: {

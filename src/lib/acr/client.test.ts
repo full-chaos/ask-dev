@@ -648,6 +648,37 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
         // "none" is never a member: ACR omits the key instead of sending it.
         expect(narrowingContinuationAxisVocabulary.has("none")).toBe(false);
     });
+
+    /**
+     * codex review round 2, P2: the budget-refusal fields were forwarded
+     * regardless of HTTP status, so a 503 (or any other non-413 status)
+     * whose `error.details` happened to carry these same key names would
+     * render a narrower-reask button under an UNRELATED failure. ACR only
+     * ever puts this continuation on a 413; the client now only reads it
+     * for one.
+     */
+    it("never surfaces narrower_continuation/overrun/counts on a non-413 status, even if details carry them", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "items",
+                measured_items: 42,
+                max_items: 25,
+                narrower_continuation: {
+                    family: "discovered_cohort_ranking",
+                    axis: "result_count",
+                },
+            }),
+            503,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toBeUndefined();
+        expect(failure.overrun).toBeUndefined();
+        expect(failure.measuredItems).toBeUndefined();
+        expect(failure.maxItems).toBeUndefined();
+        // Sanity: this really did go through the 503 branch, not a fluke.
+        expect(failure.code).toBe("acr_runtime_unavailable");
+    });
 });
 
 describe("investigate", () => {

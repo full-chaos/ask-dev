@@ -388,20 +388,30 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     // sentence in either would otherwise put it straight into the DOM.
     const code = boundedUpstreamCode(upstream.code);
     const upstreamRequestId = boundedUpstreamRequestId(upstream.requestId);
+    // CHAOS-5107 (codex review round 2, P2): ACR only ever puts a budget
+    // continuation in `error.details` on a 413 -- carrying it forward
+    // regardless of status meant a 503/401/whatever-else response with a
+    // details object that happened to carry these same key names would
+    // render a "narrower re-ask" under an UNRELATED failure. Gating on the
+    // status code the continuation is actually defined for closes that.
+    const budgetRefusalFields =
+        status === 413
+            ? {
+                  ...(upstream.narrowerContinuation === undefined
+                      ? {}
+                      : { narrowerContinuation: upstream.narrowerContinuation }),
+                  ...(upstream.overrun === undefined ? {} : { overrun: upstream.overrun }),
+                  ...(upstream.measuredItems === undefined
+                      ? {}
+                      : { measuredItems: upstream.measuredItems }),
+                  ...(upstream.maxItems === undefined ? {} : { maxItems: upstream.maxItems }),
+              }
+            : {};
     const upstreamFields = {
         httpStatus: status,
         ...(code === undefined ? {} : { upstreamCode: code }),
         ...(upstreamRequestId === undefined ? {} : { upstreamRequestId }),
-        // CHAOS-5107: forwarded whenever ACR sent them, regardless of
-        // status — the fields are read honestly from `error.details` above,
-        // never guessed at from the status code. In practice ACR sends
-        // these only on a 413 budget refusal.
-        ...(upstream.narrowerContinuation === undefined
-            ? {}
-            : { narrowerContinuation: upstream.narrowerContinuation }),
-        ...(upstream.overrun === undefined ? {} : { overrun: upstream.overrun }),
-        ...(upstream.measuredItems === undefined ? {} : { measuredItems: upstream.measuredItems }),
-        ...(upstream.maxItems === undefined ? {} : { maxItems: upstream.maxItems }),
+        ...budgetRefusalFields,
     };
     if (status === 401 || status === 403) {
         return {

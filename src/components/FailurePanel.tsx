@@ -1,5 +1,6 @@
 import { NarrowerReask } from "@/components/NarrowerReask";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
+import { isBlankQuestion } from "@/lib/acr/narrower-continuation-copy";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 
 export type FailurePanelProps = {
@@ -82,7 +83,7 @@ export function FailurePanel({
             {failure.narrowerContinuation === undefined ||
             onNarrowerReask === undefined ||
             originalQuestion === undefined ||
-            originalQuestion.trim() === "" ? null : (
+            isBlankQuestion(originalQuestion) ? null : (
                 <NarrowerReask
                     maxItems={failure.maxItems}
                     measuredItems={failure.measuredItems}

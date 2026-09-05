@@ -85,6 +85,25 @@ describe("FailurePanel — CHAOS-5107 narrower re-ask wiring", () => {
         expect(screen.queryByRole("button", { name: "Ask for fewer results" })).toBeNull();
     });
 
+    /**
+     * codex review round 2, P2: a question consisting only of the
+     * punctuation the copy module strips (`"???"`) passed the round-1
+     * `.trim() !== ""` gate, then built a re-ask question that was that
+     * same punctuation with a clause appended — nothing meaningful was
+     * ever there.
+     */
+    it("renders nothing when the original question is punctuation-only", () => {
+        render(
+            <FailurePanel
+                failure={budgetRefusalFailure}
+                onNarrowerReask={vi.fn()}
+                originalQuestion="???"
+            />,
+        );
+
+        expect(screen.queryByRole("button", { name: "Ask for fewer results" })).toBeNull();
+    });
+
     it("calls onNarrowerReask with a narrowed question, never the bare original, on click", async () => {
         const user = userEvent.setup();
         const onNarrowerReask = vi.fn();
