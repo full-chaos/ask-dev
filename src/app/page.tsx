@@ -815,6 +815,7 @@ export default function ChatPage() {
                                         <FailurePanel
                                             failure={turn.outcome.failure}
                                             pending={isPending}
+                                            originalQuestion={turn.retryQuestion}
                                             onRetry={
                                                 isLatest &&
                                                 turn.retryQuestion !== undefined &&
@@ -830,6 +831,24 @@ export default function ChatPage() {
                                                           // round 2).
                                                           composerRef.current?.retry(
                                                               turn.retryQuestion!,
+                                                          );
+                                                      }
+                                                    : undefined
+                                            }
+                                            onNarrowerReask={
+                                                // CHAOS-5107: same availability rule as
+                                                // `onRetry` (plain-ask-only, latest-turn-only),
+                                                // but NOT gated on `retryable` — a 413 budget
+                                                // refusal is never retryable, yet is exactly
+                                                // when this fires. Through the same composer
+                                                // submit path as retry, for the same reason.
+                                                isLatest &&
+                                                turn.retryQuestion !== undefined &&
+                                                turn.outcome.failure.narrowerContinuation !==
+                                                    undefined
+                                                    ? (narrowedQuestion: string) => {
+                                                          composerRef.current?.retry(
+                                                              narrowedQuestion,
                                                           );
                                                       }
                                                     : undefined

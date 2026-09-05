@@ -1,3 +1,4 @@
+import { NarrowerReask } from "@/components/NarrowerReask";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 
@@ -10,6 +11,16 @@ export type FailurePanelProps = {
      * that receipt logic. Absent elsewhere, including on frozen turns.
      */
     readonly onRetry?: (() => void) | undefined;
+    /**
+     * CHAOS-5107: the tester's own original question text, needed to build
+     * the narrower re-ask (`@/components/NarrowerReask`). Same availability
+     * rule as `onRetry` above — only the latest turn's own plain ask carries
+     * one — but gated independently: a 413 budget refusal is NOT retryable
+     * (`onRetry` never fires for it), yet IS narrower-reaskable, which is the
+     * whole point of this component.
+     */
+    readonly originalQuestion?: string | undefined;
+    readonly onNarrowerReask?: ((narrowedQuestion: string) => void) | undefined;
     readonly pending?: boolean | undefined;
 };
 
@@ -21,7 +32,13 @@ export type FailurePanelProps = {
  * and, where the cause is an operator state rather than a transient blip, says
  * what has to be true for the call to succeed.
  */
-export function FailurePanel({ failure, onRetry, pending = false }: FailurePanelProps) {
+export function FailurePanel({
+    failure,
+    onRetry,
+    originalQuestion,
+    onNarrowerReask,
+    pending = false,
+}: FailurePanelProps) {
     return (
         <section className="panel panel--failure" aria-labelledby="failure-title" role="alert">
             <h2 className="panel__title" id="failure-title">
@@ -61,6 +78,19 @@ export function FailurePanel({ failure, onRetry, pending = false }: FailurePanel
                 >
                     {pending ? "Retrying…" : "Retry"}
                 </button>
+            )}
+            {failure.narrowerContinuation === undefined ||
+            onNarrowerReask === undefined ||
+            originalQuestion === undefined ? null : (
+                <NarrowerReask
+                    maxItems={failure.maxItems}
+                    measuredItems={failure.measuredItems}
+                    narrowerContinuation={failure.narrowerContinuation}
+                    onReask={onNarrowerReask}
+                    originalQuestion={originalQuestion}
+                    overrun={failure.overrun}
+                    pending={pending}
+                />
             )}
         </section>
     );
