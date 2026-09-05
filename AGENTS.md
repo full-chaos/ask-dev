@@ -38,3 +38,11 @@ Contract rule: any acr contract widening ⇒ ask-dev pin bump before any live pr
 Data vocabulary: "local" = the admin@test.com org (`70d529e0`, REAL synced data on the compose stack); `dev-hops fixtures generate` = contrived CI data; "prod" = read-only post-deploy readback. Team = project/repo OWNERSHIP only (never person→membership→team); ownership is sync-derived, provider-agnostic; no manual TEAM mappings.
 
 Checks that bite hardest here: 6, 10, 11, 15, 18 — plus: never render a bare `Score` without its `Drivers`; this is the deterministic view that must fail closed rather than mask an answer-quality failure.
+
+## PR and branch naming
+
+- Branch name: `<type>/<topic>`, named by topic — never by lane name or date.
+- PR title: `<type>(<area>): CHAOS-<n> <short imperative description>` — `type` is `feat`/`fix`/`bug`/`enhancement`/`chore`/`docs`; `area` is the code actually touched. Every PR cites **exactly one** ticket — split a shared ticket into sub-issues **before** opening the PR. A PR that genuinely spans more than one ticket omits the id (rare; the id exists so the PR is easy to find). A follow-up ticket found during the work is noted in the body as "filed separately", never by id. Commit messages carry no ticket ids — the squash commit takes the PR title.
+- PR body carries the literal headings `## TEST-EVIDENCE` and `## RISK-NOTES` — a governance parser reads them literally.
+- A PR that depends on another **open** PR's content opens **stacked** on it (base = the dependency), never parallel and main-based.
+- Body edits: one edit per pushed tip, made **before** that tip's CI goes terminal; none after.
