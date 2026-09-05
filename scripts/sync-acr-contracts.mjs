@@ -62,7 +62,35 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // veto-exit paths at this acr sha: without this bump the rig's ask-dev leg
 // would reject those responses with `acr_contract_violation`. Bump
 // procedure lives in README.md.
-export const SOURCE_COMMIT = "0a172f937c27364d717313478845827aa081e875";
+//
+// 0a172f93 -> c6aaa727: 10 commits, only #438 ("evaluate read
+// requirements against the evidence that served them") and #435 ("Qualify
+// a count taken over a population the answer never saw all of") touch
+// `contracts/`. Verified over the full tree (`git diff 0a172f93 c6aaa727 --
+// contracts/`): the SAME single change appears in four schema files --
+// `context_fabric_common.v1`, `context_fabric_answer_projection.v1`,
+// `mcp_investigate_question_response.v1`,
+// `mcp_investigation_result_response.v1` -- and only the first is part of
+// this repo's vendored surface (the other three are MCP/answer-projection
+// schemas this repo does not vendor, same shape as the prior bump).
+//   - `context_fabric_common.v1`'s `CoverageDetail.code` (the degrading-cause
+//     enum) gains two members, one from each commit: `population_truncated`
+//     (#435 -- a value computed over a member set the cohort itself says is
+//     a strict subset of the population the question named -- acr
+//     internal/contracts/v1/context_fabric_coverage_detail.go's
+//     ContextFabricCoverageDetailPopulationTruncated) and
+//     `requirement_read_not_planned` (#438 -- a READ requirement the plan
+//     published that no planned fact of any kind could serve, so it was
+//     never attempted at all --
+//     ContextFabricCoverageDetailRequirementReadNotPlanned, same file).
+//     Both additive; no other field, $def, or required-list change in the
+//     consumed schema.
+// Bumped ahead of the acr rig leg advance for the same reason as the prior
+// pin: both new codes are wired at this acr sha, and the rig's population-
+// counting (#435) and read-evaluation (#438) paths can already emit them --
+// without this bump the rig's ask-dev leg would reject those responses
+// with `acr_contract_violation`.
+export const SOURCE_COMMIT = "c6aaa7276049e684a36fcd17aba4c4d03d68507e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
