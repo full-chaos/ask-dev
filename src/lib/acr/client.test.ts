@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildInvestigationRequest, exceedsResponseCap, investigate } from "@/lib/acr/client";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
-import { acrErrorCodeVocabulary } from "@/lib/acr/upstream-vocabulary";
+import {
+    acrErrorCodeVocabulary,
+    budgetOverrunVocabulary,
+    narrowingContinuationAxisVocabulary,
+    questionFamilyVocabulary,
+} from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import type { StructureSubjectKind } from "@/lib/contracts";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
@@ -451,6 +456,228 @@ describe("investigate — upstream identifiers are bounded, not echoed", () => {
         expect(acrErrorCodeVocabulary.has("synthesis_rejected")).toBe(true);
         expect(acrErrorCodeVocabulary.has("rate_limited")).toBe(true);
         expect(acrErrorCodeVocabulary.has("not_a_real_code")).toBe(false);
+    });
+});
+
+describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuation", () => {
+    /**
+     * Real 413 budget-refusal shape, built from ACR's own route handler
+     * (context_fabric_routes.go:279-304) — the exact keys and value types
+     * `a.writeContextFabricError`'s `budgetRefusal` branch constructs, not
+     * hand-invented ones: `overrun`, `measured_items`, `measured_bytes`,
+     * `max_items`, `max_serialized_bytes`, `question_family`,
+     * `retry_attempted`, and (only when an axis was named)
+     * `narrower_continuation.{family,axis}`. `code` is `invalid_request`
+     * because that route always classifies a budget refusal that way,
+     * confirmed against error.v1.schema.json's closed `code` enum.
+     */
+    function budgetRefusalPayload(
+        details: Record<string, unknown>,
+        message = "The Context Fabric answer did not fit the response budget",
+    ) {
+        return {
+            schema_version: "error.v1",
+            request_id: "req_budget_refusal_0001",
+            error: {
+                code: "invalid_request",
+                message,
+                http_status: 413,
+                retryable: false,
+                details,
+            },
+        };
+    }
+
+    it("reads narrower_continuation and the budget fields off a real 413 payload", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "items",
+                measured_items: 42,
+                measured_bytes: 900_000,
+                max_items: 25,
+                max_serialized_bytes: 1_048_576,
+                question_family: "discovered_cohort_ranking",
+                retry_attempted: true,
+                narrower_continuation: {
+                    family: "discovered_cohort_ranking",
+                    axis: "result_count",
+                },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toEqual({
+            axis: "result_count",
+            family: "discovered_cohort_ranking",
+        });
+        expect(failure.overrun).toBe("items");
+        expect(failure.measuredItems).toBe(42);
+        expect(failure.maxItems).toBe(25);
+        expect(failure.retryable).toBe(false);
+    });
+
+    it("omits narrower_continuation entirely when ACR named no axis (the OMITTED discipline)", async () => {
+        // ACR omits the key rather than sending {"axis":"none"} when nothing
+        // could be named (chaos4636_answer_plan.go's comment on this exact
+        // branch) — a payload that never carries the key at all.
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "bytes",
+                measured_items: 10,
+                max_items: 25,
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toBeUndefined();
+        expect(failure.overrun).toBe("bytes");
+    });
+
+    it("drops the whole continuation when axis is outside the closed vocabulary, but keeps the sibling budget fields", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "items",
+                measured_items: 42,
+                max_items: 25,
+                narrower_continuation: {
+                    family: "discovered_cohort_ranking",
+                    axis: "made_up_axis",
+                },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toBeUndefined();
+        expect(failure.overrun).toBe("items");
+        expect(failure.measuredItems).toBe(42);
+        expect(failure.maxItems).toBe(25);
+    });
+
+    it("drops family alone when it is outside the closed vocabulary, keeping the axis", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                narrower_continuation: { family: "not_a_real_family", axis: "result_count" },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toEqual({ axis: "result_count" });
+    });
+
+    it("drops a non-integer measured_items/max_items rather than rendering it as a count", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                measured_items: "forty-two",
+                max_items: -1,
+                narrower_continuation: { family: "trend", axis: "evidence_window" },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.measuredItems).toBeUndefined();
+        expect(failure.maxItems).toBeUndefined();
+        expect(failure.narrowerContinuation).toEqual({ axis: "evidence_window", family: "trend" });
+    });
+
+    /**
+     * codex review round 1, P2: `Number.isInteger` accepts any value beyond
+     * `Number.MAX_SAFE_INTEGER` that JSON.parse rounded to a whole number —
+     * rendering it as a count presents a rounded value as an exact one.
+     */
+    it("drops an unsafe (beyond MAX_SAFE_INTEGER) measured_items/max_items", async () => {
+        // Computed, not a literal: a literal one past MAX_SAFE_INTEGER trips
+        // eslint's no-loss-of-precision rule (correctly — that IS the point
+        // being tested), so the value is built at runtime instead.
+        const unsafeInteger = Number.MAX_SAFE_INTEGER + 2;
+        respondWith(
+            budgetRefusalPayload({
+                measured_items: unsafeInteger,
+                narrower_continuation: { family: "trend", axis: "evidence_window" },
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.measuredItems).toBeUndefined();
+    });
+
+    /**
+     * C1 (client.ts's own upstream-prose rule) extended to the budget-refusal
+     * shape specifically: `error.message` is exactly the kind of ACR-authored
+     * sentence this file must never carry, even when it arrives alongside a
+     * legitimate structured continuation.
+     */
+    it("never carries error.message even on a 413 that also carries a narrower_continuation", async () => {
+        const upstreamProse = "The model insists this fits; ship it anyway.";
+        respondWith(
+            budgetRefusalPayload(
+                { narrower_continuation: { family: "trend", axis: "evidence_window" } },
+                upstreamProse,
+            ),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(JSON.stringify(failure)).not.toContain(upstreamProse);
+        expect(failure.narrowerContinuation).toEqual({ axis: "evidence_window", family: "trend" });
+    });
+
+    it("derives question_family/overrun allowlists from the pinned contract rather than a hand-copied list", () => {
+        expect(questionFamilyVocabulary.has("discovered_cohort_ranking")).toBe(true);
+        expect(questionFamilyVocabulary.has("not_a_real_family")).toBe(false);
+        expect(budgetOverrunVocabulary.has("items")).toBe(true);
+        expect(budgetOverrunVocabulary.has("bytes")).toBe(true);
+        expect(budgetOverrunVocabulary.has("not_a_real_overrun")).toBe(false);
+    });
+
+    it("keeps the axis vocabulary in sync with ACR's registry (chaos4632_question_family_registry.go)", () => {
+        expect(narrowingContinuationAxisVocabulary).toEqual(
+            new Set([
+                "evidence_window",
+                "result_count",
+                "scope_anchor",
+                "group_selection",
+                "comparison_pair",
+            ]),
+        );
+        // "none" is never a member: ACR omits the key instead of sending it.
+        expect(narrowingContinuationAxisVocabulary.has("none")).toBe(false);
+    });
+
+    /**
+     * codex review round 2, P2: the budget-refusal fields were forwarded
+     * regardless of HTTP status, so a 503 (or any other non-413 status)
+     * whose `error.details` happened to carry these same key names would
+     * render a narrower-reask button under an UNRELATED failure. ACR only
+     * ever puts this continuation on a 413; the client now only reads it
+     * for one.
+     */
+    it("never surfaces narrower_continuation/overrun/counts on a non-413 status, even if details carry them", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "items",
+                measured_items: 42,
+                max_items: 25,
+                narrower_continuation: {
+                    family: "discovered_cohort_ranking",
+                    axis: "result_count",
+                },
+            }),
+            503,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+        expect(failure.narrowerContinuation).toBeUndefined();
+        expect(failure.overrun).toBeUndefined();
+        expect(failure.measuredItems).toBeUndefined();
+        expect(failure.maxItems).toBeUndefined();
+        // Sanity: this really did go through the 503 branch, not a fluke.
+        expect(failure.code).toBe("acr_runtime_unavailable");
     });
 });
 

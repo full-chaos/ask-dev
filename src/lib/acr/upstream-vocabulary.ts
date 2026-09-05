@@ -1,3 +1,4 @@
+import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import errorSchema from "@/contracts/schemas/error.v1.schema.json";
 
 /**
@@ -55,3 +56,113 @@ export function boundedUpstreamRequestId(requestId: string | undefined): string 
 
 /** Exposed for tests, so the allowlist's source can be asserted rather than assumed. */
 export const acrErrorCodeVocabulary: ReadonlySet<string> = ACR_ERROR_CODES;
+
+/**
+ * CHAOS-5107 (CHAOS-4735's client half): the planned-refusal continuation a
+ * 413 budget refusal carries in `error.details`, an OPEN object (error.v1's
+ * `details.additionalProperties: true` — see error.v1.schema.json), so none
+ * of what follows is a schema change or needs a pin bump.
+ *
+ * `question_family` and `overrun` ARE declared in the pinned common schema
+ * (`QuestionFamily`/`BudgetOverrun` `$defs`), so their allowlists are read
+ * from it exactly as `ACR_ERROR_CODES` reads `error.code` above — a pin bump
+ * that adds a member picks it up automatically. `narrower_continuation.axis`
+ * has no schema of its own (CHAOS-4735 put it in the open object on purpose,
+ * per chris's 2026-08-31 ruling that naming a structural axis is not a wire
+ * widening); its vocabulary is hand-copied from ACR's own source of truth
+ * (internal/contextfabric/chaos4632_question_family_registry.go) and
+ * verified against a real fixture in client.test.ts. `none` is excluded on
+ * purpose: the route OMITS `narrower_continuation` entirely rather than
+ * sending `{"axis":"none"}` when no axis can be named, so a consumer never
+ * sees that member on the wire.
+ */
+export type NarrowingContinuationAxis =
+    "evidence_window" | "result_count" | "scope_anchor" | "group_selection" | "comparison_pair";
+
+const NARROWING_CONTINUATION_AXES: ReadonlySet<string> = new Set<NarrowingContinuationAxis>([
+    "evidence_window",
+    "result_count",
+    "scope_anchor",
+    "group_selection",
+    "comparison_pair",
+]);
+
+/** Exposed for tests, so the hand-copied vocabulary can be asserted directly. */
+export const narrowingContinuationAxisVocabulary: ReadonlySet<string> = NARROWING_CONTINUATION_AXES;
+
+/**
+ * Returns the axis when it is a member of the closed vocabulary, `undefined`
+ * otherwise. Unlike `boundedUpstreamCode`, there is no "unrecognized" marker
+ * value: an axis outside the vocabulary has no entry in the copy table
+ * either (`narrower-continuation-copy.ts`), so a marker would only let a
+ * caller render half a claim. Absence is the honest encoding.
+ */
+export function boundedNarrowingContinuationAxis(
+    axis: string | undefined,
+): NarrowingContinuationAxis | undefined {
+    if (axis === undefined) return undefined;
+    return NARROWING_CONTINUATION_AXES.has(axis) ? (axis as NarrowingContinuationAxis) : undefined;
+}
+
+/**
+ * `QuestionFamily`'s closed vocabulary, read from the pinned common schema —
+ * see this section's header comment.
+ */
+const QUESTION_FAMILIES: ReadonlySet<string> = new Set(
+    (commonSchema as { $defs: { QuestionFamily: { enum?: string[] } } }).$defs.QuestionFamily
+        .enum ?? [],
+);
+
+/** Exposed for tests, so the allowlist's source can be asserted rather than assumed. */
+export const questionFamilyVocabulary: ReadonlySet<string> = QUESTION_FAMILIES;
+
+/**
+ * Bounded like `boundedUpstreamCode`, but with no marker for an unrecognized
+ * value: `question_family` inside `narrower_continuation` is carried for
+ * diagnosis, never rendered as copy on its own, so dropping it silently is
+ * enough — nothing downstream needs to know one arrived and was rejected.
+ */
+export function boundedQuestionFamily(family: string | undefined): string | undefined {
+    if (family === undefined) return undefined;
+    return QUESTION_FAMILIES.has(family) ? family : undefined;
+}
+
+/**
+ * `BudgetOverrun`'s closed vocabulary (`fits`/`items`/`bytes`), read from the
+ * pinned common schema — see this section's header comment. ACR only ever
+ * sends `items` or `bytes` inside a refusal's `details.overrun` (`fits`
+ * means the answer fit, so it is never the cause of a refusal), but the
+ * bound accepts the schema's full enum rather than a hand-narrowed one.
+ */
+const BUDGET_OVERRUNS: ReadonlySet<string> = new Set(
+    (commonSchema as { $defs: { BudgetOverrun: { enum?: string[] } } }).$defs.BudgetOverrun.enum ??
+        [],
+);
+
+/** Exposed for tests, so the allowlist's source can be asserted rather than assumed. */
+export const budgetOverrunVocabulary: ReadonlySet<string> = BUDGET_OVERRUNS;
+
+export function boundedBudgetOverrun(overrun: string | undefined): string | undefined {
+    if (overrun === undefined) return undefined;
+    return BUDGET_OVERRUNS.has(overrun) ? overrun : undefined;
+}
+
+/**
+ * `measured_items`/`max_items` are plain counts, not identifiers, but "should
+ * be a non-negative integer" is not a guarantee any more than "should be an
+ * identifier" was for `code`/`request_id` above — an upstream that put
+ * something else there must not have it rendered as a count regardless.
+ *
+ * `Number.isSafeInteger`, not `Number.isInteger`: a value beyond
+ * `Number.MAX_SAFE_INTEGER` (e.g. `9007199254740993`) is still
+ * integer-VALUED as a float but has already lost precision in the JSON
+ * parse that produced it — rendering it as a count would present a rounded
+ * number as an exact one. `-0` is rejected explicitly (`Object.is`, not
+ * `===`, since `-0 === 0` is true in JS) — it satisfies every other check
+ * here and has no business being "a count."
+ */
+export function boundedNonNegativeInteger(value: unknown): number | undefined {
+    if (typeof value !== "number" || !Number.isSafeInteger(value)) return undefined;
+    if (Object.is(value, -0)) return undefined;
+    return value >= 0 ? value : undefined;
+}

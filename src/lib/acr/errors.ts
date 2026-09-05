@@ -1,3 +1,5 @@
+import type { NarrowingContinuationAxis } from "@/lib/acr/upstream-vocabulary";
+
 /**
  * The failure vocabulary the Workbench shows a tester.
  *
@@ -103,6 +105,27 @@ export type WorkbenchFailure = {
     /** Contract validation errors, when the payload failed validation. */
     readonly details?: readonly string[];
     readonly retryable: boolean;
+    /**
+     * CHAOS-5107 (CHAOS-4735's client half): the planned refusal's
+     * continuation, present only on a 413 budget refusal that named an
+     * axis. `axis`/`family` are ACR-authored closed tokens — structural
+     * claims, not generated prose — so they are carried the same way
+     * `upstreamCode` is. Turning `axis` into English is this component's
+     * job, not ACR's: see `@/lib/acr/narrower-continuation-copy`, the ONLY
+     * place in the Workbench that phrases a narrower re-ask (E-6, chris).
+     */
+    readonly narrowerContinuation?:
+        | {
+              readonly axis: NarrowingContinuationAxis;
+              readonly family?: string;
+          }
+        | undefined;
+    /** Which budget ceiling was exceeded (`items`/`bytes`), when ACR said. */
+    readonly overrun?: string | undefined;
+    /** The item count the refused answer measured, when ACR said. */
+    readonly measuredItems?: number | undefined;
+    /** The item ceiling the refused answer exceeded, when ACR said. */
+    readonly maxItems?: number | undefined;
 };
 
 export class AcrRequestError extends Error {

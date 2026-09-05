@@ -5,7 +5,15 @@ import { randomUUID } from "node:crypto";
 import { signWebAssertion } from "@/lib/acr/assertion";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
-import { boundedUpstreamCode, boundedUpstreamRequestId } from "@/lib/acr/upstream-vocabulary";
+import {
+    boundedBudgetOverrun,
+    boundedNarrowingContinuationAxis,
+    boundedNonNegativeInteger,
+    boundedQuestionFamily,
+    boundedUpstreamCode,
+    boundedUpstreamRequestId,
+    type NarrowingContinuationAxis,
+} from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import { MAX_CONVERSATION_TURNS_ON_WIRE } from "@/lib/conversation";
 import type {
@@ -272,6 +280,21 @@ type UpstreamError = {
     readonly code?: string;
     readonly retryable?: boolean;
     readonly requestId?: string;
+    /**
+     * CHAOS-5107/CHAOS-4735: the planned refusal's continuation, present only
+     * when a 413 budget refusal named an axis. Read from `error.details` (an
+     * OPEN object — see upstream-vocabulary.ts's header comment on this
+     * section), so this is not a schema change. `axis` is always a member of
+     * the closed vocabulary when this field is present at all — see
+     * `parseNarrowerContinuation`.
+     */
+    readonly narrowerContinuation?: {
+        readonly axis: NarrowingContinuationAxis;
+        readonly family?: string;
+    };
+    readonly overrun?: string;
+    readonly measuredItems?: number;
+    readonly maxItems?: number;
 };
 
 function parseUpstreamError(payload: unknown): UpstreamError {
@@ -282,12 +305,67 @@ function parseUpstreamError(payload: unknown): UpstreamError {
     const base = typeof requestId === "string" ? { requestId } : {};
     if (typeof error !== "object" || error === null) return base;
     // `message` is read past deliberately; see UpstreamError.
-    const { code, retryable } = error as Record<string, unknown>;
+    const { code, retryable, details } = error as Record<string, unknown>;
     return {
         ...base,
         ...(typeof code === "string" ? { code } : {}),
         ...(typeof retryable === "boolean" ? { retryable } : {}),
+        ...parseUpstreamErrorDetails(details),
     };
+}
+
+/**
+ * CHAOS-5107: reads the CHAOS-4735 planned-refusal fields out of
+ * `error.details`. `details` is an open object (error.v1.schema.json:
+ * `details.additionalProperties: true`), so none of this is a schema change
+ * or needs a pin bump — the same fact ACR's own routes.go comment records
+ * about this exact field set.
+ *
+ * Every field is bounded against a closed vocabulary or a shape before it is
+ * carried anywhere, the same discipline `boundedUpstreamCode`/
+ * `boundedUpstreamRequestId` already apply two levels up in `failureFor`.
+ * Nothing here reads `error.message`, `question_text`, or any other free-text
+ * field — the corpus/tester's question never appears in this file.
+ */
+function parseUpstreamErrorDetails(
+    details: unknown,
+): Pick<UpstreamError, "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun"> {
+    if (typeof details !== "object" || details === null) return {};
+    const record = details as Record<string, unknown>;
+    const overrun = boundedBudgetOverrun(
+        typeof record.overrun === "string" ? record.overrun : undefined,
+    );
+    const measuredItems = boundedNonNegativeInteger(record.measured_items);
+    const maxItems = boundedNonNegativeInteger(record.max_items);
+    const narrowerContinuation = parseNarrowerContinuation(record.narrower_continuation);
+    return {
+        ...(overrun === undefined ? {} : { overrun }),
+        ...(measuredItems === undefined ? {} : { measuredItems }),
+        ...(maxItems === undefined ? {} : { maxItems }),
+        ...(narrowerContinuation === undefined ? {} : { narrowerContinuation }),
+    };
+}
+
+/**
+ * `axis` gates the whole object: an axis outside the closed vocabulary (or
+ * missing) has no entry in the copy table either
+ * (`@/lib/acr/narrower-continuation-copy`), so keeping a continuation around
+ * without one would only let a caller render half a claim. `family` is
+ * optional even when present on the wire — it is carried for diagnosis, not
+ * rendered as copy, so an unrecognized value is dropped rather than sinking
+ * the whole continuation.
+ */
+function parseNarrowerContinuation(value: unknown): UpstreamError["narrowerContinuation"] {
+    if (typeof value !== "object" || value === null) return undefined;
+    const record = value as Record<string, unknown>;
+    const axis = boundedNarrowingContinuationAxis(
+        typeof record.axis === "string" ? record.axis : undefined,
+    );
+    if (axis === undefined) return undefined;
+    const family = boundedQuestionFamily(
+        typeof record.family === "string" ? record.family : undefined,
+    );
+    return { axis, ...(family === undefined ? {} : { family }) };
 }
 
 /**
@@ -310,10 +388,30 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     // sentence in either would otherwise put it straight into the DOM.
     const code = boundedUpstreamCode(upstream.code);
     const upstreamRequestId = boundedUpstreamRequestId(upstream.requestId);
+    // CHAOS-5107 (codex review round 2, P2): ACR only ever puts a budget
+    // continuation in `error.details` on a 413 -- carrying it forward
+    // regardless of status meant a 503/401/whatever-else response with a
+    // details object that happened to carry these same key names would
+    // render a "narrower re-ask" under an UNRELATED failure. Gating on the
+    // status code the continuation is actually defined for closes that.
+    const budgetRefusalFields =
+        status === 413
+            ? {
+                  ...(upstream.narrowerContinuation === undefined
+                      ? {}
+                      : { narrowerContinuation: upstream.narrowerContinuation }),
+                  ...(upstream.overrun === undefined ? {} : { overrun: upstream.overrun }),
+                  ...(upstream.measuredItems === undefined
+                      ? {}
+                      : { measuredItems: upstream.measuredItems }),
+                  ...(upstream.maxItems === undefined ? {} : { maxItems: upstream.maxItems }),
+              }
+            : {};
     const upstreamFields = {
         httpStatus: status,
         ...(code === undefined ? {} : { upstreamCode: code }),
         ...(upstreamRequestId === undefined ? {} : { upstreamRequestId }),
+        ...budgetRefusalFields,
     };
     if (status === 401 || status === 403) {
         return {
