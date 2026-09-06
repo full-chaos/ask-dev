@@ -743,3 +743,101 @@ describe("investigation result contract — outcome-driven completeness (acr 7c6
         expect(stateRejections.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * The read-population pin (acr 084ab9c4): `CoverageDetail.code`'s closed enum
+ * gains `read_population_unverified`.
+ *
+ * A read requirement whose completion scope is distributive — `each_operand`,
+ * `each_member`, `each_group` — over a population NOTHING CAN ENUMERATE now
+ * discloses that with its own code, because every neighbour would have been a
+ * plausible lie: `population_truncated` says a population WAS enumerated and is
+ * a known floor, and `fact_pruned` is declared never-degrading while this arm
+ * IS degrading — the reader asked for a cell and gets none of it.
+ *
+ * Without this bump such an answer fails CLOSED here with
+ * `acr_contract_violation` and reads as a rig failure rather than a pin gap —
+ * the same failure mode the reuse-strip bump above exists to close, and the
+ * reason a new acr code and its consumer pin travel together.
+ */
+describe("coverage detail code — read_population_unverified (acr 084ab9c4 consumer pin)", () => {
+    function unverifiedPopulationResult(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            coverage: { partial: boolean; degraded_reasons: string[]; details?: unknown[] };
+            evidence_ref_ids: string[];
+        };
+        result.coverage.partial = true;
+        result.coverage.degraded_reasons = [
+            "Part of what you asked about could not be identified, so it was not read.",
+        ];
+        // NO `count`: this code carries no required count, and that is the
+        // point of it — nothing enumerated the population, so there is no
+        // number to report. A fixture inventing one would assert a shape acr
+        // does not produce.
+        result.coverage.details = [
+            {
+                detail_id: "cov-readpop-01",
+                source: "context-fabric:read-population",
+                code: "read_population_unverified",
+                degrading: true,
+                label: "Some of what you asked about could not be identified",
+            },
+        ];
+        return {
+            ...result,
+            evidence_ref_labels: Object.fromEntries(
+                result.evidence_ref_ids.map((ref) => [ref, ref]),
+            ),
+        };
+    }
+
+    it("an unverified-population response validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            unverifiedPopulationResult(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized coverage detail code still rejects — the enum stays closed", () => {
+        const tampered = unverifiedPopulationResult() as {
+            coverage: { details: Array<Record<string, unknown>> };
+        };
+        tampered.coverage.details[0]!.code = "read_population_bogus_code";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (c6aaa727, on origin/main
+     * before this PR): the same document against a `CoverageDetail` $def with
+     * `read_population_unverified` stripped from its `code` enum — exactly the
+     * `acr_contract_violation` this answer hits under the unbumped pin. RED
+     * against that reproduction, GREEN against the real pinned schema above.
+     * Without this arm the test above proves only that the schema accepts the
+     * document, never that the BUMP is what made it acceptable.
+     */
+    it("EXECUTED repro: an unverified-population answer would 502 under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { CoverageDetail: { properties: { code: { enum: string[] } } } };
+        };
+        const codeDef = priorSchema.$defs.CoverageDetail?.properties.code;
+        if (codeDef === undefined) {
+            throw new Error("context_fabric_common.v1 schema has no CoverageDetail.code property");
+        }
+        codeDef.enum = codeDef.enum.filter((value) => value !== "read_population_unverified");
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(unverifiedPopulationResult())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});

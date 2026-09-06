@@ -90,7 +90,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // counting (#435) and read-evaluation (#438) paths can already emit them --
 // without this bump the rig's ask-dev leg would reject those responses
 // with `acr_contract_violation`.
-export const SOURCE_COMMIT = "c6aaa7276049e684a36fcd17aba4c4d03d68507e";
+export const SOURCE_COMMIT = "084ab9c45e985dd457679e7831635d5ca86d3a05";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
