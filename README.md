@@ -437,10 +437,26 @@ a structural type). Every other field's maxItems tuple-union typing (e.g.
 
 ### Why Next.js is pinned exactly
 
-`next` is pinned to `16.2.12`, not `^16.2.12`. A fresh caret install resolves to
-16.3.x, which `dev-health-web` is deliberately paused on over open regressions.
-This surface is meant to be promoted into that repo, so it should run what that
-repo runs. Bump it when web bumps, not before.
+`next` is pinned to an exact version, not a caret range, so an install can
+never drift onto a line this repo hasn't verified.
+
+**2026-09-09: moved to `16.3.3`, ahead of the web upgrade.** The prior pin
+(`16.2.12`) carried two unpatched Next.js unauthenticated-RCE criticals that
+only a real `next` version bump clears -- unlike the sharp/postcss/fast-uri
+advisories on this same dependency, which are handled as
+`pnpm-workspace.yaml` overrides without touching next's own pin. Advisory
+references (GitHub Security Advisory database):
+
+- https://github.com/advisories/GHSA-p293-qw3h-jr36
+- https://github.com/advisories/GHSA-2xp9-vwfh-vxw4
+
+`16.3.3` is the first patched version, same major line, verified against the
+full local gate (format, contracts, lint, typecheck, unit, build) plus a
+real `next build` before landing. `next`
+staying pinned exactly, rather than caret, is unchanged -- only the pinned
+value moved. `dev-health-web` has NOT taken this upgrade yet and remains on
+its own timeline (tracked as its own ticket); this repo no longer runs
+exactly what that repo runs on this one axis until web catches up.
 
 ## ACR integration notes
 
