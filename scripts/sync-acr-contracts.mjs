@@ -90,7 +90,39 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // counting (#435) and read-evaluation (#438) paths can already emit them --
 // without this bump the rig's ask-dev leg would reject those responses
 // with `acr_contract_violation`.
-export const SOURCE_COMMIT = "084ab9c45e985dd457679e7831635d5ca86d3a05";
+//
+// 084ab9c4 -> 0945a53d: 1 commit (#477, CHAOS-5442). Only
+// `context_fabric_common.v1` changes in the vendored surface (verified over
+// the full tree, `git diff 084ab9c4 0945a53d -- contracts/`: six schema
+// files change, but the other five --
+// `context_fabric_answer_projection.v1`,
+// `context_fabric_investigation_result.v1`/`.v2`,
+// `mcp_investigate_question_response.v1`,
+// `mcp_investigation_result_response.v1` -- are MCP/answer-projection/older
+// result-version schemas this repo does not vendor, same shape as both
+// prior bumps).
+//   - One new property, `refusal_basis`: an optional string over a closed
+//     three-member vocabulary (`member_kind_unservable`,
+//     `frame_invariant_violated`, `unspecified`). ABSENT on every turn that
+//     was not refused; present and one of the three members whenever the
+//     frame gate refused a turn before retrieval ran. Names WHY the server
+//     refused, orthogonal to `terminal_reason` (which names the channel an
+//     explanation travelled through). One physical addition in this
+//     vendored schema serves both the result root and the completeness
+//     block, which share the same $def.
+// The server (acr internal/contextfabric) already emits this field at this
+// sha on every frame-gate refusal. **Load-bearing before acr deploys to
+// this consumer**: ask-dev validates every acr response with
+// `additionalProperties: false` and fails closed
+// (`acr_contract_violation`, `retryable: false`) on an unrecognised field
+// in the OTHER direction (a response the schema doesn't expect), and this
+// bump only ADDS an optional field, so an un-bumped ask-dev leg does not
+// reject a refusal response merely for carrying it -- but the deployed and
+// rig ask-dev legs still take this bump first, per standing practice for
+// every acr contract-surface pin, so the type system and generated
+// fixtures see the field ask-dev's own request/response handling may need
+// to branch on.
+export const SOURCE_COMMIT = "0945a53dfdad0e84ba8244c59e8e9d85a7d195f2";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
