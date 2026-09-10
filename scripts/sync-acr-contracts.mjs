@@ -122,7 +122,35 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // every acr contract-surface pin, so the type system and generated
 // fixtures see the field ask-dev's own request/response handling may need
 // to branch on.
-export const SOURCE_COMMIT = "0945a53dfdad0e84ba8244c59e8e9d85a7d195f2";
+// 0945a53d -> b8df5dde: 15 commits, only #490 (CHAOS-5405, acr fca2ddad)
+// touches the vendored surface. Verified over the full tree (`git diff
+// 0945a53dfdad0e84ba8244c59e8e9d85a7d195f2
+// b8df5ddea287e383daa226dd3234a8bfbaa8062b -- contracts/`): two of the four
+// vendored schema files change.
+//   - `context_fabric_common.v1` gains one new `$def`,
+//     `FactScopeCensusRecord` (additionalProperties:false, all 11 properties
+//     required): one attempted requirement/origin scope decision as served
+//     -- requirement_kind, origin_kind, policy, basis, axis, outcome,
+//     target_limit, population_measured, admitted_count, truncated (all
+//     required non-null), plus `authorized_population_count` (required but
+//     NULLABLE: null means the census did not complete, 0 means it did and
+//     the caller-visible population is genuinely none).
+//   - `context_fabric_investigation_result.v1` gains one new optional
+//     top-level field, `fact_scope_census` (array of `FactScopeCensusRecord`,
+//     maxItems 21). Absent on every result written before this field
+//     existed and on any path that resolved no scope at all -- absent and
+//     empty are different documents.
+// `context_fabric_investigation_request.v1` and `error.v1` and all four
+// pinned examples are byte-identical to the prior pin.
+//
+// THIS BUMP IS NOT OPTIONAL: `context_fabric_investigation_result.v1` is
+// `additionalProperties:false` here, so without it every served answer that
+// resolved any requirement/origin scope is rejected by validate.ts as
+// `acr_contract_violation` instead of served -- acr main already emits this
+// field on every such path at this sha (measured against a real served
+// answer before this pin moved: 502 acr_contract_violation before, 200
+// after, same acr-api and same request).
+export const SOURCE_COMMIT = "b8df5ddea287e383daa226dd3234a8bfbaa8062b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -287,6 +315,34 @@ function stripWindowOptionConditionalsForTypeGeneration(schemaDirectory) {
 }
 
 /**
+ * `unknownAny: false` still leaves `any` in the compiled declarations (the
+ * option only controls what `$ref`-less unknowns render as), so this widens
+ * every literal `any` TYPE to `unknown` -- but a blind `\bany\b` replace over
+ * the WHOLE declarations string also hits the JSDoc comments
+ * json-schema-to-typescript renders from each schema's own `description`
+ * text, corrupting prose that happens to use the English word "any" (codex
+ * review round 1, r1: CHAOS-5405's own `fact_scope_census` description reads
+ * "on any path that resolved no scope at all", rendered here as "on unknown
+ * path" -- nonsensical, and not even a type-widening the source has any
+ * business narrating). Scoped to skip `/** ... *‍/` blocks AND quoted string
+ * literals (single- or double-quoted, escape-aware) -- a JSON Schema `enum`
+ * member or `const` whose own VALUE is the word "any" renders as a quoted
+ * TypeScript string-literal type, and an outer replace that only excluded
+ * comments would still corrupt that literal's actual runtime value (codex
+ * review round 2, r2: `type X = "any"` -> `type X = "unknown"`, silently
+ * wrong for a value the compiled type no longer matches). Splitting on both
+ * comments and string literals and only replacing in what is left between
+ * them is exactly where a bare `any` TYPE token can appear.
+ */
+function replaceAnyTypeOutsideCommentsAndStrings(declarations) {
+    const preserved = /(\/\*\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/gu;
+    return declarations
+        .split(preserved)
+        .map((chunk, index) => (index % 2 === 0 ? chunk.replace(/\bany\b/gu, "unknown") : chunk))
+        .join("");
+}
+
+/**
  * Compiles one schema to a module. json-schema-to-typescript resolves the
  * cross-file `$ref`s against `cwd`, which is why the copies must already be on
  * disk before this runs.
@@ -307,7 +363,7 @@ async function generatedModules(schemaDirectory) {
             unknownAny: false,
         });
         modules[entry.artifact] = await format(
-            GENERATED_BANNER + declarations.replace(/\bany\b/gu, "unknown"),
+            GENERATED_BANNER + replaceAnyTypeOutsideCommentsAndStrings(declarations),
             PRETTIER_OPTIONS,
         );
     }
