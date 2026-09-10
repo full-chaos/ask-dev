@@ -324,13 +324,20 @@ function stripWindowOptionConditionalsForTypeGeneration(schemaDirectory) {
  * review round 1, r1: CHAOS-5405's own `fact_scope_census` description reads
  * "on any path that resolved no scope at all", rendered here as "on unknown
  * path" -- nonsensical, and not even a type-widening the source has any
- * business narrating). Scoped to skip `/** ... *‍/` blocks entirely: split on
- * them and only replace in the non-comment chunks, which is exactly where a
- * literal `any` TYPE token can appear.
+ * business narrating). Scoped to skip `/** ... *‍/` blocks AND quoted string
+ * literals (single- or double-quoted, escape-aware) -- a JSON Schema `enum`
+ * member or `const` whose own VALUE is the word "any" renders as a quoted
+ * TypeScript string-literal type, and an outer replace that only excluded
+ * comments would still corrupt that literal's actual runtime value (codex
+ * review round 2, r2: `type X = "any"` -> `type X = "unknown"`, silently
+ * wrong for a value the compiled type no longer matches). Splitting on both
+ * comments and string literals and only replacing in what is left between
+ * them is exactly where a bare `any` TYPE token can appear.
  */
-function replaceAnyTypeOutsideComments(declarations) {
+function replaceAnyTypeOutsideCommentsAndStrings(declarations) {
+    const preserved = /(\/\*\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/gu;
     return declarations
-        .split(/(\/\*\*[\s\S]*?\*\/)/gu)
+        .split(preserved)
         .map((chunk, index) => (index % 2 === 0 ? chunk.replace(/\bany\b/gu, "unknown") : chunk))
         .join("");
 }
@@ -356,7 +363,7 @@ async function generatedModules(schemaDirectory) {
             unknownAny: false,
         });
         modules[entry.artifact] = await format(
-            GENERATED_BANNER + replaceAnyTypeOutsideComments(declarations),
+            GENERATED_BANNER + replaceAnyTypeOutsideCommentsAndStrings(declarations),
             PRETTIER_OPTIONS,
         );
     }
