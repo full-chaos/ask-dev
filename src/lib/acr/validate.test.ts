@@ -968,4 +968,75 @@ describe("investigation result contract — fact scope census (acr #490 consumer
         );
         expect(additionalPropertyRejections.length).toBeGreaterThan(0);
     });
+
+    /**
+     * codex review round 3 (CHAOS-5552 r3): the tests above only ever submit
+     * a FULLY well-formed record (or one with an unrecognized property, or
+     * too many of them) -- none of them exercise `required`, `minimum` or
+     * `maxLength` on FactScopeCensusRecord's own fields, so a mutation that
+     * drops a required property, widens a numeric floor, or lengthens a
+     * string bound would leave every test above green. Read from the
+     * SCHEMA's own `required` array -- never a hand-typed field list -- so
+     * this stays correct if the record ever gains or loses a required
+     * field.
+     */
+    function factScopeCensusRequiredFields(): readonly string[] {
+        const schema = commonSchema as unknown as {
+            $defs: { FactScopeCensusRecord: { required: readonly string[] } };
+        };
+        return schema.$defs.FactScopeCensusRecord.required;
+    }
+
+    it.each(factScopeCensusRequiredFields())(
+        "RED CONTROL: a census record missing required field %s rejects",
+        (field) => {
+            const missingField = censusRecord();
+            delete missingField[field];
+            const validation = validateContract(
+                "context_fabric_investigation_result.v1.schema.json",
+                censusResult([missingField]),
+            );
+            expect(validation.valid).toBe(false);
+        },
+    );
+
+    it("RED CONTROL: a negative admitted_count breaches the schema's minimum: 0", () => {
+        const negative = censusRecord();
+        negative.admitted_count = -1;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([negative]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("RED CONTROL: a negative target_limit breaches the schema's minimum: 0", () => {
+        const negative = censusRecord();
+        negative.target_limit = -1;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([negative]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("RED CONTROL: requirement_kind past the schema's maxLength: 128 rejects", () => {
+        const tooLong = censusRecord();
+        tooLong.requirement_kind = "x".repeat(129);
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([tooLong]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("RED CONTROL: a string where population_measured must be a boolean rejects", () => {
+        const wrongType = censusRecord();
+        wrongType.population_measured = "true";
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([wrongType]),
+        );
+        expect(validation.valid).toBe(false);
+    });
 });
