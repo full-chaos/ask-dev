@@ -841,3 +841,131 @@ describe("coverage detail code — read_population_unverified (acr 084ab9c4 cons
         expect(enumRejections.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * The fact-scope-census pin (acr #490, fca2ddad): `context_fabric_common.v1`
+ * gains the `FactScopeCensusRecord` $def and
+ * `context_fabric_investigation_result.v1` gains the optional
+ * `fact_scope_census` array (<=21 items) built from it — codex review round
+ * 1 (CHAOS-5552 r1): no case in this suite exercised the new field at all,
+ * so removing the property/ref, breaking a census record's shape, or
+ * changing the 21-item boundary would leave this suite green.
+ *
+ * The fixture record below is not invented: it is the shape a real
+ * `acr-api` @ b8df5dde served for "Which teams are struggling, and why?"
+ * against the static k3s trial-data store during this PR's own
+ * EXECUTE-THE-CLAIM proof (see the commit body's TEST-EVIDENCE).
+ */
+describe("investigation result contract — fact scope census (acr #490 consumer pin)", () => {
+    function censusRecord(): Record<string, unknown> {
+        return {
+            requirement_kind: "blockers",
+            origin_kind: "team",
+            policy: "team_primary_attribution_work_item_blockers_v1",
+            basis: "attributed_primary_team",
+            axis: "current",
+            outcome: "expanded",
+            target_limit: 200,
+            population_measured: true,
+            authorized_population_count: 6,
+            admitted_count: 6,
+            truncated: false,
+        };
+    }
+
+    function censusResult(records: readonly Record<string, unknown>[]): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), fact_scope_census: records };
+    }
+
+    it("a real acr-emitted response carrying fact_scope_census validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([censusRecord()]),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("a census record whose population was never measured serializes null, not 0 — the two stay distinct documents", () => {
+        const unmeasured = censusRecord();
+        unmeasured.population_measured = false;
+        unmeasured.authorized_population_count = null;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([unmeasured]),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: a census record with an unrecognized property still rejects — additionalProperties: false", () => {
+        const tampered = censusRecord();
+        tampered.unexpected_field = "should not be accepted";
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([tampered]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Read from the schema's own `maxItems`, not a hand-typed `21` — a bound
+     * this test hard-coded would keep passing after the schema's own bound
+     * moved, which is exactly the "silently stale under a moved pin" class
+     * D-d's own bump-testing convention exists to close.
+     */
+    function factScopeCensusMaxItems(): number {
+        const schema = investigationResultSchema as unknown as {
+            properties: { fact_scope_census: { maxItems: number } };
+        };
+        return schema.properties.fact_scope_census.maxItems;
+    }
+
+    it("accepts exactly maxItems census records", () => {
+        const atLimit = Array.from({ length: factScopeCensusMaxItems() }, () => censusRecord());
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult(atLimit),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: one more than maxItems census records breaches the boundary", () => {
+        const overLimit = Array.from({ length: factScopeCensusMaxItems() + 1 }, () =>
+            censusRecord(),
+        );
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult(overLimit),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (0945a53d, on origin/main
+     * before this PR): the same real acr-emitted document, run against a
+     * schema with `fact_scope_census` stripped from `properties` — exactly
+     * what an `additionalProperties: false` schema that has never heard of
+     * the field does with it. RED against that reproduction, GREEN against
+     * the real pinned schema above — without this arm the tests above prove
+     * only that the schema accepts the document, never that the BUMP is
+     * what made it acceptable.
+     */
+    it("EXECUTED repro: a fact_scope_census-bearing answer would 502 under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(investigationResultSchema) as unknown as {
+            properties: Record<string, unknown>;
+        };
+        delete priorSchema.properties.fact_scope_census;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorSchema);
+
+        expect(validate(censusResult([censusRecord()]))).toBe(false);
+        const additionalPropertyRejections = (validate.errors ?? []).filter(
+            (error) => error.keyword === "additionalProperties",
+        );
+        expect(additionalPropertyRejections.length).toBeGreaterThan(0);
+    });
+});
