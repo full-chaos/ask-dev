@@ -17,16 +17,49 @@ const GENERIC_SOURCE_LABEL = "Source";
  * usable text at all: a fixed, content-independent sentence, never derived
  * from the raw reason text it accompanies (CHAOS-4691's pin delta item 6
  * rules out "reconstruct by parsing" as a path even for old data). Used
- * for the LEGACY exception below (a pre-4690 `degraded_reasons[]` entry,
- * which this module never parses), AND — codex round 2, P2, EXECUTED — as
- * the ultimate fallback when a NEW-shape `CoverageDetail.phrasing` AND its
- * contract-required `label` are BOTH schema-valid but whitespace-only
- * (`label`'s only wire bound is `minLength: 1`, which a lone space
- * satisfies; there is nothing further to fall back to once even the
- * deterministic floor itself is blank).
+ * for a reason with NO usable text at all — `phrasing`, `label` and the raw
+ * string every one of them absent or whitespace-only (`label`'s only wire
+ * bound is `minLength: 1`, which a lone space satisfies).
+ *
+ * A legacy `degraded_reasons[]` entry does NOT get this floor: that raw
+ * string is itself reason text, so it shows verbatim (see
+ * `degradedReasonDisplay`). Displaying a raw string is not the
+ * "reconstruct by parsing" CHAOS-4691 forbids — nothing derives a sentence
+ * from it. The wording therefore promises no `<details>`, because in the
+ * only case this floor fires there is nothing to put in one.
  */
 const GENERIC_DEGRADED_REASON_SENTENCE =
-    "This source didn't fully contribute; see details for the reason.";
+    "This source didn't fully contribute; no reason was reported.";
+
+/**
+ * What a degraded reason SHOWS, and what is left over as supplementary detail.
+ *
+ * INVARIANT: whenever the headline is non-complete, the reason itself is
+ * VISIBLE BY DEFAULT; a collapsed `<details>` carries only supplementary
+ * detail, and only once a reason already shows. A reason whose sole text is
+ * the raw string — every legacy `degraded_reasons[]` entry, and a new-shape
+ * detail whose `phrasing` and `label` are both whitespace-only — must not put
+ * a content-free sentence on screen with the real reason one click away: the
+ * visible page would disclose strictly less than the result carries.
+ *
+ * ONE rule for both reason shapes rather than per-shape branches: show the
+ * best REAL text available, and disclose `raw` only when it is not already
+ * what is shown. Displaying `raw` verbatim is not the "reconstruct by parsing"
+ * CHAOS-4691 forbids — nothing here derives a sentence from it; the generic
+ * floor still covers a reason with no usable text at all.
+ */
+function degradedReasonDisplay(reason: {
+    readonly phrasing?: string;
+    readonly label?: string;
+    readonly raw?: string;
+}): { readonly text: string; readonly supplementaryRaw: string | undefined } {
+    const shown = nonBlank(reason.phrasing) ?? nonBlank(reason.label) ?? nonBlank(reason.raw);
+    const raw = nonBlank(reason.raw);
+    return {
+        text: shown ?? GENERIC_DEGRADED_REASON_SENTENCE,
+        supplementaryRaw: raw !== undefined && raw !== shown ? raw : undefined,
+    };
+}
 
 /**
  * Shows what the investigation could and could not read.
@@ -58,10 +91,10 @@ const GENERIC_DEGRADED_REASON_SENTENCE =
  * but NONE of the new fields — `coverage.details` is simply absent, not an
  * empty array. Rendering it via the SAME sentence-table parser this ticket
  * deletes would be exactly the banned "reconstruct by parsing" shape, so a
- * legacy result instead gets a fixed, content-independent generic sentence
- * per degraded reason (never derived from what the raw reason text says)
- * with the raw string still one click away in Details — degraded, not
- * silently dropped or leaked. codex round 3: this generic-sentence
+ * legacy result's raw string is therefore never parsed into a sentence — it
+ * is shown VERBATIM instead, on screen rather than behind a closed
+ * disclosure, so the visible page discloses what the result carries.
+ * Degraded, not silently dropped, and not reconstructed. This legacy
  * rendering is triggered by "no DEGRADING detail covers this" — `details`
  * absent (the true legacy shape) OR merely insufficient (present but empty,
  * or present without a matching degrading entry) both count, so a
@@ -94,6 +127,25 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // comment above says it exists to prevent (AGENTS.md check 12: missing
     // is not healthy).
     const hasSources = coverage.sources.length > 0;
+    // Same rule for a NON-EMPTY list: `partial === false` says only that
+    // nothing OBSERVED was dropped, not that the sources which were read
+    // contributed anything. A result can be `partial: false` with its only
+    // source `unavailable`; calling that "Complete — every source
+    // contributed." is a known gap read as apparent completeness, the one
+    // failure this panel exists to prevent, and the same defect as an empty
+    // list reading as Complete.
+    //
+    // Gated through the one swept `coverageStateTone` predicate rather than a
+    // second hand list of state names: that switch is exhaustive over the
+    // closed contract enum, so a state acr adds must be classified there and
+    // this headline follows automatically instead of silently defaulting to
+    // "contributed". `ok` is the only tone that means the source actually
+    // delivered what was asked of it; `warn` (stale/truncated/conflicted/
+    // pruned), `bad` (unavailable/unauthorized) and `neutral` (unconfigured/
+    // no_data/not_applicable) each mean it did not, fully or at all.
+    const everySourceContributed = coverage.sources.every(
+        (source) => coverageStateTone(source.state) === "ok",
+    );
     return (
         <section
             className="panel panel--card panel--compact"
@@ -106,7 +158,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
             <p className={hasSources ? "record__meta" : "panel__empty"}>
                 {!hasSources
                     ? "No sources were recorded."
-                    : coverage.partial
+                    : coverage.partial || !everySourceContributed
                       ? "Partial — some sources did not contribute."
                       : "Complete — every source contributed."}
             </p>
@@ -198,24 +250,27 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {degradingDetails.map((detail) => (
-                            <li className="record" key={detail.detail_id}>
-                                {/* CHAOS-4690: synthesis-phrased sentence when
-                                    the model chose to phrase it, else the
-                                    deterministic Label floor — never both
-                                    blank (`label` is contract-required). */}
-                                <p className="record__body">
-                                    {nonBlank(detail.phrasing) ??
-                                        nonBlank(detail.label) ??
-                                        GENERIC_DEGRADED_REASON_SENTENCE}
-                                </p>
-                                {detail.raw === undefined ? null : (
-                                    <Details data-testid="degraded-reason-raw" summary="Raw reason">
-                                        <code>{detail.raw}</code>
-                                    </Details>
-                                )}
-                            </li>
-                        ))}
+                        {degradingDetails.map((detail) => {
+                            // CHAOS-4690: synthesis-phrased sentence when the
+                            // model chose to phrase it, else the deterministic
+                            // Label floor; then the raw text, and only then the
+                            // content-free floor — one rule, shared with the
+                            // legacy block below (see `degradedReasonDisplay`).
+                            const shown = degradedReasonDisplay(detail);
+                            return (
+                                <li className="record" key={detail.detail_id}>
+                                    <p className="record__body">{shown.text}</p>
+                                    {shown.supplementaryRaw === undefined ? null : (
+                                        <Details
+                                            data-testid="degraded-reason-raw"
+                                            summary="Raw reason"
+                                        >
+                                            <code>{shown.supplementaryRaw}</code>
+                                        </Details>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </>
             )}
@@ -225,14 +280,33 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {legacyDegradedReasons.map((reason) => (
-                            <li className="record" key={reason}>
-                                <p className="record__body">{GENERIC_DEGRADED_REASON_SENTENCE}</p>
-                                <Details data-testid="degraded-reason-raw" summary="Raw reason">
-                                    <code>{reason}</code>
-                                </Details>
-                            </li>
-                        ))}
+                        {legacyDegradedReasons.map((reason) => {
+                            // The legacy `degraded_reasons[]` string IS the only
+                            // reason text there is, so it is what shows; there is
+                            // nothing left to put behind a disclosure.
+                            const shown = degradedReasonDisplay({ raw: reason });
+                            return (
+                                <li className="record" key={reason}>
+                                    {/* `<code>` only when what shows IS the raw
+                                        wire text; the generic floor is prose. */}
+                                    <p className="record__body">
+                                        {shown.text === nonBlank(reason) ? (
+                                            <code>{shown.text}</code>
+                                        ) : (
+                                            shown.text
+                                        )}
+                                    </p>
+                                    {shown.supplementaryRaw === undefined ? null : (
+                                        <Details
+                                            data-testid="degraded-reason-raw"
+                                            summary="Raw reason"
+                                        >
+                                            <code>{shown.supplementaryRaw}</code>
+                                        </Details>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </>
             )}
