@@ -15,7 +15,10 @@ deliverable table joins OBSERVED values from telemetry per request_id.
 """
 
 CORPUS = [
-    # --- A. Carryover: CHAOS-4632 labelled corpus (12), reposed for a fresh 3-rep baseline ---
+    # --- A. Carryover: CHAOS-4632 labelled corpus (12), reposed for a fresh baseline ---
+    # CHAOS-5597: this comment previously said "fresh 3-rep baseline" -- the actual sweep
+    # (corpus/baseline-20260905-sweep1.json, provenance.reps) recorded reps=1. Corrected to
+    # match the artefact of record rather than assert a rep count nothing measured.
     # Source: acr/internal/contextfabric/testdata/chaos4632_labelled_questions.json
     dict(id="qa-grouped-clean", text="What are the project statuses for each team, and what are the main drivers?",
          family="grouped_cohort_status", variant="grouped_members", member_kind="project", group_kind="team",
@@ -43,7 +46,8 @@ CORPUS = [
          note="carryover=chaos4632 NEGATIVE for anchor (possessive-grammar trap)"),
     dict(id="pos-grouped-per-phrasing", text="Show me open incidents per repository.",
          family="grouped_cohort_status", variant="grouped_members", member_kind="incident", group_kind="repository",
-         note="carryover=chaos4632; CHAOS-4926 ACCEPTANCE ROW #2 / ROW-10 INCIDENT SHAPE (expect refuse basis=member_kind_unservable)"),
+         note="carryover=chaos4632; CHAOS-4926 ACCEPTANCE ROW #2 / ROW-10 INCIDENT SHAPE (expect refuse basis=member_kind_unservable)",
+         expect="refuse"),
     dict(id="neg-explicit-comparison", text="Compare the acr project to the ask-dev project over the last 90 days.",
          family="explicit_comparison", variant="explicit_set", member_kind=None, group_kind=None,
          note="carryover=chaos4632; temporal=bounded_window; known pre-existing crash class per lane-rig-advance-13"),
@@ -78,25 +82,32 @@ CORPUS = [
     # declared member_kind is outside the v1 cohort wire contract -- expect basis=member_kind_unservable.
     dict(id="basis-discovered-repo-count", text="How many repositories are there across the organization?",
          family="discovered_cohort_ranking", variant="discovered_kind", member_kind="repository", group_kind=None,
-         note="CHAOS-4926 class, 3rd instance; analog of recorded-13 C7 (org-wide repository count); expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class, 3rd instance; analog of recorded-13 C7 (org-wide repository count); expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-grouped-pr-by-project", text="Show me open pull requests per project.",
          family="grouped_cohort_status", variant="grouped_members", member_kind="pull_request", group_kind="project",
-         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-grouped-deployment-by-team", text="Show me deployments per team.",
          family="grouped_cohort_status", variant="grouped_members", member_kind="deployment", group_kind="team",
-         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-discovered-incidents", text="Which incidents need the most attention right now?",
          family="discovered_cohort_ranking", variant="discovered_kind", member_kind="incident", group_kind=None,
-         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-scoped-workitems-by-project", text="What work items does the Dev Health Ops project have?",
          family="scoped_cohort_status", variant="children_of_scope", member_kind="work_item", group_kind=None,
-         note="CHAOS-4926 class; anchor=Dev Health Ops/project; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; anchor=Dev Health Ops/project; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-discovered-documents", text="What documents exist in the organization?",
          family="discovered_cohort_ranking", variant="discovered_kind", member_kind="document", group_kind=None,
-         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
     dict(id="basis-grouped-metric-by-repo", text="Show me metrics per repository.",
          family="grouped_cohort_status", variant="grouped_members", member_kind="metric", group_kind="repository",
-         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable"),
+         note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
+         expect="refuse"),
 
     # --- D. Additional servable coverage -- goal/temporal breadth on servable kinds (team/project) ---
     dict(id="cv-discovered-project-behind", text="Which projects are behind schedule?",
@@ -120,16 +131,20 @@ CORPUS = [
     # --- E. Negative controls: nonexistent entity, false-emission trap, illegal-I6 probe, open/vague ---
     dict(id="neg-nonexistent-team", text="What is the status of the 'Nebula Strike Force' team?",
          family="subject_investigation", variant="named_subject", member_kind=None, group_kind=None,
-         note="NEGATIVE: nonexistent team name (reused from lane-s7b-i p-neg1); expect decline with a named basis, never a fabricated answer"),
+         note="NEGATIVE: nonexistent team name (reused from lane-s7b-i p-neg1); expect decline with a named basis, never a fabricated answer",
+         expect="decline"),
     dict(id="neg-nonexistent-project", text="What is the status of the 'Quantum Leap' project?",
          family="subject_investigation", variant="named_subject", member_kind=None, group_kind=None,
-         note="NEGATIVE: nonexistent project name; expect decline with a named basis"),
+         note="NEGATIVE: nonexistent project name; expect decline with a named basis",
+         expect="decline"),
     dict(id="neg-nonexistent-repo-scope", text="Which team owns the 'phantom-service' repository?",
          family="scoped_cohort_status", variant="children_of_scope", member_kind="team", group_kind=None,
-         note="NEGATIVE: nonexistent scope anchor; expect decline with a named basis (unresolved anchor)"),
+         note="NEGATIVE: nonexistent scope anchor; expect decline with a named basis (unresolved anchor)",
+         expect="decline"),
     dict(id="neg-illegal-i6-self-group", text="Group the teams by team.",
          family=None, variant="grouped_members", member_kind="team", group_kind="team",
-         note="DELIBERATE I6-ILLEGAL PROBE (group_kind==member_kind) -- expect decline at frame validation (I6) IF the model even emits this shape; a refusal upstream of frame validation is also a valid, informative outcome. NOT a design mistake: intentionally illegal, unlike every other row in this corpus."),
+         note="DELIBERATE I6-ILLEGAL PROBE (group_kind==member_kind) -- expect decline at frame validation (I6) IF the model even emits this shape; a refusal upstream of frame validation is also a valid, informative outcome. NOT a design mistake: intentionally illegal, unlike every other row in this corpus.",
+         expect="decline"),
     dict(id="neg-possessive-but-same-kind-project", text="What is the ask-dev project's status?",
          family="subject_investigation", variant="named_subject", member_kind=None, group_kind=None,
          note="NEGATIVE for anchor/group emission (project analog of neg-possessive-but-same-kind)"),
