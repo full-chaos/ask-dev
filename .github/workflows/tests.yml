@@ -41,6 +41,9 @@ jobs:
             # the committed copies against the manifest digests and regenerates
             # the types from them.
             - run: bash ci/run_checks.sh contracts
+            # Validates the corpus of record's rows (corpus/corpus.py)
+            # against acr's ingestion-boundary rule shape. See corpus/README.md.
+            - run: bash ci/run_checks.sh corpus
             - run: bash ci/run_checks.sh lint
             - run: bash ci/run_checks.sh typecheck
 
