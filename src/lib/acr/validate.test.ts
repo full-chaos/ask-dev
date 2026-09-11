@@ -1267,3 +1267,85 @@ describe("investigation result contract — answer sentence required iff support
         ).toEqual([EMPTY_ANSWER_ERROR]);
     });
 });
+
+/**
+ * `refusal_basis` is a CLOSED vocabulary and gains a 4th member,
+ * `continuation_context_unverifiable`: the server refuses a window-only
+ * continuation whose prior semantic context it could not verify. That is not a
+ * frame refusal, and such a document carries its own fixed limitation sentence.
+ * The field is carried at the same place in both consumed schemas.
+ *
+ * This is load-bearing rather than theoretical: against a real leg on the
+ * pre-bump pin, a response carrying the new value came back as HTTP 502
+ * `acr_contract_violation` on `/refusal_basis` and
+ * `/completeness/refusal_basis` (req_a3051b329f4a8184c7f177d4c2fb6ed6). The
+ * bump only WIDENS what validates; it is paired below with a reproduction of
+ * the prior pin's own schema, so it proves the bump is what changed the
+ * disposition rather than merely that the current pin accepts the value.
+ */
+describe("investigation result contract — the continuation-refusal basis (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+
+    function withRefusalBasis(value: string): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), refusal_basis: value };
+    }
+
+    it("the already-live vocabulary still validates", () => {
+        for (const value of ["member_kind_unservable", "frame_invariant_violated", "unspecified"]) {
+            const validation = validateContract(RESULT, withRefusalBasis(value));
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("GREEN: continuation_context_unverifiable validates at this pin", () => {
+        const validation = validateContract(
+            RESULT,
+            withRefusalBasis("continuation_context_unverifiable"),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("the vocabulary stays CLOSED: a value outside it is still rejected", () => {
+        expect(validateContract(RESULT, withRefusalBasis("not_a_real_refusal_basis")).valid).toBe(
+            false,
+        );
+    });
+
+    it("absence still means 'not refused' — the key is optional", () => {
+        const noBasis = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        delete noBasis.refusal_basis;
+        const validation = validateContract(RESULT, noBasis);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("the member is carried in BOTH consumed schemas, not just the result", () => {
+        const common = JSON.stringify(commonSchema);
+        const result = JSON.stringify(investigationResultSchema);
+        expect(common).toContain("continuation_context_unverifiable");
+        expect(result).toContain("continuation_context_unverifiable");
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new value", () => {
+        const priorResult = structuredClone(investigationResultSchema) as unknown as {
+            properties: { refusal_basis: { enum: string[] } };
+        };
+        expect(priorResult.properties.refusal_basis.enum).toContain(
+            "continuation_context_unverifiable",
+        );
+        priorResult.properties.refusal_basis.enum =
+            priorResult.properties.refusal_basis.enum.filter(
+                (value) => value !== "continuation_context_unverifiable",
+            );
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResult);
+
+        expect(validate(withRefusalBasis("continuation_context_unverifiable"))).toBe(false);
+        // The stand-in still accepts the live vocabulary, so it is faithful.
+        expect(validate(withRefusalBasis("frame_invariant_violated"))).toBe(true);
+    });
+});

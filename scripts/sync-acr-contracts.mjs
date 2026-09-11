@@ -228,7 +228,36 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // ask-dev leg rejects that response as `acr_contract_violation` instead
 // of rendering its disclosure. Ask-dev takes this pin first, acr deploys
 // second.
-export const SOURCE_COMMIT = "85f037dbb731e535a48a6f632cfefc8ec07b30aa";
+//
+// 85f037db -> 57f25d5f: 4 commits, all on acr main (#507, #509, a parallel-group
+// test, and #510 itself). Verified over the whole tree (`git diff
+// 85f037dbb731e535a48a6f632cfefc8ec07b30aa
+// 57f25d5f85b967452fdbe8b2e4f96cfa706b367a -- contracts/`): seven files change,
+// and TWO of them are part of this repo's vendored surface.
+//   - `refusal_basis`'s closed enum gains a 4th value,
+//     `continuation_context_unverifiable`, carried at the same field in BOTH
+//     consumed schemas (`context_fabric_common.v1`,
+//     `context_fabric_investigation_result.v1`), with the field's description
+//     extended to say what it means: the server refuses a window-only
+//     continuation whose prior semantic context it could not verify. That is
+//     not a frame refusal, and such a document carries its own fixed
+//     limitation sentence. Additive only: no other field, `$def`, or
+//     required-list change in either consumed schema.
+//   - `context_fabric_investigation_result.v2`, both `mcp_*` response schemas
+//     and `contracts/auth/v1/endpoint-profiles.acr.json` also move, but none of
+//     the four is part of this repo's vendored surface -- the same exclusion as
+//     every bump above.
+// `context_fabric_investigation_request.v1`, `error.v1`, and all five pinned
+// examples are byte-identical to the prior pin; acr publishes no new example
+// for this shape.
+//
+// LOAD-BEARING, and already proven against a real leg: with the pre-bump pin,
+// ask-dev returned HTTP 502 `acr_contract_violation` on `/refusal_basis` and
+// `/completeness/refusal_basis` for a response carrying the new value
+// (req_a3051b329f4a8184c7f177d4c2fb6ed6). The bump only WIDENS what validates,
+// and acr main now serves the value, so the consumer pin lands as soon as it
+// can -- the same two-step order every enum addition above follows.
+export const SOURCE_COMMIT = "57f25d5f85b967452fdbe8b2e4f96cfa706b367a";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
