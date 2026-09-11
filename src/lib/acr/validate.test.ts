@@ -1040,3 +1040,110 @@ describe("investigation result contract — fact scope census (acr #490 consumer
         expect(validation.valid).toBe(false);
     });
 });
+
+/**
+ * The fact-scope-census MEASUREMENT INVARIANT pin (acr #501, d949d18c):
+ * `FactScopeCensusRecord` gains an `if`/`then`/`else` enforcing the one
+ * distinction `authorized_population_count`'s own nullability exists to
+ * carry — codex review, ask-dev PR #54 r1: the prior pin declared the field
+ * NULLABLE with that intent in prose ("null means the census did not
+ * complete, 0 means it did and the caller-visible population is genuinely
+ * none") but never enforced it, so a schema-only consumer — this one,
+ * before this bump — accepted a document asserting and denying that
+ * distinction in the same record.
+ *
+ * The two contradictory shapes below are not invented: they are the exact
+ * two documents the invariant exists to tell apart, built from the SAME
+ * real-acr-emitted fixture (`censusRecord()`) the describe block above
+ * uses, so a rejection here is provably about the measurement/count
+ * agreement and nothing else about the record's shape.
+ */
+describe("investigation result contract — fact scope census measurement invariant (acr #501 consumer pin)", () => {
+    function censusRecord(): Record<string, unknown> {
+        return {
+            requirement_kind: "blockers",
+            origin_kind: "team",
+            policy: "team_primary_attribution_work_item_blockers_v1",
+            basis: "attributed_primary_team",
+            axis: "current",
+            outcome: "expanded",
+            target_limit: 200,
+            population_measured: true,
+            authorized_population_count: 6,
+            admitted_count: 6,
+            truncated: false,
+        };
+    }
+
+    function censusResult(records: readonly Record<string, unknown>[]): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), fact_scope_census: records };
+    }
+
+    it("RED CONTROL: population_measured=false beside a non-null count contradicts itself and now rejects", () => {
+        const contradiction = censusRecord();
+        contradiction.population_measured = false;
+        contradiction.authorized_population_count = 0;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([contradiction]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("RED CONTROL: population_measured=true beside a null count contradicts itself and now rejects", () => {
+        const contradiction = censusRecord();
+        contradiction.population_measured = true;
+        contradiction.authorized_population_count = null;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([contradiction]),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("a measured zero (true, 0) is the OTHER legal shape and still validates — the invariant is an agreement rule, not a ban on either value", () => {
+        const measuredZero = censusRecord();
+        measuredZero.population_measured = true;
+        measuredZero.authorized_population_count = 0;
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            censusResult([measuredZero]),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (b8df5dde, on origin/main
+     * before this PR): the SAME two contradictory documents, run against a
+     * copy of the schema with the if/then/else stripped back out — exactly
+     * what the field's nullable-but-unenforced declaration did with them.
+     * RED against that reproduction is expected to be GREEN (accepted) —
+     * without this arm the two RED CONTROLs above prove only that the new
+     * schema rejects the documents, never that the BUMP is what made it
+     * reject them.
+     */
+    it("EXECUTED repro: both contradictory documents validated clean under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { FactScopeCensusRecord: Record<string, unknown> };
+        };
+        delete priorSchema.$defs.FactScopeCensusRecord.if;
+        delete priorSchema.$defs.FactScopeCensusRecord.then;
+        delete priorSchema.$defs.FactScopeCensusRecord.else;
+
+        const priorResultSchema = structuredClone(investigationResultSchema);
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResultSchema);
+
+        const measuredFalseWithCount = censusRecord();
+        measuredFalseWithCount.population_measured = false;
+        measuredFalseWithCount.authorized_population_count = 0;
+        expect(validate(censusResult([measuredFalseWithCount]))).toBe(true);
+
+        const measuredTrueWithNull = censusRecord();
+        measuredTrueWithNull.population_measured = true;
+        measuredTrueWithNull.authorized_population_count = null;
+        expect(validate(censusResult([measuredTrueWithNull]))).toBe(true);
+    });
+});
