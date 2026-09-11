@@ -25,7 +25,7 @@ CORPUS = [
          note="carryover=chaos4632; typo-robustness twin of qa-grouped-clean"),
     dict(id="qb-scoped", text="What are the statuses of the fullchaos team's projects?",
          family="scoped_cohort_status", variant="children_of_scope", member_kind="project", group_kind=None,
-         note="carryover=chaos4632; = Q-B; anchor=fullchaos/team"),
+         note="carryover=chaos4632; = Q-B; anchor=fullchaos/team", expect="serve"),
     dict(id="q1-bar-subject-status", text="What is the status of the Dev Health Ops project?",
          family="subject_investigation", variant="named_subject", member_kind=None, group_kind=None,
          note="carryover=chaos4632; = Q1"),
