@@ -7,7 +7,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: ci/run_checks.sh <format|contracts|lint|typecheck|unit|build|e2e|ci>" >&2
+  echo "Usage: ci/run_checks.sh <format|contracts|corpus|lint|typecheck|unit|build|e2e|ci>" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -51,6 +51,14 @@ run_format() {
 # a pin bump all fail here.
 run_contracts() {
   pnpm acr:contracts:check
+}
+
+# Validates the corpus of record's rows against acr's ingestion-boundary
+# shape (corpus/test_corpus.py mirrors acr scripts/corpus/validators.py:
+# 129-157). Row *expectations* are data semantics, not enforced here --
+# see corpus/README.md.
+run_corpus() {
+  pnpm test:corpus
 }
 
 run_lint() {
@@ -98,6 +106,7 @@ run_e2e() {
 case "$1" in
   format) run_step format run_format ;;
   contracts) run_step contracts run_contracts ;;
+  corpus) run_step corpus run_corpus ;;
   lint) run_step lint run_lint ;;
   typecheck) run_step typecheck run_typecheck ;;
   unit) run_step unit run_unit ;;
@@ -113,6 +122,7 @@ case "$1" in
     # run after it.
     run_step format run_format || exit "$?"
     run_step contracts run_contracts || exit "$?"
+    run_step corpus run_corpus || exit "$?"
     run_step lint run_lint || exit "$?"
     run_step typecheck run_typecheck || exit "$?"
     run_step unit run_unit || exit "$?"

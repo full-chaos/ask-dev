@@ -9,5 +9,9 @@ test-results
 # The sync script owns their formatting; Prettier must never rewrite them.
 src/contracts/
 
+# Corpus of record baseline sweep: must stay byte-identical to the sha it was
+# generated at (see corpus/README.md). Prettier must never rewrite it.
+corpus/baseline-20260905-sweep1.json
+
 pnpm-lock.yaml
 .env*

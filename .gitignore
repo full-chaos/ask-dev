@@ -22,3 +22,7 @@ playwright-report
 .DS_Store
 *.log
 tsconfig.tsbuildinfo
+
+# Python bytecode cache (corpus/test_corpus.py)
+__pycache__/
+*.pyc

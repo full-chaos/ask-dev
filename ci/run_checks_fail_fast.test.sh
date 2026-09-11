@@ -90,11 +90,11 @@ STUB
 # Case 1: the FIRST tier fails -> nothing else may run.
 run_case "format:check" \
   -- \
-  "acr:contracts:check" "lint" "typecheck" "test:unit" "build" "test:e2e"
+  "acr:contracts:check" "test:corpus" "lint" "typecheck" "test:unit" "build" "test:e2e"
 
 # Case 2: a MIDDLE tier fails -> earlier tiers ran, later ones did not.
 run_case "lint" \
-  "format:check" "acr:contracts:check" \
+  "format:check" "acr:contracts:check" "test:corpus" \
   -- \
   "typecheck" "test:unit" "build" "test:e2e"
 
@@ -103,7 +103,7 @@ run_case "lint" \
 # its result, so a failure here must still stop the run before `pnpm
 # test:e2e` executes and must still make `run_checks.sh ci` exit non-zero.
 run_case "exec" \
-  "format:check" "acr:contracts:check" "lint" "typecheck" "test:unit" "build" \
+  "format:check" "acr:contracts:check" "test:corpus" "lint" "typecheck" "test:unit" "build" \
   -- \
   "test:e2e"
 
