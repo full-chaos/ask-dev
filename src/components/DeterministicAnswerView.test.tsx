@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
+import unsupportedExample from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
@@ -241,5 +242,36 @@ describe("DeterministicAnswerView: clarification branch shows warnings too (code
 
         expect(screen.getByRole("heading", { name: "Warnings" })).toBeInTheDocument();
         expect(screen.getByText("The cohort ranking is provisional.")).toBeInTheDocument();
+    });
+});
+
+/**
+ * acr #504: the empty form. An UNSUPPORTED terminal result (degraded, no
+ * facts, no evidence) carries `deterministic_answer: ""`; what the service
+ * could not support is disclosed in `limitations` and `coverage`, not in an
+ * answer sentence. Rendered from acr's own example, the view shows that
+ * disclosure and no blank answer line -- the empty string never renders as
+ * an empty headline pretending to be an answer.
+ */
+describe("DeterministicAnswerView: the unsupported result's empty answer renders as disclosure, not a blank answer (acr #504)", () => {
+    it("shows the limitation and the degraded source, and no answer sentence line", () => {
+        const result = unsupportedExample as unknown as InvestigationResult;
+        expect(result.status).toBe("degraded");
+        expect(result.deterministic_answer).toBe("");
+        expect(result.claimed_facts).toHaveLength(0);
+        expect(result.evidence_ref_ids).toHaveLength(0);
+
+        render(<DeterministicAnswerView result={result} />);
+
+        const answer = screen.getByTestId("answer-panel");
+        expect(answer.querySelector(".answer__judgment")).toBeNull();
+        expect(answer).toHaveTextContent("The service returned no direct judgment.");
+
+        expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
+        expect(screen.getByText(result.limitations[0]!)).toBeInTheDocument();
+
+        const coverage = screen.getByTestId("coverage-panel");
+        expect(coverage).toHaveTextContent("Degraded reasons");
+        expect(coverage).toHaveTextContent(unsupportedExample.coverage.degraded_reasons[0]!);
     });
 });

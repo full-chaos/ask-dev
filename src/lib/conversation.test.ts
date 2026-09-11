@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
+import { buildInvestigationRequest } from "@/lib/acr/client";
+import { validateContract } from "@/lib/acr/validate";
 import {
     MAX_CONVERSATION_TURNS_SENT,
     buildConversationTurns,
@@ -89,6 +92,38 @@ describe("buildConversationTurns", () => {
                 created_at: "2026-01-01T00:00:00.000Z",
             },
         ]);
+    });
+
+    /**
+     * acr #504: an UNSUPPORTED result may carry `deterministic_answer: ""`
+     * (its disclosure is in limitations/coverage/completeness, not an answer
+     * sentence). Threaded as-is, that answer became a `ConversationTurn`
+     * with `content: ""`, which the request contract refuses
+     * (`content.minLength: 1`) -- so every later re-ask in the same chat
+     * failed as `acr_rejected_request` before it was sent. An answered turn
+     * with no answer sentence is excluded, like a pending or failed one:
+     * there is nothing ACR said as an answer to thread. Blankness is judged
+     * by the one swept `nonBlank` predicate, not a local `.trim()`.
+     */
+    it("excludes an answered assistant turn whose answer sentence is blank (acr's unsupported example), so the re-ask still validates", () => {
+        expect(unsupportedResult.deterministic_answer).toBe("");
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the actual status of Ask Dev?"),
+            answeredAssistantTurn(1, unsupportedResult.deterministic_answer),
+            userTurn(2, "What about last month?", "2026-01-01T00:00:02.000Z"),
+            answeredAssistantTurn(3, "\u200b \n", "2026-01-01T00:00:03.000Z"),
+        ];
+
+        const conversation = buildConversationTurns(turns);
+        expect(conversation.map((turn) => turn.turn_id)).toEqual(["turn_0", "turn_2"]);
+
+        const request = buildInvestigationRequest("And now?", [], {}, conversation);
+        const validation = validateContract(
+            "context_fabric_investigation_request.v1.schema.json",
+            request,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 
     it("caps at MAX_CONVERSATION_TURNS_SENT, keeping the MOST RECENT turns", () => {

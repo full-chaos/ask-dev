@@ -13,6 +13,7 @@ import {
 import { validateContract } from "@/lib/acr/validate";
 import type { StructureSubjectKind } from "@/lib/contracts";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 
 const { privateKey } = generateKeyPairSync("ed25519");
 
@@ -721,6 +722,21 @@ describe("investigate", () => {
         respondWith(canonicalResult);
         await expect(investigate(config, { question: "status?" })).resolves.toEqual(
             canonicalResult,
+        );
+    });
+
+    /**
+     * acr #504: an UNSUPPORTED terminal result (degraded, no facts, no
+     * evidence) may carry `deterministic_answer: ""`. Under the prior pin
+     * this exact response from acr's own example was
+     * `acr_contract_violation`, so the tester saw a failure instead of the
+     * result's own disclosure; it is served unchanged now.
+     */
+    it("serves acr's unsupported result (empty answer sentence) unchanged instead of acr_contract_violation", async () => {
+        expect(unsupportedResult.deterministic_answer).toBe("");
+        respondWith(unsupportedResult);
+        await expect(investigate(config, { question: "status?" })).resolves.toEqual(
+            unsupportedResult,
         );
     });
 
