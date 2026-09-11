@@ -23,6 +23,14 @@ what a row expects moves the pass/fail bar for every future run against
 that row, and a report that doesn't name the move risks reading a bar
 change as a result improvement or regression.
 
+**Sha chain**: `baseline-20260905-sweep1.json` is pinned by sha256 in
+`corpus/test_corpus.py`'s `BASELINE_SHA256` constant, currently
+`ab7f8bb0ffda440240a8f60e3b1f07e8c86ed42b9ab740bedfdcdc3f5964b1dd`. CI fails
+if the file's actual sha256 stops matching that constant, so a landed
+baseline replacement must update both the file and `BASELINE_SHA256` in the
+same commit — that pairing is the deliberate-edit signal; anything else is
+an unintended change.
+
 ## Ownership
 
 Row _expectations_ (`expect`, `basis`, `anchor`, `nonexistent`) are data
