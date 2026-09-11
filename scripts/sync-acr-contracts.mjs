@@ -150,7 +150,47 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // field on every such path at this sha (measured against a real served
 // answer before this pin moved: 502 acr_contract_violation before, 200
 // after, same acr-api and same request).
-export const SOURCE_COMMIT = "b8df5ddea287e383daa226dd3234a8bfbaa8062b";
+//
+// b8df5dde -> d949d18c: found by THIS repo's own PR #54 (CHAOS-5552) r1
+// reviewer, on the SYNCED copy landed by the bump directly above: the prior
+// pin declared `authorized_population_count` NULLABLE with the prose
+// invariant quoted above ("null means the census did not complete, 0 means
+// it did...") but never ENFORCED it -- a document with
+// `population_measured: false` beside a non-null count, or `true` beside
+// null, validated clean. Verified over the full tree (`git diff
+// b8df5ddea287e383daa226dd3234a8bfbaa8062b
+// d949d18cb41b8970867eaf31b0bde48710d35956 -- contracts/`): four vendored
+// schema files change (all four commits between the two pins landed on
+// acr's own #501, one PR); only ONE is part of this repo's vendored
+// surface.
+//   - `context_fabric_common.v1`'s `FactScopeCensusRecord` gains an
+//     `if`/`then`/`else`: `population_measured: true` now requires
+//     `authorized_population_count` typed strictly `integer` (0 legal);
+//     `population_measured: false` now requires it typed strictly `null`.
+//     No property added or removed, no required-list change -- a
+//     document that was CORRECTLY shaped under the old pin (agreeing
+//     values) still validates; only a SELF-CONTRADICTORY document (the
+//     shape the field was made nullable specifically to make
+//     distinguishable, then never enforced) newly fails.
+//   - `context_fabric_answer_projection.v1`,
+//     `mcp_investigate_question_response.v1`, and
+//     `mcp_investigation_result_response.v1` also change (the identical
+//     if/then/else, propagated to the projection's own local duplicate and
+//     the two MCP embedded copies) but none of the three is part of this
+//     repo's vendored surface -- same exclusion as the prior bump's note
+//     above.
+// `context_fabric_investigation_request.v1`, `error.v1`, and all four
+// pinned examples are byte-identical to the prior pin.
+//
+// THIS BUMP IS NOT LOAD-BEARING FOR SERVED TRAFFIC THE WAY THE PRIOR ONE
+// WAS: acr's own producer (`internal/contextfabric/fact_scope.go`) already
+// writes only the agreeing shapes today, so no currently-served response
+// changes disposition. It closes a validation GAP (a response this
+// consumer would have accepted with a self-contradictory census row),
+// verified with the pin: `authorized_population_count: 0` beside
+// `population_measured: false` (and the symmetric `null` beside `true`)
+// now fails schema validation where it silently passed before.
+export const SOURCE_COMMIT = "d949d18cb41b8970867eaf31b0bde48710d35956";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
