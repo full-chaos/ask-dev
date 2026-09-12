@@ -432,9 +432,87 @@ def _self_test_baseline_guard_fires():
               f"wrongly rejected or miscounted: {(n_rows, n_dropped)!r}")
 
 
+# CHAOS-5610: the exact `expect` value of each of the 12 CHAOS-5597
+# refuse/decline rows, pinned -- previously only their shape/type
+# (validate_corpus_row) was checked, never the actual value. Row
+# *expectations* remain chris's data-semantics call (corpus/README.md
+# "## Ownership"); this pin catches a silent edit to any of the 12, it
+# does not judge whether any value is correct -- a pin that fails is
+# reported, never "fixed" by updating the pin to match.
+PINNED_REFUSE_DECLINE_EXPECT = {
+    "pos-grouped-per-phrasing": "refuse",
+    "basis-discovered-repo-count": "refuse",
+    "basis-grouped-pr-by-project": "refuse",
+    "basis-grouped-deployment-by-team": "refuse",
+    "basis-discovered-incidents": "refuse",
+    "basis-scoped-workitems-by-project": "refuse",
+    "basis-discovered-documents": "refuse",
+    "basis-grouped-metric-by-repo": "refuse",
+    "neg-nonexistent-team": "decline",
+    "neg-nonexistent-project": "decline",
+    "neg-nonexistent-repo-scope": "decline",
+    "neg-illegal-i6-self-group": "decline",
+}
+
+
+def _check_pinned_refuse_decline_expect(corpus):
+    by_id = {row["id"]: row for row in corpus}
+    for row_id, want in PINNED_REFUSE_DECLINE_EXPECT.items():
+        _require(row_id in by_id,
+                  f"pinned row {row_id!r} (CHAOS-5597) no longer exists in CORPUS")
+        got = by_id[row_id].get("expect")
+        _require(got == want,
+                  f"CORPUS[{row_id!r}].expect changed: pinned {want!r}, got {got!r} -- "
+                  "row expectations are chris's call (corpus/README.md ## Ownership); "
+                  "report this, do not silently update the pin")
+    # Reverse direction: no OTHER row has drifted INTO refuse/decline, and none of
+    # the pinned 12 has drifted OUT to some other expect value not listed above --
+    # either would mean "the 12" has silently changed size since CHAOS-5597.
+    actual = {row["id"] for row in corpus if row.get("expect") in ("refuse", "decline")}
+    pinned = set(PINNED_REFUSE_DECLINE_EXPECT)
+    _require(actual == pinned,
+              "refuse/decline row set changed since CHAOS-5597 (CHAOS-5610 pin): "
+              f"added={sorted(actual - pinned)}, removed={sorted(pinned - actual)}")
+
+
+def _self_test_pin_guard_fires():
+    """RED CONTROLs: prove `_check_pinned_refuse_decline_expect` actually
+    rejects a drifted pin -- a changed value, a pinned row deleted
+    outright, and a row drifting into (or out of) the refuse/decline set
+    without being added to (or removed from) the pin -- and that the
+    canonical 12-row shape is still accepted (CHAOS-5610)."""
+    canonical = [{"id": row_id, "expect": expect}
+                 for row_id, expect in PINNED_REFUSE_DECLINE_EXPECT.items()]
+
+    def mutated(mutate):
+        corpus = copy.deepcopy(canonical)
+        mutate(corpus)
+        return corpus
+
+    cases = [
+        (mutated(lambda c: c[0].__setitem__("expect", "decline")), "expect changed"),
+        (mutated(lambda c: c[0].__setitem__("expect", None)), "expect changed"),
+        (mutated(lambda c: c.pop(0)), "no longer exists"),
+        (mutated(lambda c: c.append({"id": "drifted-in", "expect": "refuse"})),
+         "refuse/decline row set changed"),
+    ]
+    for bad_corpus, must_mention in cases:
+        try:
+            _check_pinned_refuse_decline_expect(bad_corpus)
+            raise CorpusValidationError(
+                f"RED CONTROL FAILED: drifted pin accepted: {bad_corpus!r}")
+        except CorpusValidationError as exc:
+            _require(must_mention in str(exc),
+                      f"RED CONTROL FAILED: drifted pin rejected for the wrong reason: {exc}")
+
+    # GREEN control: the canonical 12, untouched.
+    _check_pinned_refuse_decline_expect(copy.deepcopy(canonical))
+
+
 def main():
     _self_test_guard_fires()
     _self_test_baseline_guard_fires()
+    _self_test_pin_guard_fires()
 
     corpus = corpus_module.CORPUS
     _require(isinstance(corpus, list) and corpus, "CORPUS must be a nonempty list")
@@ -454,9 +532,12 @@ def main():
             print(f"  - {f}", file=sys.stderr)
         sys.exit(1)
 
+    _check_pinned_refuse_decline_expect(corpus)
+
     baseline_rows, dropped = _validate_baseline()
 
     print(f"PASS: {len(corpus)} corpus rows validated")
+    print(f"PASS: {len(PINNED_REFUSE_DECLINE_EXPECT)} CHAOS-5597 refuse/decline expect values pinned and matched")
     print(f"PASS: baseline sha256 pin matched, {baseline_rows} baseline rows shape-checked "
           f"({dropped} historical-only, not in the current corpus)")
 
