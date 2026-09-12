@@ -1,7 +1,10 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import originStateExample from "@/contracts/examples/context_fabric_investigation_result_origin_state.v1.json";
+import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import { CoveragePanel } from "@/components/CoveragePanel";
+import { validateContract } from "@/lib/acr/validate";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { isVisibleText, visibleText } from "@/test/visible-text";
 
@@ -941,5 +944,265 @@ describe("visibleText — the element passed in is subject to the rule too", () 
         const { details } = fixture(true);
         const body = details.querySelector("code")!;
         expect(isVisibleText(body, "body-text")).toBe(true);
+    });
+});
+
+/**
+ * The rendering claim this pin bump rests on: nothing in this panel keys
+ * behaviour off `CoverageDetail.code`. A detail is rendered from its own
+ * phrasing/label/raw text, so a new code needs no new arm — asserted over the
+ * WHOLE closed vocabulary read from the pinned schema, not a sample, so a
+ * future code that would need one fails here instead of rendering silently.
+ */
+describe("CoveragePanel — a detail's code changes nothing about how it renders", () => {
+    const CODES: readonly string[] = (
+        commonSchema as unknown as {
+            $defs: { CoverageDetail: { properties: { code: { enum: string[] } } } };
+        }
+    ).$defs.CoverageDetail.properties.code.enum;
+
+    function renderWithCode(code: string) {
+        const coverage = {
+            sources: [{ source: "canonical_fact:status", state: "unavailable" }],
+            partial: false,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-code",
+                    source: "canonical_fact:status",
+                    code,
+                    degrading: true,
+                    label: "The status read could not confirm the population it read",
+                    raw: "status: origin_state unrooted",
+                },
+            ],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+        const { container, unmount } = render(<CoveragePanel coverage={coverage} />);
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+        const visible = visibleText(panel);
+        const collapsed = Array.from(panel.querySelectorAll('[data-testid="degraded-reason-raw"]'))
+            .map((node) => node.textContent ?? "")
+            .join("|");
+        unmount();
+        return { visible, collapsed };
+    }
+
+    it("the pinned vocabulary carries the read-origin-state code", () => {
+        expect(CODES).toContain("fact_read_origin_state");
+        expect(CODES).toHaveLength(17);
+    });
+
+    /**
+     * Exactly ONE code gets rendering of its own: `fact_read_origin_state`,
+     * which also produces a per-kind read-state row. Every other code renders
+     * identically for identical text. Both halves are asserted, so a future code
+     * that needs its own arm fails here — either by differing from the baseline
+     * when it should not, or by joining the exception set.
+     */
+    it("exactly one code renders anything beyond the shared reason rendering", () => {
+        const baseline = renderWithCode("fact_provider_reported");
+        const different = CODES.filter(
+            (code) => JSON.stringify(renderWithCode(code)) !== JSON.stringify(baseline),
+        );
+        expect(different).toEqual(["fact_read_origin_state"]);
+    });
+
+    it("every other code renders identically for identical text", () => {
+        const baseline = renderWithCode("fact_provider_reported");
+        for (const code of CODES.filter((c) => c !== "fact_read_origin_state")) {
+            expect(renderWithCode(code)).toEqual(baseline);
+        }
+    });
+
+    it("the new code's own disclosure is VISIBLE, with the raw text collapsed", () => {
+        const { visible, collapsed } = renderWithCode("fact_read_origin_state");
+        expect(visible).toContain("The status read could not confirm the population it read");
+        expect(visible).not.toContain("status: origin_state unrooted");
+        expect(collapsed).toContain("status: origin_state unrooted");
+    });
+
+    it("a read-origin-state detail does not soften the headline: an unavailable source still reads non-complete", () => {
+        const { visible } = renderWithCode("fact_read_origin_state");
+        expect(visible).toContain("Partial — some sources did not contribute.");
+        expect(visible).not.toContain("Complete — every source contributed.");
+        // The per-source state stays visible on the chip, beside the detail.
+        expect(visible).toContain("unavailable");
+    });
+});
+
+/**
+ * The per-kind read-state rows, against acr's own golden example for the shape.
+ * That document is the case the rows exist for: each row reads `available` while
+ * the SOURCE fold above it reads `no_data` and `unavailable`. Showing the rows
+ * without the fold, or the fold without the rows, would report a different
+ * answer than the service gave — so both are asserted VISIBLE, together, and the
+ * page is asserted to make no completeness claim anywhere.
+ */
+describe("CoveragePanel — per-kind read states, from acr's golden example", () => {
+    const COVERAGE = (originStateExample as unknown as { coverage: unknown })
+        .coverage as Parameters<typeof CoveragePanel>[0]["coverage"];
+    const ROWS = (COVERAGE.details ?? []).filter(
+        (detail) => detail.code === "fact_read_origin_state",
+    );
+
+    it("the example is the member-worse shape: per-kind available beneath a worse source fold", () => {
+        expect(ROWS).toHaveLength(2);
+        expect(ROWS.every((row) => row.source_state === "available")).toBe(true);
+        expect(ROWS.every((row) => row.degrading === false)).toBe(true);
+        expect(COVERAGE.sources.map((source) => source.state)).toEqual(["no_data", "unavailable"]);
+        expect(COVERAGE.partial).toBe(true);
+    });
+
+    it("every per-kind row is VISIBLE, carrying the engine's own label", () => {
+        render(<CoveragePanel coverage={COVERAGE} />);
+        const visible = visibleText(screen.getByTestId("coverage-panel"));
+        for (const row of ROWS) expect(visible).toContain(row.label);
+        expect(screen.getByRole("heading", { name: "Per-kind read states" })).toBeInTheDocument();
+    });
+
+    it("the worse SOURCE fold stays visible beside them — the rows never stand in for it", () => {
+        render(<CoveragePanel coverage={COVERAGE} />);
+        const visible = visibleText(screen.getByTestId("coverage-panel"));
+        expect(visible).toContain("no data");
+        expect(visible).toContain("unavailable");
+        expect(visible).toContain("Partial — some sources did not contribute.");
+        expect(visible).not.toContain("Complete — every source contributed.");
+    });
+
+    it("the reported degraded reason is still shown, and the non-degrading rows are NOT listed as reasons", () => {
+        render(<CoveragePanel coverage={COVERAGE} />);
+        const panel = screen.getByTestId("coverage-panel");
+        const visible = visibleText(panel);
+        for (const reason of COVERAGE.degraded_reasons ?? []) expect(visible).toContain(reason);
+        const reasonsList = screen.getByRole("heading", {
+            name: "Degraded reasons",
+        }).nextElementSibling!;
+        for (const row of ROWS) expect(reasonsList.textContent).not.toContain(row.label);
+    });
+
+    it("a DEGRADING origin-state row appears in both places, because it answers both questions", () => {
+        const degradingRow = {
+            ...structuredClone(ROWS[0]!),
+            degrading: true,
+            detail_id: "cov-origin-degrading",
+        };
+        const coverage = {
+            ...structuredClone(COVERAGE),
+            details: [degradingRow],
+            degraded_reasons: [],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+        render(<CoveragePanel coverage={coverage} />);
+        const panel = screen.getByTestId("coverage-panel");
+        expect(screen.getByRole("heading", { name: "Per-kind read states" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        const occurrences = visibleText(panel).split(degradingRow.label).length - 1;
+        expect(occurrences).toBe(2);
+    });
+});
+
+/**
+ * Pinned at the ROW, and on the FACTS rather than on a string the engine happens
+ * to have written: each per-kind row's own rendered text names the origin kind
+ * and the state that read reached. A row-level assertion is what this needs —
+ * a panel-wide substring check is unsound here, since `unavailable` contains
+ * `available`.
+ *
+ * The row must keep saying both even when the detail carries a `phrasing`: a
+ * phrasing is a sentence the model chose and may name neither, so it can never
+ * replace the contract-required label on these rows.
+ */
+describe("CoveragePanel — a per-kind row always names its kind and its state", () => {
+    const BASE = (originStateExample as unknown as { coverage: unknown }).coverage as Parameters<
+        typeof CoveragePanel
+    >[0]["coverage"];
+
+    function rowTexts(coverage: Parameters<typeof CoveragePanel>[0]["coverage"]) {
+        const { container, unmount } = render(<CoveragePanel coverage={coverage} />);
+        const heading = Array.from(container.querySelectorAll("h3")).find(
+            (node) => node.textContent === "Per-kind read states",
+        )!;
+        const list = heading.nextElementSibling!;
+        const texts = Array.from(list.querySelectorAll("li")).map((li) => visibleText(li));
+        unmount();
+        return texts;
+    }
+
+    function withPhrasing(phrasing: string) {
+        const coverage = structuredClone(BASE) as unknown as Record<string, unknown>;
+        coverage.details = (coverage.details as Record<string, unknown>[]).map((detail) => ({
+            ...detail,
+            phrasing,
+        }));
+        return coverage as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+    }
+
+    it("every row names its own origin_kind and source_state", () => {
+        const rows = (BASE.details ?? []).filter(
+            (detail) => detail.code === "fact_read_origin_state",
+        );
+        const texts = rowTexts(BASE);
+        expect(texts).toHaveLength(rows.length);
+        rows.forEach((row, index) => {
+            expect(texts[index]).toContain(row.origin_kind!);
+            expect(texts[index]).toContain(row.source_state!);
+        });
+    });
+
+    it("a phrasing that names neither does NOT replace the facts", () => {
+        const texts = rowTexts(withPhrasing("The read reached its source."));
+        const rows = (BASE.details ?? []).filter(
+            (detail) => detail.code === "fact_read_origin_state",
+        );
+        rows.forEach((row, index) => {
+            expect(texts[index]).toContain(row.origin_kind!);
+            expect(texts[index]).toContain(row.source_state!);
+            // Nothing the engine sent is dropped either: the phrasing is still
+            // on the row, after the facts.
+            expect(texts[index]).toContain("The read reached its source.");
+        });
+    });
+
+    it("the rows stay distinguishable — a shared phrasing cannot collapse them", () => {
+        const texts = rowTexts(withPhrasing("The read reached its source."));
+        expect(new Set(texts).size).toBe(texts.length);
+    });
+
+    it("a whitespace-only label falls to a floor that promises nothing, never a reconstructed state", () => {
+        const coverage = structuredClone(BASE) as unknown as Record<string, unknown>;
+        const row = { ...(coverage.details as Record<string, unknown>[])[0]! };
+        row.label = " ";
+        // `phrasing` is OMITTED, not null: the contract types it `string`, so a
+        // JSON null is not a shape this panel can be handed — see the boundary
+        // test below.
+        delete row.phrasing;
+        coverage.details = [row];
+        const texts = rowTexts(
+            coverage as unknown as Parameters<typeof CoveragePanel>[0]["coverage"],
+        );
+        expect(texts).toEqual([
+            "A read reported its origin state, but said nothing readable about it.",
+        ]);
+    });
+
+    /**
+     * The boundary that keeps the row rule honest about its own inputs: a JSON
+     * `null` phrasing is NOT contract-valid (`phrasing` is typed `string`), so
+     * the validator refuses such a response before anything renders it. The
+     * panel is therefore never handed one, and this test is what says so —
+     * rather than the panel carrying a guard for a shape the contract forbids.
+     */
+    it("a null phrasing is refused by the contract, so it never reaches the panel", () => {
+        const result = structuredClone(originStateExample) as unknown as Record<string, unknown>;
+        const coverage = result.coverage as Record<string, unknown>;
+        coverage.details = (coverage.details as Record<string, unknown>[]).map((detail) => ({
+            ...detail,
+            phrasing: null,
+        }));
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            result,
+        );
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toMatch(/phrasing must be string/);
     });
 });

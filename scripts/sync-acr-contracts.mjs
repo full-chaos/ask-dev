@@ -257,7 +257,34 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // (req_a3051b329f4a8184c7f177d4c2fb6ed6). The bump only WIDENS what validates,
 // and acr main now serves the value, so the consumer pin lands as soon as it
 // can -- the same two-step order every enum addition above follows.
-export const SOURCE_COMMIT = "57f25d5f85b967452fdbe8b2e4f96cfa706b367a";
+//
+// 57f25d5f -> a5f44c7f: acr #513's squash, on acr main. Verified over the whole
+// tree (`git diff 57f25d5f85b967452fdbe8b2e4f96cfa706b367a
+// a5f44c7f98ddf9f03dd0cdf2c51baaaa5ea1ffe2 -- contracts/`): five files change,
+// and TWO of them are part of this repo's vendored surface.
+//   - `context_fabric_common.v1`'s `CoverageDetail.code` closed enum gains a
+//     17th value, `fact_read_origin_state`: a row reporting the state of the
+//     population one requirement's read actually reached, PER ORIGIN KIND,
+//     rather than the read failing or being narrowed. Additive only -- no
+//     property added or removed, no required-list change, no other `$def`
+//     touched.
+//   - NEW example `context_fabric_investigation_result_origin_state.v1`,
+//     vendored below. It is the shape that makes the rows worth rendering: the
+//     per-kind rows read `available` while the SOURCE fold above them reads
+//     `no_data` and `unavailable`. A consumer that showed the rows without the
+//     fold, or the fold without the rows, would be reporting a different
+//     answer than the service gave -- so the rendering cells for this bump run
+//     against this document rather than a hand-built one.
+//   - `context_fabric_answer_projection.v1` and the two `mcp_*` response
+//     schemas carry the same member but are not part of this repo's vendored
+//     surface, the same exclusion as every bump above.
+// `context_fabric_investigation_request.v1`, `context_fabric_investigation_
+// result.v1` and `error.v1` are byte-identical to the prior pin.
+//
+// WIDENING ONLY, and now load-bearing: acr main serves this code, so without
+// the bump a response carrying such a row is rejected whole as
+// `acr_contract_violation` instead of rendering.
+export const SOURCE_COMMIT = "a5f44c7f98ddf9f03dd0cdf2c51baaaa5ea1ffe2";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -294,6 +321,12 @@ const EXAMPLE_PATHS = [
     // document acr's own contract suite validates, not a hand-edited copy of
     // the canonical result.
     "contracts/examples/v1/context_fabric_investigation_result_unsupported.v1.json",
+    // acr #513: the per-kind read-origin-state shape. Vendored for the same
+    // reason as the other examples: the rendering cells must run against the
+    // document acr's own producer emitted, and this one carries the case that
+    // matters -- per-kind rows reading `available` beneath a source fold
+    // reading `no_data`/`unavailable`.
+    "contracts/examples/v1/context_fabric_investigation_result_origin_state.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];

@@ -334,3 +334,51 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         expect(visible).not.toContain("Complete — every source contributed.");
     });
 });
+
+/**
+ * The last hop of the user-visible path for a continuation the service refused:
+ * the result's own limitation sentence is what the tester reads, so it must be
+ * VISIBLE — not merely present in the DOM behind a disclosure. The refusal basis
+ * itself is a machine field the view does not render; what must survive to the
+ * screen is the sentence the service wrote about it.
+ */
+describe("DeterministicAnswerView: a refused continuation still shows the service's own limitation", () => {
+    function refusedContinuation(): InvestigationResult {
+        const base = mockScenarios().find((s) => s.id === "complete")!.result;
+        return {
+            ...structuredClone(base),
+            refusal_basis: "continuation_context_unverifiable",
+            limitations: [
+                "The previous turn's context could not be verified, so this answer covers the requested window only.",
+            ],
+        } as unknown as InvestigationResult;
+    }
+
+    it("renders the limitation as visible text", () => {
+        const result = refusedContinuation();
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        expect(visibleText(article)).toContain(result.limitations[0]!);
+        expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
+    });
+
+    it("renders the same way with the basis absent — the view does not key off it", () => {
+        const withBasis = refusedContinuation();
+        const withoutBasis = structuredClone(withBasis) as unknown as Record<string, unknown>;
+        delete withoutBasis.refusal_basis;
+
+        const a = render(<DeterministicAnswerView result={withBasis} />);
+        const withText = visibleText(
+            a.container.querySelector('article[aria-label="Deterministic answer"]')!,
+        );
+        a.unmount();
+        const b = render(
+            <DeterministicAnswerView result={withoutBasis as unknown as InvestigationResult} />,
+        );
+        const withoutText = visibleText(
+            b.container.querySelector('article[aria-label="Deterministic answer"]')!,
+        );
+        expect(withText).toBe(withoutText);
+    });
+});

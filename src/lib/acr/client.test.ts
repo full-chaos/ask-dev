@@ -1024,3 +1024,38 @@ describe("investigate", () => {
         expect(spy).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * The user-visible path, not just the validator: a served result carrying the
+ * continuation-refusal basis — at the top level AND at
+ * `completeness.refusal_basis`, the two places the field is carried — reaches
+ * the caller unchanged. On the pre-bump pin this exact response was turned into
+ * `acr_contract_violation` before anything could render it.
+ */
+describe("investigate — a result carrying the continuation-refusal basis", () => {
+    function refusedContinuation(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        result.refusal_basis = "continuation_context_unverifiable";
+        result.completeness = {
+            ...(result.completeness as Record<string, unknown>),
+            refusal_basis: "continuation_context_unverifiable",
+        };
+        return result;
+    }
+
+    it("is served unchanged instead of acr_contract_violation", async () => {
+        const served = refusedContinuation();
+        respondWith(served);
+        await expect(investigate(config, { question: "and last month?" })).resolves.toEqual(served);
+    });
+
+    it("a value outside the vocabulary is still an upstream contract violation, named at that field", async () => {
+        const bogus = refusedContinuation();
+        bogus.refusal_basis = "not_a_real_refusal_basis";
+        respondWith(bogus);
+
+        const failure = await failureOf(investigate(config, { question: "and last month?" }));
+        expect(failure.code).toBe("acr_contract_violation");
+        expect(failure.details?.join("; ")).toMatch(/refusal_basis/);
+    });
+});
