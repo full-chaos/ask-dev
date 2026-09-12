@@ -284,7 +284,22 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // WIDENING ONLY, and now load-bearing: acr main serves this code, so without
 // the bump a response carrying such a row is rejected whole as
 // `acr_contract_violation` instead of rendering.
-export const SOURCE_COMMIT = "a5f44c7f98ddf9f03dd0cdf2c51baaaa5ea1ffe2";
+//
+// BUMP TO a03d9131 -- NO VENDORED FILE CHANGES, and that is the point of
+// recording it. That commit persists and carries each result's whole accepted
+// semantic reading: the internal snapshot beside the row, and the observability
+// the decision is read from. Neither is a wire surface -- the reading never
+// reaches a client, and the event specification it extends is the service's own
+// trace, not this repo's vendored contract. `git diff
+// a5f44c7f98ddf9f03dd0cdf2c51baaaa5ea1ffe2 a03d9131ae5f499316503ee480592ba64ad94d4d
+// -- contracts/` is EMPTY, so every vendored file below is byte-identical to
+// the prior pin and every digest in the manifest is unchanged.
+//
+// The bump is therefore a statement about what was verified, not a migration:
+// it records that this repo's vendored surface was re-derived from that acr
+// commit and still matches it. A consumer that did not bump would render the
+// same bytes; one that bumps knows it.
+export const SOURCE_COMMIT = "a03d9131ae5f499316503ee480592ba64ad94d4d";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
