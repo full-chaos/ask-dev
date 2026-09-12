@@ -987,17 +987,46 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
         return { visible, collapsed };
     }
 
-    it("the pinned vocabulary carries the read-origin-state code", () => {
-        expect(CODES).toContain("fact_read_origin_state");
-        expect(CODES).toHaveLength(17);
+    /**
+     * The tripwire, stated for what it actually is: this suite cannot tell that a
+     * FUTURE code needs rendering of its own — a member with no arm renders like
+     * every other, so the exception set below stays unchanged and the comparison
+     * passes. What it can do, and does here, is make a vocabulary change
+     * impossible to land unnoticed: the whole enum is pinned by value, so adding,
+     * removing or renaming a member fails with a readable diff and a human then
+     * decides whether it needs its own rendering.
+     */
+    it("the whole pinned vocabulary is fixed by value, so no member can arrive unnoticed", () => {
+        expect(CODES).toEqual([
+            "fact_unconfigured",
+            "fact_scope_unexpanded",
+            "fact_read_failed",
+            "fact_provider_reported",
+            "fact_pruned",
+            "fact_narrowed",
+            "graph_endpoint_lookup_failed",
+            "graph_exact_name_candidates_truncated",
+            "graph_cohort_denied_by_authorization",
+            "graph_unknown_relationship_type",
+            "graph_validity_unbounded",
+            "reuse_auxiliary_refs_stripped",
+            "answer_terminated_before_attempt",
+            "population_truncated",
+            "requirement_read_not_planned",
+            "read_population_unverified",
+            "fact_read_origin_state",
+        ]);
     });
 
     /**
      * Exactly ONE code gets rendering of its own: `fact_read_origin_state`,
      * which also produces a per-kind read-state row. Every other code renders
-     * identically for identical text. Both halves are asserted, so a future code
-     * that needs its own arm fails here — either by differing from the baseline
-     * when it should not, or by joining the exception set.
+     * identically for identical text.
+     *
+     * What this pins is the exception SET, so a code quietly GAINING its own
+     * rendering fails here. It cannot tell that a future code OUGHT to have its
+     * own — one with no arm is indistinguishable from one that needs none. The
+     * vocabulary cell above is what stops a new member arriving unnoticed.
      */
     it("exactly one code renders anything beyond the shared reason rendering", () => {
         const baseline = renderWithCode("fact_provider_reported");
