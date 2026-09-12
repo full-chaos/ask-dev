@@ -14,6 +14,28 @@ same reason corpus/test_corpus.py hand-mirrors acr's validators.py instead of
 importing it), and it means the two sides can never silently drift apart --
 there is only ever one implementation of the scalar table, acr's.
 
+THE ONLY ACCEPTANCE ORACLE. This module writes no pattern of its own to
+recognize a timestamp string, calls no library to turn one into a
+comparable value, and adds no hand-written field-presence/type check of
+its own for any shape the pinned contract already describes: every window
+offer
+(`WindowOption`), window container (`WindowClarification`,
+`StructureNeeds`), the server-canonicalized window
+(`EffectiveEvidenceWindow`), a carried structure member's disposition
+(`ConfirmedStructureEntry`), and a window receipt (`WindowBoundReceipt`)
+are all validated through `schema_shim.validate_via_schema` (ajv, the same
+library and options `src/lib/acr/validate.ts` already uses in product
+code) before this module reads a single field out of them. Any fact about
+a payload's own `start`/`end` ordering -- JSON Schema has no "field A
+before field B" keyword -- is computed by the SAME shim (via JS
+`Date.parse`), never by a Python-side timestamp parser; `test_semantic_verdict.py`'s
+own grep control asserts this module's source never re-acquires one. The
+outer two-attempt EXCHANGE envelope (`attempts`, each attempt's `request`/
+`response` wrapper) is the acr corpus HARNESS's own capture convention,
+not itself a shape the pinned wire contract describes (see below) --
+navigating it is not a second acceptance oracle for a shape ajv already
+owns.
+
 WHAT THIS DOES. It adds:
 
   * a fail-closed AUDIT of a two-turn window-clarification exchange, telling
@@ -32,12 +54,8 @@ WHAT THIS DOES. It adds:
     policy (see corpus/README.md).
 """
 
-import calendar
-import datetime
-import re
-
 import expect_schema as S
-from schema_shim import SchemaShimError, validate_via_schema
+from schema_shim import validate_via_schema
 
 # The one contract schema file every window/confirmation shape below is
 # validated against -- offers (`WindowOption`), the server-canonicalized
@@ -76,31 +94,33 @@ def is_success_status(status):
     return status in _SERVED_HTTP_STATUSES
 
 
-_TIMESTAMP_RE = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?(Z|[+-]\d\d:\d\d)")
-
-
-def timestamp(value):
-    """Integer nanoseconds since the epoch, preserving RFC3339Nano precision
-    (Go's `time.Time` resolution) rather than truncating to microseconds."""
-    match = _TIMESTAMP_RE.fullmatch(value)
-    if not match:
-        raise ValueError("invalid timestamp")
-    base, fraction, zone = match.groups()
-    parsed = datetime.datetime.fromisoformat(base + zone.replace("Z", "+00:00"))
-    return calendar.timegm(parsed.utctimetuple()) * 10**9 + int((fraction or "").ljust(9, "0"))
+class ValidatorUnavailable(Exception):
+    """The ajv shim itself could not run or produced unreadable output --
+    an INFRASTRUCTURE failure, distinct from an invalid or malformed
+    exchange. Callers report this under its own reason
+    (`validator_unavailable`), never conflated with `unreadable_exchange`
+    (which means the DATA was bad, not the tooling)."""
 
 
 def _validate_shape(schema_def, payload):
-    """Validate `payload` against `_COMMON_SCHEMA#/$defs/<schema_def>`.
-    Raises ValueError (caught by every caller's existing fail-closed path)
-    on an invalid shape, or a broken validator alike -- a validator that
-    cannot run must never be silently read as "this shape is fine"."""
-    try:
-        ok, errors = validate_via_schema(_COMMON_SCHEMA, f"#/$defs/{schema_def}", payload)
-    except SchemaShimError as exc:
-        raise ValueError(f"{schema_def} schema validation unavailable: {exc}") from exc
+    """Validate `payload` against `_COMMON_SCHEMA#/$defs/<schema_def>` and
+    return its `ordered_ascending` fact (see schema_shim.validate_via_schema
+    -- `None` when the payload carries no `start`/`end` pair). Nothing
+    here parses a timestamp string or re-checks a field's presence/type
+    on its own: ajv is the only acceptance oracle, and any ordering fact
+    about a payload's own `start`/`end` is computed by the shim (via JS
+    `Date.parse`), never here.
+
+    Raises `ValidatorUnavailable` if the validator itself could not run,
+    or `ValueError` (caught by every caller's existing fail-closed path)
+    if the shape is schema-invalid.
+    """
+    ok, errors, ordered = validate_via_schema(_COMMON_SCHEMA, f"#/$defs/{schema_def}", payload)
+    if ok is None:
+        raise ValidatorUnavailable("; ".join(errors))
     if not ok:
         raise ValueError(f"invalid {schema_def}: {'; '.join(errors)}")
+    return ordered
 
 
 def window_value(window, schema_def="WindowOption"):
@@ -108,21 +128,22 @@ def window_value(window, schema_def="WindowOption"):
     the pinned contract's own `schema_def` (`WindowOption` for an offer,
     `EffectiveEvidenceWindow` for the window an answer speaks for --
     different shapes: only `WindowOption` carries `receipt_id`/
-    `option_id`/`label`). Distinguishes bounded windows (by their frozen
-    instants, not a shared relative label), `all_time`, and an EXPLICIT
-    bounded window carrying no `relative_id` at all (legal per the pinned
-    contract: both defs require `relative_id` OR `start`+`end`, not
-    neither, and no other combination reaches this point at all -- the
-    schema itself enforces every combination the contract forbids, this
-    function only enforces bound ORDERING, which the schema does not)."""
-    _validate_shape(schema_def, window)
+    `option_id`/`label`). Distinguishes bounded windows (by their own
+    `start`/`end` strings, read verbatim -- never parsed into a numeric
+    form here), `all_time`, and an EXPLICIT bounded window carrying no
+    `relative_id` at all (legal per the pinned contract: both defs require
+    `relative_id` OR `start`+`end`, not neither, and no other combination
+    reaches this point at all -- the schema itself enforces every
+    combination the contract forbids). Bound ORDERING, which the schema
+    does not express, is the shim's own `ordered_ascending` fact, applied
+    here, never computed by this module."""
+    ordered = _validate_shape(schema_def, window)
     relative = window.get("relative_id")
     if relative == "all_time":
         return (relative,)
-    start, end = timestamp(window["start"]), timestamp(window["end"])
-    if start >= end:
+    if ordered is not True:
         raise ValueError("unordered window")
-    return (relative or "explicit", start, end)
+    return (relative or "explicit", window["start"], window["end"])
 
 
 def audit_window_exchange(attempts):
@@ -199,11 +220,31 @@ def audit_window_exchange(attempts):
         if len(refs) != 1 or refs[0]["result_id"] != first["result_id"]:
             return {**out, "window_binding": "mismatch", "reason": "wrong_parent"}
         ref = refs[0]
+        # `ref` matches `WindowBoundReceipt`'s shape exactly ({result_id,
+        # receipt_id}, receipt_id namespaced `winr_`) even though it is
+        # read from the harness's own camelCase request envelope, not the
+        # wire's snake_case one -- the RECEIPT OBJECT ITSELF is the same
+        # shape either way, only the envelope key naming around it differs
+        # (see the module docstring on the harness-vs-wire boundary).
+        _validate_shape("WindowBoundReceipt", ref)
+        structure_needs = first.get("structure_needs")
+        window_clarification = first.get("window_clarification")
+        # Validate the CONTAINER objects themselves, not only the offers
+        # inside them: `WindowClarification.options` and
+        # `StructureNeeds.window_options` carry their own `minItems`/
+        # `maxItems`/`uniqueItems` constraints (e.g. at most 20 offers) that
+        # validating each `WindowOption` individually can never see -- an
+        # offer list a lone-item check accepts one at a time can still be a
+        # container ajv itself rejects.
+        if structure_needs is not None:
+            _validate_shape("StructureNeeds", structure_needs)
+        if window_clarification is not None:
+            _validate_shape("WindowClarification", window_clarification)
         pages = [
             page
             for page in [
-                (first.get("structure_needs") or {}).get("window_options"),
-                (first.get("window_clarification") or {}).get("options"),
+                (structure_needs or {}).get("window_options"),
+                (window_clarification or {}).get("options"),
             ]
             if page
         ]
@@ -278,6 +319,11 @@ def audit_window_exchange(attempts):
         ) != window_value(offer):
             return {**out, "window_binding": "mismatch", "reason": "effective_window_mismatch"}
         return {**out, "window_binding": "verified", "reason": "family_confirmation_unavailable"}
+    except ValidatorUnavailable:
+        # An INFRASTRUCTURE failure (the ajv shim itself could not run),
+        # never conflated with a malformed exchange: an operator needs to
+        # tell "my data is bad" apart from "my tooling is broken".
+        return {**out, "reason": "validator_unavailable"}
     except (KeyError, TypeError, ValueError, AttributeError):
         return {**out, "reason": "unreadable_exchange"}
 
@@ -330,6 +376,12 @@ def score(row, bucket, status, final, audit, legacy_score, **identity):
     """
     ok, reason, choices = S.parse_expect(row.get("expect") if isinstance(row, dict) else None)
     if not ok:
+        # `validator_unavailable` is an infrastructure failure (the ajv
+        # shim could not run), never conflated with `invalid_expectation`
+        # (a data problem: the declaration itself does not match the
+        # schema) -- see semantic_verdict.py's own ValidatorUnavailable.
+        if reason.startswith("validator_unavailable:"):
+            return "unscored", reason, []
         return "unscored", "invalid_expectation:" + reason, []
     if choices is None:
         verdict, why = legacy_score(row, bucket, status, **identity)

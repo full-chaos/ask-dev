@@ -24,7 +24,7 @@ import json
 import sys
 from pathlib import Path
 
-from schema_shim import SchemaShimError, validate_via_schema
+from schema_shim import validate_via_schema
 
 SERVE, REFUSE, DECLINE, CLARIFY = "serve", "refuse", "decline", "clarify"
 
@@ -66,13 +66,12 @@ def parse_expect(expect):
     the schema validates the WHOLE `any_of` array as one document, not one
     branch at a time.
     """
-    try:
-        ok, errors = validate_via_schema(_EXPECT_SCHEMA, "", expect)
-    except SchemaShimError as exc:
-        # A broken validator must never be silently treated as "this row
-        # is fine" -- surface it as loudly as an invalid row would be,
-        # never as a pass.
-        return False, f"expect schema validation unavailable: {exc}", None
+    ok, errors, _ordered = validate_via_schema(_EXPECT_SCHEMA, "", expect)
+    if ok is None:
+        # The validator itself is unavailable -- never silently treated as
+        # "this row is fine". `validator_unavailable` is a distinct reason
+        # from an ordinary invalid declaration (infrastructure, not data).
+        return False, "validator_unavailable: " + "; ".join(errors), None
     if not ok:
         return False, "expect does not match corpus/schemas/expect.schema.json: " + "; ".join(errors), None
     if expect is None or isinstance(expect, str):

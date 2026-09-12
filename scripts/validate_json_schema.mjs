@@ -21,7 +21,15 @@
  *   <jsonPointer>  '' for the schema's own root, or e.g.
  *                  '#/$defs/WindowOption' for one of its named shapes.
  *   stdin          the JSON payload to validate.
- *   stdout         exactly one line: {"valid": bool, "errors": [string, ...]}.
+ *   stdout         exactly one line: {"valid": bool, "errors": [string, ...],
+ *                  "orderedAscending": bool|null}. `orderedAscending` is
+ *                  computed (via JS `Date.parse`, never a caller-supplied
+ *                  parser) whenever the payload is an object carrying both
+ *                  a `start` and an `end` string -- true/false/null (not
+ *                  computable, e.g. an unparseable value slipped past
+ *                  `format: date-time` some other way). Callers needing an
+ *                  ordering fact read it from here; nothing on the Python
+ *                  side parses a timestamp of its own.
  *   exit code      0 if the payload is valid, 1 if invalid, 2 on a usage
  *                  or schema-loading error (never conflated with 1 --
  *                  callers must not read a broken shim as "invalid input").
@@ -85,5 +93,23 @@ const errors = valid
     : (validator.errors ?? []).map(
           (error) => `${error.instancePath} ${error.message ?? error.keyword}`,
       );
-process.stdout.write(JSON.stringify({ valid, errors }) + "\n");
+
+// Ordering is a FACT about the payload's own start/end, not a validity
+// rule the schema itself expresses (JSON Schema has no "field A before
+// field B" keyword) -- computed here, in JS, so no caller ever parses a
+// timestamp string itself.
+let orderedAscending = null;
+if (
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    "start" in payload &&
+    "end" in payload
+) {
+    const startMs = Date.parse(payload.start);
+    const endMs = Date.parse(payload.end);
+    orderedAscending = Number.isFinite(startMs) && Number.isFinite(endMs) ? startMs < endMs : null;
+}
+
+process.stdout.write(JSON.stringify({ valid, errors, orderedAscending }) + "\n");
 process.exit(valid ? 0 : 1);

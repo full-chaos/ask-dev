@@ -19,6 +19,8 @@ build_verdict()'s docstring.
 Run: python3 corpus/test_semantic_verdict.py
 """
 import copy
+import inspect
+import re
 import sys
 from pathlib import Path
 
@@ -82,7 +84,7 @@ def base_exchange(final_family="discovered_cohort_ranking", first_family="discov
         "status": "clarification_required",
         "result_id": "result-t1",
         "answer_plan": {"family": first_family},
-        "structure_needs": {"window_options": [offer]},
+        "structure_needs": {"missing": ["window"], "window_options": [offer]},
         "window_clarification": {"options": [offer]},
     }
     final = {
@@ -166,7 +168,11 @@ def test_retry_is_not_a_third_turn():
 _MUTATIONS = [
     ("receipt", "mismatch"),
     ("parent", "mismatch"),
-    ("duplicate_offer", "mismatch"),
+    # Caught by the WindowClarification container's own `uniqueItems`
+    # constraint now, before this audit's own per-page duplicate check
+    # ever runs -- still fails closed, just via the schema-shape path
+    # (`unreadable_exchange`) rather than this audit's own named reason.
+    ("duplicate_offer", "unknown"),
     ("duplicate_ack", "mismatch"),
     ("vetoed", "mismatch"),
     ("nanosecond", "mismatch"),
@@ -232,6 +238,23 @@ def test_error_and_unknown_terminal_cannot_pass():
     _require(verdict == "disagree", verdict)
     verdict, _, _ = SV.score(row, "unserved", "future_terminal", {}, {}, fake_legacy_score)
     _require(verdict == "unscored", verdict)
+
+
+_BANNED_TOKENS = (r"\bre\.", r"\bregex\b", r"\bdatetime\b", r"\bstrptime\b", r"\bcalendar\.", r"^import re$",
+                  r"^import datetime$", r"^import calendar$")
+_BANNED_RE = re.compile("|".join(_BANNED_TOKENS), re.MULTILINE)
+
+
+def test_module_contains_no_regex_or_datetime_parsing_of_its_own():
+    # The mechanical invariant: ajv (via schema_shim) is the ONLY
+    # acceptance oracle in this module. No `re`/`datetime`/`calendar`
+    # import, and no bare reference to `strptime`, may appear in
+    # semantic_verdict.py's source -- a hand-rolled parser or format check
+    # duplicating the schema's own rules is exactly what silently drifts
+    # from the real contract over time.
+    source = inspect.getsource(SV)
+    hit = _BANNED_RE.search(source)
+    _require(hit is None, f"semantic_verdict.py must not re-implement date/format parsing, found: {hit}")
 
 
 def test_scalar_row_is_untouched_by_the_new_machinery():
@@ -319,6 +342,37 @@ def test_missing_final_result_fails_closed_not_crash():
     row = declaration(serve())
     verdict, reason, _ = SV.score(row, "served_with_data", "complete", None, {}, fake_legacy_score)
     _require((verdict, reason) == ("unscored", "family_unavailable"), (verdict, reason))
+
+
+def test_oversized_offer_container_cannot_verify():
+    # WindowClarification.options caps at 20 items (and StructureNeeds at
+    # the same, via window_options) -- a container ajv itself rejects must
+    # never verify just because every individual WindowOption inside it is
+    # otherwise well-formed. Only the container-level shape check catches
+    # this; no per-offer loop ever will.
+    attempts = base_exchange()
+    first = attempts[0]["response"]["result"]
+    extra_offers = [
+        {**_offer(option_id=f"opt-extra-{i}", receipt_id=f"winr_extra{i:04d}")} for i in range(20)
+    ]
+    first["window_clarification"] = {"options": [_offer(), *extra_offers]}
+    audit = SV.audit_window_exchange(attempts)
+    _require(audit["window_binding"] != "verified", f"a 21-option container must not verify: {audit}")
+
+
+def test_window_value_accepts_more_than_nine_fractional_digits():
+    # ajv-formats' own `date-time` format has no upper bound on fractional
+    # digits (`(?:\.\d+)?`) -- a value the pinned contract schema accepts
+    # must not fail here just because a stricter, hand-rolled cap once
+    # rejected it. This module has no timestamp parser of its own to
+    # impose one: the ajv shim decides validity, and window ordering is
+    # its own `ordered_ascending` fact (JS `Date.parse`), not a Python
+    # computation -- so this is exercised through window_value(), not a
+    # removed standalone parser.
+    offer = {"receipt_id": "winr_precise0", "option_id": "opt-precise", "label": "precise",
+             "start": "2026-05-01T00:00:00.1234567890123Z", "end": "2026-08-01T00:00:00Z"}
+    value = SV.window_value(offer)
+    _require(value == ("explicit", offer["start"], offer["end"]), value)
 
 
 def _get(container, path):

@@ -55,18 +55,25 @@ def _required_fields(def_name):
 
 
 def _validate(def_name, payload):
-    ok, errors = validate_via_schema("context_fabric_common.v1.schema.json", f"#/$defs/{def_name}", payload)
+    ok, errors, _ordered = validate_via_schema("context_fabric_common.v1.schema.json", f"#/$defs/{def_name}", payload)
+    _require(ok is not None, f"validator_unavailable while validating {def_name}: {errors}")
     return ok, errors
 
 
 def _generated_cells(def_name, seed_name, seed):
     """Yield (cell_name, payload) for the seed itself plus an absent- and
-    a null-variant of every field `def_name` requires -- mechanically
-    derived from the schema, not hand-listed."""
+    a null-variant of EVERY FIELD THE SEED CARRIES -- not only the def's
+    unconditional `required` array. A field required only on one branch
+    (e.g. WindowOption's `start`/`end`, required by an `allOf`/`if`/`then`
+    only when `relative_id` is not `all_time`) never appears in the def's
+    own top-level `required` list, so limiting mutation to that list
+    misses exactly the conditional cells a real exchange can still send.
+    Mutating every field the seed itself carries, and letting ajv (not
+    this function) decide whether each mutation is still valid, covers
+    both kinds without this file having to parse the schema's own
+    conditional logic by hand."""
     yield f"{seed_name}/seed", seed
-    for field in _required_fields(def_name):
-        if field not in seed:
-            continue  # this seed's own branch does not carry this field at all
+    for field in seed:
         absent = dict(seed)
         del absent[field]
         yield f"{seed_name}/{field}_absent", absent
@@ -104,6 +111,7 @@ _CONFIRMED_STRUCTURE_ENTRY_SEEDS = {
 
 def _run_table(def_name, seeds, extra_check=None):
     executed = []
+    unconditional = _required_fields(def_name)
     for seed_name, seed in seeds.items():
         seed_ok, seed_errors = _validate(def_name, seed)
         _require(seed_ok, f"{def_name}/{seed_name} seed itself is not schema-valid: {seed_errors}")
@@ -113,12 +121,21 @@ def _run_table(def_name, seeds, extra_check=None):
             print(f"SCHEMA_TABLE {def_name}/{cell_name}: valid={ok}" + (f" errors={errors}" if errors else ""))
             if extra_check is not None:
                 extra_check(def_name, cell_name, payload, ok)
-    # Removing or nulling a required field must never leave the schema
-    # accepting the mutated payload -- a basic completeness sanity check
-    # that `required` is doing anything at all.
+    # Removing or nulling one of the def's UNCONDITIONALLY required fields
+    # must never leave the schema accepting the mutated payload, on ANY
+    # seed -- a basic completeness sanity check that `required` is doing
+    # anything at all. A field that is only conditionally required for ONE
+    # branch (e.g. WindowOption's `start`, required only when `relative_id`
+    # is not `all_time`) can legitimately still validate after removal, if
+    # the seed also satisfies a DIFFERENT branch once that field is gone
+    # (e.g. a `relative` seed carrying both `relative_id` and `start`/`end`
+    # still matches the explicit-bounds branch with `relative_id` removed)
+    # -- ajv's verdict there is observed, never asserted in one direction.
     for cell_name, ok, _errors in executed:
-        if cell_name.endswith("_absent") or cell_name.endswith("_null"):
-            _require(not ok, f"{def_name}/{cell_name} was ACCEPTED despite removing/nulling a required field")
+        field = cell_name.rsplit("/", 1)[-1].rsplit("_", 1)[0]
+        if (cell_name.endswith("_absent") or cell_name.endswith("_null")) and field in unconditional:
+            _require(not ok, f"{def_name}/{cell_name} was ACCEPTED despite removing/nulling an unconditionally "
+                     f"required field")
     print(f"{def_name}: {len(executed)} generated cells executed")
     return executed
 
