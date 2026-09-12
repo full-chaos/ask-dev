@@ -207,7 +207,7 @@ def _validate_baseline_doc(doc, corpus_ids):
     _require(ticket, "baseline.ticket must be a non-empty string")
     _require_type(doc, "provenance", dict, "mapping")
     totals = _require_type(doc, "totals", dict, "mapping")
-    _require_type(doc, "per_family", dict, "mapping")
+    per_family = _require_type(doc, "per_family", dict, "mapping")
     rows = _require_type(doc, "rows", list, "list")
     _require(rows, "baseline.rows must be a nonempty list")
 
@@ -264,6 +264,45 @@ def _validate_baseline_doc(doc, corpus_ids):
         _require(count == actual,
                   f"baseline.totals.{bucket} ({count}) != rows with bucket=={bucket!r} ({actual})")
 
+    # per_family's bucket counts and totals must reconcile against the actual
+    # rows the same way the top-level totals do above -- a mapping-shaped but
+    # otherwise unchecked per_family would let a stale or fabricated summary
+    # pass silently. Group rows by family the same way acr's merge_corpus.py
+    # does (`fam = r.get("family") or BY_ID[...].get("family") or "_none"` --
+    # confirmed against the real pinned baseline: the I6-illegal probe row's
+    # family=None lands under "_none"), then cross-check every family entry's
+    # `total` and any present bucket counts.
+    family_rows = {}
+    for row in rows:
+        family_rows.setdefault(row.get("family") or "_none", []).append(row)
+
+    for fam_key, fam_summary in per_family.items():
+        _require(isinstance(fam_summary, dict),
+                  f"baseline.per_family[{fam_key!r}] must be a mapping, got {type(fam_summary).__name__}")
+        fam_rows = family_rows.get(fam_key, [])
+        _require("total" in fam_summary, f"baseline.per_family[{fam_key!r}].total missing")
+        fam_total = fam_summary["total"]
+        _require(isinstance(fam_total, int) and not isinstance(fam_total, bool),
+                  f"baseline.per_family[{fam_key!r}].total must be an int, got {type(fam_total).__name__}")
+        _require(fam_total == len(fam_rows),
+                  f"baseline.per_family[{fam_key!r}].total ({fam_total}) != "
+                  f"rows with family=={fam_key!r} ({len(fam_rows)})")
+        for bucket in sorted(BUCKET_VALUES):
+            if bucket not in fam_summary:
+                continue
+            count = fam_summary[bucket]
+            _require(isinstance(count, int) and not isinstance(count, bool),
+                      f"baseline.per_family[{fam_key!r}].{bucket} must be an int, "
+                      f"got {type(count).__name__}")
+            actual = sum(1 for row in fam_rows if row["bucket"] == bucket)
+            _require(count == actual,
+                      f"baseline.per_family[{fam_key!r}].{bucket} ({count}) != "
+                      f"rows with family=={fam_key!r} and bucket=={bucket!r} ({actual})")
+
+    _require(set(family_rows) <= set(per_family),
+              "family/families with rows but no baseline.per_family entry at all: "
+              f"{sorted(set(family_rows) - set(per_family))}")
+
     return len(rows), len(only_in_baseline)
 
 
@@ -289,7 +328,10 @@ def _base_baseline_fixture():
     doc = {
         "ticket": "TEST-FIXTURE",
         "provenance": {},
-        "per_family": {},
+        "per_family": {
+            "f1": {"served_with_data": 1, "total": 1},
+            "_none": {"error": 1, "total": 1},
+        },
         "totals": {
             "served_with_data": 1, "served_degraded": 0, "unserved": 0,
             "clarification_needed": 0, "error": 1, "total": 2,
@@ -343,15 +385,38 @@ def _self_test_baseline_guard_fires():
          "totals.error must be an int"),
         (mutated(lambda d: d["totals"].__setitem__("total", 3)),
          "totals.total"),
+        # per_family-vs-rows agreement: a stale/fabricated per_family summary
+        # must be caught the same way top-level totals are.
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("total", 999)),
+         "per_family['f1'].total"),
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("served_with_data", 0)),
+         "per_family['f1'].served_with_data"),
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("total", "1")),
+         "per_family['f1'].total must be an int"),
+        (mutated(lambda d: d["per_family"].__setitem__("f1", "not-a-mapping")),
+         "per_family['f1'] must be a mapping"),
+        (mutated(lambda d: d["per_family"].pop("_none")),
+         "family/families with rows but no baseline.per_family entry"),
     ]
     for bad_doc, must_mention in cases:
+        # Catching the RED control's own synthesized "accepted" failure in the
+        # same except block that checks the REJECTION reason lets the
+        # accept-message (which quotes the whole bad_doc, and so can itself
+        # contain the word being searched for, e.g. "bucket") satisfy
+        # `must_mention` even though the guard being tested never actually
+        # fired. Two independent assertions close this -- same discipline as
+        # `_self_test_guard_fires` above, which never shares one try/except
+        # between "was it accepted" and "why was it rejected."
+        accepted = False
+        reason = None
         try:
             _validate_baseline_doc(bad_doc, base_ids)
-            raise CorpusValidationError(
-                f"RED CONTROL FAILED: baseline doc accepted: {bad_doc!r}")
+            accepted = True
         except CorpusValidationError as exc:
-            _require(must_mention in str(exc),
-                      f"RED CONTROL FAILED: baseline doc rejected for the wrong reason: {exc}")
+            reason = str(exc)
+        _require(not accepted, f"RED CONTROL FAILED: baseline doc accepted: {bad_doc!r}")
+        _require(must_mention in reason,
+                  f"RED CONTROL FAILED: baseline doc rejected for the wrong reason: {reason}")
 
     # GREEN control: the canonical fixture, and a canonical baseline that
     # legitimately drops a corpus row (rows_deleted_since_by_lane_corpus_cleanup).
