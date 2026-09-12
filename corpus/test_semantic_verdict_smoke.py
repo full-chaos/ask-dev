@@ -48,16 +48,27 @@ def test_build_verdict_runs_over_every_real_corpus_row():
                                    corpus_version="smoke-test", legacy_scorer_version="no-op-v1")
         _require(record["corpus_id"] == row["id"], record)
         _require(record["verdict"] in {"agree", "agree_weak", "disagree", "unscored"}, record)
-        _require(record["branch_results"] == [], f"{row['id']}: every real row is scalar today, "
-                 f"an any_of declaration must not appear here silently: {record}")
+        expect = row.get("expect")
+        if isinstance(expect, dict) and "any_of" in expect:
+            # D24: three real rows now declare any_of (neg-explicit-comparison,
+            # cv-c7-org-drivers, cv-scoped-projects-by-team-bounded) -- branch_results
+            # must carry one entry per declared alternative; an empty list here would
+            # mean the any_of was silently dropped rather than evaluated.
+            _require(len(record["branch_results"]) == len(expect["any_of"]),
+                      f"{row['id']}: any_of declares {len(expect['any_of'])} branch(es), "
+                      f"branch_results has {len(record['branch_results'])} instead: {record}")
+        else:
+            _require(record["branch_results"] == [], f"{row['id']}: a scalar/absent expect "
+                     f"must produce empty branch_results: {record}")
 
 
 def test_build_verdict_runs_over_a_synthetic_any_of_variant_of_every_real_row():
-    # Real rows are all scalar today (no any_of applied -- see
-    # docs/chaos-5620-semantic-verdict.md). Exercise the any_of/branch-
-    # combination path against every real row's actual family label, not
-    # only a hand-built fixture, by wrapping each row's declared family in
-    # a synthetic any_of alternative.
+    # Overwrites `expect` unconditionally with a synthetic ONE-branch any_of
+    # derived from each row's own family, regardless of the row's real expect
+    # (scalar or any_of, D24). Exercise the any_of/branch-combination path
+    # against every real row's actual family label, not only a hand-built
+    # fixture, by wrapping each row's declared family in a synthetic any_of
+    # alternative.
     for row in corpus.CORPUS:
         family = row.get("family")
         if family is None:
