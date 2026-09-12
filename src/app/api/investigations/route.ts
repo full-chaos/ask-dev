@@ -309,12 +309,9 @@ class MalformedSelectionEventError extends Error {
  * (this module's own imports, `outcome.ts`) but never wired -- a builder
  * with no caller, same as `emitTelemetryEvent`'s own header describes. Every
  * failure exit of this route -- a malformed request, a config fault, or an
- * ACR failure -- reaches this ONE function, so it is the single place the
- * event is emitted for a failed request, rather than one call per early
- * return (round-1 review: an earlier version of this wiring emitted only on
- * the two exits of `investigate()`, so a validation or configuration
- * failure -- most of what actually fails in production -- was invisible at
- * Info even though the response and console.error were unchanged).
+ * ACR failure -- reaches this ONE function, so the event is emitted exactly
+ * once per request that fails, from a single place, rather than needing a
+ * call at every early return this route has.
  *
  * `latencyMs` is measured from `startedAt`, which every caller passes as the
  * SAME timestamp taken at the top of `POST` -- one definition of "how long
@@ -325,8 +322,7 @@ class MalformedSelectionEventError extends Error {
  * an investigation result (`src/app/page.tsx`, `src/app/workbench/page.tsx`)
  * render `DeterministicAnswerView` unconditionally today -- `EnrichmentView`
  * is defined but never mounted -- so `"deterministic"` is what actually
- * happens on every request, not a guess. `"raw"` (round-1 review) claimed a
- * surface this app never shows.
+ * happens on every request, not a guess.
  */
 function failureResponse(
     startedAt: number,

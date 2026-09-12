@@ -731,12 +731,10 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         consoleInfo.mockRestore();
     });
 
-    // Round-1 review, P1: an earlier version of this wiring emitted the
-    // event only on the two exits of investigate(), so a request that never
-    // reaches ACR at all -- a malformed body, an unconfigured server hop --
-    // was invisible at Info even though the response and console.error were
-    // unchanged. Every failure exit of the route now emits through the same
-    // failureResponse function, so these are no longer silent.
+    // A request that never reaches ACR at all -- a malformed body, an
+    // unconfigured server hop -- still emits: every failure exit of the
+    // route emits through the same failureResponse function, so none of
+    // them are silent at Info.
     it("emits a workbench_investigation event naming the failure when configuration fails", async () => {
         vi.stubEnv("ACR_API_ORIGIN", "");
         const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
