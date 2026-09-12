@@ -35,6 +35,7 @@ twice.
 
 Run: python3 corpus/test_corpus.py
 """
+import copy
 import hashlib
 import json
 import sys
@@ -71,6 +72,17 @@ import expect_schema  # noqa: E402
 # Re-exported from expect_schema so there is exactly one spelling of this
 # set in this repo (CHAOS-5620).
 EXPECT_VALUES = expect_schema.EXPECT_VALUES
+
+# CHAOS-5599: the five terminal buckets a scored baseline row can land in,
+# per semantic_verdict.py's module docstring (served_with_data /
+# served_degraded / clarification_needed / unserved / error). No acr
+# checkout is available here (see this file's module docstring), so this
+# is a hand-mirror, same discipline as EXPECT_VALUES above -- keep both in
+# sync by hand if the bucket set changes.
+BUCKET_VALUES = frozenset({
+    "served_with_data", "served_degraded", "unserved",
+    "clarification_needed", "error",
+})
 
 # Pinned sha256 of corpus/baseline-20260905-sweep1.json. A silent edit to
 # the baseline (hand or otherwise) fails CI here until this constant AND
@@ -171,33 +183,35 @@ def _require_type(doc, key, want_type, type_name):
     return val
 
 
-def _validate_baseline():
-    """Shape + sha256 pin for corpus/baseline-20260905-sweep1.json.
+def _validate_baseline_doc(doc, corpus_ids):
+    """Shape + cross-check logic for a parsed baseline document, separated
+    from file I/O and the sha256 pin (see `_validate_baseline` below) so
+    RED/GREEN fixtures can exercise it directly without a real file on
+    disk -- see `_self_test_baseline_guard_fires`.
 
     Type-checks every required top-level field (not just presence -- a
     baseline with `ticket=None`/`provenance=None`/`per_family=None`
     previously passed, r1 finding P3) and requires each row to carry the
     real schema's `corpus_id`/`family`/`bucket` fields, not just
     `corpus_id` alone.
-    """
-    raw = BASELINE_PATH.read_bytes()
-    got_sha = hashlib.sha256(raw).hexdigest()
-    _require(got_sha == BASELINE_SHA256,
-              f"baseline sha256 mismatch: got {got_sha}, pinned {BASELINE_SHA256} "
-              "-- update BASELINE_SHA256 here AND corpus/README.md's sha chain together, "
-              "deliberately, if this edit is real")
 
-    doc = json.loads(raw)
+    CHAOS-5599: also cross-checks a re-pinned baseline is internally
+    consistent -- no two rows share a `corpus_id`, every row's `bucket` is
+    in the known vocabulary (`BUCKET_VALUES`), and `totals` (both the
+    overall `total` and each known bucket's count) agrees with the actual
+    rows rather than being a stale summary left over from a hand edit.
+    """
     _require(isinstance(doc, dict), "baseline must be a JSON object")
 
     ticket = _require_type(doc, "ticket", str, "string")
     _require(ticket, "baseline.ticket must be a non-empty string")
     _require_type(doc, "provenance", dict, "mapping")
     totals = _require_type(doc, "totals", dict, "mapping")
-    _require_type(doc, "per_family", dict, "mapping")
+    per_family = _require_type(doc, "per_family", dict, "mapping")
     rows = _require_type(doc, "rows", list, "list")
     _require(rows, "baseline.rows must be a nonempty list")
 
+    row_ids = []
     for i, row in enumerate(rows):
         _require(isinstance(row, dict), f"baseline.rows[{i}] is not a mapping")
         # corpus_id/bucket are always populated (a scored row always lands in
@@ -211,9 +225,15 @@ def _validate_baseline():
         family = row.get("family")
         _require(family is None or (isinstance(family, str) and family),
                   f"baseline.rows[{i}].family must be a non-empty string or None, got {family!r}")
+        bucket = row["bucket"]
+        _require(bucket in BUCKET_VALUES,
+                  f"baseline.rows[{i}].bucket must be one of {sorted(BUCKET_VALUES)}, got {bucket!r}")
+        row_ids.append(row["corpus_id"])
 
-    baseline_ids = {row["corpus_id"] for row in rows}
-    corpus_ids = {row["id"] for row in corpus_module.CORPUS}
+    dupes = sorted({rid for rid in row_ids if row_ids.count(rid) > 1})
+    _require(not dupes, f"duplicate corpus_id(s) in baseline.rows: {dupes}")
+
+    baseline_ids = set(row_ids)
     only_in_baseline = baseline_ids - corpus_ids
     # Rows removed from the corpus since this baseline was measured are
     # expected (see provenance.rows_deleted_since_by_lane_corpus_cleanup)
@@ -229,11 +249,192 @@ def _validate_baseline():
     _require(totals["total"] == len(rows),
               f"baseline.totals.total ({totals['total']}) != len(rows) ({len(rows)})")
 
+    # Per-bucket totals are optional keys (only `total` is required above),
+    # but any that ARE present must be an int and must agree with the rows
+    # actually carrying that bucket -- a re-pin that edits a row's bucket
+    # without updating its summary count is exactly the drift this rule
+    # exists to catch.
+    for bucket in sorted(BUCKET_VALUES):
+        if bucket not in totals:
+            continue
+        count = totals[bucket]
+        _require(isinstance(count, int) and not isinstance(count, bool),
+                  f"baseline.totals.{bucket} must be an int, got {type(count).__name__}")
+        actual = sum(1 for row in rows if row["bucket"] == bucket)
+        _require(count == actual,
+                  f"baseline.totals.{bucket} ({count}) != rows with bucket=={bucket!r} ({actual})")
+
+    # per_family's bucket counts and totals must reconcile against the actual
+    # rows the same way the top-level totals do above -- a mapping-shaped but
+    # otherwise unchecked per_family would let a stale or fabricated summary
+    # pass silently. Group rows by family the same way acr's merge_corpus.py
+    # does (`fam = r.get("family") or BY_ID[...].get("family") or "_none"` --
+    # confirmed against the real pinned baseline: the I6-illegal probe row's
+    # family=None lands under "_none"), then cross-check every family entry's
+    # `total` and any present bucket counts.
+    family_rows = {}
+    for row in rows:
+        family_rows.setdefault(row.get("family") or "_none", []).append(row)
+
+    for fam_key, fam_summary in per_family.items():
+        _require(isinstance(fam_summary, dict),
+                  f"baseline.per_family[{fam_key!r}] must be a mapping, got {type(fam_summary).__name__}")
+        fam_rows = family_rows.get(fam_key, [])
+        _require("total" in fam_summary, f"baseline.per_family[{fam_key!r}].total missing")
+        fam_total = fam_summary["total"]
+        _require(isinstance(fam_total, int) and not isinstance(fam_total, bool),
+                  f"baseline.per_family[{fam_key!r}].total must be an int, got {type(fam_total).__name__}")
+        _require(fam_total == len(fam_rows),
+                  f"baseline.per_family[{fam_key!r}].total ({fam_total}) != "
+                  f"rows with family=={fam_key!r} ({len(fam_rows)})")
+        for bucket in sorted(BUCKET_VALUES):
+            if bucket not in fam_summary:
+                continue
+            count = fam_summary[bucket]
+            _require(isinstance(count, int) and not isinstance(count, bool),
+                      f"baseline.per_family[{fam_key!r}].{bucket} must be an int, "
+                      f"got {type(count).__name__}")
+            actual = sum(1 for row in fam_rows if row["bucket"] == bucket)
+            _require(count == actual,
+                      f"baseline.per_family[{fam_key!r}].{bucket} ({count}) != "
+                      f"rows with family=={fam_key!r} and bucket=={bucket!r} ({actual})")
+
+    _require(set(family_rows) <= set(per_family),
+              "family/families with rows but no baseline.per_family entry at all: "
+              f"{sorted(set(family_rows) - set(per_family))}")
+
     return len(rows), len(only_in_baseline)
+
+
+def _validate_baseline():
+    """Shape + sha256 pin for corpus/baseline-20260905-sweep1.json. See
+    `_validate_baseline_doc` for the shape/cross-check rules themselves."""
+    raw = BASELINE_PATH.read_bytes()
+    got_sha = hashlib.sha256(raw).hexdigest()
+    _require(got_sha == BASELINE_SHA256,
+              f"baseline sha256 mismatch: got {got_sha}, pinned {BASELINE_SHA256} "
+              "-- update BASELINE_SHA256 here AND corpus/README.md's sha chain together, "
+              "deliberately, if this edit is real")
+
+    doc = json.loads(raw)
+    corpus_ids = {row["id"] for row in corpus_module.CORPUS}
+    return _validate_baseline_doc(doc, corpus_ids)
+
+
+def _base_baseline_fixture():
+    """Canonical two-row baseline doc + its matching corpus_ids, used as
+    the GREEN starting point every RED control in
+    `_self_test_baseline_guard_fires` mutates exactly one field of."""
+    doc = {
+        "ticket": "TEST-FIXTURE",
+        "provenance": {},
+        "per_family": {
+            "f1": {"served_with_data": 1, "total": 1},
+            "_none": {"error": 1, "total": 1},
+        },
+        "totals": {
+            "served_with_data": 1, "served_degraded": 0, "unserved": 0,
+            "clarification_needed": 0, "error": 1, "total": 2,
+        },
+        "rows": [
+            {"corpus_id": "r1", "bucket": "served_with_data", "family": "f1"},
+            {"corpus_id": "r2", "bucket": "error", "family": None},
+        ],
+    }
+    corpus_ids = {"r1", "r2"}
+    return doc, corpus_ids
+
+
+def _self_test_baseline_guard_fires():
+    """RED CONTROLs: prove `_validate_baseline_doc` actually rejects a
+    re-pinned baseline carrying a duplicate row id, a bucket value outside
+    the known vocabulary, or totals that no longer match the actual rows
+    (CHAOS-5599) -- and that the canonical shape is still accepted. Same
+    discipline as `_self_test_guard_fires` above: a check never exercised
+    against a failing case is unproven."""
+    base_doc, base_ids = _base_baseline_fixture()
+
+    def mutated(mutate):
+        doc = copy.deepcopy(base_doc)
+        mutate(doc)
+        return doc
+
+    cases = [
+        # duplicate corpus_id: canonical vs duplicate vs re-pinned canonical
+        (mutated(lambda d: d["rows"].__setitem__(
+            1, {"corpus_id": "r1", "bucket": "error", "family": None})),
+         "duplicate corpus_id"),
+        # bucket: out of vocabulary / wrong scalar type / empty / null / absent
+        (mutated(lambda d: d["rows"][0].__setitem__("bucket", "not_a_real_bucket")),
+         "bucket must be one of"),
+        (mutated(lambda d: d["rows"][0].__setitem__("bucket", 1)),
+         "bucket"),
+        (mutated(lambda d: d["rows"][0].__setitem__("bucket", "")),
+         "bucket"),
+        (mutated(lambda d: d["rows"][0].__setitem__("bucket", None)),
+         "bucket"),
+        (mutated(lambda d: d["rows"][0].pop("bucket")),
+         "bucket"),
+        # totals-vs-rows agreement: per-bucket count off by one (both directions),
+        # wrong scalar type, and the pre-existing total-vs-len(rows) check
+        (mutated(lambda d: d["totals"].__setitem__("served_with_data", 2)),
+         "totals.served_with_data"),
+        (mutated(lambda d: d["totals"].__setitem__("error", 0)),
+         "totals.error"),
+        (mutated(lambda d: d["totals"].__setitem__("error", "1")),
+         "totals.error must be an int"),
+        (mutated(lambda d: d["totals"].__setitem__("total", 3)),
+         "totals.total"),
+        # per_family-vs-rows agreement: a stale/fabricated per_family summary
+        # must be caught the same way top-level totals are.
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("total", 999)),
+         "per_family['f1'].total"),
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("served_with_data", 0)),
+         "per_family['f1'].served_with_data"),
+        (mutated(lambda d: d["per_family"]["f1"].__setitem__("total", "1")),
+         "per_family['f1'].total must be an int"),
+        (mutated(lambda d: d["per_family"].__setitem__("f1", "not-a-mapping")),
+         "per_family['f1'] must be a mapping"),
+        (mutated(lambda d: d["per_family"].pop("_none")),
+         "family/families with rows but no baseline.per_family entry"),
+    ]
+    for bad_doc, must_mention in cases:
+        # Catching the RED control's own synthesized "accepted" failure in the
+        # same except block that checks the REJECTION reason lets the
+        # accept-message (which quotes the whole bad_doc, and so can itself
+        # contain the word being searched for, e.g. "bucket") satisfy
+        # `must_mention` even though the guard being tested never actually
+        # fired. Two independent assertions close this -- same discipline as
+        # `_self_test_guard_fires` above, which never shares one try/except
+        # between "was it accepted" and "why was it rejected."
+        accepted = False
+        reason = None
+        try:
+            _validate_baseline_doc(bad_doc, base_ids)
+            accepted = True
+        except CorpusValidationError as exc:
+            reason = str(exc)
+        _require(not accepted, f"RED CONTROL FAILED: baseline doc accepted: {bad_doc!r}")
+        _require(must_mention in reason,
+                  f"RED CONTROL FAILED: baseline doc rejected for the wrong reason: {reason}")
+
+    # GREEN control: the canonical fixture, and a canonical baseline that
+    # legitimately drops a corpus row (rows_deleted_since_by_lane_corpus_cleanup).
+    ok_doc, ok_ids = _base_baseline_fixture()
+    n_rows, n_dropped = _validate_baseline_doc(ok_doc, ok_ids)
+    _require((n_rows, n_dropped) == (2, 0),
+              f"GREEN CONTROL FAILED: canonical baseline rejected or miscounted: {(n_rows, n_dropped)!r}")
+
+    shrunk_doc, _ = _base_baseline_fixture()
+    n_rows, n_dropped = _validate_baseline_doc(shrunk_doc, {"r1"})
+    _require((n_rows, n_dropped) == (2, 1),
+              f"GREEN CONTROL FAILED: baseline row (r2) since removed from the corpus "
+              f"wrongly rejected or miscounted: {(n_rows, n_dropped)!r}")
 
 
 def main():
     _self_test_guard_fires()
+    _self_test_baseline_guard_fires()
 
     corpus = corpus_module.CORPUS
     _require(isinstance(corpus, list) and corpus, "CORPUS must be a nonempty list")
