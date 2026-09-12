@@ -26,6 +26,13 @@ rows carrying only `corpus_id`, so long as the (fake) sha matched -- it now
 type-checks every top-level field and requires each row to carry the real
 baseline schema's `family`/`bucket` fields too, not just `corpus_id`.
 
+CHAOS-5620: `expect` may now ALSO be an explicit `{"any_of": [...]}`
+disjunction (see expect_schema.py); the scalar form's rules and error
+messages are unchanged byte-for-byte. Shape validation for both forms is
+delegated to `expect_schema.parse_expect`, the single source of truth this
+module and semantic_verdict.py both use -- no expect-shape rule is spelled
+twice.
+
 Run: python3 corpus/test_corpus.py
 """
 import hashlib
@@ -55,12 +62,15 @@ _require(__debug__, "refusing to run under python -O / PYTHONOPTIMIZE=1: "
 
 sys.path.insert(0, str(Path(__file__).parent))
 import corpus as corpus_module  # noqa: E402
+import expect_schema  # noqa: E402
 
 # Mirrors acr scripts/corpus/validators.py:15 (EXPECT_VALUES) and
 # :129-157 (validate_corpus_row). Keep in sync by hand: acr's corpus
 # harness (scripts/corpus/*.py) is supplied externally on sys.path at run
 # time, never committed here, so there is no shared import to pin against.
-EXPECT_VALUES = {"serve", "refuse", "decline", "clarify"}
+# Re-exported from expect_schema so there is exactly one spelling of this
+# set in this repo (CHAOS-5620).
+EXPECT_VALUES = expect_schema.EXPECT_VALUES
 
 # Pinned sha256 of corpus/baseline-20260905-sweep1.json. A silent edit to
 # the baseline (hand or otherwise) fails CI here until this constant AND
@@ -72,9 +82,11 @@ BASELINE_PATH = Path(__file__).parent / "baseline-20260905-sweep1.json"
 
 def validate_corpus_row(row):
     """(ok, reason) -- same shape and rules as acr's validators.py:129,
-    plus `id`/`text` presence (acr's corpus harness reads both directly;
-    a row missing either broke the evaluator downstream of the old
-    validator, not inside it -- r1 finding #1 on the prior PR)."""
+    plus `id`/`text` presence: acr's corpus harness reads both directly, so
+    a row missing either must fail here, at the ingestion boundary, rather
+    than downstream inside the evaluator. Also validates CHAOS-5620's
+    `any_of` disjunction shape (delegated to expect_schema.parse_expect so
+    this rule is authored once)."""
     if not isinstance(row, dict):
         return False, "row is not a mapping"
 
@@ -86,13 +98,15 @@ def validate_corpus_row(row):
     if not isinstance(text, str) or not text:
         return False, f"text must be a non-empty string, got {text!r}"
 
-    expect = row.get("expect")
-    if expect is not None and (not isinstance(expect, str) or expect not in EXPECT_VALUES):
-        return False, f"expect must be one of {sorted(EXPECT_VALUES)} or None, got {expect!r}"
+    ok, reason, branches = expect_schema.parse_expect(row.get("expect"))
+    if not ok:
+        return False, reason
 
     basis = row.get("basis")
     if basis is not None and not isinstance(basis, str):
         return False, f"basis must be a string or None, got {type(basis).__name__}"
+    if branches is not None and basis is not None:
+        return False, "an any_of row must declare basis on each alternative, not at row level"
 
     anchor = row.get("anchor")
     if anchor is not None:
@@ -122,15 +136,32 @@ def _self_test_guard_fires():
         ({"id": "x", "text": "hello", "basis": 5}, "basis"),
         ({"id": "x", "text": "hello", "anchor": {"kind": "team"}}, "anchor"),
         ({"id": "x", "text": "hello", "nonexistent": "yes"}, "nonexistent"),
+        # CHAOS-5620: any_of shape controls.
+        ({"id": "x", "text": "hello", "expect": {"any_of": []}}, "any_of"),
+        ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "bogus"}]}}, "outcome"),
+        ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "serve"}]}}, "requires answer"),
+        ({"id": "x", "text": "hello",
+          "expect": {"any_of": [{"outcome": "serve", "answer": {"family": "not_a_family"}}]}},
+         "answer.family"),
+        ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "decline"}]}, "basis": "named_basis"},
+         "row level"),
     ]
     for bad_row, must_mention in cases:
         ok, reason = validate_corpus_row(bad_row)
         _require(not ok, f"RED CONTROL FAILED: {bad_row!r} was accepted")
         _require(must_mention in (reason or ""),
                   f"RED CONTROL FAILED: {bad_row!r} rejected for the wrong reason: {reason!r}")
-    # GREEN control: the smallest legal row must pass.
+    # GREEN controls: the smallest legal scalar row, and a legal any_of row.
     ok, reason = validate_corpus_row({"id": "x", "text": "hello"})
     _require(ok, f"GREEN CONTROL FAILED: minimal legal row rejected: {reason!r}")
+    ok, reason = validate_corpus_row({
+        "id": "x", "text": "hello",
+        "expect": {"any_of": [
+            {"outcome": "serve", "answer": {"family": "discovered_cohort_ranking"}},
+            {"outcome": "decline", "basis": "named_basis"},
+        ]},
+    })
+    _require(ok, f"GREEN CONTROL FAILED: legal any_of row rejected: {reason!r}")
 
 
 def _require_type(doc, key, want_type, type_name):
