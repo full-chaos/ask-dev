@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { investigate } from "@/lib/acr/client";
+import { acrClient } from "./dependencies";
 import { AcrConfigError, loadAcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import { isDateTimeFormatted } from "@/lib/acr/validate";
@@ -551,7 +551,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     try {
-        const result = await investigate(config, {
+        const result = await acrClient.investigate(config, {
             question,
             priorSubjectReceipts,
             priorKindReceipts: structureReceipts.priorKindReceipts,
