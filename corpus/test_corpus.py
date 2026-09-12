@@ -497,13 +497,56 @@ def _self_test_pin_guard_fires():
          "refuse/decline row set changed"),
     ]
     for bad_corpus, must_mention in cases:
+        # Catching the RED control's own synthesized "accepted" failure in the
+        # same except block that checks the REJECTION reason lets the
+        # accept-message (which quotes the whole rejected corpus, and so can
+        # itself contain the word being searched for) satisfy `must_mention`
+        # even though the guard being tested never actually fired. Two
+        # independent assertions close this -- same discipline as
+        # `_self_test_guard_fires` and `_self_test_baseline_guard_fires`
+        # above, neither of which shares one try/except between "was it
+        # accepted" and "why was it rejected."
+        accepted = False
+        reason = None
         try:
             _check_pinned_refuse_decline_expect(bad_corpus)
-            raise CorpusValidationError(
-                f"RED CONTROL FAILED: drifted pin accepted: {bad_corpus!r}")
+            accepted = True
         except CorpusValidationError as exc:
-            _require(must_mention in str(exc),
-                      f"RED CONTROL FAILED: drifted pin rejected for the wrong reason: {exc}")
+            reason = str(exc)
+        _require(not accepted, f"RED CONTROL FAILED: drifted pin accepted: {bad_corpus!r}")
+        _require(must_mention in reason,
+                  f"RED CONTROL FAILED: drifted pin rejected for the wrong reason: {reason}")
+
+    # RED control for the masking bug the split above fixes (CHAOS-5651): a
+    # stub that WRONGLY accepts, whose argument's repr contains the exact word
+    # `must_mention` would be searched for, must still be reported as
+    # "accepted" -- never silently pass because its own accept-message
+    # happens to contain that word. `stub_bad_corpus`'s repr contains "id"
+    # (every row has an "id" key) on purpose, and the stub itself never
+    # raises, standing in for a validator whose guard has regressed to a
+    # no-op.
+    def _stub_wrongly_accepts(_corpus):
+        return None
+
+    stub_bad_corpus = [{"id": "x", "expect": "id"}]
+    stub_accepted = False
+    try:
+        _stub_wrongly_accepts(stub_bad_corpus)
+        stub_accepted = True
+    except CorpusValidationError:
+        pass
+    masking_control_fired = False
+    try:
+        _require(not stub_accepted,
+                  f"RED CONTROL FAILED: drifted pin accepted: {stub_bad_corpus!r}")
+    except CorpusValidationError as caught:
+        masking_control_fired = True
+        _require("accepted" in str(caught),
+                  f"masking-bug RED control raised for the wrong reason: {caught}")
+    _require(masking_control_fired,
+              "masking-bug RED control did not fire: a wrongly-accepting stub must be caught "
+              "by the accepted-check, never let its own accept-message satisfy a later "
+              "reason-check")
 
     # GREEN control: the canonical 12, untouched.
     _check_pinned_refuse_decline_expect(copy.deepcopy(canonical))
