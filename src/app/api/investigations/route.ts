@@ -15,6 +15,7 @@ import {
 } from "@/lib/contracts";
 import { emitTelemetryEvent } from "@/lib/telemetry/emit";
 import {
+    buildOutcomeEvent,
     buildStructureOfferSelectionEvent,
     type StructureOfferSelectionOutcome,
 } from "@/lib/telemetry/outcome";
@@ -303,7 +304,39 @@ class MalformedSelectionEventError extends Error {
     override readonly name = "MalformedSelectionEventError";
 }
 
-function failureResponse(failure: WorkbenchFailure, status: number): NextResponse {
+/**
+ * CHAOS-5621: `buildOutcomeEvent`/`workbench_investigation` was documented
+ * (this module's own imports, `outcome.ts`) but never wired -- a builder
+ * with no caller, same as `emitTelemetryEvent`'s own header describes. Every
+ * failure exit of this route -- a malformed request, a config fault, or an
+ * ACR failure -- reaches this ONE function, so the event is emitted exactly
+ * once per request that fails, from a single place, rather than needing a
+ * call at every early return this route has.
+ *
+ * `latencyMs` is measured from `startedAt`, which every caller passes as the
+ * SAME timestamp taken at the top of `POST` -- one definition of "how long
+ * this request took" that holds for every exit, success or failure, rather
+ * than a validation failure silently carrying no latency at all.
+ *
+ * `renderSurface` is fixed at `"deterministic"`: both surfaces that render
+ * an investigation result (`src/app/page.tsx`, `src/app/workbench/page.tsx`)
+ * render `DeterministicAnswerView` unconditionally today -- `EnrichmentView`
+ * is defined but never mounted -- so `"deterministic"` is what actually
+ * happens on every request, not a guess.
+ */
+function failureResponse(
+    startedAt: number,
+    failure: WorkbenchFailure,
+    status: number,
+): NextResponse {
+    emitTelemetryEvent(
+        buildOutcomeEvent({
+            latencyMs: Date.now() - startedAt,
+            renderSurface: "deterministic",
+            failureCode: failure.code,
+            upstreamStatus: failure.httpStatus,
+        }),
+    );
     return NextResponse.json({ failure }, { status });
 }
 
@@ -337,6 +370,12 @@ function statusFor(failure: WorkbenchFailure): number {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+    // One timestamp for the whole request, read by every exit below
+    // (`failureResponse` and the success/failure branches after
+    // `investigate()`) so `latencyMs` means the same thing -- total request
+    // handling time -- on every outcome this route can report.
+    const requestStartedAt = Date.now();
+
     let body: InvestigateBody;
     try {
         const parsed: unknown = await request.json();
@@ -345,6 +384,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         // be a controlled 400, never an unhandled throw.
         if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
             return failureResponse(
+                requestStartedAt,
                 {
                     code: "acr_rejected_request",
                     message: "The request body must be a JSON object.",
@@ -359,6 +399,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         body = parsed;
     } catch {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message: "The request body must be JSON.",
@@ -371,6 +412,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const question = typeof body.question === "string" ? body.question.trim() : "";
     if (question === "" || codePointLength(question) > MAX_QUESTION_LENGTH) {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message: `A question is required and must be at most ${MAX_QUESTION_LENGTH} characters.`,
@@ -390,6 +432,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         priorSubjectReceipts = parseReceipts(body.priorSubjectReceipts);
     } catch {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message:
@@ -420,6 +463,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             structureReceipts[field] = parseReceipts(body[field], prefix);
         } catch {
             return failureResponse(
+                requestStartedAt,
                 {
                     code: "acr_rejected_request",
                     message: `A supplied ${label} structure receipt was malformed. The request was rejected rather than run without the chosen selection.`,
@@ -435,6 +479,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         conversation = parseConversation(body.conversation);
     } catch {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message:
@@ -450,6 +495,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         expectedKinds = parseExpectedKinds(body.expectedKinds);
     } catch {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message:
@@ -470,6 +516,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         selectionEvents = parseSelectionEvents(body.structureSelectionEvents);
     } catch {
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_rejected_request",
                 message:
@@ -490,6 +537,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         // Configuration errors name the missing variable but never its value,
         // and never key material.
         return failureResponse(
+            requestStartedAt,
             {
                 code: "workbench_misconfigured",
                 message:
@@ -515,14 +563,25 @@ export async function POST(request: Request): Promise<NextResponse> {
             expectedKinds,
             signal: request.signal,
         });
+        // See failureResponse's own doc comment for requestStartedAt and
+        // renderSurface: the same "one timer, one honest surface" reasoning
+        // applies here on the success exit.
+        emitTelemetryEvent(
+            buildOutcomeEvent({
+                latencyMs: Date.now() - requestStartedAt,
+                renderSurface: "deterministic",
+                result,
+            }),
+        );
         return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
         if (error instanceof AcrRequestError) {
-            return failureResponse(error.failure, statusFor(error.failure));
+            return failureResponse(requestStartedAt, error.failure, statusFor(error.failure));
         }
         // An unexpected throw must not leak a stack or a header value.
         console.error("investigation failed", error);
         return failureResponse(
+            requestStartedAt,
             {
                 code: "acr_unreachable",
                 message: "The investigation failed for an unexpected reason.",

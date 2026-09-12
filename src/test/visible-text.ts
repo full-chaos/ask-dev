@@ -59,7 +59,23 @@ function isCollapsedByAncestor(element: Element): boolean {
     return false;
 }
 
-/** True when `text` is on screen rather than collapsed behind a summary. */
+/**
+ * True when `text` is on screen rather than collapsed behind a summary.
+ *
+ * `text` must not be blank: `"".includes("")` is `true` in JS for ANY left
+ * side, so a blank expected value would make this function return `true`
+ * unconditionally — passing whether the element renders anything at all or
+ * is entirely collapsed. That is not a visibility claim a caller could ever
+ * have meant, so it is rejected outright rather than silently answered with
+ * a result that says nothing about what is actually on screen.
+ */
 export function isVisibleText(element: Element, text: string): boolean {
-    return visibleText(element).includes(text.replace(/\s+/gu, " ").trim());
+    const normalized = text.replace(/\s+/gu, " ").trim();
+    if (normalized === "") {
+        throw new Error(
+            "isVisibleText: expected text must not be blank -- a blank value is " +
+                'trivially "visible" in any element, visible or fully collapsed, and so asserts nothing',
+        );
+    }
+    return visibleText(element).includes(normalized);
 }
