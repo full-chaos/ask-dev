@@ -39,4 +39,45 @@ call, not an engineering judgment made in the PR that happens to touch this
 file. `corpus/test_corpus.py` only enforces the shape acr's harness
 requires (see that file and acr's `scripts/corpus/validators.py:129-157`
 for the validated rule set) — it never enforces or infers what any row's
-correct `expect` value should be.
+correct `expect` value should be. This applies identically to the `any_of`
+form below: which alternatives a row accepts is still chris's call.
+
+## Expectation declaration (CHAOS-5620)
+
+`expect` supports two shapes:
+
+- **Scalar** (unchanged): one of `serve`/`refuse`/`decline`/`clarify`, or
+  `None`/absent for an unscored row.
+- **Explicit disjunction**: `expect = {"any_of": [branch, ...]}`. Each
+  branch is a complete accepted alternative — an `outcome` from the same
+  vocabulary, plus (for `outcome: "serve"`) `answer: {"family": <token>}`
+  naming which family the served answer must match. Conditions _within_ a
+  branch are ANDed; branches are ORed by `any_of`. A row with `any_of`
+  declares `basis` on each alternative that needs one, never at the row
+  level (avoids an ambiguous "which alternative does this basis belong
+  to?"). `anchor`/`nonexistent` stay row-level constraints applying to
+  every alternative.
+
+The vocabulary and shape live in `corpus/expect_schema.py` (`FAMILIES`,
+`EXPECT_VALUES`, `SCHEMA_VERSION`, `parse_expect`). `corpus/test_corpus.py`
+delegates its `expect` shape check to that module, so scalar and `any_of`
+rows are validated by one rule, not two.
+
+`corpus/semantic_verdict.py` adds the **versioned semantic verdict**,
+published beside the five existing buckets without changing them: it
+combines an `any_of` row's branch results (a complete matching branch can
+pass; an undecidable branch can never manufacture one), and it audits a
+two-turn window-clarification exchange to tell apart the row's declared
+target, the engine's proposed interpretation, and what a verified caller
+action actually accepted — matching the declared family, or repeating
+turn-1's family, does neither. It does not re-implement acr's scalar leaf
+scoring table (`COHERENCE`/`VERDICTS` in acr `scripts/corpus/expectations.py`);
+that table is supplied by the caller (an injected `legacy_score`), the same
+boundary `test_corpus.py` already draws around acr's real ingestion
+validator. See `corpus/semantic_verdict.py`'s module docstring and
+`docs/chaos-5620-semantic-verdict.md` for the full design and its proposed
+(not applied) corpus diff.
+
+No row in this corpus was changed to `any_of` by this change; `expect`
+values remain chris's to set, same as any other row edit (see "## Versioning"
+above).

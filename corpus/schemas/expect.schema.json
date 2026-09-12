@@ -1,0 +1,58 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$comment": "CHAOS-5620: this repo's OWN schema for the corpus `expect` declaration -- not part of acr's wire contract (acr has no concept of a corpus row's declared expectation). `answer.family`'s vocabulary is the one place this schema reaches into the real pinned contract, via $ref, rather than re-declaring the family list by hand: see context_fabric_common.v1.schema.json#/$defs/QuestionFamily.",
+    "oneOf": [
+        {
+            "description": "The legacy scalar form, or absent/null for an unscored row.",
+            "enum": ["serve", "refuse", "decline", "clarify", null]
+        },
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["any_of"],
+            "properties": {
+                "any_of": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": { "$ref": "#/$defs/branch" }
+                }
+            }
+        }
+    ],
+    "$defs": {
+        "branch": {
+            "description": "One complete accepted alternative. A serve branch requires answer.family; every other outcome forbids `answer` entirely (not merely a falsy one) -- oneOf plus each side's own additionalProperties:false enforces both directions without a hand-written conditional.",
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["outcome", "answer"],
+                    "properties": {
+                        "outcome": { "const": "serve" },
+                        "basis": { "type": "string" },
+                        "answer": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": ["family"],
+                            "properties": {
+                                "family": {
+                                    "$ref": "context_fabric_common.v1.schema.json#/$defs/QuestionFamily"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["outcome"],
+                    "properties": {
+                        "outcome": { "enum": ["refuse", "decline", "clarify"] },
+                        "basis": { "type": "string" }
+                    }
+                }
+            ]
+        }
+    }
+}

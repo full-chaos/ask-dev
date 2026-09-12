@@ -55,8 +55,20 @@ run_contracts() {
 
 # Validates the corpus of record's rows against acr's ingestion-boundary
 # shape (corpus/test_corpus.py mirrors acr scripts/corpus/validators.py:
-# 129-157). Row *expectations* are data semantics, not enforced here --
-# see corpus/README.md.
+# 129-157, widened for CHAOS-5620's any_of shape), then the any_of schema
+# and semantic-verdict machinery's own controls (corpus/test_expect_schema.py,
+# corpus/test_schema_shim.py -- the node/ajv shim fails closed on its own
+# breakage, never an uncaught exception -- corpus/test_semantic_verdict.py,
+# corpus/test_semantic_verdict_smoke.py -- the new machinery over every
+# real corpus row, not only synthetic fixtures -- corpus/test_semantic_verdict_proof.py,
+# which replays vendored REAL recorded exchanges and asserts the exact
+# published family/window figures, and corpus/test_schema_driven_shapes.py,
+# which validates every window/confirmation shape against the real pinned
+# contract schema via scripts/validate_json_schema.mjs, generating its
+# legal/illegal cells by mutating every field a seed carries (covering
+# conditionally-required fields too) rather than a hand-typed list). Row
+# *expectations* (scalar and any_of alike) are data semantics, not
+# enforced here -- see corpus/README.md.
 run_corpus() {
   pnpm test:corpus
 }

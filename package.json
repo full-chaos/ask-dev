@@ -16,7 +16,7 @@
         "typecheck": "tsc --noEmit",
         "test:unit": "vitest run",
         "test:e2e": "playwright test",
-        "test:corpus": "python3 corpus/test_corpus.py",
+        "test:corpus": "python3 corpus/test_corpus.py && python3 corpus/test_expect_schema.py && python3 corpus/test_schema_shim.py && python3 corpus/test_semantic_verdict.py && python3 corpus/test_semantic_verdict_smoke.py && python3 corpus/test_semantic_verdict_proof.py && python3 corpus/test_schema_driven_shapes.py",
         "acr:contracts:generate": "node scripts/sync-acr-contracts.mjs generate --allow-write",
         "acr:contracts:check": "node scripts/sync-acr-contracts.mjs check",
         "test:ci": "bash ci/run_checks.sh ci"
