@@ -15,6 +15,7 @@ import {
 } from "@/lib/contracts";
 import { emitTelemetryEvent } from "@/lib/telemetry/emit";
 import {
+    buildOutcomeEvent,
     buildStructureOfferSelectionEvent,
     type StructureOfferSelectionOutcome,
 } from "@/lib/telemetry/outcome";
@@ -502,6 +503,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
     }
 
+    // CHAOS-5621: `buildOutcomeEvent`/`workbench_investigation` was documented
+    // (this module's own imports, `outcome.ts`) but never wired -- a builder
+    // with no caller, same as `emitTelemetryEvent`'s own header describes.
+    // Measured from here, not from request entry: everything above is this
+    // route's OWN request-shape validation, never ACR's, so timing it in
+    // would attribute the Workbench's own parsing cost to "ACR stage
+    // latency" (this module's own outcome.ts docstring). `renderSurface` is
+    // fixed at `"raw"` here on purpose -- deterministic/enriched is a
+    // CLIENT-side rendering choice made after this response returns, and
+    // this route cannot observe it; `"raw"` is what every other caller of
+    // `buildOutcomeEvent` in this repo (its own test suite) already uses for
+    // exactly that reason, not a guess at what the client will do with the
+    // result.
+    const investigateStartedAt = Date.now();
     try {
         const result = await investigate(config, {
             question,
@@ -515,13 +530,35 @@ export async function POST(request: Request): Promise<NextResponse> {
             expectedKinds,
             signal: request.signal,
         });
+        emitTelemetryEvent(
+            buildOutcomeEvent({
+                latencyMs: Date.now() - investigateStartedAt,
+                renderSurface: "raw",
+                result,
+            }),
+        );
         return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
         if (error instanceof AcrRequestError) {
+            emitTelemetryEvent(
+                buildOutcomeEvent({
+                    latencyMs: Date.now() - investigateStartedAt,
+                    renderSurface: "raw",
+                    failureCode: error.failure.code,
+                    upstreamStatus: error.failure.httpStatus,
+                }),
+            );
             return failureResponse(error.failure, statusFor(error.failure));
         }
         // An unexpected throw must not leak a stack or a header value.
         console.error("investigation failed", error);
+        emitTelemetryEvent(
+            buildOutcomeEvent({
+                latencyMs: Date.now() - investigateStartedAt,
+                renderSurface: "raw",
+                failureCode: "acr_unreachable",
+            }),
+        );
         return failureResponse(
             {
                 code: "acr_unreachable",
