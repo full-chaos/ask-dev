@@ -1,10 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
+import unsupportedExample from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
+import { visibleText } from "@/test/visible-text";
 
 /**
  * codex finding (CHAOS-4171 PR3, chaos4171pr3-codex-r1): the clarification
@@ -241,5 +243,94 @@ describe("DeterministicAnswerView: clarification branch shows warnings too (code
 
         expect(screen.getByRole("heading", { name: "Warnings" })).toBeInTheDocument();
         expect(screen.getByText("The cohort ranking is provisional.")).toBeInTheDocument();
+    });
+});
+
+/**
+ * acr #504: the empty form. An UNSUPPORTED terminal result (degraded, no
+ * facts, no evidence) carries `deterministic_answer: ""`; what the service
+ * could not support is disclosed in `limitations` and `coverage`, not in an
+ * answer sentence. Rendered from acr's own example, the view shows that
+ * disclosure and no blank answer line -- the empty string never renders as
+ * an empty headline pretending to be an answer.
+ *
+ * Every claim below is made against `visibleText`, not `toHaveTextContent`:
+ * jsdom's `textContent` counts the body of a CLOSED `<details>`, so an
+ * assertion written against it cannot tell a disclosed sentence from a
+ * collapsed one. What is on screen and what is merely reachable are asserted
+ * separately, each as itself.
+ */
+describe("DeterministicAnswerView: the unsupported result's empty answer renders as disclosure, not a blank answer (acr #504)", () => {
+    it("shows the limitation and the degraded source, and no answer sentence line", () => {
+        const result = unsupportedExample as unknown as InvestigationResult;
+        expect(result.status).toBe("degraded");
+        expect(result.deterministic_answer).toBe("");
+        expect(result.claimed_facts).toHaveLength(0);
+        expect(result.evidence_ref_ids).toHaveLength(0);
+
+        render(<DeterministicAnswerView result={result} />);
+
+        const answer = screen.getByTestId("answer-panel");
+        expect(answer.querySelector(".answer__judgment")).toBeNull();
+        expect(visibleText(answer)).toContain("The service returned no direct judgment.");
+
+        expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
+        const limitations = screen
+            .getByRole("heading", { name: "Limitations" })
+            .closest("section")!;
+        expect(visibleText(limitations)).toContain(result.limitations[0]!);
+
+        const coverage = screen.getByTestId("coverage-panel");
+        expect(visibleText(coverage)).toContain("Degraded reasons");
+        // The headline must not claim completeness while the only source is
+        // `unavailable` -- acr's example is `partial: false`, so before the
+        // sibling fix in CoveragePanel this panel said "Complete - every
+        // source contributed." beside its own degraded-reason list.
+        expect(visibleText(coverage)).toContain("Partial — some sources did not contribute.");
+        expect(visibleText(coverage)).not.toContain("Complete — every source contributed.");
+        // The non-contributing source and its state ARE on screen, on the chip.
+        expect(visibleText(coverage)).toContain("unavailable");
+    });
+
+    /**
+     * The reason the non-complete headline is reporting is ON SCREEN, not one
+     * click away. acr's example carries the legacy `degraded_reasons[]` shape
+     * (no `coverage.details`), whose raw string is the only reason text there
+     * is — so it is what shows, and nothing is left to collapse. This is the
+     * end-to-end form of the invariant: a reader who never opens a
+     * disclosure still learns WHY the answer was withheld.
+     */
+    it("shows the concrete degraded reason on screen, with nothing left behind a disclosure", () => {
+        const result = unsupportedExample as unknown as InvestigationResult;
+        render(<DeterministicAnswerView result={result} />);
+
+        const coverage = screen.getByTestId("coverage-panel");
+        const reason = unsupportedExample.coverage.degraded_reasons[0]!;
+
+        expect(visibleText(coverage)).toContain(reason);
+        expect(visibleText(coverage)).not.toContain(
+            "This source didn't fully contribute; no reason was reported.",
+        );
+        expect(within(coverage).queryAllByTestId("degraded-reason-raw")).toEqual([]);
+    });
+
+    /**
+     * The whole visible disclosure, as one string, so a future change that
+     * quietly drops any part of it fails here rather than passing three
+     * narrower assertions. This is what the tester actually reads for an
+     * unsupported answer.
+     */
+    it("the visible page states the gap: no answer, a non-complete headline, the state, the reason, the limitation", () => {
+        const result = unsupportedExample as unknown as InvestigationResult;
+        render(<DeterministicAnswerView result={result} />);
+
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const visible = visibleText(article);
+        expect(visible).toContain("The service returned no direct judgment.");
+        expect(visible).toContain("Partial — some sources did not contribute.");
+        expect(visible).toContain("unavailable");
+        expect(visible).toContain(unsupportedExample.coverage.degraded_reasons[0]!);
+        expect(visible).toContain(result.limitations[0]!);
+        expect(visible).not.toContain("Complete — every source contributed.");
     });
 });

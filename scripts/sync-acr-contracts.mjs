@@ -190,7 +190,45 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // verified with the pin: `authorized_population_count: 0` beside
 // `population_measured: false` (and the symmetric `null` beside `true`)
 // now fails schema validation where it silently passed before.
-export const SOURCE_COMMIT = "d949d18cb41b8970867eaf31b0bde48710d35956";
+//
+// d949d18c -> 85f037db: 6 commits, only #504 (acr 85f037db) touches
+// `contracts/`. Verified over the full tree (`git diff
+// d949d18cb41b8970867eaf31b0bde48710d35956
+// 85f037dbb731e535a48a6f632cfefc8ec07b30aa -- contracts/`): five files
+// change, and only ONE schema is part of this repo's vendored surface.
+//   - `context_fabric_investigation_result.v1`'s `deterministic_answer`
+//     loses its unconditional `minLength: 1`; a new root `allOf` entry puts
+//     it back as `if`/`then` exactly when the result is SUPPORTED: `status`
+//     is `complete` or `partial`, OR the result carries at least one
+//     `claimed_facts` entry AND at least one `evidence_ref_ids` entry. An
+//     UNSUPPORTED terminal result (e.g. `degraded` with no facts and no
+//     evidence) may now carry `deterministic_answer: ""`; its disclosure
+//     lives in `limitations`, `coverage.degraded_reasons`, and
+//     `completeness`, not in an answer sentence. The key stays REQUIRED
+//     (no required-list change) -- only the empty string became legal, and
+//     only on an unsupported result.
+//   - New example `context_fabric_investigation_result_unsupported.v1`
+//     (degraded, zero facts, zero evidence, empty answer, one limitation,
+//     one degraded reason) -- vendored below so the test of the empty form
+//     runs against the document acr's own contract suite validates, not a
+//     hand-edited copy.
+//   - `context_fabric_investigation_result.v2`,
+//     `mcp_investigate_question_response.v1`, and
+//     `mcp_investigation_result_response.v1` carry the identical `if`/`then`
+//     but are not part of this repo's vendored surface -- same exclusion
+//     as the prior bumps.
+// `context_fabric_common.v1`, `context_fabric_investigation_request.v1`,
+// `error.v1`, and all four previously pinned examples are byte-identical to
+// the prior pin.
+//
+// THIS BUMP IS LOAD-BEARING BEFORE ACR DEPLOYS 85f037db: it only WIDENS
+// what validates (every document the prior pin accepted still validates;
+// a supported result with an empty answer is rejected by both pins), but
+// once acr emits the empty form on an unsupported result, an un-bumped
+// ask-dev leg rejects that response as `acr_contract_violation` instead
+// of rendering its disclosure. Ask-dev takes this pin first, acr deploys
+// second.
+export const SOURCE_COMMIT = "85f037dbb731e535a48a6f632cfefc8ec07b30aa";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -221,6 +259,12 @@ const EXAMPLE_PATHS = [
     // under a single_subject interpretation and therefore no shapes at all,
     // which is exactly why it cannot serve as this one.
     "contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json",
+    // acr #504: the unsupported terminal form -- degraded, no facts, no
+    // evidence, `deterministic_answer: ""`. Vendored for the same reason as
+    // the render-shape example: the empty-form tests must run against the
+    // document acr's own contract suite validates, not a hand-edited copy of
+    // the canonical result.
+    "contracts/examples/v1/context_fabric_investigation_result_unsupported.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];

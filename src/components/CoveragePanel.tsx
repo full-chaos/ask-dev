@@ -3,6 +3,11 @@ import { useId } from "react";
 import { Badge } from "@/components/Badge";
 import { Details } from "@/components/Details";
 import type { Coverage, CoverageDetail } from "@/lib/contracts";
+import {
+    degradedReasonDisplay,
+    degradingDetails as degradingDetailsOf,
+    uncoveredLegacyReasons,
+} from "@/lib/degraded-reasons";
 import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
 
 export type CoveragePanelProps = {
@@ -11,22 +16,6 @@ export type CoveragePanelProps = {
 
 /** The deterministic fail-readable floor for a source absent a `label` (never a guess at what the raw name means). */
 const GENERIC_SOURCE_LABEL = "Source";
-
-/**
- * The deterministic fail-readable floor for a degraded reason with no
- * usable text at all: a fixed, content-independent sentence, never derived
- * from the raw reason text it accompanies (CHAOS-4691's pin delta item 6
- * rules out "reconstruct by parsing" as a path even for old data). Used
- * for the LEGACY exception below (a pre-4690 `degraded_reasons[]` entry,
- * which this module never parses), AND — codex round 2, P2, EXECUTED — as
- * the ultimate fallback when a NEW-shape `CoverageDetail.phrasing` AND its
- * contract-required `label` are BOTH schema-valid but whitespace-only
- * (`label`'s only wire bound is `minLength: 1`, which a lone space
- * satisfies; there is nothing further to fall back to once even the
- * deterministic floor itself is blank).
- */
-const GENERIC_DEGRADED_REASON_SENTENCE =
-    "This source didn't fully contribute; see details for the reason.";
 
 /**
  * Shows what the investigation could and could not read.
@@ -58,10 +47,10 @@ const GENERIC_DEGRADED_REASON_SENTENCE =
  * but NONE of the new fields — `coverage.details` is simply absent, not an
  * empty array. Rendering it via the SAME sentence-table parser this ticket
  * deletes would be exactly the banned "reconstruct by parsing" shape, so a
- * legacy result instead gets a fixed, content-independent generic sentence
- * per degraded reason (never derived from what the raw reason text says)
- * with the raw string still one click away in Details — degraded, not
- * silently dropped or leaked. codex round 3: this generic-sentence
+ * legacy result's raw string is therefore never parsed into a sentence — it
+ * is shown VERBATIM instead, on screen rather than behind a closed
+ * disclosure, so the visible page discloses what the result carries.
+ * Degraded, not silently dropped, and not reconstructed. This legacy
  * rendering is triggered by "no DEGRADING detail covers this" — `details`
  * absent (the true legacy shape) OR merely insufficient (present but empty,
  * or present without a matching degrading entry) both count, so a
@@ -73,19 +62,10 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
     const idPrefix = useId();
-    const degradingDetails: readonly CoverageDetail[] =
-        coverage.details?.filter((detail) => detail.degrading) ?? [];
-    // codex round 3, P2, EXECUTED: gated on `details === undefined` alone,
-    // this silently dropped a non-empty `degraded_reasons[]` whenever
-    // `details` was PRESENT but had no degrading entries (e.g. `details:
-    // []`) — a schema-valid, if internally inconsistent, response. The
-    // fallback to the generic-sentence rendering (never a parsed one — see
-    // this component's own doc comment above) now triggers whenever the
-    // structured details don't already cover any degradation, regardless
-    // of whether `details` is absent (the true legacy shape) or merely
-    // insufficient — never a silent drop either way.
-    const legacyDegradedReasons =
-        degradingDetails.length === 0 ? (coverage.degraded_reasons ?? []) : [];
+    // Reasons are the UNION of both shapes: a legacy raw string is withheld only
+    // when byte-identical to a degrading detail's rendered line or its own `raw`.
+    const degradingDetails: readonly CoverageDetail[] = degradingDetailsOf(coverage);
+    const legacyDegradedReasons = uncoveredLegacyReasons(coverage);
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
     // observed was dropped" — it says nothing about whether anything was
@@ -94,6 +74,25 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // comment above says it exists to prevent (AGENTS.md check 12: missing
     // is not healthy).
     const hasSources = coverage.sources.length > 0;
+    // Same rule for a NON-EMPTY list: `partial === false` says only that
+    // nothing OBSERVED was dropped, not that the sources which were read
+    // contributed anything. A result can be `partial: false` with its only
+    // source `unavailable`; calling that "Complete — every source
+    // contributed." is a known gap read as apparent completeness, the one
+    // failure this panel exists to prevent, and the same defect as an empty
+    // list reading as Complete.
+    //
+    // Gated through the one swept `coverageStateTone` predicate rather than a
+    // second hand list of state names: that switch is exhaustive over the
+    // closed contract enum, so a state acr adds must be classified there and
+    // this headline follows automatically instead of silently defaulting to
+    // "contributed". `ok` is the only tone that means the source actually
+    // delivered what was asked of it; `warn` (stale/truncated/conflicted/
+    // pruned), `bad` (unavailable/unauthorized) and `neutral` (unconfigured/
+    // no_data/not_applicable) each mean it did not, fully or at all.
+    const everySourceContributed = coverage.sources.every(
+        (source) => coverageStateTone(source.state) === "ok",
+    );
     return (
         <section
             className="panel panel--card panel--compact"
@@ -106,7 +105,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
             <p className={hasSources ? "record__meta" : "panel__empty"}>
                 {!hasSources
                     ? "No sources were recorded."
-                    : coverage.partial
+                    : coverage.partial || !everySourceContributed
                       ? "Partial — some sources did not contribute."
                       : "Complete — every source contributed."}
             </p>
@@ -192,47 +191,63 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                     </details>
                 </>
             )}
-            {degradingDetails.length === 0 ? null : (
+            {degradingDetails.length === 0 && legacyDegradedReasons.length === 0 ? null : (
                 <>
+                    {/* ONE heading for the union: both lists are the same
+                        disclosure, and a response carrying both shapes must not
+                        render "Degraded reasons" twice. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {degradingDetails.map((detail) => (
-                            <li className="record" key={detail.detail_id}>
-                                {/* CHAOS-4690: synthesis-phrased sentence when
-                                    the model chose to phrase it, else the
-                                    deterministic Label floor — never both
-                                    blank (`label` is contract-required). */}
-                                <p className="record__body">
-                                    {nonBlank(detail.phrasing) ??
-                                        nonBlank(detail.label) ??
-                                        GENERIC_DEGRADED_REASON_SENTENCE}
-                                </p>
-                                {detail.raw === undefined ? null : (
-                                    <Details data-testid="degraded-reason-raw" summary="Raw reason">
-                                        <code>{detail.raw}</code>
-                                    </Details>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            )}
-            {legacyDegradedReasons.length === 0 ? null : (
-                <>
-                    <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Degraded reasons
-                    </h3>
-                    <ul className="stack stack--tight">
-                        {legacyDegradedReasons.map((reason) => (
-                            <li className="record" key={reason}>
-                                <p className="record__body">{GENERIC_DEGRADED_REASON_SENTENCE}</p>
-                                <Details data-testid="degraded-reason-raw" summary="Raw reason">
-                                    <code>{reason}</code>
-                                </Details>
-                            </li>
-                        ))}
+                        {degradingDetails.map((detail) => {
+                            // CHAOS-4690: synthesis-phrased sentence when the
+                            // model chose to phrase it, else the deterministic
+                            // Label floor; then the raw text, and only then the
+                            // content-free floor — one rule, shared with the
+                            // legacy block below (see `degradedReasonDisplay`).
+                            const shown = degradedReasonDisplay(detail);
+                            return (
+                                <li className="record" key={detail.detail_id}>
+                                    <p className="record__body">{shown.text}</p>
+                                    {shown.supplementaryRaw === undefined ? null : (
+                                        <Details
+                                            data-testid="degraded-reason-raw"
+                                            summary="Raw reason"
+                                        >
+                                            <code>{shown.supplementaryRaw}</code>
+                                        </Details>
+                                    )}
+                                </li>
+                            );
+                        })}
+                        {legacyDegradedReasons.map((reason) => {
+                            // The legacy `degraded_reasons[]` string IS the only
+                            // reason text there is, so it is what shows; there is
+                            // nothing left to put behind a disclosure.
+                            const shown = degradedReasonDisplay({ raw: reason });
+                            return (
+                                <li className="record" key={reason}>
+                                    {/* `<code>` only when what shows IS the raw
+                                        wire text; the generic floor is prose. */}
+                                    <p className="record__body">
+                                        {shown.text === nonBlank(reason) ? (
+                                            <code>{shown.text}</code>
+                                        ) : (
+                                            shown.text
+                                        )}
+                                    </p>
+                                    {shown.supplementaryRaw === undefined ? null : (
+                                        <Details
+                                            data-testid="degraded-reason-raw"
+                                            summary="Raw reason"
+                                        >
+                                            <code>{shown.supplementaryRaw}</code>
+                                        </Details>
+                                    )}
+                                </li>
+                            );
+                        })}
                     </ul>
                 </>
             )}

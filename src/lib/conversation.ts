@@ -1,4 +1,5 @@
 import type { ConversationTurn } from "@/lib/contracts";
+import { nonBlank } from "@/lib/presentation";
 
 /**
  * Conversation threading (chat-surface follow-up context).
@@ -70,6 +71,16 @@ export type ConversationSourceTurn =
  * ACR said, so it does not belong in the conversation ACR sees itself
  * having. A user turn always has content (the question itself).
  *
+ * An ANSWERED turn with a blank answer sentence is excluded too (acr #504):
+ * an unsupported result may carry `deterministic_answer: ""`, its
+ * disclosure living in limitations/coverage/completeness instead. Threading
+ * it would put `content: ""` on the wire, which the request contract
+ * refuses (`ConversationTurn.content` has `minLength: 1`), so every later
+ * re-ask in that chat would fail before it was sent. There is no answer
+ * sentence to thread, and a substitute would be Workbench-written chrome,
+ * the same reason a failure is not threaded. Blankness is `nonBlank`'s
+ * judgment, the one swept predicate every other blank check here uses.
+ *
  * Bounded to the most recent `MAX_CONVERSATION_TURNS_SENT` here; capped
  * again to the wire's own `MAX_CONVERSATION_TURNS_ON_WIRE` by
  * `buildInvestigationRequest`, defense in depth against a future caller
@@ -90,10 +101,12 @@ export function buildConversationTurns(
             continue;
         }
         if (turn.outcome.kind !== "answered") continue;
+        const answer = nonBlank(turn.outcome.result.deterministic_answer);
+        if (answer === undefined) continue;
         settled.push({
             turn_id: `turn_${String(turn.id)}`,
             role: "assistant",
-            content: turn.outcome.result.deterministic_answer,
+            content: answer,
             created_at: turn.createdAt,
         });
     }

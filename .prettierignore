@@ -15,3 +15,8 @@ corpus/baseline-20260905-sweep1.json
 
 pnpm-lock.yaml
 .env*
+
+# Scratch the code-review tooling drops in the worktree root: never
+# committed (kept untracked out of the tree), and not ours to format.
+.codex-review-context.md
+prompt.md

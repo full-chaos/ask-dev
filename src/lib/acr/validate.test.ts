@@ -5,6 +5,7 @@ import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.js
 import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
+import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import { isDateTimeFormatted, validateContract } from "@/lib/acr/validate";
 
 /**
@@ -1145,5 +1146,124 @@ describe("investigation result contract — fact scope census measurement invari
         measuredTrueWithNull.population_measured = true;
         measuredTrueWithNull.authorized_population_count = null;
         expect(validate(censusResult([measuredTrueWithNull]))).toBe(true);
+    });
+});
+
+/**
+ * acr #504 (85f037db): `deterministic_answer` is required non-empty iff the
+ * result is SUPPORTED -- `status` is `complete`/`partial`, OR the result
+ * carries at least one claimed fact AND at least one evidence ref. An
+ * UNSUPPORTED terminal result may carry `""`; its disclosure lives in
+ * `limitations`, `coverage`, and `completeness`. The key itself stays
+ * required.
+ *
+ * Each rejection below is paired with the SAME document carrying a non-empty
+ * answer, which validates: the answer sentence is the only reason the
+ * document fails, so no RED CONTROL passes on some unrelated rule.
+ */
+describe("investigation result contract — answer sentence required iff supported (acr #504 consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+    const EMPTY_ANSWER_ERROR = "/deterministic_answer must NOT have fewer than 1 characters";
+    // ajv (allErrors) reports the failed `then` branch beside the keyword it
+    // failed on; both entries name the one conditional this pin added.
+    const EMPTY_ANSWER_ERRORS = [EMPTY_ANSWER_ERROR, ' must match "then" schema'];
+
+    function unsupported(): Record<string, unknown> {
+        const clone: Record<string, unknown> = structuredClone(unsupportedResult);
+        return clone;
+    }
+
+    it("acr's own unsupported example (as pinned) validates: degraded, no facts, no evidence, empty answer, a disclosed limitation", () => {
+        expect(unsupportedResult.status).toBe("degraded");
+        expect(unsupportedResult.claimed_facts).toEqual([]);
+        expect(unsupportedResult.evidence_ref_ids).toEqual([]);
+        expect(unsupportedResult.deterministic_answer).toBe("");
+        expect(unsupportedResult.limitations.length).toBeGreaterThan(0);
+        const validation = validateContract(RESULT, unsupportedResult);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL (support arm): the canonical complete result with an empty answer rejects on the answer alone", () => {
+        const emptied = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        emptied.deterministic_answer = "";
+        const validation = validateContract(RESULT, emptied);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors).toEqual(EMPTY_ANSWER_ERRORS);
+    });
+
+    it("RED CONTROL (status arm): a partial result with no facts and an empty answer rejects on the answer alone; with an answer it validates", () => {
+        const partial = unsupported();
+        partial.status = "partial";
+        partial.direct_judgment = "Ask Dev is partly readable.";
+        const validation = validateContract(RESULT, partial);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors).toEqual(EMPTY_ANSWER_ERRORS);
+
+        partial.deterministic_answer = "Ask Dev is partly readable.";
+        expect(validateContract(RESULT, partial).errors).toEqual([]);
+    });
+
+    it("RED CONTROL (facts AND evidence arm): a degraded result that carries facts and evidence is supported, so an empty answer rejects; with an answer it validates", () => {
+        const supportedDegraded = unsupported();
+        supportedDegraded.claimed_facts = structuredClone(canonicalResult.claimed_facts);
+        supportedDegraded.evidence_ref_ids = structuredClone(canonicalResult.evidence_ref_ids);
+        const validation = validateContract(RESULT, supportedDegraded);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors).toEqual(EMPTY_ANSWER_ERRORS);
+
+        supportedDegraded.deterministic_answer = "Ask Dev is degraded.";
+        expect(validateContract(RESULT, supportedDegraded).errors).toEqual([]);
+    });
+
+    it("the support arm is a conjunction: facts without evidence, or evidence without facts, stays unsupported and may carry an empty answer", () => {
+        const factsOnly = unsupported();
+        factsOnly.claimed_facts = structuredClone(canonicalResult.claimed_facts);
+        expect(validateContract(RESULT, factsOnly).errors).toEqual([]);
+
+        const evidenceOnly = unsupported();
+        evidenceOnly.evidence_ref_ids = structuredClone(canonicalResult.evidence_ref_ids);
+        expect(validateContract(RESULT, evidenceOnly).errors).toEqual([]);
+    });
+
+    it("the key is still required: an unsupported result with the answer key removed rejects", () => {
+        const missing = unsupported();
+        delete missing.deterministic_answer;
+        const validation = validateContract(RESULT, missing);
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toMatch(/deterministic_answer/);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator (d949d18c, on origin/main
+     * before this PR): the new `allOf` entry stripped back out and the
+     * unconditional `minLength: 1` restored. acr's own unsupported example
+     * is REJECTED there -- the exact document an un-bumped consumer would
+     * have turned into `acr_contract_violation` once acr emits it. Without
+     * this arm the tests above prove only that the new schema accepts the
+     * empty form, never that the BUMP is what made it acceptable.
+     */
+    it("EXECUTED repro: the prior pin's own schema rejects acr's unsupported example on the answer alone", () => {
+        const priorResultSchema = structuredClone(investigationResultSchema) as unknown as {
+            properties: { deterministic_answer: Record<string, unknown> };
+            allOf: Record<string, unknown>[];
+        };
+        const newEntries = priorResultSchema.allOf.filter((entry) =>
+            JSON.stringify(entry).includes('"deterministic_answer"'),
+        );
+        expect(newEntries).toHaveLength(1);
+        priorResultSchema.allOf = priorResultSchema.allOf.filter(
+            (entry) => !newEntries.includes(entry),
+        );
+        priorResultSchema.properties.deterministic_answer.minLength = 1;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResultSchema);
+
+        expect(validate(unsupportedResult)).toBe(false);
+        expect(
+            (validate.errors ?? []).map((error) => `${error.instancePath} ${error.message ?? ""}`),
+        ).toEqual([EMPTY_ANSWER_ERROR]);
     });
 });
