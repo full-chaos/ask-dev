@@ -1321,11 +1321,55 @@ describe("investigation result contract — the continuation-refusal basis (cons
         expect(validation.valid).toBe(true);
     });
 
-    it("the member is carried in BOTH consumed schemas, not just the result", () => {
-        const common = JSON.stringify(commonSchema);
-        const result = JSON.stringify(investigationResultSchema);
-        expect(common).toContain("continuation_context_unverifiable");
-        expect(result).toContain("continuation_context_unverifiable");
+    /**
+     * The field is carried at TWO places — the result's own `refusal_basis` and
+     * `completeness.refusal_basis`, which resolves through the common schema's
+     * `AnswerCompleteness`. A bump that updated one and not the other would
+     * accept a document through one path and reject it through the other.
+     *
+     * Asserted on the enum ARRAYS and then BEHAVIOURALLY, never on the schema
+     * text: the field's description names the new member too, so a text search
+     * passes even with the member removed from both vocabularies.
+     */
+    it("both vocabularies carry the member — as enum values, not as description text", () => {
+        const resultEnum = (
+            investigationResultSchema as unknown as {
+                properties: { refusal_basis: { enum: string[] } };
+            }
+        ).properties.refusal_basis.enum;
+        const commonEnum = (
+            commonSchema as unknown as {
+                $defs: {
+                    AnswerCompleteness: { properties: { refusal_basis: { enum: string[] } } };
+                };
+            }
+        ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
+        expect(resultEnum).toContain("continuation_context_unverifiable");
+        expect(commonEnum).toContain("continuation_context_unverifiable");
+        expect(resultEnum).toHaveLength(4);
+        expect(commonEnum).toHaveLength(4);
+        expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
+    });
+
+    it("BEHAVIOURAL: the new value validates at completeness.refusal_basis too, which resolves through the common schema", () => {
+        const doc = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        doc.completeness = {
+            ...(doc.completeness as Record<string, unknown>),
+            refusal_basis: "continuation_context_unverifiable",
+        };
+        const validation = validateContract(RESULT, doc);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+
+        // Same path, an unknown value: rejected, and named at that path.
+        const bad = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        bad.completeness = {
+            ...(bad.completeness as Record<string, unknown>),
+            refusal_basis: "not_a_real_refusal_basis",
+        };
+        const rejected = validateContract(RESULT, bad);
+        expect(rejected.valid).toBe(false);
+        expect(rejected.errors.join("; ")).toMatch(/completeness\/refusal_basis/);
     });
 
     it("EXECUTED repro: the prior pin's own schema rejects the new value", () => {
@@ -1347,5 +1391,84 @@ describe("investigation result contract — the continuation-refusal basis (cons
         expect(validate(withRefusalBasis("continuation_context_unverifiable"))).toBe(false);
         // The stand-in still accepts the live vocabulary, so it is faithful.
         expect(validate(withRefusalBasis("frame_invariant_violated"))).toBe(true);
+    });
+});
+
+/**
+ * `CoverageDetail.code` gains a 17th closed-vocabulary member,
+ * `fact_read_origin_state`: the code the service publishes when a requirement's
+ * read reports the ORIGIN STATE of the population it read, per kind, rather
+ * than the read failing or being narrowed. Additive only — every document the
+ * prior pin accepted still validates, and the vocabulary stays closed.
+ *
+ * Paired with a reproduction of the PRIOR pin's own schema, so this proves the
+ * BUMP is what made the value acceptable, not merely that the current pin
+ * accepts it.
+ */
+describe("coverage detail contract — the read-origin-state code (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+
+    function resultWithDetailCode(code: string): Record<string, unknown> {
+        const clone = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        clone.coverage = {
+            ...(clone.coverage as Record<string, unknown>),
+            details: [
+                {
+                    detail_id: "cov-origin-state",
+                    source: "canonical_fact:status",
+                    code,
+                    degrading: true,
+                    fact_kind: "status",
+                    source_state: "unavailable",
+                    origin_kind: "team",
+                    label: "The status read could not confirm the population it read",
+                    raw: "status: origin_state unrooted",
+                },
+            ],
+        };
+        return clone;
+    }
+
+    it("GREEN: a degrading detail carrying the new code validates at this pin", () => {
+        const validation = validateContract(RESULT, resultWithDetailCode("fact_read_origin_state"));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("the already-live codes still validate", () => {
+        for (const code of [
+            "fact_unconfigured",
+            "fact_provider_reported",
+            "read_population_unverified",
+        ]) {
+            const validation = validateContract(RESULT, resultWithDetailCode(code));
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("the vocabulary stays CLOSED: a code outside it is still rejected", () => {
+        const validation = validateContract(RESULT, resultWithDetailCode("not_a_real_code"));
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toMatch(/code must be equal to one of the allowed/);
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new code", () => {
+        const priorCommon = structuredClone(commonSchema) as unknown as {
+            $defs: { CoverageDetail: { properties: { code: { enum: string[] } } } };
+        };
+        const codes = priorCommon.$defs.CoverageDetail.properties.code.enum;
+        expect(codes).toContain("fact_read_origin_state");
+        priorCommon.$defs.CoverageDetail.properties.code.enum = codes.filter(
+            (code) => code !== "fact_read_origin_state",
+        );
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommon, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(structuredClone(investigationResultSchema));
+
+        expect(validate(resultWithDetailCode("fact_read_origin_state"))).toBe(false);
+        // The same stand-in still accepts a live code, so it is faithful.
+        expect(validate(resultWithDetailCode("fact_provider_reported"))).toBe(true);
     });
 });

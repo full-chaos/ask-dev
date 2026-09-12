@@ -10,6 +10,14 @@ import {
 } from "@/lib/degraded-reasons";
 import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
 
+/**
+ * The deterministic floor for a read-origin-state row whose contract-required
+ * `label` is nevertheless whitespace-only: a fixed sentence that promises
+ * nothing, never a state or a kind reconstructed from another field.
+ */
+const GENERIC_READ_ORIGIN_STATE_SENTENCE =
+    "A read reported its origin state, but said nothing readable about it.";
+
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
 };
@@ -66,6 +74,14 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // when byte-identical to a degrading detail's rendered line or its own `raw`.
     const degradingDetails: readonly CoverageDetail[] = degradingDetailsOf(coverage);
     const legacyDegradedReasons = uncoveredLegacyReasons(coverage);
+    // A read-origin-state row reports the state of the population ONE read
+    // actually reached, per origin kind. It is not a degraded reason -- it can
+    // be non-degrading -- and it is not the source fold above it either: a row
+    // may read `available` while its source reads `no_data`. Both are true of
+    // the same read, so both are shown, fold first.
+    const readOriginStates = (coverage.details ?? []).filter(
+        (detail) => detail.code === "fact_read_origin_state",
+    );
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
     // observed was dropped" — it says nothing about whether anything was
@@ -189,6 +205,43 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             })}
                         </div>
                     </details>
+                </>
+            )}
+            {readOriginStates.length === 0 ? null : (
+                <>
+                    {/* Below the source chips on purpose: the fold is the worse,
+                        coarser truth and is read first. This section never
+                        summarises -- one row per read, carrying the engine's own
+                        label, so a row reading `available` cannot be mistaken
+                        for a statement about the source it belongs to. */}
+                    <h3 className="panel__title" style={{ marginTop: 14 }}>
+                        Per-kind read states
+                    </h3>
+                    <ul className="stack stack--tight">
+                        {readOriginStates.map((detail) => {
+                            // The LABEL is the fact-bearing text here: it is
+                            // contract-required and carries the origin kind and
+                            // the state this read reached. A `phrasing` is a
+                            // sentence the model chose and may say neither, so it
+                            // must never REPLACE the label on these rows -- the
+                            // opposite precedence from a degraded reason, because
+                            // the question is different. A differing phrasing is
+                            // still shown, after the facts, so nothing the engine
+                            // sent is dropped.
+                            const facts = nonBlank(detail.label);
+                            const phrasing = nonBlank(detail.phrasing);
+                            return (
+                                <li className="record" key={detail.detail_id}>
+                                    <p className="record__body">
+                                        {facts ?? GENERIC_READ_ORIGIN_STATE_SENTENCE}
+                                    </p>
+                                    {phrasing === undefined || phrasing === facts ? null : (
+                                        <p className="record__meta">{phrasing}</p>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
                 </>
             )}
             {degradingDetails.length === 0 && legacyDegradedReasons.length === 0 ? null : (

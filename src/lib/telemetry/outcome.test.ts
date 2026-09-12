@@ -469,3 +469,47 @@ describe("buildOutcomeEvent — degradedReasonCount spans both reason shapes", (
         expect(eventFor({ sources: [], partial: false, degraded_reasons: [] })).toBe(0);
     });
 });
+
+/**
+ * A degrading detail carrying the new read-origin-state code counts like any
+ * other: the event's degraded-reason count is over the union of both wire
+ * shapes and is not keyed on the code either.
+ */
+describe("buildOutcomeEvent — the read-origin-state code counts as a degraded reason", () => {
+    function countFor(code: string, degrading: boolean): number {
+        const result = {
+            ...structuredClone(canonicalResult),
+            coverage: {
+                sources: [],
+                partial: true,
+                degraded_reasons: [],
+                details: [
+                    {
+                        detail_id: "cov-origin",
+                        source: "canonical_fact:status",
+                        code,
+                        degrading,
+                        label: "The status read could not confirm the population it read",
+                    },
+                ],
+            },
+        } as unknown as InvestigationResult;
+        return buildOutcomeEvent({ result, latencyMs: 1 } as unknown as Parameters<
+            typeof buildOutcomeEvent
+        >[0]).degradedReasonCount;
+    }
+
+    it("counts a degrading read-origin-state detail", () => {
+        expect(countFor("fact_read_origin_state", true)).toBe(1);
+    });
+
+    it("does not count a NON-degrading one — the code is not what makes it a gap", () => {
+        expect(countFor("fact_read_origin_state", false)).toBe(0);
+    });
+
+    it("counts it exactly as it counts an already-live code", () => {
+        expect(countFor("fact_read_origin_state", true)).toBe(
+            countFor("fact_provider_reported", true),
+        );
+    });
+});
