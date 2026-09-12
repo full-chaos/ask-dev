@@ -450,12 +450,21 @@ describe("structure-selection telemetry rides the submit request and the route e
         consoleInfo.mockRestore();
     });
 
-    it("logs nothing when the field is absent", async () => {
+    function selectionEventsOf(consoleInfo: { mock: { calls: unknown[][] } }): unknown[] {
+        return consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_structure_offer_selection");
+    }
+
+    it("logs no selection event when the field is absent", async () => {
         const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
 
+        // Falls through to a config failure (no ACR env stubbed in this
+        // describe block), which now emits its own workbench_investigation
+        // event (CHAOS-5621) — this test is about the SELECTION event only.
         await POST(post(JSON.stringify({ question: "status?" })));
 
-        expect(consoleInfo).not.toHaveBeenCalled();
+        expect(selectionEventsOf(consoleInfo)).toHaveLength(0);
         consoleInfo.mockRestore();
     });
 
@@ -483,9 +492,10 @@ describe("structure-selection telemetry rides the submit request and the route e
 
             expect(response.status).toBe(400);
             expect((await failureOf(response)).code).toBe("acr_rejected_request");
-            // Rejects, never partially emits: no line for a request the
-            // route is about to refuse.
-            expect(consoleInfo).not.toHaveBeenCalled();
+            // Rejects, never partially emits: no SELECTION line for a request
+            // the route is about to refuse (a workbench_investigation failure
+            // event still fires — CHAOS-5621 — asserted separately below).
+            expect(selectionEventsOf(consoleInfo)).toHaveLength(0);
 
             consoleInfo.mockRestore();
         });
@@ -690,7 +700,7 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         expect(events).toHaveLength(1);
         const event = events[0] as Record<string, unknown>;
         expect(event["outcome"]).toBe("answered");
-        expect(event["renderSurface"]).toBe("raw");
+        expect(event["renderSurface"]).toBe("deterministic");
         expect(event["resultStatus"]).toBe((canonicalResult as { status: string }).status);
         expect(event["failureCode"]).toBeUndefined();
         expect(typeof event["latencyMs"]).toBe("number");
@@ -713,7 +723,7 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         expect(events).toHaveLength(1);
         const event = events[0] as Record<string, unknown>;
         expect(event["outcome"]).toBe("failed");
-        expect(event["renderSurface"]).toBe("raw");
+        expect(event["renderSurface"]).toBe("deterministic");
         expect(event["failureCode"]).toBe("acr_unreachable");
         expect(event["resultStatus"]).toBeUndefined();
         expect(typeof event["latencyMs"]).toBe("number");
@@ -721,14 +731,67 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         consoleInfo.mockRestore();
     });
 
-    it("emits nothing before configuration is loaded, and nothing at all when config fails", async () => {
+    // Round-1 review, P1: an earlier version of this wiring emitted the
+    // event only on the two exits of investigate(), so a request that never
+    // reaches ACR at all -- a malformed body, an unconfigured server hop --
+    // was invisible at Info even though the response and console.error were
+    // unchanged. Every failure exit of the route now emits through the same
+    // failureResponse function, so these are no longer silent.
+    it("emits a workbench_investigation event naming the failure when configuration fails", async () => {
         vi.stubEnv("ACR_API_ORIGIN", "");
         const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
 
         const response = await POST(post(JSON.stringify({ question: "status?" })));
 
         expect(response.status).toBe(500);
-        expect(consoleInfo).not.toHaveBeenCalled();
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        const event = events[0] as Record<string, unknown>;
+        expect(event["outcome"]).toBe("failed");
+        expect(event["renderSurface"]).toBe("deterministic");
+        expect(event["failureCode"]).toBe("workbench_misconfigured");
+        expect(typeof event["latencyMs"]).toBe("number");
+
+        consoleInfo.mockRestore();
+    });
+
+    it("emits a workbench_investigation event naming the failure when the request body is malformed", async () => {
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        const response = await POST(post(JSON.stringify({})));
+
+        expect(response.status).toBe(400);
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        const event = events[0] as Record<string, unknown>;
+        expect(event["outcome"]).toBe("failed");
+        expect(event["failureCode"]).toBe("acr_rejected_request");
+
+        consoleInfo.mockRestore();
+    });
+
+    it("never emits before the request is validated (a rejected structure-selection event)", async () => {
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    structureSelectionEvents: "not-an-array",
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(400);
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        expect((events[0] as Record<string, unknown>)["failureCode"]).toBe("acr_rejected_request");
 
         consoleInfo.mockRestore();
     });
