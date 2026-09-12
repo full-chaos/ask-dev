@@ -6,6 +6,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/investigations/route";
+import { acrClient } from "@/app/api/investigations/dependencies";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 
@@ -792,5 +793,55 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         expect((events[0] as Record<string, unknown>)["failureCode"]).toBe("acr_rejected_request");
 
         consoleInfo.mockRestore();
+    });
+
+    /**
+     * CHAOS-5656: every real failure exit of `investigate()` wraps into
+     * `AcrRequestError` (client.ts: contract validation, signing, fetch, and
+     * response parsing each have their own try/catch, each throwing
+     * `AcrRequestError`) — so the route's own fallback branch for an
+     * UNEXPECTED, non-`AcrRequestError` throw had no test that could reach
+     * it through config or `fetch` alone. `acrClient` (dependencies.ts) is
+     * the seam: swap `investigate` for a function that throws the one shape
+     * the real one never does, drive the route, then restore it.
+     */
+    it("returns a 502 acr_unreachable failure, and emits the failure event exactly once, on a raw throw from investigate()", async () => {
+        stubAcrConfig();
+        const originalInvestigate = acrClient.investigate;
+        acrClient.investigate = () => {
+            throw new TypeError("not an AcrRequestError");
+        };
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        try {
+            const response = await POST(post(JSON.stringify({ question: "status?" })));
+
+            expect(response.status).toBe(502);
+            const payload = (await response.json()) as { failure?: WorkbenchFailure };
+            if (payload.failure === undefined) throw new Error("expected a failure payload");
+            expect(payload.failure.code).toBe("acr_unreachable");
+            expect(payload.failure.retryable).toBe(true);
+
+            const events = consoleInfo.mock.calls
+                .map(([line]) => JSON.parse(line as string) as { event: string })
+                .filter((event) => event.event === "workbench_investigation");
+            // Exactly once: failureResponse is the ONE place this route emits
+            // a failure outcome, so a raw throw must reach it exactly like
+            // any other failure exit does -- not zero (silently unobserved)
+            // and not twice (a duplicate emission on the way out).
+            expect(events).toHaveLength(1);
+            const event = events[0] as Record<string, unknown>;
+            expect(event["outcome"]).toBe("failed");
+            expect(event["failureCode"]).toBe("acr_unreachable");
+
+            // The raw error is logged server-side, never leaked to the response.
+            expect(consoleError).toHaveBeenCalledTimes(1);
+            expect(JSON.stringify(payload)).not.toContain("not an AcrRequestError");
+        } finally {
+            acrClient.investigate = originalInvestigate;
+            consoleInfo.mockRestore();
+            consoleError.mockRestore();
+        }
     });
 });
