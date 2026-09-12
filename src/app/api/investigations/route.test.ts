@@ -796,20 +796,23 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
     });
 
     /**
-     * CHAOS-5656: every real failure exit of `investigate()` wraps into
+     * CHAOS-5656: `investigate()` wraps MOST failure exits into
      * `AcrRequestError` (client.ts: contract validation, signing, fetch, and
      * response parsing each have their own try/catch, each throwing
-     * `AcrRequestError`) — so the route's own fallback branch for an
-     * UNEXPECTED, non-`AcrRequestError` throw had no test that could reach
-     * it through config or `fetch` alone. `acrClient` (dependencies.ts) is
-     * the seam: swap `investigate` for a function that throws the one shape
-     * the real one never does, drive the route, then restore it.
+     * `AcrRequestError`) — but `await response.text()` sits outside any
+     * try/catch, so a body-read failure (below) already reaches the route
+     * as a raw throw in production. This test uses `acrClient`
+     * (dependencies.ts) instead: a deterministic seam that swaps
+     * `investigate` for a function that throws directly, drives the route,
+     * then restores it, rather than depending on a fragile streaming-body
+     * failure to exercise the SAME fallback branch.
      */
     it("returns a 502 acr_unreachable failure, and emits the failure event exactly once, on a raw throw from investigate()", async () => {
         stubAcrConfig();
         const originalInvestigate = acrClient.investigate;
+        const thrown = new TypeError("not an AcrRequestError");
         acrClient.investigate = () => {
-            throw new TypeError("not an AcrRequestError");
+            throw thrown;
         };
         const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
         const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -837,11 +840,51 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
 
             // The raw error is logged server-side, never leaked to the response.
             expect(consoleError).toHaveBeenCalledTimes(1);
+            expect(consoleError).toHaveBeenNthCalledWith(1, "investigation failed", thrown);
             expect(JSON.stringify(payload)).not.toContain("not an AcrRequestError");
         } finally {
             acrClient.investigate = originalInvestigate;
             consoleInfo.mockRestore();
             consoleError.mockRestore();
         }
+    });
+
+    /**
+     * The REAL path to the same fallback branch, not the seam:
+     * `client.ts`'s `await response.text()` has no try/catch of its own, so
+     * a body-stream that errors on read reaches `route.ts` as a raw throw
+     * already, without `acrClient` involved at all. Proves the fallback
+     * branch is exercised by production's own reachable failure shape, not
+     * only by the deterministic seam above.
+     */
+    it("reaches the same fallback via a real response.text() failure, without touching acrClient", async () => {
+        stubAcrConfig();
+        const body = new ReadableStream({
+            start(controller) {
+                controller.error(new Error("body read failed"));
+            },
+        });
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }),
+        );
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+        const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+        const response = await POST(post(JSON.stringify({ question: "status?" })));
+
+        expect(response.status).toBe(502);
+        const payload = (await response.json()) as { failure?: WorkbenchFailure };
+        if (payload.failure === undefined) throw new Error("expected a failure payload");
+        expect(payload.failure.code).toBe("acr_unreachable");
+        expect(consoleError).toHaveBeenCalledTimes(1);
+
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        expect((events[0] as Record<string, unknown>)["failureCode"]).toBe("acr_unreachable");
+
+        consoleInfo.mockRestore();
+        consoleError.mockRestore();
     });
 });
