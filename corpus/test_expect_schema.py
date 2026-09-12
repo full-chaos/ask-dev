@@ -3,11 +3,20 @@
 
 Run: python3 corpus/test_expect_schema.py
 """
+import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 import expect_schema as S  # noqa: E402
+
+# The pinned contract schema this repo already syncs (scripts/sync-acr-contracts.mjs),
+# not a fresh acr checkout: `QuestionFamily` there is the same closed
+# vocabulary expect_schema.FAMILIES mirrors by hand. Comparing FAMILIES only
+# against ITSELF (iterating `for family in S.FAMILIES`) cannot detect a
+# family silently dropped from FAMILIES -- this pins it against an
+# independent, in-repo source of truth instead.
+_SCHEMA_PATH = Path(__file__).parent.parent / "src/contracts/schemas/context_fabric_common.v1.schema.json"
 
 
 class ExpectSchemaTestError(Exception):
@@ -54,6 +63,17 @@ def test_family_vocabulary_is_closed():
     for family in S.FAMILIES:
         ok, reason, _ = S.parse_expect({"any_of": [_serve(family)]})
         _require(ok, f"{family!r} is in FAMILIES but rejected: {reason!r}")
+
+
+def test_family_vocabulary_matches_the_pinned_contract_schema():
+    # Independent of S.FAMILIES: reads the synced schema file directly, so
+    # a FAMILIES that silently lost (or gained) a member relative to the
+    # pinned contract fails here, not only against its own membership.
+    schema = json.loads(_SCHEMA_PATH.read_text())
+    pinned = set(schema["$defs"]["QuestionFamily"]["enum"])
+    _require(pinned, f"no QuestionFamily enum found at {_SCHEMA_PATH}")
+    _require(S.FAMILIES == pinned,
+              f"expect_schema.FAMILIES {sorted(S.FAMILIES)} != pinned contract QuestionFamily {sorted(pinned)}")
 
 
 _RED_CASES = [

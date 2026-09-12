@@ -250,13 +250,89 @@ def test_build_verdict_carries_versions_and_unscored_flag():
     final = attempts[-1]["response"]["result"]
     audit = SV.audit_window_exchange(attempts)
     record = SV.build_verdict(row, "served_with_data", "complete", final, audit, fake_legacy_score,
-                              corpus_version="test-corpus-v0")
+                              corpus_version="test-corpus-v0", legacy_scorer_version="fake-legacy-v1")
     _require(record["scorer_version"] == SV.SCORER_VERSION, record)
     _require(record["policy_version"] == SV.POLICY_VERSION, record)
     _require(record["schema_version"] == ES.SCHEMA_VERSION, record)
     _require(record["corpus_version"] == "test-corpus-v0", record)
+    _require(record["legacy_scorer_version"] == "fake-legacy-v1", record)
     _require(record["unscored"] is True, record)
     _require(len(record["branch_results"]) == 1, record)
+
+
+def test_two_legacy_scorers_are_distinguished_by_version():
+    # Two different injected scalar scorers, wired in behind the SAME
+    # legacy_score parameter, can legitimately disagree (a scorer upgrade,
+    # a different acr pin, a test double). The record must never look
+    # identically versioned for both -- only `legacy_scorer_version` may
+    # differ; every OTHER version field is this module's own and must not
+    # move just because the caller swapped its injected scorer.
+    row = {"id": "synthetic", "text": "Synthetic", "expect": "serve"}
+
+    def scorer_a(r, b, s, **kw):
+        return "agree", "scorer-a-says-yes"
+
+    def scorer_b(r, b, s, **kw):
+        return "disagree", "scorer-b-says-no"
+
+    ra = SV.build_verdict(row, "served_with_data", "complete", {}, {}, scorer_a,
+                           corpus_version="c1", legacy_scorer_version="scorer-a-v1")
+    rb = SV.build_verdict(row, "served_with_data", "complete", {}, {}, scorer_b,
+                           corpus_version="c1", legacy_scorer_version="scorer-b-v1")
+    _require(ra["verdict"] != rb["verdict"], (ra, rb))
+    _require(ra["legacy_scorer_version"] != rb["legacy_scorer_version"], (ra, rb))
+    for field in ("scorer_version", "policy_version", "schema_version", "corpus_version"):
+        _require(ra[field] == rb[field], f"{field} must not depend on the injected scorer: {ra} vs {rb}")
+
+
+def test_window_value_accepts_explicit_bounds_without_relative_id():
+    # The pinned contract (RelativeWindowID in
+    # src/contracts/schemas/context_fabric_common.v1.schema.json) permits a
+    # window carrying explicit start+end and NO relative_id at all -- that
+    # is a distinct legal shape, not a malformed one.
+    explicit = {"start": "2026-05-01T00:00:00Z", "end": "2026-08-01T00:00:00Z"}
+    value = SV.window_value(explicit)
+    _require(value == ("explicit", SV.timestamp(explicit["start"]), SV.timestamp(explicit["end"])), value)
+    # It is still distinguishable from a same-bounds relative window.
+    relative = {**explicit, "relative_id": "trailing_90d"}
+    _require(SV.window_value(relative) != value, "explicit and relative windows over the same bounds must differ")
+    # Still rejects an unordered explicit window.
+    try:
+        SV.window_value({"start": explicit["end"], "end": explicit["start"]})
+        _require(False, "unordered explicit window must raise")
+    except ValueError:
+        pass
+
+
+def test_malformed_retry_evidence_fails_closed_not_crash():
+    # A non-2xx attempt whose `response` is not a mapping (a raw transport
+    # error string, say) must never reach `.get()` on a non-dict and crash
+    # the whole audit -- it must fail closed to `unsupported_exchange`,
+    # the same as any other shape this audit does not recognize.
+    attempts = [
+        {"status": 502, "request": {"q": 1}, "response": "plain string body, not a dict"},
+        {"status": 200, "request": {"q": 1},
+         "response": {"result": {"status": "clarification_required", "result_id": "r1"}}},
+    ]
+    audit = SV.audit_window_exchange(attempts)
+    _require(audit["window_binding"] == "unknown", audit)
+    # A `failure` that is present but not itself a mapping must not crash either.
+    attempts2 = [
+        {"status": 502, "request": {"q": 1}, "response": {"failure": "not-a-mapping"}},
+        {"status": 200, "request": {"q": 1},
+         "response": {"result": {"status": "clarification_required", "result_id": "r1"}}},
+    ]
+    audit2 = SV.audit_window_exchange(attempts2)
+    _require(audit2["window_binding"] == "unknown", audit2)
+
+
+def test_missing_final_result_fails_closed_not_crash():
+    # A row with no successful result at all (error/no_match/exhausted
+    # turns) legitimately has `final=None` -- scoring a serve branch
+    # against it must return `family_unavailable`, never raise.
+    row = declaration(serve())
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", None, {}, fake_legacy_score)
+    _require((verdict, reason) == ("unscored", "family_unavailable"), (verdict, reason))
 
 
 def main():

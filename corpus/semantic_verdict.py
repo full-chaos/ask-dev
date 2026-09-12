@@ -77,21 +77,28 @@ def timestamp(value):
     return calendar.timegm(parsed.utctimetuple()) * 10**9 + int((fraction or "").ljust(9, "0"))
 
 
+_RELATIVE_WINDOW_IDS = frozenset({"trailing_30d", "trailing_90d", "trailing_365d"})
+
+
 def window_value(window):
     """A comparable value for an evidence window: distinguishes bounded
     windows (by their frozen instants, not a shared relative label),
-    `all_time`, and rejects malformed/unordered/over-specified shapes."""
+    `all_time`, an EXPLICIT bounded window carrying no `relative_id` at all
+    (legal per the pinned contract: `RelativeWindowID` in
+    src/contracts/schemas/context_fabric_common.v1.schema.json requires
+    `relative_id` OR `start`+`end`, not both), and rejects malformed/
+    unordered/over-specified shapes."""
     relative = window.get("relative_id")
     if relative == "all_time":
         if "start" in window or "end" in window:
             raise ValueError("bounded all_time")
         return (relative,)
-    if relative not in {"trailing_30d", "trailing_90d", "trailing_365d"}:
+    if relative is not None and relative not in _RELATIVE_WINDOW_IDS:
         raise ValueError("unsupported window")
     start, end = timestamp(window["start"]), timestamp(window["end"])
     if start >= end:
         raise ValueError("unordered window")
-    return relative, start, end
+    return relative or "explicit", start, end
 
 
 def audit_window_exchange(attempts):
@@ -116,25 +123,46 @@ def audit_window_exchange(attempts):
     }
     if not isinstance(attempts, list):
         return out
-    semantic_turns = []
-    for index, attempt in enumerate(attempts):
-        if not isinstance(attempt, dict):
-            return out
-        if is_success_status(attempt.get("status")):
-            semantic_turns.append(attempt)
-        elif (
-            index + 1 < len(attempts)
-            and (attempt.get("response", {}).get("failure") or {}).get("retryable") is True
-            and attempt.get("request") == attempts[index + 1].get("request")
-        ):
-            continue
-        else:
-            return out
-    attempts = semantic_turns
-    if len(attempts) != 2:
-        return out
-    before, after = attempts
+    # Every read below -- including the retry-collapse check, which touches
+    # attacker/producer-controlled `response`/`request` shapes just as much
+    # as the rest of this function -- is inside the SAME try/except as the
+    # parse that follows. A malformed attempt (a non-dict `response`, a
+    # `failure` that is not a mapping) must fail closed to `unreadable_exchange`,
+    # never raise past this function's caller.
     try:
+        semantic_turns = []
+        for index, attempt in enumerate(attempts):
+            if not isinstance(attempt, dict):
+                return out
+            if is_success_status(attempt.get("status")):
+                semantic_turns.append(attempt)
+            elif (
+                index + 1 < len(attempts)
+                and isinstance(attempt.get("response"), dict)
+                and isinstance(attempt["response"].get("failure"), dict)
+                and attempt["response"]["failure"].get("retryable") is True
+                and attempt.get("request") == attempts[index + 1].get("request")
+            ):
+                continue
+            else:
+                return out
+        attempts = semantic_turns
+        if len(attempts) != 2:
+            return out
+        before, after = attempts
+        # This is the acr CORPUS HARNESS's own attempt-record shape (`request`
+        # is the exact dict the harness's `post()` builds and logs, `response`
+        # is what `post()` returns, wrapping the parsed body under `result`) --
+        # not the raw internal/contracts/v1 Go struct's json tags. The harness
+        # builds this request body itself, camelCase, at
+        # scripts/corpus/harness.py's window-receipt call site, and reads
+        # `payload.get("result")` on the way back; that is the recorded shape
+        # every corpus proof-of-record attempt file on disk actually carries,
+        # confirmed against real recorded attempts (see the CHAOS-5620
+        # TEST-EVIDENCE replay). A caller handing this function a raw
+        # snake_case wire request/response, unwrapped, is passing the wrong
+        # layer's shape -- fails closed to `unreadable_exchange` below, same
+        # as any other unrecognized input.
         first, final = before["response"]["result"], after["response"]["result"]
         request = after["request"]
         if set(request) != {"question", "priorWindowReceipts"}:
@@ -220,7 +248,11 @@ def score_branch(row, branch, bucket, status, final, audit, legacy_score, **iden
     verdict, why = legacy_score(scalar, bucket, status, **identity)
     if branch["outcome"] != S.SERVE or verdict not in {"agree", "agree_weak"}:
         return verdict, why
-    observed = (final.get("answer_plan") or {}).get("family")
+    # `final` is evidence, not a guaranteed shape: a row with no successful
+    # result at all (error/no_match/turns-exhausted) legitimately has no
+    # `final` payload to read a family from. Missing or malformed evidence
+    # is `family_unavailable`, never an exception.
+    observed = (final.get("answer_plan") or {}).get("family") if isinstance(final, dict) else None
     if observed is None:
         return "unscored", "family_unavailable"
     if observed != branch["answer"]["family"]:
@@ -255,7 +287,8 @@ def score(row, bucket, status, final, audit, legacy_score, **identity):
     return best[0], best[1], results
 
 
-def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_version, **identity):
+def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_version,
+                   legacy_scorer_version, **identity):
     """The published, versioned semantic-verdict record for one row/rep.
 
     Carries SCORER_VERSION/POLICY_VERSION/`corpus_version` explicitly (a
@@ -265,12 +298,22 @@ def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_versio
     `unscored` flag -- dropping unknowns from a report, rather than counting
     them against a fixed denominator, would let disappearing evidence
     improve the score.
+
+    `legacy_scorer_version` is REQUIRED, not defaulted: SCORER_VERSION/
+    POLICY_VERSION/SCHEMA_VERSION only identify THIS module's own behavior,
+    never the injected `legacy_score` callable's -- two different scalar
+    scoring policies wired in behind the same call can produce different
+    verdicts while carrying identical metadata otherwise. The caller must
+    name its own scorer's identity (e.g. acr's git sha, or a test double's
+    own label) so a rescore under a changed `legacy_score` is never
+    mistaken for a rescore under the same one.
     """
     verdict, reason, branch_results = score(row, bucket, status, final, audit, legacy_score, **identity)
     return {
         "scorer_version": SCORER_VERSION,
         "policy_version": POLICY_VERSION,
         "schema_version": S.SCHEMA_VERSION,
+        "legacy_scorer_version": legacy_scorer_version,
         "corpus_version": corpus_version,
         "corpus_id": row.get("id") if isinstance(row, dict) else None,
         "bucket": bucket,

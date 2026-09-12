@@ -57,8 +57,10 @@ run_contracts() {
 # shape (corpus/test_corpus.py mirrors acr scripts/corpus/validators.py:
 # 129-157, widened for CHAOS-5620's any_of shape), then the any_of schema
 # and semantic-verdict machinery's own controls (corpus/test_expect_schema.py,
-# corpus/test_semantic_verdict.py). Row *expectations* (scalar and any_of
-# alike) are data semantics, not enforced here -- see corpus/README.md.
+# corpus/test_semantic_verdict.py, corpus/test_semantic_verdict_smoke.py --
+# the last runs the new machinery over every real corpus row, not only
+# synthetic fixtures). Row *expectations* (scalar and any_of alike) are data
+# semantics, not enforced here -- see corpus/README.md.
 run_corpus() {
   pnpm test:corpus
 }
