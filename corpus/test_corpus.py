@@ -139,10 +139,10 @@ def _self_test_guard_fires():
         # CHAOS-5620: any_of shape controls.
         ({"id": "x", "text": "hello", "expect": {"any_of": []}}, "any_of"),
         ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "bogus"}]}}, "outcome"),
-        ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "serve"}]}}, "requires answer"),
+        ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "serve"}]}}, "answer"),
         ({"id": "x", "text": "hello",
           "expect": {"any_of": [{"outcome": "serve", "answer": {"family": "not_a_family"}}]}},
-         "answer.family"),
+         "answer/family"),
         ({"id": "x", "text": "hello", "expect": {"any_of": [{"outcome": "decline"}]}, "basis": "named_basis"},
          "row level"),
     ]

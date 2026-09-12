@@ -17,6 +17,7 @@ validate_corpus_row.
 
 Run: python3 corpus/test_semantic_verdict_proof.py
 """
+import hashlib
 import json
 import re
 import sys
@@ -28,6 +29,7 @@ import semantic_verdict as SV  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "testdata" / "cv-discovered-team-series-nine-reps"
 _NAME_RE = re.compile(r"cv-discovered-team-series-rep(\d+)-t(\d+)-a(\d+)\.json$")
+_SHA256SUMS = FIXTURES / "SHA256SUMS"
 
 
 class SemanticVerdictProofError(Exception):
@@ -66,6 +68,25 @@ def _attempts_for_rep(rep):
     _require(matches, f"no fixture attempts found for rep {rep} under {FIXTURES}")
     matches.sort(key=lambda triple: triple[:2])
     return [json.loads(path.read_text()) for _turn, _attempt, path in matches]
+
+
+def test_vendored_fixtures_match_their_pinned_sha256():
+    # SHA256SUMS holds RELATIVE filenames (portable across checkouts, not
+    # this lane's absolute scratch path) and is actively enforced here, not
+    # only a static file a human might run `sha256sum -c` against by hand.
+    lines = [ln for ln in _SHA256SUMS.read_text().splitlines() if ln.strip()]
+    _require(lines, f"{_SHA256SUMS} is empty")
+    pinned = {}
+    for line in lines:
+        digest, name = line.split(maxsplit=1)
+        _require("/" not in name, f"SHA256SUMS entry must be a relative filename, got {name!r}")
+        pinned[name] = digest
+    on_disk = {p.name for p in FIXTURES.glob("*.json")}
+    _require(pinned.keys() == on_disk, f"SHA256SUMS entries {sorted(pinned)} != vendored files {sorted(on_disk)}")
+    for name, digest in pinned.items():
+        got = hashlib.sha256((FIXTURES / name).read_bytes()).hexdigest()
+        _require(got == digest, f"{name}: sha256 mismatch, got {got}, pinned {digest}")
+    print(f"vendored_fixtures_match_their_pinned_sha256: {len(pinned)} files verified")
 
 
 def test_nine_reps_reproduce_the_design_of_records_published_figures():

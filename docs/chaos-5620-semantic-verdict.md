@@ -12,24 +12,66 @@ deliberately does not implement.
 
 ## What shipped in this PR
 
-- `corpus/expect_schema.py` — the `any_of` vocabulary and shape validator,
-  pinned against the synced contract schema
-  (`src/contracts/schemas/context_fabric_common.v1.schema.json`'s
-  `QuestionFamily` enum), not only its own membership.
+- `scripts/validate_json_schema.mjs` — a small node shim around the SAME
+  ajv setup `src/lib/acr/validate.ts` already uses in product code (no new
+  dependency). Validates a payload against any `$def` in the pinned
+  contract schemas, or against `corpus/schemas/` (this repo's own
+  invented shapes). Every window/confirmation/`expect` shape below is
+  validated through it, not by a hand-rolled Python `isinstance` chain —
+  r2 review found hand-rolled checks miss cells a real JSON Schema
+  validator gets right by construction (a `relative_id: null` offer
+  silently treated as legal, a `null` `applied_value` compared for
+  equality without checking its type, `sorted()` crashing on a
+  non-string dict key).
+- `corpus/schemas/expect.schema.json` — this repo's own schema for the
+  `expect` declaration (scalar or `any_of`); its `answer.family` reaches
+  into the real pinned contract via `$ref` for the family vocabulary,
+  rather than re-declaring it.
+- `corpus/expect_schema.py` — `parse_expect` now delegates shape
+  validation to that schema. `FAMILIES` is read directly from the pinned
+  contract schema at import time (not hand-copied), so it cannot drift.
 - `corpus/semantic_verdict.py` — the family/window audit and branch
   combination machinery, versioned (`SCORER_VERSION`, `POLICY_VERSION`,
   `expect_schema.SCHEMA_VERSION`, and a REQUIRED `legacy_scorer_version`
-  naming whichever scalar scorer was injected). Every field it consumes
-  fails closed (never raises) on absent/null/wrong-type/malformed input.
+  naming whichever scalar scorer was injected). Every offer, the
+  effective-evidence-window, and every confirmed-structure entry is
+  validated against the pinned contract's own `WindowOption`/
+  `EffectiveEvidenceWindow`/`ConfirmedStructureEntry` shapes before this
+  module reasons about it. Every field it consumes fails closed (never
+  raises) on absent/null/wrong-type/malformed input.
 - `corpus/test_corpus.py` widened to accept both `expect` shapes.
 - `corpus/test_semantic_verdict_smoke.py` runs the machinery over every
   real `corpus.CORPUS` row (scalar, and a synthetic `any_of` variant of
-  each). `corpus/test_semantic_verdict_proof.py` replays vendored REAL
-  recorded exchanges (`corpus/testdata/cv-discovered-team-series-nine-reps/`)
-  through the audit and asserts the exact published family/window figures
-  — all three run in `pnpm test:corpus` / CI.
+  each) — the in-repo caller exercising this machinery end to end (see
+  RISK-NOTES on the acr-side wiring boundary, CHAOS-5625).
+  `corpus/test_semantic_verdict_proof.py` replays vendored REAL recorded
+  exchanges (`corpus/testdata/cv-discovered-team-series-nine-reps/`)
+  through the audit and asserts the exact published family/window
+  figures, and actively re-verifies each vendored file's pinned sha256.
+  `corpus/test_schema_driven_shapes.py` GENERATES its legal/illegal
+  tables from the pinned schema's own `required` fields (one hand-authored
+  seed per legal branch, then every required field mutated to
+  absent/null, mechanically) and uses ajv itself as the pass/fail oracle
+  — never a hand-declared expectation. All four run in `pnpm test:corpus`
+  / CI.
 - No row's `expect`, `basis`, `anchor`, or `nonexistent` value changed.
   `neg-illegal-i6-self-group` stays scalar `decline` (chris D20 = A).
+
+## Scope boundary: this PR's caller vs. the corpus RUNNER (CHAOS-5625)
+
+This PR's machinery has an IN-REPO caller: `corpus/test_semantic_verdict_smoke.py`
+and `corpus/test_semantic_verdict_proof.py` run it, in CI, against every
+real corpus row and against real vendored recorded exchanges. What it does
+NOT have is a PRODUCTION caller, because the corpus RUNNER — the thing
+that actually scores a live sweep and publishes bucket totals — is acr's
+`scripts/corpus/harness.py`/`merge_corpus.py`, not anything in this
+repository (ask-dev has never had a corpus scorer of its own; see
+`corpus/README.md` "## Ownership"). Publishing this semantic verdict
+beside acr's own bucket totals and PROVENANCE, consuming this PR's
+`corpus/expect_schema.py`/`semantic_verdict.py` at the landed ask-dev pin,
+is a separate, acr-side follow-up PR by this lane after this one lands —
+proposed parent ticket CHAOS-5625. This PR does not implement that wiring
+and does not claim to.
 
 ## The three distinctions this verdict keeps separate
 

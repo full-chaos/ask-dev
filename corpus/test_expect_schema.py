@@ -10,12 +10,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import expect_schema as S  # noqa: E402
 
-# The pinned contract schema this repo already syncs (scripts/sync-acr-contracts.mjs),
-# not a fresh acr checkout: `QuestionFamily` there is the same closed
-# vocabulary expect_schema.FAMILIES mirrors by hand. Comparing FAMILIES only
-# against ITSELF (iterating `for family in S.FAMILIES`) cannot detect a
-# family silently dropped from FAMILIES -- this pins it against an
-# independent, in-repo source of truth instead.
+# The pinned contract schema this repo already syncs
+# (scripts/sync-acr-contracts.mjs): expect_schema.FAMILIES is now read
+# directly from this file at import time (not hand-copied), so this test
+# mainly guards the READING itself (a bad $defs path, an empty enum) --
+# see expect_schema.py's own docstring for why drift is no longer possible
+# the way it was when FAMILIES was a hand-typed literal.
 _SCHEMA_PATH = Path(__file__).parent.parent / "src/contracts/schemas/context_fabric_common.v1.schema.json"
 
 
@@ -47,7 +47,7 @@ def test_scalar_forms_unchanged():
         _require(branches is None, f"scalar {expect!r} must not yield branches")
     ok, reason, branches = S.parse_expect("bogus")
     _require(not ok and branches is None, "unknown scalar must be rejected")
-    _require("expect must be one of" in reason, f"wrong reason: {reason!r}")
+    _require("allowed values" in reason, f"wrong reason: {reason!r}")
 
 
 def test_minimal_legal_any_of():
@@ -59,7 +59,7 @@ def test_minimal_legal_any_of():
 def test_family_vocabulary_is_closed():
     ok, reason, _ = S.parse_expect({"any_of": [_serve("bogus_family")]})
     _require(not ok, "unknown family must be rejected")
-    _require("answer.family" in reason, f"wrong reason: {reason!r}")
+    _require("family" in reason, f"wrong reason: {reason!r}")
     for family in S.FAMILIES:
         ok, reason, _ = S.parse_expect({"any_of": [_serve(family)]})
         _require(ok, f"{family!r} is in FAMILIES but rejected: {reason!r}")
@@ -77,17 +77,17 @@ def test_family_vocabulary_matches_the_pinned_contract_schema():
 
 
 _RED_CASES = [
-    ([], "any_of"),
+    ([], "object"),
     ({"any_of": []}, "any_of"),
-    ({"any_of": ["serve"]}, "not a mapping"),
+    ({"any_of": ["serve"]}, "object"),
     ({"any_of": [{"outcome": ["serve"]}]}, "outcome"),
     ({"any_of": [{"outcome": "bogus"}]}, "outcome"),
-    ({"any_of": [_serve(), _serve()]}, "duplicates"),
-    ({"any_of": [{"outcome": "serve"}]}, "requires answer"),
-    ({"any_of": [{"outcome": "decline", "answer": {}}]}, "only applies to outcome=serve"),
-    ({"any_of": [_serve()], "unknown": True}, "exactly one key"),
+    ({"any_of": [_serve(), _serve()]}, "duplicate"),
+    ({"any_of": [{"outcome": "serve"}]}, "answer"),
+    ({"any_of": [{"outcome": "decline", "answer": {}}]}, "additional propert"),
+    ({"any_of": [_serve()], "unknown": True}, "additional propert"),
     ({"any_of": [{"outcome": "decline", "basis": 3}]}, "basis"),
-    ({"any_of": [{"outcome": "decline", "extra": 1}]}, "unsupported keys"),
+    ({"any_of": [{"outcome": "decline", "extra": 1}]}, "additional propert"),
 ]
 
 

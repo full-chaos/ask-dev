@@ -37,6 +37,19 @@ import datetime
 import re
 
 import expect_schema as S
+from schema_shim import SchemaShimError, validate_via_schema
+
+# The one contract schema file every window/confirmation shape below is
+# validated against -- offers (`WindowOption`), the server-canonicalized
+# window an answer speaks for (`EffectiveEvidenceWindow`), and a carried
+# structure member's disposition (`ConfirmedStructureEntry`). Each shape
+# accepts EXACTLY what its own $def in this schema accepts (a
+# `relative_id` typed and enum-constrained as the schema declares, an
+# `applied_value` the schema requires to be a non-empty string), never a
+# hand-rolled Python check that could accept or reject something the
+# schema itself does not -- see this module's docstring and
+# corpus/README.md.
+_COMMON_SCHEMA = "context_fabric_common.v1.schema.json"
 
 # Bump on any change to the audit/branch-combination behavior below (not on a
 # schema change -- that is expect_schema.SCHEMA_VERSION). A published verdict
@@ -77,28 +90,39 @@ def timestamp(value):
     return calendar.timegm(parsed.utctimetuple()) * 10**9 + int((fraction or "").ljust(9, "0"))
 
 
-_RELATIVE_WINDOW_IDS = frozenset({"trailing_30d", "trailing_90d", "trailing_365d"})
+def _validate_shape(schema_def, payload):
+    """Validate `payload` against `_COMMON_SCHEMA#/$defs/<schema_def>`.
+    Raises ValueError (caught by every caller's existing fail-closed path)
+    on an invalid shape, or a broken validator alike -- a validator that
+    cannot run must never be silently read as "this shape is fine"."""
+    try:
+        ok, errors = validate_via_schema(_COMMON_SCHEMA, f"#/$defs/{schema_def}", payload)
+    except SchemaShimError as exc:
+        raise ValueError(f"{schema_def} schema validation unavailable: {exc}") from exc
+    if not ok:
+        raise ValueError(f"invalid {schema_def}: {'; '.join(errors)}")
 
 
-def window_value(window):
-    """A comparable value for an evidence window: distinguishes bounded
-    windows (by their frozen instants, not a shared relative label),
-    `all_time`, an EXPLICIT bounded window carrying no `relative_id` at all
-    (legal per the pinned contract: `RelativeWindowID` in
-    src/contracts/schemas/context_fabric_common.v1.schema.json requires
-    `relative_id` OR `start`+`end`, not both), and rejects malformed/
-    unordered/over-specified shapes."""
+def window_value(window, schema_def="WindowOption"):
+    """A comparable value for an evidence window, once validated against
+    the pinned contract's own `schema_def` (`WindowOption` for an offer,
+    `EffectiveEvidenceWindow` for the window an answer speaks for --
+    different shapes: only `WindowOption` carries `receipt_id`/
+    `option_id`/`label`). Distinguishes bounded windows (by their frozen
+    instants, not a shared relative label), `all_time`, and an EXPLICIT
+    bounded window carrying no `relative_id` at all (legal per the pinned
+    contract: both defs require `relative_id` OR `start`+`end`, not
+    neither, and no other combination reaches this point at all -- the
+    schema itself enforces every combination the contract forbids, this
+    function only enforces bound ORDERING, which the schema does not)."""
+    _validate_shape(schema_def, window)
     relative = window.get("relative_id")
     if relative == "all_time":
-        if "start" in window or "end" in window:
-            raise ValueError("bounded all_time")
         return (relative,)
-    if relative is not None and relative not in _RELATIVE_WINDOW_IDS:
-        raise ValueError("unsupported window")
     start, end = timestamp(window["start"]), timestamp(window["end"])
     if start >= end:
         raise ValueError("unordered window")
-    return relative or "explicit", start, end
+    return (relative or "explicit", start, end)
 
 
 def audit_window_exchange(attempts):
@@ -188,6 +212,15 @@ def audit_window_exchange(attempts):
                 {o["option_id"] for o in page}
             ) != len(page):
                 return {**out, "window_binding": "mismatch", "reason": "duplicate_offer"}
+            # Validate EVERY offered window's shape up front, in every page,
+            # not only when reconciling two redundant pages: an offer this
+            # audit could not otherwise validate (a malformed or invalid
+            # `relative_id`, e.g. `null`, mismatched bounds, ...) must never
+            # reach the confirmation check below un-checked -- window_value
+            # raising here is caught by this function's own try/except and
+            # fails closed to `unreadable_exchange`, never `verified`.
+            for offer in page:
+                window_value(offer)
         if len(pages) == 2:
             bindings = [
                 {o["receipt_id"]: (o["option_id"], window_value(o)) for o in page} for page in pages
@@ -198,6 +231,7 @@ def audit_window_exchange(attempts):
         matched = [o for o in options if o.get("receipt_id") == ref["receipt_id"]]
         if len(matched) != 1:
             return {**out, "window_binding": "mismatch", "reason": "unoffered_or_duplicate_receipt"}
+        offer = matched[0]
         initial_family = first.get("answer_plan", {}).get("family")
         final_family = final.get("answer_plan", {}).get("family")
         if initial_family and final_family:
@@ -208,13 +242,31 @@ def audit_window_exchange(attempts):
         if len(entries) != 1:
             return {**out, "window_binding": "mismatch", "reason": "duplicate_window_ack"}
         confirmation = entries[0]
+        # Validate the confirmation entry's own shape (e.g. `applied_value`
+        # must be a non-empty string per ConfirmedStructureEntry) BEFORE
+        # comparing its values against what this exchange should have
+        # produced -- a schema-invalid confirmation (a null applied_value,
+        # a receipt-sourced entry missing its receipt_id) must never reach
+        # an equality check that could accidentally "match" two invalid
+        # nulls and manufacture a false verification.
+        _validate_shape("ConfirmedStructureEntry", confirmation)
+        offer_relative_id = offer.get("relative_id")
+        if offer_relative_id is None:
+            # A legal, contract-permitted explicit-bounds-only offer (no
+            # relative_id -- see window_value's docstring). The
+            # confirmation check below is defined in terms of a relative_id
+            # `applied_value`; there is no confirmed wire convention yet for
+            # how an explicit-only offer's application is recorded, so this
+            # stops here rather than guess one -- unknown, never a
+            # manufactured pass and never a crash on a legal shape.
+            return {**out, "reason": "explicit_offer_confirmation_unsupported"}
         expected = {
             "prior_result_id": first["result_id"],
             "receipt_id": ref["receipt_id"],
             "source": "receipt",
             "provenance": "clarification_confirmed",
             "disposition": "applied",
-            "applied_value": matched[0]["relative_id"],
+            "applied_value": offer_relative_id,
         }
         if any(confirmation.get(k) != v for k, v in expected.items()):
             return {**out, "window_binding": "mismatch", "reason": "window_ack_mismatch"}
@@ -222,8 +274,8 @@ def audit_window_exchange(attempts):
         if effective is None:
             return {**out, "reason": "missing_effective_window"}
         if effective.get("provenance") != "clarification_confirmed" or window_value(
-            effective
-        ) != window_value(matched[0]):
+            effective, "EffectiveEvidenceWindow"
+        ) != window_value(offer):
             return {**out, "window_binding": "mismatch", "reason": "effective_window_mismatch"}
         return {**out, "window_binding": "verified", "reason": "family_confirmation_unavailable"}
     except (KeyError, TypeError, ValueError, AttributeError):

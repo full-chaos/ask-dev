@@ -71,9 +71,9 @@ def serve(family="discovered_cohort_ranking"):
 # --- synthetic two-turn window-clarification exchange -----------------------------------
 
 def _offer(option_id="opt-90d", receipt_id="winr_90d", relative_id="trailing_90d",
-           start="2026-05-01T00:00:00Z", end="2026-08-01T00:00:00Z"):
+           start="2026-05-01T00:00:00Z", end="2026-08-01T00:00:00Z", label="the last 90 days"):
     return {"option_id": option_id, "receipt_id": receipt_id, "relative_id": relative_id,
-            "start": start, "end": end}
+            "start": start, "end": end, "label": label}
 
 
 def base_exchange(final_family="discovered_cohort_ranking", first_family="discovered_cohort_ranking"):
@@ -285,73 +285,9 @@ def test_two_legacy_scorers_are_distinguished_by_version():
         _require(ra[field] == rb[field], f"{field} must not depend on the injected scorer: {ra} vs {rb}")
 
 
-def test_window_value_table():
-    # Every window SHAPE the pinned contract allows or forbids, in one
-    # table. Cites src/contracts/schemas/context_fabric_common.v1.schema.json:
-    #   :316-325 WindowOption's `relative_id` -- the closed RelativeWindowID
-    #            enum (trailing_30d/90d/365d, all_time).
-    #   :326-431 WindowOption's own shape: `relative_id` OR `start`+`end`
-    #            (not neither, and not exactly one of start/end).
-    bounded = {"start": "2026-05-01T00:00:00Z", "end": "2026-08-01T00:00:00Z"}
-    legal = [
-        ("relative_30d", {**bounded, "relative_id": "trailing_30d"}),
-        ("relative_90d", {**bounded, "relative_id": "trailing_90d"}),
-        ("relative_365d", {**bounded, "relative_id": "trailing_365d"}),
-        ("all_time_no_bounds", {"relative_id": "all_time"}),
-        ("explicit_bounds_no_relative_id", dict(bounded)),
-        ("relative_with_offset_tz_same_instant", {**bounded, "relative_id": "trailing_90d",
-                                                   "start": "2026-05-01T01:00:00+01:00"}),
-    ]
-    illegal = [
-        ("all_time_with_start", {"relative_id": "all_time", "start": bounded["start"]}),
-        ("all_time_with_end", {"relative_id": "all_time", "end": bounded["end"]}),
-        ("relative_only_start", {"relative_id": "trailing_90d", "start": bounded["start"]}),
-        ("relative_only_end", {"relative_id": "trailing_90d", "end": bounded["end"]}),
-        ("explicit_only_start", {"start": bounded["start"]}),
-        ("explicit_only_end", {"end": bounded["end"]}),
-        ("neither_relative_nor_bounds", {}),
-        ("unsupported_relative_id", {**bounded, "relative_id": "trailing_7d"}),
-        ("unordered_bounds", {"start": bounded["end"], "end": bounded["start"]}),
-        ("bad_timestamp", {"start": "not-a-timestamp", "end": bounded["end"]}),
-    ]
-    for name, window in legal:
-        try:
-            value = SV.window_value(window)
-        except Exception as exc:  # noqa: BLE001
-            _require(False, f"WINDOW_TABLE legal/{name} raised {type(exc).__name__}: {exc}")
-        print(f"WINDOW_TABLE legal/{name}: accepted -> {value}")
-    # Same-instant relative and explicit windows over identical bounds must
-    # still be distinguishable (a relative label is not interchangeable
-    # with an explicit one -- see window_value's docstring).
-    relative_value = SV.window_value(legal[1][1])
-    explicit_value = SV.window_value(legal[4][1])
-    _require(relative_value != explicit_value, (relative_value, explicit_value))
-    for name, window in illegal:
-        try:
-            SV.window_value(window)
-            _require(False, f"WINDOW_TABLE illegal/{name} was accepted: {window}")
-        except (ValueError, KeyError) as exc:
-            print(f"WINDOW_TABLE illegal/{name}: rejected ({type(exc).__name__}: {exc})")
-    print(f"window_value_table: {len(legal)} legal + {len(illegal)} illegal shapes executed")
-
-
-def test_window_value_accepts_explicit_bounds_without_relative_id():
-    # The pinned contract (RelativeWindowID in
-    # src/contracts/schemas/context_fabric_common.v1.schema.json) permits a
-    # window carrying explicit start+end and NO relative_id at all -- that
-    # is a distinct legal shape, not a malformed one.
-    explicit = {"start": "2026-05-01T00:00:00Z", "end": "2026-08-01T00:00:00Z"}
-    value = SV.window_value(explicit)
-    _require(value == ("explicit", SV.timestamp(explicit["start"]), SV.timestamp(explicit["end"])), value)
-    # It is still distinguishable from a same-bounds relative window.
-    relative = {**explicit, "relative_id": "trailing_90d"}
-    _require(SV.window_value(relative) != value, "explicit and relative windows over the same bounds must differ")
-    # Still rejects an unordered explicit window.
-    try:
-        SV.window_value({"start": explicit["end"], "end": explicit["start"]})
-        _require(False, "unordered explicit window must raise")
-    except ValueError:
-        pass
+# Window-shape legality (every RelativeWindowID/WindowOption/
+# EffectiveEvidenceWindow branch, legal and illegal) is a schema-GENERATED
+# table now, not hand-enumerated here -- see test_schema_driven_shapes.py.
 
 
 def test_malformed_retry_evidence_fails_closed_not_crash():
