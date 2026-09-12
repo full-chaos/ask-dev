@@ -1,0 +1,24 @@
+{
+  "request": {
+    "question": "How has each team's health trended over the last two quarters?",
+    "priorWindowReceipts": [
+      {
+        "result_id": "result_3cab64f94d66dc47ce2fe58715a8219a",
+        "receipt_id": "winr_a3028711a5c40d36683e5e05"
+      }
+    ]
+  },
+  "status": 422,
+  "response": {
+    "failure": {
+      "httpStatus": 422,
+      "upstreamCode": "synthesis_rejected",
+      "upstreamRequestId": "req_ea160016e0535adaaba01681504b1f6c",
+      "code": "acr_answer_rejected",
+      "message": "ACR derived an answer and its own validator rejected it. No answer was asserted.",
+      "retryable": true
+    }
+  },
+  "dt": 30.0,
+  "body_undecodable": false
+}

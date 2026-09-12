@@ -13,6 +13,10 @@ src/contracts/
 # generated at (see corpus/README.md). Prettier must never rewrite it.
 corpus/baseline-20260905-sweep1.json
 
+# Vendored real recorded proof attempts (CHAOS-5620): must stay byte-identical
+# to their sha256-pinned source (see SHA256SUMS in the same directory).
+corpus/testdata/cv-discovered-team-series-nine-reps/*.json
+
 pnpm-lock.yaml
 .env*
 

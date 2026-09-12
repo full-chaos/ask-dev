@@ -1,0 +1,250 @@
+{
+  "request": {
+    "question": "How has each team's health trended over the last two quarters?"
+  },
+  "status": 200,
+  "response": {
+    "result": {
+      "schema_version": "context_fabric_investigation_result.v1",
+      "result_id": "result_3cab64f94d66dc47ce2fe58715a8219a",
+      "request_id": "req_2262f28ddb046912d7c8f0e7a1cf197a",
+      "generated_at": "2026-09-11T20:25:09.418927397Z",
+      "status": "clarification_required",
+      "question": "How has each team's health trended over the last two quarters?",
+      "interpretation": {
+        "shape": "discovered_cohort",
+        "requested_judgment": "Assess how each team's health has changed over the last two quarters.",
+        "subject_terms": [
+          "team"
+        ],
+        "time_context": {
+          "axis": "current"
+        },
+        "fact_requirements": [
+          {
+            "kind": "health"
+          }
+        ],
+        "clarification_needed": false
+      },
+      "subject_resolution": {
+        "candidates": [],
+        "committed": [],
+        "clarification_prompt": "Confirm the evidence window for this answer."
+      },
+      "answer_plan": {
+        "family": "discovered_cohort_ranking",
+        "family_source": "model",
+        "family_version": "question-family.v2",
+        "require_drivers": true,
+        "require_ranking": true,
+        "render_kinds": [
+          "series"
+        ],
+        "fact_kinds": [
+          "health",
+          "workload",
+          "readiness",
+          "operational_deficiencies",
+          "investment"
+        ],
+        "axes": [
+          "window"
+        ],
+        "budget": {
+          "max_items": 30,
+          "max_serialized_bytes": 262144,
+          "max_members": 14,
+          "synthesis_headroom": 16,
+          "narrowing_basis": "canonical_id_lexical"
+        },
+        "requirements": [
+          {
+            "requirement": "state/member/team",
+            "obligation": "state",
+            "role": "member",
+            "subject": "team",
+            "kind": "read",
+            "fact_kinds": [
+              "flow",
+              "health",
+              "investment",
+              "landscape",
+              "readiness",
+              "workload"
+            ],
+            "scope": "each_member",
+            "quantifier": "corroborated"
+          },
+          {
+            "requirement": "trend_series/member/team",
+            "obligation": "trend_series",
+            "role": "member",
+            "subject": "team",
+            "kind": "read",
+            "fact_kinds": [
+              "flow",
+              "health",
+              "readiness",
+              "workload"
+            ],
+            "scope": "each_member",
+            "quantifier": "corroborated"
+          }
+        ]
+      },
+      "direct_judgment": "",
+      "current_state": "",
+      "strongest_pressures": [],
+      "drivers": [],
+      "remaining_work": [],
+      "readiness_gaps": [],
+      "paths": [],
+      "conflicts": [],
+      "limitations": [
+        "This answer requires confirming the evidence window it should read against. Confirm one of the offered options to proceed."
+      ],
+      "evidence_ref_ids": [],
+      "claimed_facts": [],
+      "coverage": {
+        "sources": [],
+        "partial": false
+      },
+      "versions": {
+        "service_version": "5582fix-760014f7",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "devhealthsource.clickhouse.v6+devhealthsource.episodes.v1+devhealthsource.teams_projects.v10",
+        "query_version": "devhealthfacts.clickhouse.v5",
+        "interpretation_version": "unwired",
+        "synthesis_version": "unwired",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "unwired"
+      },
+      "deterministic_answer": "This answer requires confirming the evidence window it should read against. Confirm one of the offered options to proceed.",
+      "warnings": [],
+      "reused": false,
+      "effective_evidence_window": {
+        "start": "2026-06-13T20:25:05.462549713Z",
+        "end": "2026-09-11T20:25:05.462549713Z",
+        "relative_id": "trailing_90d",
+        "window_class": "trend_assessment",
+        "provenance": "inferred_default",
+        "confidence": "low"
+      },
+      "window_clarification": {
+        "options": [
+          {
+            "receipt_id": "winr_6a0a393bcb4483482ab2dea2",
+            "option_id": "opt_08878743e8a32307",
+            "label": "the last 30 days",
+            "relative_id": "trailing_30d",
+            "start": "2026-08-12T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_a3028711a5c40d36683e5e05",
+            "option_id": "opt_948174fe97555735",
+            "label": "the last 90 days",
+            "relative_id": "trailing_90d",
+            "start": "2026-06-13T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_868b6b06ac1803ca0978a947",
+            "option_id": "opt_3957f1cd4f462600",
+            "label": "the last 365 days",
+            "relative_id": "trailing_365d",
+            "start": "2025-09-11T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_1b664cf6136c7cff42c5475d",
+            "option_id": "opt_066e2ffa1249692e",
+            "label": "all time",
+            "relative_id": "all_time"
+          }
+        ]
+      },
+      "structure_needs": {
+        "missing": [
+          "window"
+        ],
+        "window_options": [
+          {
+            "receipt_id": "winr_6a0a393bcb4483482ab2dea2",
+            "option_id": "opt_08878743e8a32307",
+            "label": "the last 30 days",
+            "relative_id": "trailing_30d",
+            "start": "2026-08-12T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_a3028711a5c40d36683e5e05",
+            "option_id": "opt_948174fe97555735",
+            "label": "the last 90 days",
+            "relative_id": "trailing_90d",
+            "start": "2026-06-13T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_868b6b06ac1803ca0978a947",
+            "option_id": "opt_3957f1cd4f462600",
+            "label": "the last 365 days",
+            "relative_id": "trailing_365d",
+            "start": "2025-09-11T20:25:09.418899397Z",
+            "end": "2026-09-11T20:25:09.418899397Z"
+          },
+          {
+            "receipt_id": "winr_1b664cf6136c7cff42c5475d",
+            "option_id": "opt_066e2ffa1249692e",
+            "label": "all time",
+            "relative_id": "all_time"
+          }
+        ],
+        "window_expand_options": [
+          {
+            "receipt_id": "winr_868b6b06ac1803ca0978a947",
+            "option_id": "opt_3957f1cd4f462600",
+            "label": "the last 365 days",
+            "relative_id": "trailing_365d",
+            "window_class": "trend_assessment"
+          }
+        ]
+      },
+      "completeness": {
+        "terminal_status": "clarification_required",
+        "terminal_reason": "clarification_reason_disclosed",
+        "claimed_facts_count": 0,
+        "rows_count": 0,
+        "state": "partial",
+        "outcomes": [
+          {
+            "stage": "planning",
+            "requirement": "state/member/team",
+            "obligation": "state",
+            "outcome": "not_attempted",
+            "impact": "dimension",
+            "cause_coverage": "answer_terminated_before_attempt",
+            "cause_observed": false,
+            "served": 0,
+            "declared": 0
+          },
+          {
+            "stage": "planning",
+            "requirement": "trend_series/member/team",
+            "obligation": "trend_series",
+            "outcome": "not_attempted",
+            "impact": "dimension",
+            "cause_coverage": "answer_terminated_before_attempt",
+            "cause_observed": false,
+            "served": 0,
+            "declared": 0
+          }
+        ]
+      }
+    }
+  },
+  "dt": 13.9,
+  "body_undecodable": false
+}

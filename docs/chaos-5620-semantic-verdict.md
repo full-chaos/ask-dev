@@ -12,11 +12,22 @@ deliberately does not implement.
 
 ## What shipped in this PR
 
-- `corpus/expect_schema.py` — the `any_of` vocabulary and shape validator.
+- `corpus/expect_schema.py` — the `any_of` vocabulary and shape validator,
+  pinned against the synced contract schema
+  (`src/contracts/schemas/context_fabric_common.v1.schema.json`'s
+  `QuestionFamily` enum), not only its own membership.
 - `corpus/semantic_verdict.py` — the family/window audit and branch
   combination machinery, versioned (`SCORER_VERSION`, `POLICY_VERSION`,
-  `expect_schema.SCHEMA_VERSION`).
+  `expect_schema.SCHEMA_VERSION`, and a REQUIRED `legacy_scorer_version`
+  naming whichever scalar scorer was injected). Every field it consumes
+  fails closed (never raises) on absent/null/wrong-type/malformed input.
 - `corpus/test_corpus.py` widened to accept both `expect` shapes.
+- `corpus/test_semantic_verdict_smoke.py` runs the machinery over every
+  real `corpus.CORPUS` row (scalar, and a synthetic `any_of` variant of
+  each). `corpus/test_semantic_verdict_proof.py` replays vendored REAL
+  recorded exchanges (`corpus/testdata/cv-discovered-team-series-nine-reps/`)
+  through the audit and asserts the exact published family/window figures
+  — all three run in `pnpm test:corpus` / CI.
 - No row's `expect`, `basis`, `anchor`, or `nonexistent` value changed.
   `neg-illegal-i6-self-group` stays scalar `decline` (chris D20 = A).
 
@@ -35,14 +46,20 @@ verdict either — it is a known, documented limitation, not a false green.
 
 ## Proof executed against this PR's machinery
 
-See the PR body's TEST-EVIDENCE for the executed replay against:
+The nine `cv-discovered-team-series` reps at `760014f7` are vendored as
+committed fixture data (`corpus/testdata/cv-discovered-team-series-nine-reps/`)
+and replayed by `corpus/test_semantic_verdict_proof.py`, part of `pnpm
+test:corpus` / CI: `family_relation` changed=3/same=6; `window_binding`
+verified=9; `family_confirmation` unavailable=9 — the row has no `expect`
+today, so this is an evidence-availability count, not a corpus score. This
+needs no acr checkout: the audit reads only the recorded exchange.
 
-- `~/.cache/acr-kiac-askdev/proofs/2026-09-11-main-89efc1f9/` (36-row
-  baseline, unchanged buckets).
-- The nine `cv-discovered-team-series` reps at `760014f7`
-  (`family_relation`: changed=3/same=6; `confirmed_family_verified=0`;
-  `unscored=9` under the legacy scalar bar — the row has no `expect`
-  today, so this is an evidence-availability count, not a corpus score).
+The OTHER proof — that `build_verdict()` is a byte-exact no-op over acr's
+real legacy scalar verdict for the full 36-row pinned baseline
+(`~/.cache/acr-kiac-askdev/proofs/2026-09-11-main-89efc1f9/`) — genuinely
+needs acr's real scorer, which ask-dev CI does not have (see
+`corpus/README.md`). See the PR body's TEST-EVIDENCE for that executed,
+uncommitted replay's output.
 
 ## Proposed corpus diff (NOT applied — chris's call)
 

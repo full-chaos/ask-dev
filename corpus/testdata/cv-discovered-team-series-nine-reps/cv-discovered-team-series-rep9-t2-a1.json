@@ -1,0 +1,2024 @@
+{
+  "request": {
+    "question": "How has each team's health trended over the last two quarters?",
+    "priorWindowReceipts": [
+      {
+        "result_id": "result_201f7ef4300b7067a4287545e212a19d",
+        "receipt_id": "winr_9da7601350668a2e0fbdd30f"
+      }
+    ]
+  },
+  "status": 200,
+  "response": {
+    "result": {
+      "schema_version": "context_fabric_investigation_result.v1",
+      "result_id": "result_476d697c592e4884c2f2ff6fa0194fc9",
+      "request_id": "req_c9c06b61dec9252ecff2ddb3d755c410",
+      "generated_at": "2026-09-11T20:30:32.283347833Z",
+      "status": "degraded",
+      "question": "How has each team's health trended over the last two quarters?",
+      "interpretation": {
+        "shape": "discovered_cohort",
+        "requested_judgment": "Assess how each team's health has changed over the last two quarters.",
+        "time_context": {
+          "axis": "current"
+        },
+        "fact_requirements": [
+          {
+            "kind": "health"
+          }
+        ],
+        "clarification_needed": false
+      },
+      "subject_resolution": {
+        "candidates": [],
+        "committed": []
+      },
+      "answer_plan": {
+        "family": "discovered_cohort_ranking",
+        "family_source": "model",
+        "family_version": "question-family.v2",
+        "member_kind": "team",
+        "require_drivers": true,
+        "require_ranking": true,
+        "render_kinds": [
+          "series"
+        ],
+        "fact_kinds": [
+          "health",
+          "workload",
+          "readiness",
+          "operational_deficiencies",
+          "investment"
+        ],
+        "axes": [
+          "window"
+        ],
+        "budget": {
+          "max_items": 30,
+          "max_serialized_bytes": 262144,
+          "max_members": 14,
+          "synthesis_headroom": 16,
+          "narrowing_basis": "canonical_id_lexical"
+        },
+        "narrowing": [
+          {
+            "stage": "cardinality",
+            "basis": "canonical_id_lexical",
+            "before": 50,
+            "after": 14
+          }
+        ],
+        "requirements": [
+          {
+            "requirement": "state/member/team",
+            "obligation": "state",
+            "role": "member",
+            "subject": "team",
+            "kind": "read",
+            "fact_kinds": [
+              "flow",
+              "health",
+              "investment",
+              "landscape",
+              "readiness",
+              "workload"
+            ],
+            "scope": "each_member",
+            "quantifier": "corroborated"
+          },
+          {
+            "requirement": "trend_series/member/team",
+            "obligation": "trend_series",
+            "role": "member",
+            "subject": "team",
+            "kind": "read",
+            "fact_kinds": [
+              "flow",
+              "health",
+              "readiness",
+              "workload"
+            ],
+            "scope": "each_member",
+            "quantifier": "corroborated"
+          }
+        ]
+      },
+      "cohort": {
+        "kind": "team",
+        "members": [
+          {
+            "subject": {
+              "kind": "team",
+              "canonical_id": "team:CHAOS",
+              "label": "Fullchaos"
+            },
+            "rank": 1,
+            "inclusion_reasons": [
+              "Graph retrieval associated this subject with the requested organization-level condition."
+            ],
+            "evidence_ref_ids": [
+              "acr:v1:team:CHAOS"
+            ],
+            "ranking_computed": true,
+            "attention_rank": 1,
+            "score": 60,
+            "ranking_basis": [
+              "investment_mix",
+              "operational_deficiencies.severity",
+              "readiness.coverage_gap",
+              "workload.forecast_pressure"
+            ],
+            "data_completeness": "partial",
+            "outcome": "provisional",
+            "missing_signals": [
+              "health.compounding_risk"
+            ],
+            "drivers": [
+              {
+                "signal": "investment_mix",
+                "value": 0,
+                "weight": 30,
+                "weight_contributed": 0,
+                "window": "current",
+                "concentration": 0.516524575767722,
+                "concentration_method": "max_share"
+              },
+              {
+                "signal": "operational_deficiencies.severity",
+                "value": 1,
+                "weight": 20,
+                "weight_contributed": 26.666666666666668,
+                "window": "current",
+                "source_claimed_fact_ids": [
+                  "claim_cohort_88cad88367c815eae568ce1f979c1471"
+                ]
+              },
+              {
+                "signal": "readiness.coverage_gap",
+                "value": 1,
+                "weight": 15,
+                "weight_contributed": 20,
+                "window": "current",
+                "source_claimed_fact_ids": [
+                  "claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"
+                ]
+              },
+              {
+                "signal": "workload.forecast_pressure",
+                "value": 1,
+                "weight": 10,
+                "weight_contributed": 13.333333333333334,
+                "window": "current",
+                "source_claimed_fact_ids": [
+                  "claim_cohort_46ff8f5c30a2ad7a6166aea44eeb75a3"
+                ]
+              }
+            ]
+          },
+          {
+            "subject": {
+              "kind": "team",
+              "canonical_id": "team:gh:ops-team",
+              "label": "Ops Team"
+            },
+            "rank": 2,
+            "inclusion_reasons": [
+              "Graph retrieval associated this subject with the requested organization-level condition."
+            ],
+            "evidence_ref_ids": [
+              "acr:v1:team:gh:ops-team"
+            ],
+            "ranking_computed": true,
+            "attention_rank": 2,
+            "data_completeness": "degraded",
+            "outcome": "insufficient_evidence",
+            "missing_signals": [
+              "investment_mix",
+              "health.compounding_risk",
+              "readiness.coverage_gap",
+              "workload.forecast_pressure"
+            ]
+          },
+          {
+            "subject": {
+              "kind": "team",
+              "canonical_id": "team:gl:full.chaos",
+              "label": "fullchaos"
+            },
+            "rank": 3,
+            "inclusion_reasons": [
+              "Graph retrieval associated this subject with the requested organization-level condition."
+            ],
+            "evidence_ref_ids": [
+              "acr:v1:team:gl:full.chaos"
+            ],
+            "ranking_computed": true,
+            "attention_rank": 3,
+            "data_completeness": "partial",
+            "outcome": "insufficient_evidence",
+            "missing_signals": [
+              "investment_mix",
+              "health.compounding_risk"
+            ]
+          }
+        ],
+        "rationale": "Subjects were discovered from the authorized Context Fabric graph using the user's open-ended cohort question.",
+        "complete": true,
+        "truncated": false
+      },
+      "direct_judgment": "This investigation is degraded: coverage was limited.",
+      "current_state": "Current observed values: health.computed_at=2026-09-06 03:06:33 for Fullchaos; health.severity=unknown for Fullchaos; health.computed_at=2026-09-06 03:06:33 for Ops Team; health.severity=unknown for Ops Team.",
+      "strongest_pressures": [],
+      "drivers": [
+        {
+          "driver_id": "health-trend-fullchaos",
+          "standing": "withheld",
+          "category": "health",
+          "title": "Fullchaos health trend cannot be determined",
+          "summary": "The supplied health record for Fullchaos reports severity \"unknown\" at 2026-09-06 03:06:33. No prior-quarter health observation is supplied, so a change over the last two quarters cannot be established.",
+          "affected_subjects": [
+            {
+              "kind": "team",
+              "canonical_id": "team:CHAOS",
+              "label": "Fullchaos"
+            }
+          ],
+          "evidence_ref_ids": [
+            "acr:v1:team:CHAOS"
+          ],
+          "claimed_fact_ids": [
+            "claim-health-fullchaos-severity",
+            "claim-health-fullchaos-computed-at"
+          ],
+          "derivation": "canonical_structured",
+          "epistemic_status": "observed",
+          "confidence": 1,
+          "qualification": "Trend assessment is withheld because the supplied data contains only one current health snapshot and its severity is unknown.",
+          "current": true
+        },
+        {
+          "driver_id": "health-trend-ops-team",
+          "standing": "withheld",
+          "category": "health",
+          "title": "Ops Team health trend cannot be determined",
+          "summary": "The supplied health record for Ops Team reports severity \"unknown\" at 2026-09-06 03:06:33. No prior-quarter health observation is supplied, so a change over the last two quarters cannot be established.",
+          "affected_subjects": [
+            {
+              "kind": "team",
+              "canonical_id": "team:gh:ops-team",
+              "label": "Ops Team"
+            }
+          ],
+          "evidence_ref_ids": [
+            "acr:v1:team:gh:ops-team"
+          ],
+          "claimed_fact_ids": [
+            "claim-health-ops-team-severity",
+            "claim-health-ops-team-computed-at"
+          ],
+          "derivation": "canonical_structured",
+          "epistemic_status": "observed",
+          "confidence": 1,
+          "qualification": "Trend assessment is withheld because the supplied data contains only one current health snapshot and its severity is unknown.",
+          "current": true
+        },
+        {
+          "driver_id": "cohort-driver-01-1",
+          "standing": "principal",
+          "category": "operational_deficiency",
+          "title": "Fullchaos: operational deficiencies",
+          "summary": "operational deficiencies (weight 20, value 1.00) contributed 26.7 of Fullchaos's 60.0 attention points.",
+          "affected_subjects": [
+            {
+              "kind": "team",
+              "canonical_id": "team:CHAOS",
+              "label": "Fullchaos"
+            }
+          ],
+          "evidence_ref_ids": [
+            "acr:v1:team:CHAOS"
+          ],
+          "claimed_fact_ids": [
+            "claim_cohort_88cad88367c815eae568ce1f979c1471"
+          ],
+          "derivation": "rule_inferred",
+          "epistemic_status": "inferred",
+          "confidence": 0.85,
+          "current": true
+        },
+        {
+          "driver_id": "cohort-driver-01-2",
+          "standing": "contributing",
+          "category": "readiness",
+          "title": "Fullchaos: readiness gap",
+          "summary": "readiness gap (weight 15, value 1.00) contributed 20.0 of Fullchaos's 60.0 attention points.",
+          "affected_subjects": [
+            {
+              "kind": "team",
+              "canonical_id": "team:CHAOS",
+              "label": "Fullchaos"
+            }
+          ],
+          "evidence_ref_ids": [
+            "acr:v1:team:CHAOS"
+          ],
+          "claimed_fact_ids": [
+            "claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"
+          ],
+          "derivation": "rule_inferred",
+          "epistemic_status": "inferred",
+          "confidence": 0.85,
+          "current": true
+        },
+        {
+          "driver_id": "cohort-driver-01-3",
+          "standing": "contributing",
+          "category": "workload",
+          "title": "Fullchaos: workload pressure",
+          "summary": "workload pressure (weight 10, value 1.00) contributed 13.3 of Fullchaos's 60.0 attention points.",
+          "affected_subjects": [
+            {
+              "kind": "team",
+              "canonical_id": "team:CHAOS",
+              "label": "Fullchaos"
+            }
+          ],
+          "evidence_ref_ids": [
+            "acr:v1:team:CHAOS"
+          ],
+          "claimed_fact_ids": [
+            "claim_cohort_46ff8f5c30a2ad7a6166aea44eeb75a3"
+          ],
+          "derivation": "rule_inferred",
+          "epistemic_status": "inferred",
+          "confidence": 0.85,
+          "current": true
+        }
+      ],
+      "remaining_work": [],
+      "readiness_gaps": [],
+      "paths": [],
+      "conflicts": [],
+      "limitations": [
+        "Historical health observations for the last two quarters are not supplied for any team, so quarter-over-quarter direction cannot be assessed.",
+        "The current health severity is \"unknown\" for Fullchaos and Ops Team.",
+        "No health canonical fact is supplied for fullchaos.",
+        "Readiness coverage is partial because the readiness canonical fact result was truncated; readiness data does not substitute for historical health observations."
+      ],
+      "evidence_ref_ids": [
+        "acr:v1:team:CHAOS",
+        "acr:v1:team:gh:ops-team"
+      ],
+      "claimed_facts": [
+        {
+          "claim_id": "claim-health-fullchaos-severity",
+          "kind": "health",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:CHAOS",
+            "label": "Fullchaos"
+          },
+          "field": "severity",
+          "value": {
+            "string": "unknown"
+          },
+          "rows": [
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "churn"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.3
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0.5479622958895003
+                },
+                "signal": {
+                  "string": "complexity"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.1643886887668501
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0.9990467111534795
+                },
+                "signal": {
+                  "string": "ownership"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "number": 0.1998093422306959
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "null": true
+                },
+                "signal": {
+                  "string": "review"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "null": true
+                }
+              }
+            }
+          ],
+          "table": {
+            "field": "risk_rules",
+            "shape": "breakdown",
+            "key": [
+              "signal"
+            ],
+            "measures": [
+              "weight",
+              "norm_value",
+              "weighted_contribution"
+            ]
+          },
+          "time_series_rows": [
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-06"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.686557374316806
+                },
+                "day": {
+                  "string": "2026-09-05"
+                },
+                "severity": {
+                  "string": "high"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6175019126048937
+                },
+                "day": {
+                  "string": "2026-09-04"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5793385774393596
+                },
+                "day": {
+                  "string": "2026-09-03"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5991100804949401
+                },
+                "day": {
+                  "string": "2026-09-02"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5640549009186493
+                },
+                "day": {
+                  "string": "2026-09-01"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6385281276589692
+                },
+                "day": {
+                  "string": "2026-08-31"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5964284658403526
+                },
+                "day": {
+                  "string": "2026-08-30"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6285979369961295
+                },
+                "day": {
+                  "string": "2026-08-29"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6257542485485219
+                },
+                "day": {
+                  "string": "2026-08-28"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6239523850679595
+                },
+                "day": {
+                  "string": "2026-08-27"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6181369968766247
+                },
+                "day": {
+                  "string": "2026-08-26"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5910182196225963
+                },
+                "day": {
+                  "string": "2026-08-25"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5524034387742597
+                },
+                "day": {
+                  "string": "2026-08-24"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5236410571657972
+                },
+                "day": {
+                  "string": "2026-08-23"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4992563023921081
+                },
+                "day": {
+                  "string": "2026-08-22"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.49921470132583945
+                },
+                "day": {
+                  "string": "2026-08-21"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4993893321313199
+                },
+                "day": {
+                  "string": "2026-08-20"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5029550773759489
+                },
+                "day": {
+                  "string": "2026-08-19"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-18"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-17"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-16"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.0025983796296296297
+                },
+                "day": {
+                  "string": "2026-08-14"
+                },
+                "severity": {
+                  "string": "low"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.000375
+                },
+                "day": {
+                  "string": "2026-08-13"
+                },
+                "severity": {
+                  "string": "low"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.49944556792134154
+                },
+                "day": {
+                  "string": "2026-08-12"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4994745213963964
+                },
+                "day": {
+                  "string": "2026-08-11"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5168343522754755
+                },
+                "day": {
+                  "string": "2026-08-10"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5185429176343125
+                },
+                "day": {
+                  "string": "2026-08-09"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5396689681717088
+                },
+                "day": {
+                  "string": "2026-08-08"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            }
+          ],
+          "time_series_table": {
+            "field": "daily_health",
+            "shape": "time_series",
+            "key": [
+              "day"
+            ],
+            "measures": [
+              "compounding_risk"
+            ],
+            "observations": [
+              "severity"
+            ]
+          }
+        },
+        {
+          "claim_id": "claim-health-fullchaos-computed-at",
+          "kind": "health",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:CHAOS",
+            "label": "Fullchaos"
+          },
+          "field": "computed_at",
+          "value": {
+            "string": "2026-09-06 03:06:33"
+          },
+          "rows": [
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "churn"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.3
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0.5479622958895003
+                },
+                "signal": {
+                  "string": "complexity"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.1643886887668501
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0.9990467111534795
+                },
+                "signal": {
+                  "string": "ownership"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "number": 0.1998093422306959
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "null": true
+                },
+                "signal": {
+                  "string": "review"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "null": true
+                }
+              }
+            }
+          ],
+          "table": {
+            "field": "risk_rules",
+            "shape": "breakdown",
+            "key": [
+              "signal"
+            ],
+            "measures": [
+              "weight",
+              "norm_value",
+              "weighted_contribution"
+            ]
+          },
+          "time_series_rows": [
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-06"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.686557374316806
+                },
+                "day": {
+                  "string": "2026-09-05"
+                },
+                "severity": {
+                  "string": "high"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6175019126048937
+                },
+                "day": {
+                  "string": "2026-09-04"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5793385774393596
+                },
+                "day": {
+                  "string": "2026-09-03"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5991100804949401
+                },
+                "day": {
+                  "string": "2026-09-02"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5640549009186493
+                },
+                "day": {
+                  "string": "2026-09-01"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6385281276589692
+                },
+                "day": {
+                  "string": "2026-08-31"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5964284658403526
+                },
+                "day": {
+                  "string": "2026-08-30"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6285979369961295
+                },
+                "day": {
+                  "string": "2026-08-29"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6257542485485219
+                },
+                "day": {
+                  "string": "2026-08-28"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6239523850679595
+                },
+                "day": {
+                  "string": "2026-08-27"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.6181369968766247
+                },
+                "day": {
+                  "string": "2026-08-26"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5910182196225963
+                },
+                "day": {
+                  "string": "2026-08-25"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5524034387742597
+                },
+                "day": {
+                  "string": "2026-08-24"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5236410571657972
+                },
+                "day": {
+                  "string": "2026-08-23"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4992563023921081
+                },
+                "day": {
+                  "string": "2026-08-22"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.49921470132583945
+                },
+                "day": {
+                  "string": "2026-08-21"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4993893321313199
+                },
+                "day": {
+                  "string": "2026-08-20"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5029550773759489
+                },
+                "day": {
+                  "string": "2026-08-19"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-18"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-17"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-16"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.0025983796296296297
+                },
+                "day": {
+                  "string": "2026-08-14"
+                },
+                "severity": {
+                  "string": "low"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.000375
+                },
+                "day": {
+                  "string": "2026-08-13"
+                },
+                "severity": {
+                  "string": "low"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.49944556792134154
+                },
+                "day": {
+                  "string": "2026-08-12"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.4994745213963964
+                },
+                "day": {
+                  "string": "2026-08-11"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5168343522754755
+                },
+                "day": {
+                  "string": "2026-08-10"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5185429176343125
+                },
+                "day": {
+                  "string": "2026-08-09"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5396689681717088
+                },
+                "day": {
+                  "string": "2026-08-08"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            }
+          ],
+          "time_series_table": {
+            "field": "daily_health",
+            "shape": "time_series",
+            "key": [
+              "day"
+            ],
+            "measures": [
+              "compounding_risk"
+            ],
+            "observations": [
+              "severity"
+            ]
+          }
+        },
+        {
+          "claim_id": "claim-health-ops-team-severity",
+          "kind": "health",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:gh:ops-team",
+            "label": "Ops Team"
+          },
+          "field": "severity",
+          "value": {
+            "string": "unknown"
+          },
+          "rows": [
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "churn"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.3
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0
+                },
+                "signal": {
+                  "string": "complexity"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "ownership"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "number": 0.2
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "null": true
+                },
+                "signal": {
+                  "string": "review"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "null": true
+                }
+              }
+            }
+          ],
+          "table": {
+            "field": "risk_rules",
+            "shape": "breakdown",
+            "key": [
+              "signal"
+            ],
+            "measures": [
+              "weight",
+              "norm_value",
+              "weighted_contribution"
+            ]
+          },
+          "time_series_rows": [
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-06"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-05"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5004699074074074
+                },
+                "day": {
+                  "string": "2026-09-04"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-03"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5086534722222222
+                },
+                "day": {
+                  "string": "2026-09-02"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5001238425925926
+                },
+                "day": {
+                  "string": "2026-09-01"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5001365740740741
+                },
+                "day": {
+                  "string": "2026-08-31"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-30"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            }
+          ],
+          "time_series_table": {
+            "field": "daily_health",
+            "shape": "time_series",
+            "key": [
+              "day"
+            ],
+            "measures": [
+              "compounding_risk"
+            ],
+            "observations": [
+              "severity"
+            ]
+          }
+        },
+        {
+          "claim_id": "claim-health-ops-team-computed-at",
+          "kind": "health",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:gh:ops-team",
+            "label": "Ops Team"
+          },
+          "field": "computed_at",
+          "value": {
+            "string": "2026-09-06 03:06:33"
+          },
+          "rows": [
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "churn"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0.3
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 0
+                },
+                "signal": {
+                  "string": "complexity"
+                },
+                "weight": {
+                  "number": 0.3
+                },
+                "weighted_contribution": {
+                  "number": 0
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "number": 1
+                },
+                "signal": {
+                  "string": "ownership"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "number": 0.2
+                }
+              }
+            },
+            {
+              "fields": {
+                "norm_value": {
+                  "null": true
+                },
+                "signal": {
+                  "string": "review"
+                },
+                "weight": {
+                  "number": 0.2
+                },
+                "weighted_contribution": {
+                  "null": true
+                }
+              }
+            }
+          ],
+          "table": {
+            "field": "risk_rules",
+            "shape": "breakdown",
+            "key": [
+              "signal"
+            ],
+            "measures": [
+              "weight",
+              "norm_value",
+              "weighted_contribution"
+            ]
+          },
+          "time_series_rows": [
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-06"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-05"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5004699074074074
+                },
+                "day": {
+                  "string": "2026-09-04"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-09-03"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5086534722222222
+                },
+                "day": {
+                  "string": "2026-09-02"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5001238425925926
+                },
+                "day": {
+                  "string": "2026-09-01"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "compounding_risk": {
+                  "number": 0.5001365740740741
+                },
+                "day": {
+                  "string": "2026-08-31"
+                },
+                "severity": {
+                  "string": "elevated"
+                }
+              }
+            },
+            {
+              "fields": {
+                "day": {
+                  "string": "2026-08-30"
+                },
+                "severity": {
+                  "string": "unknown"
+                }
+              }
+            }
+          ],
+          "time_series_table": {
+            "field": "daily_health",
+            "shape": "time_series",
+            "key": [
+              "day"
+            ],
+            "measures": [
+              "compounding_risk"
+            ],
+            "observations": [
+              "severity"
+            ]
+          }
+        },
+        {
+          "claim_id": "claim_cohort_88cad88367c815eae568ce1f979c1471",
+          "kind": "operational_deficiencies",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:CHAOS",
+            "label": "Fullchaos"
+          },
+          "field": "severity",
+          "value": {
+            "string": "critical"
+          }
+        },
+        {
+          "claim_id": "claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2",
+          "kind": "readiness",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:CHAOS",
+            "label": "Fullchaos"
+          },
+          "field": "estimate_coverage_ratio",
+          "value": {
+            "number": 0
+          }
+        },
+        {
+          "claim_id": "claim_cohort_46ff8f5c30a2ad7a6166aea44eeb75a3",
+          "kind": "workload",
+          "subject": {
+            "kind": "team",
+            "canonical_id": "team:CHAOS",
+            "label": "Fullchaos"
+          },
+          "field": "forecast_p50_days",
+          "value": {
+            "integer": 365
+          }
+        }
+      ],
+      "coverage": {
+        "sources": [
+          {
+            "source": "canonical_fact:health",
+            "state": "available",
+            "label": "Canonical facts \u2014 health",
+            "state_label": "available"
+          },
+          {
+            "source": "canonical_fact:investment",
+            "state": "available",
+            "label": "Canonical facts \u2014 investment",
+            "state_label": "available"
+          },
+          {
+            "source": "canonical_fact:operational_deficiencies",
+            "state": "available",
+            "label": "Canonical facts \u2014 operational deficiency",
+            "state_label": "available"
+          },
+          {
+            "source": "canonical_fact:readiness",
+            "state": "truncated",
+            "reason": "canonical fact result was truncated",
+            "label": "Canonical facts \u2014 readiness",
+            "state_label": "partially included"
+          },
+          {
+            "source": "canonical_fact:workload",
+            "state": "available",
+            "label": "Canonical facts \u2014 workload",
+            "state_label": "available"
+          },
+          {
+            "source": "context-fabric:graph",
+            "state": "available",
+            "observed_at": "2026-09-11T20:30:14.761540961Z",
+            "label": "Relationship graph",
+            "state_label": "available"
+          }
+        ],
+        "partial": true,
+        "degraded_reasons": [
+          "readiness: canonical fact result was truncated"
+        ],
+        "details": [
+          {
+            "detail_id": "cov-01",
+            "source": "canonical_fact:readiness",
+            "code": "fact_provider_reported",
+            "degrading": true,
+            "fact_kind": "readiness",
+            "source_state": "truncated",
+            "supported_kinds": [
+              "team",
+              "project"
+            ],
+            "label": "Only part of the readiness facts could be included",
+            "raw": "readiness: canonical fact result was truncated"
+          }
+        ]
+      },
+      "evidence_ref_labels": {
+        "acr:v1:team:CHAOS": "Team: CHAOS",
+        "acr:v1:team:gh:ops-team": "Team: gh:ops-team",
+        "acr:v1:team:gl:full.chaos": "Team: gl:full.chaos"
+      },
+      "versions": {
+        "service_version": "5582fix-760014f7",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "devhealthsource.clickhouse.v6+devhealthsource.episodes.v1+devhealthsource.teams_projects.v10",
+        "query_version": "devhealthfacts.clickhouse.v5",
+        "interpretation_version": "context-fabric-model-output.v4",
+        "synthesis_version": "context-fabric-synthesis.v15+gpt-5.6-luna",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "openai/gpt-5.6-luna"
+      },
+      "deterministic_answer": "This investigation is degraded: coverage was limited.",
+      "warnings": [
+        "The cohort includes three teams, but only two have supplied current health canonical facts."
+      ],
+      "reused": false,
+      "effective_evidence_window": {
+        "start": "2026-06-13T20:30:07.512675015Z",
+        "end": "2026-09-11T20:30:07.512675015Z",
+        "relative_id": "trailing_90d",
+        "provenance": "clarification_confirmed"
+      },
+      "confirmed_structure": [
+        {
+          "member": "window",
+          "applied_value": "trailing_90d",
+          "source": "receipt",
+          "prior_result_id": "result_201f7ef4300b7067a4287545e212a19d",
+          "receipt_id": "winr_9da7601350668a2e0fbdd30f",
+          "offer_source": "engine",
+          "provenance": "clarification_confirmed",
+          "disposition": "applied"
+        }
+      ],
+      "render_shapes": [
+        {
+          "shape_id": "rs_1",
+          "kind": "series",
+          "presentation": "bars",
+          "selected_by": "cohort_attention_score",
+          "title": "Attention score by team",
+          "axis_kind": "category",
+          "axis_label": "team",
+          "value_label": "attention score",
+          "series": [
+            {
+              "key": "attention_score",
+              "label": "Attention score",
+              "points": [
+                {
+                  "label": "Fullchaos",
+                  "value": 60,
+                  "source": {
+                    "kind": "cohort_member_score",
+                    "subject_canonical_id": "team:CHAOS"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "shape_id": "rs_2",
+          "kind": "series",
+          "presentation": "stacked_bars",
+          "selected_by": "cohort_driver_contribution",
+          "title": "Score contribution by driver, per team",
+          "axis_kind": "category",
+          "axis_label": "team",
+          "value_label": "points contributed",
+          "series": [
+            {
+              "key": "investment_mix",
+              "label": "Investment mix",
+              "points": [
+                {
+                  "label": "Fullchaos",
+                  "value": 0,
+                  "source": {
+                    "kind": "cohort_driver_weight_contributed",
+                    "subject_canonical_id": "team:CHAOS",
+                    "signal": "investment_mix"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "operational_deficiencies.severity",
+              "label": "Operational deficiencies.severity",
+              "points": [
+                {
+                  "label": "Fullchaos",
+                  "value": 26.666666666666668,
+                  "source": {
+                    "kind": "cohort_driver_weight_contributed",
+                    "subject_canonical_id": "team:CHAOS",
+                    "signal": "operational_deficiencies.severity"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "readiness.coverage_gap",
+              "label": "Readiness.coverage gap",
+              "points": [
+                {
+                  "label": "Fullchaos",
+                  "value": 20,
+                  "source": {
+                    "kind": "cohort_driver_weight_contributed",
+                    "subject_canonical_id": "team:CHAOS",
+                    "signal": "readiness.coverage_gap"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "workload.forecast_pressure",
+              "label": "Workload.forecast pressure",
+              "points": [
+                {
+                  "label": "Fullchaos",
+                  "value": 13.333333333333334,
+                  "source": {
+                    "kind": "cohort_driver_weight_contributed",
+                    "subject_canonical_id": "team:CHAOS",
+                    "signal": "workload.forecast_pressure"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "completeness": {
+        "terminal_status": "degraded",
+        "terminal_reason": "degraded_reason_disclosed",
+        "claimed_facts_count": 7,
+        "rows_count": 16,
+        "state": "partial",
+        "outcomes": [
+          {
+            "stage": "planning",
+            "requirement": "state/member/team",
+            "obligation": "state",
+            "outcome": "satisfied",
+            "impact": "none",
+            "cause_observed": false,
+            "served": 0,
+            "declared": 0
+          },
+          {
+            "stage": "planning",
+            "requirement": "trend_series/member/team",
+            "obligation": "trend_series",
+            "outcome": "satisfied",
+            "impact": "none",
+            "cause_observed": false,
+            "served": 0,
+            "declared": 0
+          },
+          {
+            "stage": "assembled_result",
+            "requirement": "state/member/team",
+            "obligation": "state",
+            "outcome": "narrowed",
+            "impact": "depth",
+            "cause_coverage": "fact_provider_reported",
+            "cause_observed": true,
+            "served": 3,
+            "declared": 4,
+            "refinements": [
+              {
+                "stage": "assembled_result",
+                "coverage": "fact_provider_reported",
+                "before": 4,
+                "after": 3
+              }
+            ]
+          },
+          {
+            "stage": "assembled_result",
+            "requirement": "trend_series/member/team",
+            "obligation": "trend_series",
+            "outcome": "narrowed",
+            "impact": "depth",
+            "cause_coverage": "fact_provider_reported",
+            "cause_observed": true,
+            "served": 2,
+            "declared": 3,
+            "refinements": [
+              {
+                "stage": "assembled_result",
+                "coverage": "fact_provider_reported",
+                "before": 3,
+                "after": 2
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "dt": 24.8,
+  "body_undecodable": false
+}

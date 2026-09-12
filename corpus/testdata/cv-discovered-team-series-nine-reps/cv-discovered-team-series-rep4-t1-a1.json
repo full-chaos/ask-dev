@@ -1,0 +1,263 @@
+{
+  "request": {
+    "question": "How has each team's health trended over the last two quarters?"
+  },
+  "status": 200,
+  "response": {
+    "result": {
+      "schema_version": "context_fabric_investigation_result.v1",
+      "result_id": "result_4ce9804cdfa0563dd94cc4aa29eda1fa",
+      "request_id": "req_178be6cb13622f372f55369e560a5605",
+      "generated_at": "2026-09-11T20:23:43.563601098Z",
+      "status": "clarification_required",
+      "question": "How has each team's health trended over the last two quarters?",
+      "interpretation": {
+        "shape": "discovered_cohort",
+        "requested_judgment": "Assess how team health has changed over the last two quarters and identify teams with improving or declining health.",
+        "subject_terms": [
+          "each team",
+          "health"
+        ],
+        "time_context": {
+          "axis": "current"
+        },
+        "fact_requirements": [
+          {
+            "kind": "health"
+          },
+          {
+            "kind": "metrics"
+          }
+        ],
+        "clarification_needed": false
+      },
+      "subject_resolution": {
+        "candidates": [],
+        "committed": [],
+        "clarification_prompt": "Confirm the evidence window for this answer."
+      },
+      "answer_plan": {
+        "family": "grouped_cohort_status",
+        "family_source": "model",
+        "family_version": "question-family.v2",
+        "group_kind": "team",
+        "require_drivers": true,
+        "require_ranking": false,
+        "render_kinds": [
+          "table"
+        ],
+        "fact_kinds": [
+          "health",
+          "metrics",
+          "workload",
+          "readiness",
+          "operational_deficiencies",
+          "investment"
+        ],
+        "axes": [
+          "window"
+        ],
+        "budget": {
+          "max_items": 30,
+          "max_serialized_bytes": 262144,
+          "max_members": 10,
+          "synthesis_headroom": 20,
+          "narrowing_basis": "canonical_id_lexical"
+        },
+        "requirements": [
+          {
+            "requirement": "state/group/team",
+            "obligation": "state",
+            "role": "group",
+            "subject": "team",
+            "kind": "read",
+            "fact_kinds": [
+              "flow",
+              "health",
+              "investment",
+              "landscape",
+              "readiness",
+              "workload"
+            ],
+            "scope": "each_group",
+            "quantifier": "corroborated"
+          },
+          {
+            "requirement": "state/member/metric",
+            "obligation": "state",
+            "role": "member",
+            "subject": "metric",
+            "kind": "read",
+            "scope": "each_member",
+            "quantifier": "none",
+            "unavailable": "subject_kind_unsupported"
+          },
+          {
+            "requirement": "trend_series/member/metric",
+            "obligation": "trend_series",
+            "role": "member",
+            "subject": "metric",
+            "kind": "read",
+            "scope": "each_member",
+            "quantifier": "none",
+            "unavailable": "subject_kind_unsupported"
+          }
+        ]
+      },
+      "direct_judgment": "",
+      "current_state": "",
+      "strongest_pressures": [],
+      "drivers": [],
+      "remaining_work": [],
+      "readiness_gaps": [],
+      "paths": [],
+      "conflicts": [],
+      "limitations": [
+        "This answer requires confirming the evidence window it should read against. Confirm one of the offered options to proceed."
+      ],
+      "evidence_ref_ids": [],
+      "claimed_facts": [],
+      "coverage": {
+        "sources": [],
+        "partial": false
+      },
+      "versions": {
+        "service_version": "5582fix-760014f7",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "devhealthsource.clickhouse.v6+devhealthsource.episodes.v1+devhealthsource.teams_projects.v10",
+        "query_version": "devhealthfacts.clickhouse.v5",
+        "interpretation_version": "unwired",
+        "synthesis_version": "unwired",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "unwired"
+      },
+      "deterministic_answer": "This answer requires confirming the evidence window it should read against. Confirm one of the offered options to proceed.",
+      "warnings": [],
+      "reused": false,
+      "effective_evidence_window": {
+        "start": "2026-06-13T20:23:43.563505338Z",
+        "end": "2026-09-11T20:23:43.563505338Z",
+        "relative_id": "trailing_90d",
+        "window_class": "trend_assessment",
+        "provenance": "inferred_default",
+        "confidence": "low"
+      },
+      "window_clarification": {
+        "options": [
+          {
+            "receipt_id": "winr_9792ccbef0e3b36c11bdf25a",
+            "option_id": "opt_a471b8aa4869e60f",
+            "label": "the last 30 days",
+            "relative_id": "trailing_30d",
+            "start": "2026-08-12T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_f8636e3964a673b0d6071de6",
+            "option_id": "opt_2b00675791ee8611",
+            "label": "the last 90 days",
+            "relative_id": "trailing_90d",
+            "start": "2026-06-13T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_15a6e2745f89f841d0e169bc",
+            "option_id": "opt_324ec961fb1e9ef1",
+            "label": "the last 365 days",
+            "relative_id": "trailing_365d",
+            "start": "2025-09-11T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_d2bf5f01a056c1cf3f13bdc6",
+            "option_id": "opt_7d374fef521274b1",
+            "label": "all time",
+            "relative_id": "all_time"
+          }
+        ]
+      },
+      "structure_needs": {
+        "missing": [
+          "window"
+        ],
+        "window_options": [
+          {
+            "receipt_id": "winr_9792ccbef0e3b36c11bdf25a",
+            "option_id": "opt_a471b8aa4869e60f",
+            "label": "the last 30 days",
+            "relative_id": "trailing_30d",
+            "start": "2026-08-12T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_f8636e3964a673b0d6071de6",
+            "option_id": "opt_2b00675791ee8611",
+            "label": "the last 90 days",
+            "relative_id": "trailing_90d",
+            "start": "2026-06-13T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_15a6e2745f89f841d0e169bc",
+            "option_id": "opt_324ec961fb1e9ef1",
+            "label": "the last 365 days",
+            "relative_id": "trailing_365d",
+            "start": "2025-09-11T20:23:43.563565018Z",
+            "end": "2026-09-11T20:23:43.563565018Z"
+          },
+          {
+            "receipt_id": "winr_d2bf5f01a056c1cf3f13bdc6",
+            "option_id": "opt_7d374fef521274b1",
+            "label": "all time",
+            "relative_id": "all_time"
+          }
+        ]
+      },
+      "completeness": {
+        "terminal_status": "clarification_required",
+        "terminal_reason": "clarification_reason_disclosed",
+        "claimed_facts_count": 0,
+        "rows_count": 0,
+        "state": "degraded",
+        "outcomes": [
+          {
+            "stage": "planning",
+            "requirement": "state/group/team",
+            "obligation": "state",
+            "outcome": "not_attempted",
+            "impact": "dimension",
+            "cause_coverage": "answer_terminated_before_attempt",
+            "cause_observed": false,
+            "served": 0,
+            "declared": 0
+          },
+          {
+            "stage": "planning",
+            "requirement": "state/member/metric",
+            "obligation": "state",
+            "outcome": "unavailable",
+            "impact": "dimension",
+            "cause_coverage": "fact_pruned",
+            "cause_observed": true,
+            "served": 0,
+            "declared": 0
+          },
+          {
+            "stage": "planning",
+            "requirement": "trend_series/member/metric",
+            "obligation": "trend_series",
+            "outcome": "unavailable",
+            "impact": "dimension",
+            "cause_coverage": "fact_pruned",
+            "cause_observed": true,
+            "served": 0,
+            "declared": 0
+          }
+        ]
+      }
+    }
+  },
+  "dt": 11.4,
+  "body_undecodable": false
+}

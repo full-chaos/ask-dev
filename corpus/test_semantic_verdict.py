@@ -285,6 +285,56 @@ def test_two_legacy_scorers_are_distinguished_by_version():
         _require(ra[field] == rb[field], f"{field} must not depend on the injected scorer: {ra} vs {rb}")
 
 
+def test_window_value_table():
+    # Every window SHAPE the pinned contract allows or forbids, in one
+    # table. Cites src/contracts/schemas/context_fabric_common.v1.schema.json:
+    #   :316-325 WindowOption's `relative_id` -- the closed RelativeWindowID
+    #            enum (trailing_30d/90d/365d, all_time).
+    #   :326-431 WindowOption's own shape: `relative_id` OR `start`+`end`
+    #            (not neither, and not exactly one of start/end).
+    bounded = {"start": "2026-05-01T00:00:00Z", "end": "2026-08-01T00:00:00Z"}
+    legal = [
+        ("relative_30d", {**bounded, "relative_id": "trailing_30d"}),
+        ("relative_90d", {**bounded, "relative_id": "trailing_90d"}),
+        ("relative_365d", {**bounded, "relative_id": "trailing_365d"}),
+        ("all_time_no_bounds", {"relative_id": "all_time"}),
+        ("explicit_bounds_no_relative_id", dict(bounded)),
+        ("relative_with_offset_tz_same_instant", {**bounded, "relative_id": "trailing_90d",
+                                                   "start": "2026-05-01T01:00:00+01:00"}),
+    ]
+    illegal = [
+        ("all_time_with_start", {"relative_id": "all_time", "start": bounded["start"]}),
+        ("all_time_with_end", {"relative_id": "all_time", "end": bounded["end"]}),
+        ("relative_only_start", {"relative_id": "trailing_90d", "start": bounded["start"]}),
+        ("relative_only_end", {"relative_id": "trailing_90d", "end": bounded["end"]}),
+        ("explicit_only_start", {"start": bounded["start"]}),
+        ("explicit_only_end", {"end": bounded["end"]}),
+        ("neither_relative_nor_bounds", {}),
+        ("unsupported_relative_id", {**bounded, "relative_id": "trailing_7d"}),
+        ("unordered_bounds", {"start": bounded["end"], "end": bounded["start"]}),
+        ("bad_timestamp", {"start": "not-a-timestamp", "end": bounded["end"]}),
+    ]
+    for name, window in legal:
+        try:
+            value = SV.window_value(window)
+        except Exception as exc:  # noqa: BLE001
+            _require(False, f"WINDOW_TABLE legal/{name} raised {type(exc).__name__}: {exc}")
+        print(f"WINDOW_TABLE legal/{name}: accepted -> {value}")
+    # Same-instant relative and explicit windows over identical bounds must
+    # still be distinguishable (a relative label is not interchangeable
+    # with an explicit one -- see window_value's docstring).
+    relative_value = SV.window_value(legal[1][1])
+    explicit_value = SV.window_value(legal[4][1])
+    _require(relative_value != explicit_value, (relative_value, explicit_value))
+    for name, window in illegal:
+        try:
+            SV.window_value(window)
+            _require(False, f"WINDOW_TABLE illegal/{name} was accepted: {window}")
+        except (ValueError, KeyError) as exc:
+            print(f"WINDOW_TABLE illegal/{name}: rejected ({type(exc).__name__}: {exc})")
+    print(f"window_value_table: {len(legal)} legal + {len(illegal)} illegal shapes executed")
+
+
 def test_window_value_accepts_explicit_bounds_without_relative_id():
     # The pinned contract (RelativeWindowID in
     # src/contracts/schemas/context_fabric_common.v1.schema.json) permits a
@@ -333,6 +383,95 @@ def test_missing_final_result_fails_closed_not_crash():
     row = declaration(serve())
     verdict, reason, _ = SV.score(row, "served_with_data", "complete", None, {}, fake_legacy_score)
     _require((verdict, reason) == ("unscored", "family_unavailable"), (verdict, reason))
+
+
+def _get(container, path):
+    obj = container
+    for key in path[:-1]:
+        obj = obj[key]
+    return obj, path[-1]
+
+
+def _mutate(base_attempts, path, kind):
+    mutated = copy.deepcopy(base_attempts)
+    obj, key = _get(mutated, path)
+    if kind == "absent":
+        del obj[key]
+    elif kind == "null":
+        obj[key] = None
+    elif kind == "wrong_type":
+        current = obj[key]
+        obj[key] = "wrong_type_string" if isinstance(current, (int, float)) else 12345
+    elif kind == "empty":
+        current = obj[key]
+        obj[key] = [] if isinstance(current, list) else ({} if isinstance(current, dict) else "")
+    elif kind == "duplicate_list":
+        obj[key] = obj[key] * 2
+    else:
+        raise ValueError(kind)
+    return mutated
+
+
+# Every field this audit actually reads, per audit_window_exchange's own
+# body, crossed with the mutations applicable to its own type. `kinds`
+# lists only mutations that make sense for that field's shape (e.g.
+# "duplicate_list" only where the value is a list feeding a uniqueness
+# check).
+_FUZZ_FIELDS = [
+    ((1, "status"), ["absent", "null", "wrong_type"]),
+    ((1, "response"), ["absent", "null", "wrong_type", "empty"]),
+    ((1, "response", "result"), ["absent", "null", "wrong_type"]),
+    ((1, "request"), ["absent", "null", "wrong_type", "empty"]),
+    ((1, "request", "question"), ["absent", "null", "wrong_type"]),
+    ((1, "request", "priorWindowReceipts"), ["absent", "null", "wrong_type", "empty", "duplicate_list"]),
+    ((0, "response", "result", "status"), ["absent", "null", "wrong_type"]),
+    ((0, "response", "result", "result_id"), ["absent", "null"]),
+    ((0, "response", "result", "structure_needs"), ["absent", "null", "wrong_type"]),
+    ((0, "response", "result", "window_clarification"), ["absent", "null", "wrong_type"]),
+    ((0, "response", "result", "answer_plan"), ["absent", "null", "wrong_type"]),
+    ((1, "response", "result", "answer_plan"), ["absent", "null", "wrong_type"]),
+    ((1, "response", "result", "confirmed_structure"), ["absent", "null", "wrong_type", "empty", "duplicate_list"]),
+    ((1, "response", "result", "effective_evidence_window"), ["absent", "null", "wrong_type"]),
+]
+
+
+def test_fuzz_every_consumed_field_fails_closed():
+    # The hard invariant fail-closed guarantees: NOTHING here may ever
+    # raise (F4), and nothing here may claim MORE confidence
+    # (family_confirmation) than this schema version ever grants (always
+    # "unavailable" -- see audit_window_exchange's docstring). Whether a
+    # single-field mutation still verifies depends on whether that field's
+    # data is redundant elsewhere in the exchange (e.g. window_options is
+    # offered via two paths) -- the printed table below shows the actual
+    # outcome per field/kind so that is visible, not asserted blind.
+    base = base_exchange()
+    executed = []
+    for path, kinds in _FUZZ_FIELDS:
+        for kind in kinds:
+            try:
+                mutated = _mutate(base, path, kind)
+            except (KeyError, TypeError):
+                continue  # this (path, kind) combination is not constructible; not a cell to report
+            try:
+                audit = SV.audit_window_exchange(mutated)
+            except Exception as exc:  # noqa: BLE001 -- the whole point is that NOTHING may raise here
+                _require(False, f"{path}/{kind} RAISED {type(exc).__name__}: {exc}")
+            _require(isinstance(audit, dict) and "window_binding" in audit, f"{path}/{kind}: malformed audit {audit}")
+            _require(audit["family_confirmation"] == "unavailable",
+                     f"{path}/{kind} must never claim more than unavailable at this schema version, got {audit}")
+            executed.append((path, kind, audit["window_binding"], audit["reason"]))
+    for path, kind, binding, reason in executed:
+        print(f"FUZZ {'.'.join(map(str, path))}/{kind}: window_binding={binding} reason={reason}")
+    print(f"fuzz_every_consumed_field: {len(executed)} cells executed, 0 raised, 0 over-claimed confirmation")
+
+    # The one cell that DOES have to break verification: both redundant
+    # offer sources gone at once, leaving no offer to match the receipt.
+    both_gone = copy.deepcopy(base)
+    del both_gone[0]["response"]["result"]["structure_needs"]
+    del both_gone[0]["response"]["result"]["window_clarification"]
+    audit = SV.audit_window_exchange(both_gone)
+    _require(audit["window_binding"] != "verified", f"both offer sources gone must not verify: {audit}")
+    print(f"FUZZ both-offer-sources-absent: window_binding={audit['window_binding']} reason={audit['reason']}")
 
 
 def main():
