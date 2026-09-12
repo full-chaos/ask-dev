@@ -454,24 +454,40 @@ PINNED_REFUSE_DECLINE_EXPECT = {
     "neg-illegal-i6-self-group": "decline",
 }
 
+# D24: a second tranche of refuse/decline rows, drafted from the 2026-09-12
+# main-b6579178 yardstick and chris-approved alongside the rest of D24's
+# scalar/any_of expect values. Kept as its OWN named dict rather than merged
+# into CHAOS-5597's 12 above so each pin's own origin/history stays legible --
+# CHAOS-5597 is the first tranche, D24 the second, and drift between either
+# tranche and the rest of the corpus is still caught (see the reverse check).
+PINNED_D24_REFUSE_DECLINE_EXPECT = {
+    "cv-c3-grouped-explain-change": "refuse",
+    "cv-b5-org-health": "refuse",
+    "cv-org-count-projects": "refuse",
+    "neg-open-question": "decline",
+    "neg-open-vague": "decline",
+}
+
 
 def _check_pinned_refuse_decline_expect(corpus):
     by_id = {row["id"]: row for row in corpus}
-    for row_id, want in PINNED_REFUSE_DECLINE_EXPECT.items():
+    all_pinned = {**PINNED_REFUSE_DECLINE_EXPECT, **PINNED_D24_REFUSE_DECLINE_EXPECT}
+    for row_id, want in all_pinned.items():
+        origin = "CHAOS-5597" if row_id in PINNED_REFUSE_DECLINE_EXPECT else "D24"
         _require(row_id in by_id,
-                  f"pinned row {row_id!r} (CHAOS-5597) no longer exists in CORPUS")
+                  f"pinned row {row_id!r} ({origin}) no longer exists in CORPUS")
         got = by_id[row_id].get("expect")
         _require(got == want,
                   f"CORPUS[{row_id!r}].expect changed: pinned {want!r}, got {got!r} -- "
                   "row expectations are chris's call (corpus/README.md ## Ownership); "
                   "report this, do not silently update the pin")
     # Reverse direction: no OTHER row has drifted INTO refuse/decline, and none of
-    # the pinned 12 has drifted OUT to some other expect value not listed above --
-    # either would mean "the 12" has silently changed size since CHAOS-5597.
+    # the pinned rows has drifted OUT to some other expect value not listed above --
+    # either would mean the pinned set has silently changed size.
     actual = {row["id"] for row in corpus if row.get("expect") in ("refuse", "decline")}
-    pinned = set(PINNED_REFUSE_DECLINE_EXPECT)
+    pinned = set(all_pinned)
     _require(actual == pinned,
-              "refuse/decline row set changed since CHAOS-5597 (CHAOS-5610 pin): "
+              "refuse/decline row set changed since CHAOS-5597/D24: "
               f"added={sorted(actual - pinned)}, removed={sorted(pinned - actual)}")
 
 
@@ -480,9 +496,11 @@ def _self_test_pin_guard_fires():
     rejects a drifted pin -- a changed value, a pinned row deleted
     outright, and a row drifting into (or out of) the refuse/decline set
     without being added to (or removed from) the pin -- and that the
-    canonical 12-row shape is still accepted (CHAOS-5610)."""
+    canonical shape (both the CHAOS-5597 12 and the D24 5) is still
+    accepted (CHAOS-5610, CHAOS-D24)."""
     canonical = [{"id": row_id, "expect": expect}
-                 for row_id, expect in PINNED_REFUSE_DECLINE_EXPECT.items()]
+                 for row_id, expect in {**PINNED_REFUSE_DECLINE_EXPECT,
+                                         **PINNED_D24_REFUSE_DECLINE_EXPECT}.items()]
 
     def mutated(mutate):
         corpus = copy.deepcopy(canonical)
@@ -552,6 +570,65 @@ def _self_test_pin_guard_fires():
     _check_pinned_refuse_decline_expect(copy.deepcopy(canonical))
 
 
+# D24: every corpus row must now declare an `expect` except the two named
+# below, which are intentionally left unset -- both hit an unresolved 5-turn
+# clarification loop with no served text at all on the 2026-09-12 yardstick
+# of record (CHAOS-5660), not a stable target to pin against yet. This pin
+# exists so a future row added without an expect (or a future fix to one of
+# these two that should get an expect) is caught explicitly, not silently.
+UNSCORED_BY_DESIGN = frozenset({"neg-single-subject-why", "cv-named-project-completion"})
+
+
+def _check_every_row_scored_except_named(corpus):
+    unscored = {row["id"] for row in corpus if row.get("expect") is None}
+    missing = unscored - UNSCORED_BY_DESIGN
+    _require(not missing,
+              f"row(s) with no expect and not in UNSCORED_BY_DESIGN: {sorted(missing)}")
+    stale = UNSCORED_BY_DESIGN - unscored
+    _require(not stale,
+              f"UNSCORED_BY_DESIGN name(s) that now HAVE an expect (stale exemption, "
+              f"remove from UNSCORED_BY_DESIGN): {sorted(stale)}")
+
+
+def _self_test_every_row_scored_guard_fires():
+    """RED CONTROLs: prove `_check_every_row_scored_except_named` actually
+    rejects an unscored row outside the named exemption set, and a stale
+    exemption (a named row that now has an expect) -- and that the real
+    shape (exactly the two named rows unscored, everything else scored) is
+    accepted."""
+    base = [
+        {"id": "neg-single-subject-why", "expect": None},
+        {"id": "cv-named-project-completion", "expect": None},
+        {"id": "qa-grouped-clean", "expect": "serve"},
+    ]
+
+    def mutated(mutate):
+        corpus = copy.deepcopy(base)
+        mutate(corpus)
+        return corpus
+
+    cases = [
+        (mutated(lambda c: c.append({"id": "some-new-row", "expect": None})),
+         "row(s) with no expect and not in UNSCORED_BY_DESIGN"),
+        (mutated(lambda c: c[0].__setitem__("expect", "serve")),
+         "stale exemption"),
+    ]
+    for bad_corpus, must_mention in cases:
+        accepted = False
+        reason = None
+        try:
+            _check_every_row_scored_except_named(bad_corpus)
+            accepted = True
+        except CorpusValidationError as exc:
+            reason = str(exc)
+        _require(not accepted, f"RED CONTROL FAILED: unscored-pin accepted: {bad_corpus!r}")
+        _require(must_mention in reason,
+                  f"RED CONTROL FAILED: unscored-pin rejected for the wrong reason: {reason}")
+
+    # GREEN control: the canonical shape.
+    _check_every_row_scored_except_named(copy.deepcopy(base))
+
+
 def main():
     _self_test_guard_fires()
     _self_test_baseline_guard_fires()
@@ -576,11 +653,15 @@ def main():
         sys.exit(1)
 
     _check_pinned_refuse_decline_expect(corpus)
+    _self_test_every_row_scored_guard_fires()
+    _check_every_row_scored_except_named(corpus)
 
     baseline_rows, dropped = _validate_baseline()
 
     print(f"PASS: {len(corpus)} corpus rows validated")
-    print(f"PASS: {len(PINNED_REFUSE_DECLINE_EXPECT)} CHAOS-5597 refuse/decline expect values pinned and matched")
+    print(f"PASS: {len(PINNED_REFUSE_DECLINE_EXPECT)} CHAOS-5597 + {len(PINNED_D24_REFUSE_DECLINE_EXPECT)} D24 "
+          "refuse/decline expect values pinned and matched")
+    print(f"PASS: every corpus row scored except {sorted(UNSCORED_BY_DESIGN)} (CHAOS-5660)")
     print(f"PASS: baseline sha256 pin matched, {baseline_rows} baseline rows shape-checked "
           f"({dropped} historical-only, not in the current corpus)")
 
