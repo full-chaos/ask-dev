@@ -368,3 +368,104 @@ describe("buildStructureOfferSelectionEvent", () => {
         expect(Object.keys(event).sort()).toEqual(["event", "member", "outcome"]);
     });
 });
+
+/**
+ * `degradedReasonCount` counts the union of the two shapes a response can
+ * report degradation in. Reading only the legacy array reported 0 for a
+ * response whose degradation was entirely structured, which makes a degraded
+ * turn indistinguishable from a clean one in aggregate — invisible at Info.
+ */
+describe("buildOutcomeEvent — degradedReasonCount spans both reason shapes", () => {
+    function eventFor(coverage: Record<string, unknown>): number {
+        const result = {
+            ...structuredClone(canonicalResult),
+            coverage,
+        } as unknown as InvestigationResult;
+        return buildOutcomeEvent({ result, latencyMs: 1 } as unknown as Parameters<
+            typeof buildOutcomeEvent
+        >[0]).degradedReasonCount;
+    }
+
+    const detail = (id: string, raw?: string) => ({
+        detail_id: id,
+        source: "canonical_fact:status",
+        code: "fact_provider_reported",
+        degrading: true,
+        label: `Structured ${id}`,
+        ...(raw === undefined ? {} : { raw }),
+    });
+
+    it("counts structured degrading details when the legacy array is empty", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: [],
+                details: [detail("a"), detail("b")],
+            }),
+        ).toBe(2);
+    });
+
+    it("counts legacy reasons when there are no details", () => {
+        expect(eventFor({ sources: [], partial: true, degraded_reasons: ["x", "y", "z"] })).toBe(3);
+    });
+
+    it("counts the union when the shapes are disjoint", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: ["x", "y"],
+                details: [detail("a")],
+            }),
+        ).toBe(3);
+    });
+
+    it("does not double-count a legacy reason byte-identical to a detail's own raw", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: ["x", "y"],
+                details: [detail("a", "x")],
+            }),
+        ).toBe(2);
+    });
+
+    it("does not double-count a legacy reason byte-identical to a detail's rendered line", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: ["Structured a", "y"],
+                details: [detail("a")],
+            }),
+        ).toBe(2);
+    });
+
+    it("n details about one source never inflate past the raw reasons about another", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: ["x", "y", "z"],
+                details: [detail("a"), detail("b"), detail("c")],
+            }),
+        ).toBe(6);
+    });
+
+    it("ignores non-degrading details", () => {
+        expect(
+            eventFor({
+                sources: [],
+                partial: true,
+                degraded_reasons: [],
+                details: [{ ...detail("a"), degrading: false }],
+            }),
+        ).toBe(0);
+    });
+
+    it("is 0 when nothing degraded", () => {
+        expect(eventFor({ sources: [], partial: false, degraded_reasons: [] })).toBe(0);
+    });
+});

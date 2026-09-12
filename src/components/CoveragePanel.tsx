@@ -3,6 +3,11 @@ import { useId } from "react";
 import { Badge } from "@/components/Badge";
 import { Details } from "@/components/Details";
 import type { Coverage, CoverageDetail } from "@/lib/contracts";
+import {
+    degradedReasonDisplay,
+    degradingDetails as degradingDetailsOf,
+    uncoveredLegacyReasons,
+} from "@/lib/degraded-reasons";
 import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
 
 export type CoveragePanelProps = {
@@ -11,55 +16,6 @@ export type CoveragePanelProps = {
 
 /** The deterministic fail-readable floor for a source absent a `label` (never a guess at what the raw name means). */
 const GENERIC_SOURCE_LABEL = "Source";
-
-/**
- * The deterministic fail-readable floor for a degraded reason with no
- * usable text at all: a fixed, content-independent sentence, never derived
- * from the raw reason text it accompanies (CHAOS-4691's pin delta item 6
- * rules out "reconstruct by parsing" as a path even for old data). Used
- * for a reason with NO usable text at all — `phrasing`, `label` and the raw
- * string every one of them absent or whitespace-only (`label`'s only wire
- * bound is `minLength: 1`, which a lone space satisfies).
- *
- * A legacy `degraded_reasons[]` entry does NOT get this floor: that raw
- * string is itself reason text, so it shows verbatim (see
- * `degradedReasonDisplay`). Displaying a raw string is not the
- * "reconstruct by parsing" CHAOS-4691 forbids — nothing derives a sentence
- * from it. The wording therefore promises no `<details>`, because in the
- * only case this floor fires there is nothing to put in one.
- */
-const GENERIC_DEGRADED_REASON_SENTENCE =
-    "This source didn't fully contribute; no reason was reported.";
-
-/**
- * What a degraded reason SHOWS, and what is left over as supplementary detail.
- *
- * INVARIANT: whenever the headline is non-complete, the reason itself is
- * VISIBLE BY DEFAULT; a collapsed `<details>` carries only supplementary
- * detail, and only once a reason already shows. A reason whose sole text is
- * the raw string — every legacy `degraded_reasons[]` entry, and a new-shape
- * detail whose `phrasing` and `label` are both whitespace-only — must not put
- * a content-free sentence on screen with the real reason one click away: the
- * visible page would disclose strictly less than the result carries.
- *
- * ONE rule for both reason shapes rather than per-shape branches: show the
- * best REAL text available, and disclose `raw` only when it is not already
- * what is shown. Displaying `raw` verbatim is not the "reconstruct by parsing"
- * CHAOS-4691 forbids — nothing here derives a sentence from it; the generic
- * floor still covers a reason with no usable text at all.
- */
-function degradedReasonDisplay(reason: {
-    readonly phrasing?: string;
-    readonly label?: string;
-    readonly raw?: string;
-}): { readonly text: string; readonly supplementaryRaw: string | undefined } {
-    const shown = nonBlank(reason.phrasing) ?? nonBlank(reason.label) ?? nonBlank(reason.raw);
-    const raw = nonBlank(reason.raw);
-    return {
-        text: shown ?? GENERIC_DEGRADED_REASON_SENTENCE,
-        supplementaryRaw: raw !== undefined && raw !== shown ? raw : undefined,
-    };
-}
 
 /**
  * Shows what the investigation could and could not read.
@@ -106,19 +62,10 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
     const idPrefix = useId();
-    const degradingDetails: readonly CoverageDetail[] =
-        coverage.details?.filter((detail) => detail.degrading) ?? [];
-    // codex round 3, P2, EXECUTED: gated on `details === undefined` alone,
-    // this silently dropped a non-empty `degraded_reasons[]` whenever
-    // `details` was PRESENT but had no degrading entries (e.g. `details:
-    // []`) — a schema-valid, if internally inconsistent, response. The
-    // fallback to the generic-sentence rendering (never a parsed one — see
-    // this component's own doc comment above) now triggers whenever the
-    // structured details don't already cover any degradation, regardless
-    // of whether `details` is absent (the true legacy shape) or merely
-    // insufficient — never a silent drop either way.
-    const legacyDegradedReasons =
-        degradingDetails.length === 0 ? (coverage.degraded_reasons ?? []) : [];
+    // Reasons are the UNION of both shapes: a legacy raw string is withheld only
+    // when byte-identical to a degrading detail's rendered line or its own `raw`.
+    const degradingDetails: readonly CoverageDetail[] = degradingDetailsOf(coverage);
+    const legacyDegradedReasons = uncoveredLegacyReasons(coverage);
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
     // observed was dropped" — it says nothing about whether anything was
@@ -244,8 +191,11 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                     </details>
                 </>
             )}
-            {degradingDetails.length === 0 ? null : (
+            {degradingDetails.length === 0 && legacyDegradedReasons.length === 0 ? null : (
                 <>
+                    {/* ONE heading for the union: both lists are the same
+                        disclosure, and a response carrying both shapes must not
+                        render "Degraded reasons" twice. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
                         Degraded reasons
                     </h3>
@@ -271,15 +221,6 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                 </li>
                             );
                         })}
-                    </ul>
-                </>
-            )}
-            {legacyDegradedReasons.length === 0 ? null : (
-                <>
-                    <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Degraded reasons
-                    </h3>
-                    <ul className="stack stack--tight">
                         {legacyDegradedReasons.map((reason) => {
                             // The legacy `degraded_reasons[]` string IS the only
                             // reason text there is, so it is what shows; there is

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { mockScenarios } from "@/test/fixtures/investigations";
-import { visibleText } from "@/test/visible-text";
+import { isVisibleText, visibleText } from "@/test/visible-text";
 
 const degradedCoverage = mockScenarios().find((s) => s.id === "degraded")!.result.coverage;
 const legacyCoverage = mockScenarios().find((s) => s.id === "degraded-legacy")!.result.coverage;
@@ -218,6 +218,13 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
         expect(details).not.toHaveAttribute("open");
         expect(details.getAttribute("data-testid")).toBe("degraded-reason-raw");
 
+        // This fixture's legacy strings ARE the details' own `raw` values, so the
+        // union withholds them as repeats and no raw closed-vocabulary string
+        // reaches the always-visible surface.
+        const panel = screen.getByTestId("coverage-panel");
+        for (const reason of degradedCoverage.degraded_reasons ?? [])
+            expect(visibleText(panel)).not.toContain(reason);
+
         const phrasedSentence = screen.getByText(
             "Incident data wasn't authorized for this account, so it's left out here.",
         );
@@ -297,7 +304,15 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
         expect(within(panel).queryAllByTestId("degraded-reason-raw")).toEqual([]);
     });
 
-    it("prefers structured details over degraded_reasons when both are present and details actually cover the degradation", () => {
+    /**
+     * Reasons are a UNION, never a substitution. A degrading detail accounts
+     * for a raw reason only when it carries that same string as its own `raw`;
+     * the mere presence of a detail says nothing about any particular raw
+     * reason, and inferring the link from the string's contents would mean
+     * parsing it. So a detail with no `raw` leaves the raw reason uncovered,
+     * and both appear.
+     */
+    it("shows a structured detail AND a raw reason no detail covers by value", () => {
         const coverage = {
             sources: [],
             partial: true,
@@ -313,13 +328,38 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
             ],
         };
         render(<CoveragePanel coverage={coverage} />);
-        expect(screen.getByText("Metrics facts may be out of date")).toBeInTheDocument();
-        // The raw degraded_reasons string is never rendered when a
-        // degrading detail already covers the same gap.
-        expect(screen.queryByText("metrics: canonical fact capability returned stale")).toBeNull();
-        expect(
-            screen.queryByText("This source didn't fully contribute; see details for the reason."),
-        ).toBeNull();
+        const visible = visibleText(screen.getByTestId("coverage-panel"));
+        expect(visible).toContain("Metrics facts may be out of date");
+        expect(visible).toContain("metrics: canonical fact capability returned stale");
+        // ONE heading for the union, never one per shape.
+        expect(screen.getAllByRole("heading", { name: "Degraded reasons" })).toHaveLength(1);
+    });
+
+    it("shows the detail ALONE when a rendered line is byte-identical to the raw reason", () => {
+        const coverage = {
+            sources: [],
+            partial: true,
+            degraded_reasons: ["metrics: stale_provider_window"],
+            details: [
+                {
+                    detail_id: "cov-01",
+                    source: "canonical_fact:metrics",
+                    code: "fact_provider_reported" as const,
+                    degrading: true,
+                    // The LINE this detail renders IS the raw string, so the
+                    // legacy entry would be a byte-identical repeat.
+                    label: "metrics: stale_provider_window",
+                    raw: "metrics: stale_provider_window",
+                },
+            ],
+        };
+        render(<CoveragePanel coverage={coverage} />);
+        const panel = screen.getByTestId("coverage-panel");
+        expect(visibleText(panel)).toContain("metrics: stale_provider_window");
+        // Once, not twice: one reason entry in the list.
+        expect(panel.querySelectorAll("li.record")).toHaveLength(1);
+        // Nothing collapsed, because the raw IS what shows.
+        expect(within(panel).queryAllByTestId("degraded-reason-raw")).toEqual([]);
     });
 });
 
@@ -722,5 +762,184 @@ describe("CoveragePanel — the degraded-reason display rule, whole input domain
         if (expected.shows !== FLOOR) {
             expect(rendered.visible).not.toContain(FLOOR);
         }
+    });
+});
+
+/**
+ * The union rule over its whole domain: {details none, one, many} x {reasons
+ * none, one, many, overlapping by value, disjoint}. Every cell asserts VISIBLE
+ * text, and every cell asserts BOTH directions — what must appear and what must
+ * not — so a cell cannot pass by rendering everything or nothing.
+ */
+describe("CoveragePanel — degraded reasons are a union over the whole shape domain", () => {
+    const RAW_A = "canonical_fact:status unavailable";
+    const RAW_B = "canonical_fact:permissions unauthorized";
+    const RAW_C = "canonical_fact:metrics pruned";
+
+    function detail(index: number) {
+        return {
+            detail_id: `cov-${String(index)}`,
+            source: "canonical_fact:status",
+            code: "fact_provider_reported",
+            degrading: true,
+            label: `Structured reason ${String(index)}`,
+        };
+    }
+
+    /** A detail whose RENDERED LINE is exactly `line` — the only thing that withholds a raw reason. */
+    function detailRendering(index: number, line: string) {
+        return { ...detail(index), label: line };
+    }
+
+    function panelFor(details: readonly unknown[], reasons: readonly string[]) {
+        const coverage = {
+            sources: [{ source: "canonical_fact:status", state: "available" }],
+            partial: true,
+            degraded_reasons: [...reasons],
+            details: [...details],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+        render(<CoveragePanel coverage={coverage} />);
+        return screen.getByTestId("coverage-panel");
+    }
+
+    it("details none x reasons none: no section at all", () => {
+        panelFor([], []);
+        expect(screen.queryByRole("heading", { name: "Degraded reasons" })).toBeNull();
+    });
+
+    it("details none x reasons one: the raw reason shows", () => {
+        const visible = visibleText(panelFor([], [RAW_A]));
+        expect(visible).toContain(RAW_A);
+    });
+
+    it("details none x reasons many: every raw reason shows", () => {
+        const visible = visibleText(panelFor([], [RAW_A, RAW_B, RAW_C]));
+        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+    });
+
+    it("details one x reasons none: the detail shows", () => {
+        const visible = visibleText(panelFor([detail(0)], []));
+        expect(visible).toContain("Structured reason 0");
+    });
+
+    it("details one x reasons many, DISJOINT: the detail and every raw reason show", () => {
+        const visible = visibleText(panelFor([detail(0)], [RAW_A, RAW_B, RAW_C]));
+        expect(visible).toContain("Structured reason 0");
+        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+        expect(screen.getAllByRole("heading", { name: "Degraded reasons" })).toHaveLength(1);
+    });
+
+    it("details one x reasons one, BYTE-IDENTICAL to the detail's rendered line: shown once", () => {
+        const panel = panelFor([detailRendering(0, RAW_A)], [RAW_A]);
+        expect(visibleText(panel)).toContain(RAW_A);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(1);
+    });
+
+    it("a raw reason byte-identical to a detail's own `raw` is not repeated — it is already on the page, collapsed", () => {
+        const panel = panelFor([{ ...detail(0), raw: RAW_A }], [RAW_A]);
+        const visible = visibleText(panel);
+        expect(visible).toContain("Structured reason 0");
+        expect(visible).not.toContain(RAW_A);
+        expect(within(panel).getByTestId("degraded-reason-raw").textContent).toContain(RAW_A);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(1);
+    });
+
+    it("a raw reason matching NO detail line and NO detail raw still shows", () => {
+        const panel = panelFor([{ ...detail(0), raw: RAW_B }], [RAW_A]);
+        const visible = visibleText(panel);
+        expect(visible).toContain("Structured reason 0");
+        expect(visible).toContain(RAW_A);
+    });
+
+    it("n details about one source never withhold n raw reasons about another", () => {
+        const panel = panelFor([detail(0), detail(1), detail(2)], [RAW_A, RAW_B, RAW_C]);
+        const visible = visibleText(panel);
+        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+    });
+
+    it("details many x reasons many, PARTIALLY byte-identical: the repeats are dropped, the rest show", () => {
+        const panel = panelFor(
+            [detailRendering(0, RAW_A), detailRendering(1, RAW_B)],
+            [RAW_A, RAW_B, RAW_C],
+        );
+        const visible = visibleText(panel);
+        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+        // Three entries, not five: RAW_A and RAW_B are the details' own lines.
+        expect(panel.querySelectorAll("li.record")).toHaveLength(3);
+    });
+
+    it("details many x reasons none: every detail shows", () => {
+        const visible = visibleText(panelFor([detail(0), detail(1), detail(2)], []));
+        for (const index of [0, 1, 2])
+            expect(visible).toContain(`Structured reason ${String(index)}`);
+    });
+
+    it("a NON-degrading detail withholds nothing, even when it renders the same line", () => {
+        const nonDegrading = { ...detailRendering(0, RAW_A), degrading: false };
+        const visible = visibleText(panelFor([nonDegrading], [RAW_A]));
+        expect(visible).not.toContain("Structured reason 0");
+        expect(visible).toContain(RAW_A);
+    });
+
+    it("a blank raw reason is kept as the floor, never dropped", () => {
+        const visible = visibleText(panelFor([detail(0)], [" "]));
+        expect(visible).toContain("Structured reason 0");
+        expect(visible).toContain("This source didn't fully contribute; no reason was reported.");
+    });
+});
+
+/**
+ * The visibility helper's own contract, because a helper that mis-reports
+ * visibility silently weakens every assertion built on it. A closed
+ * `<details>` shows its summary and hides its body — including when the closed
+ * element is the one handed in, which `querySelectorAll` does not match.
+ */
+describe("visibleText — the element passed in is subject to the rule too", () => {
+    function fixture(open: boolean) {
+        const host = document.createElement("div");
+        host.innerHTML = `<details${open ? " open" : ""}><summary>Raw reason</summary><code>body-text</code></details>`;
+        document.body.append(host);
+        return { host, details: host.querySelector("details")! };
+    }
+
+    it("a CLOSED details handed in as the root reports only its summary", () => {
+        const { details } = fixture(false);
+        expect(visibleText(details)).toBe("Raw reason");
+        expect(isVisibleText(details, "body-text")).toBe(false);
+        expect(isVisibleText(details, "Raw reason")).toBe(true);
+    });
+
+    it("an OPEN details handed in as the root reports its body too", () => {
+        const { details } = fixture(true);
+        expect(isVisibleText(details, "body-text")).toBe(true);
+    });
+
+    it("a closed DESCENDANT keeps its summary on screen and hides its body", () => {
+        const { host } = fixture(false);
+        expect(isVisibleText(host, "Raw reason")).toBe(true);
+        expect(isVisibleText(host, "body-text")).toBe(false);
+    });
+
+    it("an element INSIDE a closed details is hidden by that ancestor", () => {
+        const { details } = fixture(false);
+        const body = details.querySelector("code")!;
+        // The element has no <details> at or below it, so only the ancestor
+        // walk can tell that nothing it contains is on screen.
+        expect(visibleText(body)).toBe("");
+        expect(isVisibleText(body, "body-text")).toBe(false);
+    });
+
+    it("an element inside a closed details' own SUMMARY is still visible", () => {
+        const host = document.createElement("div");
+        host.innerHTML = `<details><summary><span>Raw reason</span></summary><code>body-text</code></details>`;
+        document.body.append(host);
+        const inSummary = host.querySelector("summary span")!;
+        expect(isVisibleText(inSummary, "Raw reason")).toBe(true);
+    });
+
+    it("an element inside an OPEN details is visible", () => {
+        const { details } = fixture(true);
+        const body = details.querySelector("code")!;
+        expect(isVisibleText(body, "body-text")).toBe(true);
     });
 });

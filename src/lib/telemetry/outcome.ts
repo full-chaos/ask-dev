@@ -1,5 +1,6 @@
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
+import { degradedReasonCount } from "@/lib/degraded-reasons";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
 import type { EnrichmentPredicate } from "@/lib/enrichment/validate";
 import { trendChartSourceCounts } from "@/lib/render-shapes";
@@ -84,6 +85,15 @@ export type OutcomeEvent = {
     readonly coverageSourceStates: readonly { readonly source: string; readonly state: string }[];
     /** How many sources fell outside the known vocabulary. */
     readonly unknownSourceCount: number;
+    /**
+     * How many degraded reasons the response reported, counted over BOTH
+     * shapes it can arrive in — the structured `coverage.details[]` degrading
+     * entries and the legacy `coverage.degraded_reasons[]` strings, minus the
+     * raw strings a structured entry already carries as its own `raw`. Reading
+     * only the legacy array reported 0 for a response whose degradation was
+     * entirely structured, which makes a degraded turn indistinguishable from
+     * a clean one in aggregate.
+     */
     readonly degradedReasonCount: number;
     readonly limitationCount: number;
     readonly warningCount: number;
@@ -248,7 +258,7 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         unknownSourceCount: (coverage?.sources ?? []).filter(
             (source) => boundedCoverageSource(source.source) === UNRECOGNIZED_SOURCE,
         ).length,
-        degradedReasonCount: coverage?.degraded_reasons?.length ?? 0,
+        degradedReasonCount: degradedReasonCount(coverage),
         limitationCount: result?.limitations.length ?? 0,
         warningCount: result?.warnings.length ?? 0,
 
