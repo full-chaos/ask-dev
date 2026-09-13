@@ -1595,6 +1595,70 @@ describe("investigation result contract — the organization-scope refusal basis
 });
 
 /**
+ * The investigation result gains an optional `semantic_reading` object: ACR
+ * sets it on a result-by-id read of a stored clarification whose check against
+ * its stored reading of the question could not run, because that reading could
+ * not be loaded. `status` is `unavailable`; `reason` is `semantic_state_absent`
+ * or `semantic_state_unreadable`. Additive: every document the prior pin
+ * accepted still validates, and the object stays closed.
+ */
+describe("investigation result contract — the semantic_reading disclosure (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+
+    function withSemanticReading(value: unknown): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), semantic_reading: value };
+    }
+
+    it("GREEN: both reasons validate at this pin", () => {
+        for (const reason of ["semantic_state_absent", "semantic_state_unreadable"]) {
+            const validation = validateContract(
+                RESULT,
+                withSemanticReading({ status: "unavailable", reason }),
+            );
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("a result without the field still validates", () => {
+        expect(validateContract(RESULT, structuredClone(canonicalResult)).valid).toBe(true);
+    });
+
+    it("the object stays CLOSED: bad members, missing members and extra keys are rejected", () => {
+        for (const value of [
+            { status: "available", reason: "semantic_state_absent" },
+            { status: "unavailable", reason: "pre_semantic_state" },
+            { status: "unavailable" },
+            { reason: "semantic_state_absent" },
+            { status: "unavailable", reason: "semantic_state_absent", note: "x" },
+            "unavailable",
+        ]) {
+            expect(validateContract(RESULT, withSemanticReading(value)).valid).toBe(false);
+        }
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the field", () => {
+        const priorResult = structuredClone(investigationResultSchema) as unknown as {
+            properties: Record<string, unknown>;
+        };
+        expect(priorResult.properties).toHaveProperty("semantic_reading");
+        delete priorResult.properties.semantic_reading;
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResult);
+
+        expect(
+            validate(
+                withSemanticReading({ status: "unavailable", reason: "semantic_state_absent" }),
+            ),
+        ).toBe(false);
+        // The stand-in still accepts a document without it, so it is faithful.
+        expect(validate(structuredClone(canonicalResult))).toBe(true);
+    });
+});
+
+/**
  * `CoverageDetail.code` gains a 17th closed-vocabulary member,
  * `fact_read_origin_state`: the code the service publishes when a requirement's
  * read reports the ORIGIN STATE of the population it read, per kind, rather

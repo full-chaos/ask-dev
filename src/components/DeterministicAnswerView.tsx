@@ -14,6 +14,7 @@ import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
 import { FindingsPanel } from "@/components/FindingsPanel";
 import { LimitationsPanel } from "@/components/LimitationsPanel";
+import { SemanticReadingNotice } from "@/components/SemanticReadingNotice";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
@@ -346,6 +347,7 @@ export function DeterministicAnswerView({
                         />
                     );
                 })()}
+                <SemanticReadingNotice semanticReading={result.semantic_reading} />
                 <CoveragePanel coverage={result.coverage} />
                 <CompletenessPanel completeness={result.completeness} />
                 <AnswerPlanPanel answerPlan={result.answer_plan} />
