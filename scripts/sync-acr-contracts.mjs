@@ -305,7 +305,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // WIDENING ONLY, and load-bearing: acr main mints this claim, so without the
 // bump a response carrying it is rejected whole as `acr_contract_violation`
 // instead of rendering.
-export const SOURCE_COMMIT = "1e50a2f05a50e91038b0d2980dc31a0c0040c2cf";
+export const SOURCE_COMMIT = "548607119ed4f7691f8ef1e9ed5a8cc41d28273f";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
