@@ -4,6 +4,7 @@ import { Badge } from "@/components/Badge";
 import { Details } from "@/components/Details";
 import type { Coverage, CoverageDetail } from "@/lib/contracts";
 import {
+    GENERIC_DEGRADED_REASON_SENTENCE,
     degradedReasonDisplay,
     degradingDetails as degradingDetailsOf,
     uncoveredLegacyReasons,
@@ -74,6 +75,22 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
     // when byte-identical to a degrading detail's rendered line or its own `raw`.
     const degradingDetails: readonly CoverageDetail[] = degradingDetailsOf(coverage);
     const legacyDegradedReasons = uncoveredLegacyReasons(coverage);
+    // A kind_census_truncated row names WHICH kind's census was cut and BOTH
+    // numbers: declared (the census figure observed -- a floor) and served
+    // (how many of that kind made this answer). It is degrading (a real
+    // coverage loss), so it stays in `degradingDetails` for every consumer
+    // that counts degradation — but it gets its OWN section here rather than
+    // the generic "Degraded reasons" list, the same reason `fact_read_origin_state`
+    // does above: displaying its structured fields (not a derived sentence —
+    // the numbers are the contract's own `kind`/`declared`/`served`, shown
+    // verbatim) says more than folding it into one more prose line would.
+    const kindCensusTruncated = (coverage.details ?? []).filter(
+        (detail) => detail.code === "kind_census_truncated",
+    );
+    const kindCensusTruncatedIds = new Set(kindCensusTruncated.map((detail) => detail.detail_id));
+    const genericDegradingDetails = degradingDetails.filter(
+        (detail) => !kindCensusTruncatedIds.has(detail.detail_id),
+    );
     // A read-origin-state row reports the state of the population ONE read
     // actually reached, per origin kind. It is not a degraded reason -- it can
     // be non-degrading -- and it is not the source fold above it either: a row
@@ -244,7 +261,44 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                     </ul>
                 </>
             )}
-            {degradingDetails.length === 0 && legacyDegradedReasons.length === 0 ? null : (
+            {kindCensusTruncated.length === 0 ? null : (
+                <>
+                    {/* Below the per-kind read states, above the generic
+                        degraded-reasons list: a cut kind census is its own
+                        cause, with its own numbers, not a fold over sources. */}
+                    <h3 className="panel__title" style={{ marginTop: 14 }}>
+                        Kind census
+                    </h3>
+                    <ul className="stack stack--tight">
+                        {kindCensusTruncated.map((detail) => {
+                            const kind = nonBlank(detail.kind);
+                            const phrasing = nonBlank(detail.phrasing);
+                            const facts = nonBlank(detail.label);
+                            return (
+                                <li className="record" key={detail.detail_id}>
+                                    <p className="record__body">
+                                        {kind === undefined ? null : (
+                                            <strong>{humanizeTerm(kind)}: </strong>
+                                        )}
+                                        {facts ?? GENERIC_DEGRADED_REASON_SENTENCE}
+                                    </p>
+                                    {phrasing === undefined || phrasing === facts ? null : (
+                                        <p className="record__meta">{phrasing}</p>
+                                    )}
+                                    {detail.declared === undefined ||
+                                    detail.served === undefined ? null : (
+                                        <p className="record__meta">
+                                            declared {detail.declared} (floor) · served{" "}
+                                            {detail.served}
+                                        </p>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </>
+            )}
+            {genericDegradingDetails.length === 0 && legacyDegradedReasons.length === 0 ? null : (
                 <>
                     {/* ONE heading for the union: both lists are the same
                         disclosure, and a response carrying both shapes must not
@@ -253,7 +307,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         Degraded reasons
                     </h3>
                     <ul className="stack stack--tight">
-                        {degradingDetails.map((detail) => {
+                        {genericDegradingDetails.map((detail) => {
                             // CHAOS-4690: synthesis-phrased sentence when the
                             // model chose to phrase it, else the deterministic
                             // Label floor; then the raw text, and only then the

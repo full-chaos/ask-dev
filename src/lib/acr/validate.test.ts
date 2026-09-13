@@ -1738,6 +1738,138 @@ describe("coverage detail contract — the read-origin-state code (consumer pin)
 });
 
 /**
+ * `CoverageDetail.code` gains an 18th closed-vocabulary member,
+ * `kind_census_truncated`: a discovered cohort's kind-scoped census (the
+ * term-free fetch of a declared member kind) was cut at its own row bound.
+ * Three additive properties ride with it — `kind`, `declared`, `served` —
+ * present together on this code and absent on every other. Additive only —
+ * every document the prior pin accepted still validates, and the vocabulary
+ * stays closed.
+ *
+ * Paired with a reproduction of the PRIOR pin's own schema, so this proves
+ * the BUMP is what made the value acceptable, not merely that the current
+ * pin accepts it.
+ */
+describe("coverage detail contract — the kind_census_truncated code (consumer pin, D47)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+
+    function resultWithDetail(overrides: Record<string, unknown>): Record<string, unknown> {
+        const clone = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        clone.coverage = {
+            ...(clone.coverage as Record<string, unknown>),
+            details: [
+                {
+                    detail_id: "cov-census-01",
+                    source: "context-fabric:graph",
+                    code: "kind_census_truncated",
+                    degrading: true,
+                    label: "At least 2000 team found; 25 included",
+                    raw: "kind_census_truncated:team:2000:25",
+                    kind: "team",
+                    declared: 2000,
+                    served: 25,
+                    ...overrides,
+                },
+            ],
+        };
+        return clone;
+    }
+
+    it("GREEN: a degrading detail carrying the new code and all three fields validates at this pin", () => {
+        const validation = validateContract(RESULT, resultWithDetail({}));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("GREEN: the fields are each independently optional at the SCHEMA level (acr's own write path enforces they ride together)", () => {
+        for (const overrides of [
+            { kind: undefined },
+            { declared: undefined },
+            { served: undefined },
+        ]) {
+            const document = resultWithDetail(overrides);
+            const details = (
+                (document.coverage as Record<string, unknown>).details as Array<
+                    Record<string, unknown>
+                >
+            )[0]!;
+            for (const [key, value] of Object.entries(overrides)) {
+                if (value === undefined) delete details[key];
+            }
+            const validation = validateContract(RESULT, document);
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("RED CONTROL: served must be a non-negative integer, not a string or a fraction", () => {
+        for (const bad of ["25", 2.5, -1]) {
+            const validation = validateContract(RESULT, resultWithDetail({ served: bad }));
+            expect(validation.valid).toBe(false);
+        }
+    });
+
+    it("RED CONTROL: declared must be a non-negative integer", () => {
+        for (const bad of ["2000", -1, 1.1]) {
+            const validation = validateContract(RESULT, resultWithDetail({ declared: bad }));
+            expect(validation.valid).toBe(false);
+        }
+    });
+
+    it("the already-live codes still validate", () => {
+        for (const code of [
+            "fact_unconfigured",
+            "fact_provider_reported",
+            "fact_read_origin_state",
+        ]) {
+            const clone = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+            clone.coverage = {
+                ...(clone.coverage as Record<string, unknown>),
+                details: [
+                    {
+                        detail_id: "cov-x",
+                        source: "canonical_fact:status",
+                        code,
+                        degrading: true,
+                        label: "x",
+                    },
+                ],
+            };
+            const validation = validateContract(RESULT, clone);
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("the vocabulary stays CLOSED: a code outside it is still rejected", () => {
+        const validation = validateContract(RESULT, resultWithDetail({ code: "not_a_real_code" }));
+        expect(validation.valid).toBe(false);
+        expect(validation.errors.join("; ")).toMatch(/code must be equal to one of the allowed/);
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new code", () => {
+        const priorCommon = structuredClone(commonSchema) as unknown as {
+            $defs: { CoverageDetail: { properties: { code: { enum: string[] } } } };
+        };
+        const codes = priorCommon.$defs.CoverageDetail.properties.code.enum;
+        expect(codes).toContain("kind_census_truncated");
+        priorCommon.$defs.CoverageDetail.properties.code.enum = codes.filter(
+            (code) => code !== "kind_census_truncated",
+        );
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommon, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(structuredClone(investigationResultSchema));
+
+        expect(validate(resultWithDetail({}))).toBe(false);
+        // The same stand-in still accepts a live code, so it is faithful
+        // (kind/declared/served ride along as ordinary optional properties
+        // regardless of code at the SCHEMA level -- see the GREEN test above).
+        expect(validate(resultWithDetail({ code: "fact_provider_reported" }))).toBe(true);
+    });
+});
+
+/**
  * `ClaimedFact.kind` gains a 23rd member, `cardinality`: the count the service
  * computes over a resolved member set, minted as a claimed fact whose subject
  * is the organization, on an answer whose question owes a count. Its value is
