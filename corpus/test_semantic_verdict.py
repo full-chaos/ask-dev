@@ -117,7 +117,12 @@ def base_exchange(final_family="discovered_cohort_ranking", first_family="discov
     return [t1, t2]
 
 
-def test_family_match_is_not_confirmation():
+def test_family_match_is_not_confirmation_without_a_persisted_link():
+    # CHAOS-5722: matching family + a verified window receipt still does
+    # NOT manufacture confirmation on their own -- only a caller-supplied
+    # `persisted_semantic_state` adapter can promote past `unscored`. No
+    # adapter is passed here (every call site that predates this ticket),
+    # so this must read exactly as if the adapter found no persisted row.
     attempts = base_exchange()
     final = attempts[-1]["response"]["result"]
     audit = SV.audit_window_exchange(attempts)
@@ -125,8 +130,9 @@ def test_family_match_is_not_confirmation():
     _require(audit["family_relation"] == "same", audit)
     row = declaration(serve())
     verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score)
-    _require((verdict, reason) == ("unscored", "family_confirmation_unavailable"),
-             f"a verified window receipt + matching family must NOT manufacture confirmation, got {(verdict, reason)}")
+    _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_ABSENT),
+             f"a verified window receipt + matching family must NOT manufacture confirmation "
+             f"without a persisted link, got {(verdict, reason)}")
 
 
 def test_family_mismatch_is_a_failure():
@@ -163,6 +169,256 @@ def test_retry_is_not_a_third_turn():
     with_retry = [attempts[0], retryable_failure, attempts[1]]
     audit = SV.audit_window_exchange(with_retry)
     _require(audit["window_binding"] == "verified", f"a retry must collapse to two semantic turns: {audit}")
+
+
+# --- CHAOS-5722: persisted semantic-state family-confirmation link ----------
+
+def _verified_exchange_with_result_id(result_id="result-final"):
+    """A clean base_exchange() (verified window binding, same family) whose
+    `final` carries a `result_id` -- base_exchange()'s own `final` has none
+    (only the first turn's clarification does), so every test below that
+    needs the persisted-state adapter to actually run adds one."""
+    attempts = base_exchange()
+    final = {**attempts[-1]["response"]["result"], "result_id": result_id}
+    attempts[-1] = {**attempts[-1], "response": {"result": final}}
+    audit = SV.audit_window_exchange(attempts)
+    _require(audit["window_binding"] == "verified", audit)
+    _require(audit["family_relation"] == "same", audit)
+    return final, audit
+
+
+def _persisted_state(family="discovered_cohort_ranking", gate_outcome="passed",
+                      format_version="semantic-state.v1"):
+    return {"format_version": format_version, "family": family,
+            "validation": {"gate_outcome": gate_outcome}}
+
+
+class _CountingAdapter:
+    """A `persisted_semantic_state` test double that records every
+    `result_id` it was called with, so a test can assert it was NEVER
+    called for a scalar row or a refuse/decline/clarify branch (score_branch
+    must short-circuit before reaching it in both cases)."""
+
+    def __init__(self, response):
+        self.response = response
+        self.calls = []
+
+    def __call__(self, result_id):
+        self.calls.append(result_id)
+        if isinstance(self.response, Exception):
+            raise self.response
+        return self.response
+
+
+def test_persisted_link_promotes_serve_to_agree_and_outranks_a_wrongly_certified_refuse():
+    # The exact defect this ticket fixes: a refuse branch on the same
+    # any_of row can score agree_weak (acr's real table matches it on a
+    # disclosed basis, independent of the actual served bucket) while a
+    # correct, persisted-confirmed serve is capped below it by _RANK. A
+    # complete persisted link must let the serve branch win.
+    def legacy_score_refuse_agrees_on_a_served_bucket(row, bucket, status, **identity):
+        if row.get("expect") == ES.SERVE:
+            return ("agree", "served") if bucket == "served_with_data" else ("disagree", "not served")
+        return "agree_weak", "matched_basis_on_served_bucket"
+
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve(), {"outcome": "refuse"})
+    adapter = _CountingAdapter(_persisted_state())
+    verdict, reason, results = SV.score(row, "served_with_data", "complete", final, audit,
+                                         legacy_score_refuse_agrees_on_a_served_bucket, adapter)
+    _require(verdict == "agree", (verdict, reason, results))
+    _require(reason == "family_confirmed", (verdict, reason))
+    _require(results[0][0] == "agree", f"serve branch must reach agree: {results}")
+    _require(results[1][0] == "agree_weak", f"refuse branch must be untouched by this ticket: {results}")
+    _require(SV._RANK[results[0][0]] > SV._RANK[results[1][0]],
+             f"the persisted-confirmed serve must outrank the wrongly-certified refuse: {results}")
+    _require(adapter.calls == [final["result_id"]], adapter.calls)
+
+
+def test_persisted_state_absent_stays_unscored():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    adapter = _CountingAdapter(None)  # adapter ran, found no row
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_ABSENT), (verdict, reason))
+    _require(adapter.calls == [final["result_id"]], adapter.calls)
+
+
+def test_persisted_state_unreadable_stays_unscored():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    adapter = _CountingAdapter(SV.PersistedSemanticStateUnreadable("corrupt row"))
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_UNREADABLE), (verdict, reason))
+
+
+def test_persisted_state_non_dict_return_is_unreadable():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    for bad in ["not-a-dict", 12345, ["a", "list"]]:
+        adapter = _CountingAdapter(bad)
+        verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+        _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_UNREADABLE), (bad, verdict, reason))
+
+
+def test_persisted_state_malformed_shape_is_unreadable():
+    # Domain table over the two shape-bearing fields (`family`,
+    # `validation.gate_outcome`) this scorer reads once format_version is
+    # known: {absent, null, wrong scalar/container type} each -- every cell
+    # must fail closed to `SEMANTIC_STATE_UNREADABLE`, never a crash and
+    # never a manufactured mismatch/agree against a value that was never
+    # really there.
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    cells = [
+        ("family_absent", {"format_version": "semantic-state.v1", "validation": {"gate_outcome": "passed"}}),
+        ("family_null", {"format_version": "semantic-state.v1", "family": None,
+                          "validation": {"gate_outcome": "passed"}}),
+        ("family_wrong_type", {"format_version": "semantic-state.v1", "family": 42,
+                                "validation": {"gate_outcome": "passed"}}),
+        ("validation_absent", {"format_version": "semantic-state.v1", "family": "discovered_cohort_ranking"}),
+        ("validation_null", {"format_version": "semantic-state.v1", "family": "discovered_cohort_ranking",
+                              "validation": None}),
+        ("validation_wrong_type_string", {"format_version": "semantic-state.v1",
+                                           "family": "discovered_cohort_ranking", "validation": "not-a-dict"}),
+        ("validation_wrong_container_type_list", {"format_version": "semantic-state.v1",
+                                                   "family": "discovered_cohort_ranking", "validation": []}),
+        ("gate_outcome_absent", {"format_version": "semantic-state.v1", "family": "discovered_cohort_ranking",
+                                  "validation": {}}),
+        ("gate_outcome_null", {"format_version": "semantic-state.v1", "family": "discovered_cohort_ranking",
+                                "validation": {"gate_outcome": None}}),
+        ("gate_outcome_wrong_type", {"format_version": "semantic-state.v1", "family": "discovered_cohort_ranking",
+                                      "validation": {"gate_outcome": 200}}),
+    ]
+    for label, bad in cells:
+        adapter = _CountingAdapter(bad)
+        verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+        _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_UNREADABLE), (label, verdict, reason))
+
+
+def test_persisted_family_mismatch_is_disagree():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    adapter = _CountingAdapter(_persisted_state(family="grouped_cohort_status"))
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("disagree", "persisted_family_mismatch"), (verdict, reason))
+
+
+def test_persisted_gate_outcome_not_accepted_is_not_agree():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    for gate_outcome in ["refused_basis", "rejected_invalid", "not_proposed", ""]:
+        adapter = _CountingAdapter(_persisted_state(gate_outcome=gate_outcome))
+        verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+        _require(verdict != "agree", f"gate_outcome={gate_outcome!r} must never reach agree: {(verdict, reason)}")
+        _require((verdict, reason) == ("unscored", "gate_outcome_not_accepted"),
+                 f"gate_outcome={gate_outcome!r}: {(verdict, reason)}")
+
+
+def test_persisted_state_unknown_format_version_is_unscored():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    adapter = _CountingAdapter(_persisted_state(format_version="semantic-state.v0-legacy"))
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("unscored", "semantic_state_version_unknown"), (verdict, reason))
+
+
+def test_malformed_result_id_is_absent_and_adapter_is_never_called():
+    # Domain table over `final.result_id`: {absent, null, empty string,
+    # wrong scalar type} -- none of these may reach the adapter at all
+    # (there is nothing to look up), and every one must read as
+    # SEMANTIC_STATE_ABSENT, never a crash.
+    row = declaration(serve())
+    for label, mutate in [
+        ("absent", lambda f: f.pop("result_id")),
+        ("null", lambda f: f.__setitem__("result_id", None)),
+        ("empty_string", lambda f: f.__setitem__("result_id", "")),
+        ("wrong_type_int", lambda f: f.__setitem__("result_id", 12345)),
+    ]:
+        final, audit = _verified_exchange_with_result_id()
+        mutate(final)
+        adapter = _CountingAdapter(_persisted_state())
+        verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+        _require((verdict, reason) == ("unscored", ES.SEMANTIC_STATE_ABSENT), (label, verdict, reason))
+        _require(adapter.calls == [], f"{label}: an adapter must never be called with no result_id: {adapter.calls}")
+
+
+def test_adapter_is_never_called_for_a_scalar_row():
+    adapter = _CountingAdapter(_persisted_state())
+    row = {"id": "synthetic", "text": "Synthetic", "expect": "serve"}
+    SV.score(row, "served_with_data", "complete", {}, {}, fake_legacy_score, adapter)
+    _require(adapter.calls == [], f"a scalar row must never consult the persisted-state adapter: {adapter.calls}")
+
+
+def test_adapter_is_never_called_for_a_refuse_branch():
+    final, audit = _verified_exchange_with_result_id()
+    adapter = _CountingAdapter(_persisted_state())
+    row = declaration({"outcome": "refuse"}, {"outcome": "decline"}, {"outcome": "clarify"})
+    SV.score(row, "unserved", "complete", final, audit, fake_legacy_score, adapter)
+    _require(adapter.calls == [],
+             f"a refuse/decline/clarify branch must never consult the persisted-state adapter: {adapter.calls}")
+
+
+def test_adapter_is_never_called_when_window_binding_mismatches_or_family_changed():
+    # (window_binding mismatch, family_relation changed) both short-circuit
+    # score_branch BEFORE the persisted-state check -- see score_branch.
+    mismatched = base_exchange()
+    mismatched[1]["request"]["priorWindowReceipts"][0]["receipt_id"] = "winr_unoffered"
+    final_mismatch = {**mismatched[1]["response"]["result"], "result_id": "result-mismatch"}
+    mismatched[1] = {**mismatched[1], "response": {"result": final_mismatch}}
+    audit_mismatch = SV.audit_window_exchange(mismatched)
+    _require(audit_mismatch["window_binding"] == "mismatch", audit_mismatch)
+    adapter = _CountingAdapter(_persisted_state())
+    row = declaration(serve())
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final_mismatch, audit_mismatch,
+                                   fake_legacy_score, adapter)
+    _require(verdict == "disagree", (verdict, reason))
+    _require(adapter.calls == [], f"a window-binding mismatch must never reach the adapter: {adapter.calls}")
+
+    changed = base_exchange(final_family="grouped_cohort_status", first_family="discovered_cohort_ranking")
+    final_changed = {**changed[1]["response"]["result"], "result_id": "result-changed"}
+    changed[1] = {**changed[1], "response": {"result": final_changed}}
+    audit_changed = SV.audit_window_exchange(changed)
+    _require(audit_changed["family_relation"] == "changed", audit_changed)
+    adapter2 = _CountingAdapter(_persisted_state(family="grouped_cohort_status"))
+    row2 = declaration(serve("grouped_cohort_status"))
+    verdict2, reason2, _ = SV.score(row2, "served_with_data", "complete", final_changed, audit_changed,
+                                     fake_legacy_score, adapter2)
+    _require((verdict2, reason2) == ("unscored", "unratified_family_change"), (verdict2, reason2))
+    _require(adapter2.calls == [], f"an unratified family change must never reach the adapter: {adapter2.calls}")
+
+
+def test_persisted_link_fields_are_published_in_branch_results():
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    record = SV.build_verdict(row, "served_with_data", "complete", final, audit, fake_legacy_score,
+                               corpus_version="test-corpus-v0", legacy_scorer_version="fake-legacy-v1",
+                               persisted_semantic_state=_CountingAdapter(_persisted_state()))
+    branch = record["branch_results"][0]
+    _require(branch["verdict"] == "agree", branch)
+    _require(branch["result_id"] == final["result_id"], branch)
+    _require(branch["persisted_format_version"] == "semantic-state.v1", branch)
+    _require(branch["persisted_family"] == "discovered_cohort_ranking", branch)
+    _require(branch["persisted_gate_outcome"] == "passed", branch)
+
+
+def test_build_verdict_with_no_persisted_state_argument_is_backward_compatible():
+    # Every call site that predates CHAOS-5722 (acr's semantic_verdict_bridge.py
+    # included) calls build_verdict()/score() with no `persisted_semantic_state`
+    # argument at all -- this must keep working exactly as documented (absent
+    # adapter == adapter that found no row), never a TypeError.
+    final, audit = _verified_exchange_with_result_id()
+    row = declaration(serve())
+    record = SV.build_verdict(row, "served_with_data", "complete", final, audit, fake_legacy_score,
+                               corpus_version="test-corpus-v0", legacy_scorer_version="fake-legacy-v1")
+    _require(record["verdict"] == "unscored", record)
+    _require(record["reason"] == ES.SEMANTIC_STATE_ABSENT, record)
+
+
+def test_rank_ordering_is_unchanged():
+    # Regression pin: CHAOS-5722 adds a new terminal outcome (`agree` from a
+    # persisted link) but must never touch the ordinal ranking itself.
+    _require(SV._RANK == {"agree": 3, "agree_weak": 2, "unscored": 1, "disagree": 0}, SV._RANK)
 
 
 _MUTATIONS = [
