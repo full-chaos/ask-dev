@@ -54,8 +54,13 @@ export type {
     // CHAOS-4636/CHAOS-4668: one recorded narrowing step ("showing 2 of 3
     // teams" and why).
     PlanNarrowing,
+    // CHAOS-5640/CHAOS-5109: one requirement's derived outcome inside
+    // `AnswerCompleteness.outcomes` -- what the answer was supposed to
+    // contain and what became of it.
+    PlanRequirementOutcomeRow,
     PriorSubjectReceiptDispositionEntry,
     RelationshipPath,
+    RequirementRefinement,
     // CHAOS-4415: the service's own conditional render shapes and their
     // parts. Exported by name because the generated module is rewritten
     // wholesale on every pin bump (see this file's own header).

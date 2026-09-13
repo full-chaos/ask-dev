@@ -7,10 +7,12 @@
  * alongside the tone, so a reader can see the vocabulary, not just the color.
  */
 import type {
+    AnswerCompleteness,
     CohortMemberDataCompleteness,
     CohortMemberOutcome,
     CoverageState,
     InvestigationStatus,
+    PlanRequirementOutcomeRow,
     PriorSubjectReceiptDisposition,
     StructureDisposition,
     SubjectCandidateState,
@@ -137,6 +139,52 @@ export function cohortDataCompletenessTone(completeness: CohortMemberDataComplet
         case "partial":
             return "warn";
         case "degraded":
+            return "bad";
+    }
+}
+
+/**
+ * Tone for `completeness.state` (CHAOS-5640/CHAOS-5109) -- what the derived
+ * requirement outcomes add up to, DISTINCT from `terminal_status`'s own tone
+ * (`statusTone` above): the two vocabularies answer different questions and
+ * can legitimately disagree on the same result, so this switch never reads
+ * `terminal_status`. Exhaustive over the closed enum.
+ *
+ * `not_derived` is `neutral`, never `ok`: it is a real, honest state (no
+ * outcome rows exist to derive from) and must never read as "complete" —
+ * the exact vacuous-success failure `AnswerCompleteness.state`'s own schema
+ * doc comment exists to name.
+ */
+export function completenessStateTone(state: AnswerCompleteness["state"]): Tone {
+    switch (state) {
+        case "complete":
+            return "ok";
+        case "partial":
+            return "warn";
+        case "degraded":
+            return "bad";
+        case "not_derived":
+            return "neutral";
+    }
+}
+
+/**
+ * Tone for one `PlanRequirementOutcomeRow.outcome` (CHAOS-5640/CHAOS-5109).
+ * Exhaustive over the closed enum, same discipline as `cohortOutcomeTone`:
+ * `not_applicable` is `neutral` (nothing was owed, so nothing was lost), the
+ * two impact-bearing outcomes are `warn`, and `unavailable` -- the one
+ * outcome the derived `state` above can turn `degraded` on -- is `bad`.
+ */
+export function planRequirementOutcomeTone(outcome: PlanRequirementOutcomeRow["outcome"]): Tone {
+    switch (outcome) {
+        case "satisfied":
+            return "ok";
+        case "not_applicable":
+            return "neutral";
+        case "narrowed":
+        case "not_attempted":
+            return "warn";
+        case "unavailable":
             return "bad";
     }
 }
