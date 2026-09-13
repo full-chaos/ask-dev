@@ -1346,8 +1346,8 @@ describe("investigation result contract — the continuation-refusal basis (cons
         ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
         expect(resultEnum).toContain("continuation_context_unverifiable");
         expect(commonEnum).toContain("continuation_context_unverifiable");
-        expect(resultEnum).toHaveLength(4);
-        expect(commonEnum).toHaveLength(4);
+        expect(resultEnum).toHaveLength(5);
+        expect(commonEnum).toHaveLength(5);
         expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
     });
 
@@ -1391,6 +1391,106 @@ describe("investigation result contract — the continuation-refusal basis (cons
         expect(validate(withRefusalBasis("continuation_context_unverifiable"))).toBe(false);
         // The stand-in still accepts the live vocabulary, so it is faithful.
         expect(validate(withRefusalBasis("frame_invariant_violated"))).toBe(true);
+    });
+});
+
+/**
+ * `refusal_basis` gains a 5th member, `declared_kind_unmatched`: the question's
+ * frame declared a subject kind, retrieval ran, and nothing it could offer
+ * carried that kind, so the server stops rather than ask a question the caller
+ * has no means of answering.
+ *
+ * It is NOT a frame refusal -- the frame validated and its gate passed -- and it
+ * is not `member_kind_unservable` either: that member says no discovery arm
+ * serves the kind, which is false here. The document carries its own fixed
+ * sentence. The field is carried at the same two places as every other member.
+ *
+ * Load-bearing for the same reason the previous member was: a consumer on the
+ * prior pin rejects the new value as a contract violation, so the bump is what
+ * turns a truthful terminal into a 502. The executed repro below proves the
+ * prior pin's own schema is what rejects it, not merely that this pin accepts it.
+ */
+describe("investigation result contract — the declared-kind terminal basis (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+    const MEMBER = "declared_kind_unmatched";
+
+    function withRefusalBasis(value: string): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), refusal_basis: value };
+    }
+
+    it("GREEN: declared_kind_unmatched validates at this pin", () => {
+        const validation = validateContract(RESULT, withRefusalBasis(MEMBER));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("every earlier member still validates alongside it", () => {
+        for (const value of [
+            "member_kind_unservable",
+            "frame_invariant_violated",
+            "unspecified",
+            "continuation_context_unverifiable",
+        ]) {
+            const validation = validateContract(RESULT, withRefusalBasis(value));
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+        for (const value of [
+            "declared_kind_unmatched_",
+            "DECLARED_KIND_UNMATCHED",
+            "declared_kind",
+        ]) {
+            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(false);
+        }
+    });
+
+    it("both vocabularies carry the member — as enum values, not as description text", () => {
+        const resultEnum = (
+            investigationResultSchema as unknown as {
+                properties: { refusal_basis: { enum: string[] } };
+            }
+        ).properties.refusal_basis.enum;
+        const commonEnum = (
+            commonSchema as unknown as {
+                $defs: {
+                    AnswerCompleteness: { properties: { refusal_basis: { enum: string[] } } };
+                };
+            }
+        ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
+        expect(resultEnum).toContain(MEMBER);
+        expect(commonEnum).toContain(MEMBER);
+        expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
+    });
+
+    it("BEHAVIOURAL: the new value validates at completeness.refusal_basis too", () => {
+        const doc = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        doc.completeness = {
+            ...(doc.completeness as Record<string, unknown>),
+            refusal_basis: MEMBER,
+        };
+        const validation = validateContract(RESULT, doc);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new value", () => {
+        const priorResult = structuredClone(investigationResultSchema) as unknown as {
+            properties: { refusal_basis: { enum: string[] } };
+        };
+        expect(priorResult.properties.refusal_basis.enum).toContain(MEMBER);
+        priorResult.properties.refusal_basis.enum =
+            priorResult.properties.refusal_basis.enum.filter((value) => value !== MEMBER);
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResult);
+
+        expect(validate(withRefusalBasis(MEMBER))).toBe(false);
+        // The stand-in still accepts the previous member, so it is faithful.
+        expect(validate(withRefusalBasis("continuation_context_unverifiable"))).toBe(true);
     });
 });
 
