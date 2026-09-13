@@ -1346,8 +1346,8 @@ describe("investigation result contract — the continuation-refusal basis (cons
         ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
         expect(resultEnum).toContain("continuation_context_unverifiable");
         expect(commonEnum).toContain("continuation_context_unverifiable");
-        expect(resultEnum).toHaveLength(5);
-        expect(commonEnum).toHaveLength(5);
+        expect(resultEnum).toHaveLength(6);
+        expect(commonEnum).toHaveLength(6);
         expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
     });
 
