@@ -439,15 +439,15 @@ def _self_test_baseline_guard_fires():
 # "## Ownership"); this pin catches a silent edit to any of the 12, it
 # does not judge whether any value is correct -- a pin that fails is
 # reported, never "fixed" by updating the pin to match.
+#
+# CHAOS-5721: five of the original 12 (pos-grouped-per-phrasing,
+# basis-discovered-repo-count, basis-grouped-pr-by-project,
+# basis-discovered-incidents, basis-grouped-metric-by-repo) moved OFF this
+# scalar pin -- rescored any_of, now pinned by PINNED_5721_ANY_OF below.
 PINNED_REFUSE_DECLINE_EXPECT = {
-    "pos-grouped-per-phrasing": "refuse",
-    "basis-discovered-repo-count": "refuse",
-    "basis-grouped-pr-by-project": "refuse",
     "basis-grouped-deployment-by-team": "refuse",
-    "basis-discovered-incidents": "refuse",
     "basis-scoped-workitems-by-project": "refuse",
     "basis-discovered-documents": "refuse",
-    "basis-grouped-metric-by-repo": "refuse",
     "neg-nonexistent-team": "decline",
     "neg-nonexistent-project": "decline",
     "neg-nonexistent-repo-scope": "decline",
@@ -460,10 +460,12 @@ PINNED_REFUSE_DECLINE_EXPECT = {
 # into CHAOS-5597's 12 above so each pin's own origin/history stays legible --
 # CHAOS-5597 is the first tranche, D24 the second, and drift between either
 # tranche and the rest of the corpus is still caught (see the reverse check).
+#
+# CHAOS-5721: cv-org-count-projects moved OFF this scalar pin -- rescored
+# any_of, now pinned by PINNED_5721_ANY_OF below.
 PINNED_D24_REFUSE_DECLINE_EXPECT = {
     "cv-c3-grouped-explain-change": "refuse",
     "cv-b5-org-health": "refuse",
-    "cv-org-count-projects": "refuse",
     "neg-open-question": "decline",
     "neg-open-vague": "decline",
 }
@@ -496,8 +498,8 @@ def _self_test_pin_guard_fires():
     rejects a drifted pin -- a changed value, a pinned row deleted
     outright, and a row drifting into (or out of) the refuse/decline set
     without being added to (or removed from) the pin -- and that the
-    canonical shape (both the CHAOS-5597 12 and the D24 5) is still
-    accepted (CHAOS-5610, CHAOS-D24)."""
+    canonical shape (the current CHAOS-5597 and D24 scalar tranches, post
+    CHAOS-5721's any_of moves) is still accepted (CHAOS-5610, CHAOS-D24)."""
     canonical = [{"id": row_id, "expect": expect}
                  for row_id, expect in {**PINNED_REFUSE_DECLINE_EXPECT,
                                          **PINNED_D24_REFUSE_DECLINE_EXPECT}.items()]
@@ -566,8 +568,97 @@ def _self_test_pin_guard_fires():
               "by the accepted-check, never let its own accept-message satisfy a later "
               "reason-check")
 
-    # GREEN control: the canonical 12, untouched.
+    # GREEN control: the canonical scalar tranches, untouched.
     _check_pinned_refuse_decline_expect(copy.deepcopy(canonical))
+
+
+# CHAOS-5721: `any_of` for the six rows whose scalar `refuse` was overtaken
+# by the D27/D28/D33 servable-kind admissions, plus the seventh row's
+# existing any_of with its refuse branch dropped now that the role-aware
+# declared-kind terminal (acr #544 74d8fc4c) removed the terminal error
+# that branch had certified. Pinned by BRANCH SHAPE (outcome, and
+# for a serve branch its answer family) -- never by question text -- so a
+# silent edit to any of the seven rows' accepted alternatives is caught
+# here, not "fixed" by updating the pin to match (corpus/README.md
+# "## Ownership": row expectations are chris's call).
+PINNED_5721_ANY_OF = {
+    "pos-grouped-per-phrasing": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
+    "cv-org-count-projects": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
+    "basis-discovered-repo-count": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
+    "basis-grouped-pr-by-project": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
+    "basis-discovered-incidents": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
+    "basis-grouped-metric-by-repo": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
+    "cv-scoped-projects-by-team-bounded": frozenset({("serve", "scoped_cohort_status")}),
+}
+
+
+def _branch_key(branch):
+    outcome = branch.get("outcome")
+    family = (branch.get("answer") or {}).get("family") if outcome == "serve" else None
+    return (outcome, family)
+
+
+def _check_pinned_5721_any_of(corpus):
+    by_id = {row["id"]: row for row in corpus}
+    for row_id, want in PINNED_5721_ANY_OF.items():
+        _require(row_id in by_id,
+                  f"pinned any_of row {row_id!r} (CHAOS-5721) no longer exists in CORPUS")
+        expect = by_id[row_id].get("expect")
+        _require(isinstance(expect, dict) and isinstance(expect.get("any_of"), list),
+                  f"CORPUS[{row_id!r}].expect is no longer an any_of declaration (CHAOS-5721): got {expect!r} -- "
+                  "row expectations are chris's call (corpus/README.md ## Ownership); report, do not silently "
+                  "update the pin")
+        branches = expect["any_of"]
+        got = frozenset(_branch_key(b) for b in branches)
+        _require(len(branches) == len(want) and got == want,
+                  f"CORPUS[{row_id!r}].expect.any_of alternatives changed: pinned {sorted(want)}, "
+                  f"got {sorted(got)} (branch count pinned {len(want)}, got {len(branches)}) -- "
+                  "row expectations are chris's call (corpus/README.md ## Ownership); report, do not silently "
+                  "update the pin")
+
+
+def _self_test_5721_any_of_pin_guard_fires():
+    """RED CONTROLs: prove `_check_pinned_5721_any_of` rejects a drifted
+    branch set, a pinned row reverted to scalar, and a pinned row deleted
+    outright -- and that the canonical seven-row shape is still accepted."""
+    canonical = [
+        {"id": row_id, "expect": {"any_of": [
+            ({"outcome": "serve", "answer": {"family": family}} if outcome == "serve"
+             else {"outcome": outcome})
+            for outcome, family in sorted(branches)
+        ]}}
+        for row_id, branches in PINNED_5721_ANY_OF.items()
+    ]
+
+    def mutated(mutate):
+        corpus = copy.deepcopy(canonical)
+        mutate(corpus)
+        return corpus
+
+    def _serve_branch(corpus, row_index):
+        return next(b for b in corpus[row_index]["expect"]["any_of"] if b["outcome"] == "serve")
+
+    cases = [
+        (mutated(lambda c: c[0]["expect"]["any_of"].pop()), "alternatives changed"),
+        (mutated(lambda c: _serve_branch(c, 0)["answer"].__setitem__("family", "explicit_comparison")),
+         "alternatives changed"),
+        (mutated(lambda c: c[0].__setitem__("expect", "refuse")), "no longer an any_of declaration"),
+        (mutated(lambda c: c.pop(0)), "no longer exists"),
+    ]
+    for bad_corpus, must_mention in cases:
+        accepted = False
+        reason = None
+        try:
+            _check_pinned_5721_any_of(bad_corpus)
+            accepted = True
+        except CorpusValidationError as exc:
+            reason = str(exc)
+        _require(not accepted, f"RED CONTROL FAILED: drifted CHAOS-5721 pin accepted: {bad_corpus!r}")
+        _require(must_mention in reason,
+                  f"RED CONTROL FAILED: drifted CHAOS-5721 pin rejected for the wrong reason: {reason}")
+
+    # GREEN control: the canonical seven-row shape, untouched.
+    _check_pinned_5721_any_of(copy.deepcopy(canonical))
 
 
 # D24: every corpus row must now declare an `expect` except the two named
@@ -633,6 +724,7 @@ def main():
     _self_test_guard_fires()
     _self_test_baseline_guard_fires()
     _self_test_pin_guard_fires()
+    _self_test_5721_any_of_pin_guard_fires()
 
     corpus = corpus_module.CORPUS
     _require(isinstance(corpus, list) and corpus, "CORPUS must be a nonempty list")
@@ -653,6 +745,7 @@ def main():
         sys.exit(1)
 
     _check_pinned_refuse_decline_expect(corpus)
+    _check_pinned_5721_any_of(corpus)
     _self_test_every_row_scored_guard_fires()
     _check_every_row_scored_except_named(corpus)
 
@@ -661,6 +754,7 @@ def main():
     print(f"PASS: {len(corpus)} corpus rows validated")
     print(f"PASS: {len(PINNED_REFUSE_DECLINE_EXPECT)} CHAOS-5597 + {len(PINNED_D24_REFUSE_DECLINE_EXPECT)} D24 "
           "refuse/decline expect values pinned and matched")
+    print(f"PASS: {len(PINNED_5721_ANY_OF)} CHAOS-5721 any_of row branch sets pinned and matched")
     print(f"PASS: every corpus row scored except {sorted(UNSCORED_BY_DESIGN)} (CHAOS-5660)")
     print(f"PASS: baseline sha256 pin matched, {baseline_rows} baseline rows shape-checked "
           f"({dropped} historical-only, not in the current corpus)")
