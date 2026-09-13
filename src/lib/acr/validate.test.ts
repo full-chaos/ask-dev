@@ -1495,6 +1495,104 @@ describe("investigation result contract — the declared-kind terminal basis (co
 });
 
 /**
+ * `refusal_basis` gains a 6th member, `organization_scope_unsupported`: the
+ * question made the organization itself the subject and asked for something
+ * other than a count -- its state, health or drivers -- which is not a
+ * capability the service has. Organization-wide counts of one kind of subject
+ * are supported, and the document's own fixed sentence says so.
+ *
+ * It is NOT `declared_kind_unmatched`, which invites renaming a subject: nothing
+ * retrieval could offer makes an organization-wide health question answerable.
+ * It is not a frame refusal either. The field is carried at the same two places
+ * as every other member, and the prior pin rejects the value, so the bump is
+ * what turns this truthful refusal into an answer this workbench can render.
+ */
+describe("investigation result contract — the organization-scope refusal basis (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+    const MEMBER = "organization_scope_unsupported";
+
+    function withRefusalBasis(value: string): Record<string, unknown> {
+        return { ...structuredClone(canonicalResult), refusal_basis: value };
+    }
+
+    it("GREEN: organization_scope_unsupported validates at this pin", () => {
+        const validation = validateContract(RESULT, withRefusalBasis(MEMBER));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("every earlier member still validates alongside it", () => {
+        for (const value of [
+            "member_kind_unservable",
+            "frame_invariant_violated",
+            "unspecified",
+            "continuation_context_unverifiable",
+            "declared_kind_unmatched",
+        ]) {
+            const validation = validateContract(RESULT, withRefusalBasis(value));
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+        for (const value of [
+            "organization_scope_unsupported_",
+            "ORGANIZATION_SCOPE_UNSUPPORTED",
+            "organization_scope",
+        ]) {
+            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(false);
+        }
+    });
+
+    it("both vocabularies carry the member — as enum values, not as description text", () => {
+        const resultEnum = (
+            investigationResultSchema as unknown as {
+                properties: { refusal_basis: { enum: string[] } };
+            }
+        ).properties.refusal_basis.enum;
+        const commonEnum = (
+            commonSchema as unknown as {
+                $defs: {
+                    AnswerCompleteness: { properties: { refusal_basis: { enum: string[] } } };
+                };
+            }
+        ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
+        expect(resultEnum).toContain(MEMBER);
+        expect(commonEnum).toContain(MEMBER);
+        expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
+    });
+
+    it("BEHAVIOURAL: the new value validates at completeness.refusal_basis too", () => {
+        const doc = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
+        doc.completeness = {
+            ...(doc.completeness as Record<string, unknown>),
+            refusal_basis: MEMBER,
+        };
+        const validation = validateContract(RESULT, doc);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new value", () => {
+        const priorResult = structuredClone(investigationResultSchema) as unknown as {
+            properties: { refusal_basis: { enum: string[] } };
+        };
+        expect(priorResult.properties.refusal_basis.enum).toContain(MEMBER);
+        priorResult.properties.refusal_basis.enum =
+            priorResult.properties.refusal_basis.enum.filter((value) => value !== MEMBER);
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(commonSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(priorResult);
+
+        expect(validate(withRefusalBasis(MEMBER))).toBe(false);
+        // The stand-in still accepts the previous member, so it is faithful.
+        expect(validate(withRefusalBasis("declared_kind_unmatched"))).toBe(true);
+    });
+});
+
+/**
  * `CoverageDetail.code` gains a 17th closed-vocabulary member,
  * `fact_read_origin_state`: the code the service publishes when a requirement's
  * read reports the ORIGIN STATE of the population it read, per kind, rather

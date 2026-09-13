@@ -382,3 +382,35 @@ describe("DeterministicAnswerView: a refused continuation still shows the servic
         expect(withText).toBe(withoutText);
     });
 });
+
+/**
+ * The user-facing wording of the organization-scope refusal is the service's
+ * own fixed sentence (ACR `ContextFabricOrganizationScopeUnsupportedLimitation`):
+ * it says organization-wide analysis of status, health or drivers is not
+ * supported, and that organization-wide counts are. The view renders it as
+ * visible text under Limitations; the basis itself is a machine field the view
+ * does not key off.
+ */
+describe("DeterministicAnswerView: an organization-scope refusal shows what is and is not supported", () => {
+    const SENTENCE =
+        "This question was read as being about the organization as a whole. Organization-wide analysis of status, health or drivers is not supported; organization-wide counts of one kind of subject, such as how many repositories or teams there are, are supported. No canonical facts were read. The server refused this question on the basis organization_scope_unsupported.";
+
+    function refusedOrganizationQuestion(): InvestigationResult {
+        const base = mockScenarios().find((s) => s.id === "complete")!.result;
+        return {
+            ...structuredClone(base),
+            status: "no_match",
+            refusal_basis: "organization_scope_unsupported",
+            limitations: [SENTENCE],
+        } as unknown as InvestigationResult;
+    }
+
+    it("renders the sentence as visible text, including what IS supported", () => {
+        render(<DeterministicAnswerView result={refusedOrganizationQuestion()} />);
+        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const text = visibleText(article);
+        expect(text).toContain(SENTENCE);
+        expect(text).toContain("organization-wide counts");
+        expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
+    });
+});
