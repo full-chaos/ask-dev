@@ -235,6 +235,48 @@ def test_persisted_link_promotes_serve_to_agree_and_outranks_a_wrongly_certified
     _require(adapter.calls == [final["result_id"]], adapter.calls)
 
 
+def test_persisted_link_promotes_a_single_turn_serve_with_no_window_exchange_at_all():
+    # The window audit and the persisted-family link are independent
+    # evidence about independent questions (see score_branch's own
+    # docstring) -- an ORDINARY single-turn serve never goes through a
+    # window-clarification exchange at all, so the audit's own default is
+    # `window_binding="unknown"`/`reason="unsupported_exchange"`, never
+    # "verified". That must not block a real, independently-confirmed
+    # persisted link: this is exactly the real-world shape a served,
+    # non-window-clarification any_of row has (confirmed against real
+    # trial-store data in the ticket's own rescore evidence).
+    audit = SV.audit_window_exchange([])  # no attempts at all -> no exchange, ever
+    _require(audit["window_binding"] == "unknown", audit)
+    final = {"answer_plan": {"family": "explicit_comparison"}, "result_id": "result-single-turn"}
+    row = declaration(serve("explicit_comparison"), {"outcome": "refuse"})
+    adapter = _CountingAdapter(_persisted_state(family="explicit_comparison"))
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("agree", "family_confirmed"), (verdict, reason))
+    _require(adapter.calls == [final["result_id"]], adapter.calls)
+
+
+def test_persisted_link_promotes_a_serve_whose_window_exchange_audit_is_merely_inconclusive():
+    # A DIFFERENT shape from "no exchange at all" above: a two-turn exchange
+    # WAS attempted but the audit could not positively verify it (a
+    # corpus-harness capture gap, not a proven mistake) -- window_binding
+    # still reads "unknown", never "mismatch". The persisted link is a
+    # separate, independently-grounded signal (the engine's own stored
+    # state for the SERVED result) and must not be downgraded just because
+    # the corpus's OWN capture of the surrounding conversation was
+    # unreadable.
+    attempts = base_exchange()
+    final = attempts[-1]["response"]["result"]
+    del final["confirmed_structure"]  # -> audit_window_exchange: "missing_window_ack", still "unknown"
+    final = {**final, "result_id": "result-inconclusive-audit"}
+    audit = SV.audit_window_exchange([attempts[0], {**attempts[1], "response": {"result": final}}])
+    _require(audit["window_binding"] == "unknown", audit)
+    _require(audit["reason"] == "missing_window_ack", audit)
+    row = declaration(serve())
+    adapter = _CountingAdapter(_persisted_state())
+    verdict, reason, _ = SV.score(row, "served_with_data", "complete", final, audit, fake_legacy_score, adapter)
+    _require((verdict, reason) == ("agree", "family_confirmed"), (verdict, reason))
+
+
 def test_persisted_state_absent_stays_unscored():
     final, audit = _verified_exchange_with_result_id()
     row = declaration(serve())

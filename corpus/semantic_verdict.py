@@ -440,14 +440,38 @@ def score_branch(row, branch, bucket, status, final, audit, legacy_score, persis
     production; a test double in ask-dev's own tests -- see
     test_semantic_verdict.py). This function never grants `agree` for a
     serve branch on outcome alone: it additionally requires the observed
-    family to match the declared one, the window-binding audit to be clean,
-    and (CHAOS-5722) the family-confirmation link from the served result's
-    PERSISTED semantic state (`persisted_semantic_state`, injected the same
-    way `legacy_score` is -- this function never opens a connection of its
-    own) -- see `_score_persisted_family_confirmation`. Any step short of a
-    complete, matching link stays `unscored` under one of D49's two closed
-    reasons; a positive family mismatch (declared, or persisted) or a
-    window-binding mismatch is `disagree`, never `unscored`.
+    family to match the declared one, the window-binding audit to have found
+    NO POSITIVE MISTAKE (`!= "mismatch"` -- see the next paragraph for why
+    this is not the same as "verified"), and (CHAOS-5722) the
+    family-confirmation link from the served result's PERSISTED semantic
+    state (`persisted_semantic_state`, injected the same way `legacy_score`
+    is -- this function never opens a connection of its own) -- see
+    `_score_persisted_family_confirmation`. Any step short of a complete,
+    matching link stays `unscored` under one of D49's two closed reasons; a
+    positive family mismatch (declared, or persisted) or a window-binding
+    mismatch is `disagree`, never `unscored`.
+
+    WHY `window_binding != "mismatch"`, NOT `== "verified"`. The window
+    audit (`audit_window_exchange`) and the persisted-family link below are
+    two INDEPENDENT sources of evidence about two DIFFERENT questions: the
+    audit asks "was a window-clarification receipt correctly offered and
+    applied", the persisted link asks "does the engine's own record of what
+    it served and validated match what was declared". A row that never went
+    through a window-clarification exchange at all (an ordinary single-turn
+    serve -- the audit's own default, `window_binding="unknown"`,
+    `reason="unsupported_exchange"`) has NOTHING for the first question to
+    confirm or deny; that says nothing about the second question, which the
+    persisted link answers on its own, from the engine's own stored state,
+    not from the corpus harness's capture of a conversation. Only a
+    POSITIVE, PROVEN mistake in the window mechanics (`"mismatch"` -- a
+    receipt applied to the wrong offer, a conflicting confirmation, ...)
+    contradicts what a served answer's family/gate says; an inconclusive or
+    absent audit does not, and must not silently downgrade a real,
+    independently-confirmed persisted link to `unscored`. See
+    `test_persisted_link_promotes_a_single_turn_serve_with_no_window_exchange_at_all`
+    for the executed proof, and the ticket's own rescore evidence (a real
+    single-turn `any_of` row, `window_binding="unknown"`, correctly reaching
+    `agree` from its persisted state).
 
     Returns `(verdict, reason, detail)` -- `detail` is `{}` unless the
     persisted-state check actually ran and read something, in which case it
