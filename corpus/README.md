@@ -81,3 +81,28 @@ validator. See `corpus/semantic_verdict.py`'s module docstring and
 No row in this corpus was changed to `any_of` by this change; `expect`
 values remain chris's to set, same as any other row edit (see "## Versioning"
 above).
+
+## Version history
+
+This corpus has no separate numeric version constant: the **corpus version
+IS this file's git commit sha** (`git show <sha>:corpus/corpus.py`), which
+is what a scoring run's `corpus_version` provenance field (see
+`corpus/semantic_verdict.py:build_verdict`) records. Each entry below is a
+commit (or PR) that changed a row's `expect` and moved the pass/fail bar —
+"bumping the corpus version" means landing that commit; there is nothing
+else to increment.
+
+- **CHAOS-5620** — added the `any_of` shape and `corpus/expect_schema.py`
+  (`SCHEMA_VERSION`). No row's `expect` changed.
+- **CHAOS-5721** — six rows whose scalar `expect="refuse"` had been
+  overtaken by the D27/D28/D33 servable-kind admissions
+  (`basis-discovered-incidents`, `basis-discovered-repo-count`,
+  `cv-org-count-projects`, `basis-grouped-metric-by-repo`,
+  `basis-grouped-pr-by-project`, `pos-grouped-per-phrasing`) rescored to
+  `any_of {serve with the row's own family, refuse}`.
+  `cv-scoped-projects-by-team-bounded`'s existing `any_of` had its `refuse`
+  alternative dropped: the role-aware declared-kind terminal (acr #544
+  `74d8fc4c`) removed the terminal error that alternative had certified as
+  a match. The prior scoring series for these seven rows stays in git
+  history, never overwritten; every future run against them scores under
+  this new expect.
