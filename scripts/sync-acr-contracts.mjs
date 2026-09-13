@@ -284,7 +284,28 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // WIDENING ONLY, and now load-bearing: acr main serves this code, so without
 // the bump a response carrying such a row is rejected whole as
 // `acr_contract_violation` instead of rendering.
-export const SOURCE_COMMIT = "d28f042978b8cfe58a6d08102be485994cff5738";
+//
+// d28f0429 -> fe3fe467: two commits touch `contracts/` (`git diff d28f0429
+// fe3fe467 -- contracts/` shows five files), and exactly one change reaches
+// the vendored surface.
+//   - `context_fabric_common.v1`'s `ClaimedFact.kind` enum gains its 23rd
+//     member, `cardinality` (acr #529): the count the server computes over a
+//     resolved member set, minted as a claimed fact whose subject is the
+//     organization, on an answer whose question owes a count. It is a CLAIM
+//     kind only -- no requestable fact-kind enum carries it -- so a request
+//     can never ask for it.
+//   - `context_fabric_answer_projection.v1` and the two `mcp_*` response
+//     schemas carry the same member, and `context_fabric_projection_batch.v1`
+//     (example, acr #538) changes; none is part of this repo's vendored
+//     surface, the same exclusion as every bump above.
+// `context_fabric_investigation_request.v1`, `context_fabric_investigation_
+// result.v1`, `error.v1` and every vendored example are byte-identical to the
+// prior pin.
+//
+// WIDENING ONLY, and load-bearing: acr main mints this claim, so without the
+// bump a response carrying it is rejected whole as `acr_contract_violation`
+// instead of rendering.
+export const SOURCE_COMMIT = "fe3fe467afb91323eaa8d122be7f78a5e6758e3b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

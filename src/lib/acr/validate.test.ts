@@ -1572,3 +1572,114 @@ describe("coverage detail contract — the read-origin-state code (consumer pin)
         expect(validate(resultWithDetailCode("fact_provider_reported"))).toBe(true);
     });
 });
+
+/**
+ * `ClaimedFact.kind` gains a 23rd member, `cardinality`: the count the service
+ * computes over a resolved member set, minted as a claimed fact whose subject
+ * is the organization, on an answer whose question owes a count. Its value is
+ * the SERVED member count, as an integer.
+ *
+ * It is a CLAIM kind only. The four requestable fact-kind vocabularies --
+ * `FactRequirement.kind`, `AnswerPlan.fact_kinds`, `PlanRequirement.fact_kinds`
+ * and `PlanRequirement.input_fact_kinds` -- do not carry it, so a request or a
+ * plan can never name it. That asymmetry is pinned here too: a mirror that
+ * widened every fact-kind enum would validate documents the service refuses.
+ *
+ * Load-bearing: a consumer on the prior pin rejects a response carrying this
+ * claim as a contract violation. The executed repro proves the prior pin's own
+ * schema is what rejects it, not merely that this pin accepts it.
+ */
+describe("investigation result contract — the cardinality claim kind (consumer pin)", () => {
+    const RESULT = "context_fabric_investigation_result.v1.schema.json";
+    const MEMBER = "cardinality";
+
+    type CommonDefs = {
+        $defs: {
+            ClaimedFact: { properties: { kind: { enum: string[] } } };
+            FactRequirement: { properties: { kind: { enum: string[] } } };
+            AnswerPlan: { properties: { fact_kinds: { items: { enum: string[] } } } };
+            PlanRequirement: {
+                properties: {
+                    fact_kinds: { items: { enum: string[] } };
+                    input_fact_kinds: { items: { enum: string[] } };
+                };
+            };
+        };
+    };
+
+    function cardinalityClaim(kind: string): Record<string, unknown> {
+        return {
+            claim_id: "server:cardinality:team",
+            kind,
+            subject: { kind: "organization", canonical_id: "org_1", label: "org_1" },
+            field: "team_count",
+            value: { integer: 14 },
+        };
+    }
+
+    function withClaim(kind: string): Record<string, unknown> {
+        const doc = structuredClone(canonicalResult) as unknown as {
+            claimed_facts: Array<Record<string, unknown>>;
+        };
+        doc.claimed_facts = [...doc.claimed_facts, cardinalityClaim(kind)];
+        return doc;
+    }
+
+    it("GREEN: a cardinality claim validates at this pin", () => {
+        const validation = validateContract(RESULT, withClaim(MEMBER));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("every earlier claim kind still validates alongside it", () => {
+        const kinds = (commonSchema as unknown as CommonDefs).$defs.ClaimedFact.properties.kind
+            .enum;
+        const earlier = kinds.filter((kind) => kind !== MEMBER);
+        expect(earlier).toHaveLength(22);
+        for (const kind of earlier) {
+            const validation = validateContract(RESULT, withClaim(kind));
+            expect(validation.errors).toEqual([]);
+            expect(validation.valid).toBe(true);
+        }
+    });
+
+    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+        for (const kind of ["cardinality_", "CARDINALITY", "cardinalities", "count"]) {
+            expect(validateContract(RESULT, withClaim(kind)).valid).toBe(false);
+        }
+    });
+
+    it("the claim vocabulary carries the member as an enum value; no requestable vocabulary does", () => {
+        const defs = (commonSchema as unknown as CommonDefs).$defs;
+        const claimKinds = defs.ClaimedFact.properties.kind.enum;
+        expect(claimKinds).toContain(MEMBER);
+        expect(claimKinds).toHaveLength(23);
+
+        const requestable = [
+            defs.FactRequirement.properties.kind.enum,
+            defs.AnswerPlan.properties.fact_kinds.items.enum,
+            defs.PlanRequirement.properties.fact_kinds.items.enum,
+            defs.PlanRequirement.properties.input_fact_kinds.items.enum,
+        ];
+        for (const vocabulary of requestable) {
+            expect(vocabulary).toHaveLength(22);
+            expect(vocabulary).not.toContain(MEMBER);
+            expect([...vocabulary, MEMBER].sort()).toEqual([...claimKinds].sort());
+        }
+    });
+
+    it("EXECUTED repro: the prior pin's own schema rejects the new claim kind", () => {
+        const priorCommon = structuredClone(commonSchema) as unknown as CommonDefs;
+        const claimKind = priorCommon.$defs.ClaimedFact.properties.kind;
+        expect(claimKind.enum).toContain(MEMBER);
+        claimKind.enum = claimKind.enum.filter((kind) => kind !== MEMBER);
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorCommon, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(withClaim(MEMBER))).toBe(false);
+        // The stand-in still accepts an earlier claim kind, so it is faithful.
+        expect(validate(withClaim("readiness"))).toBe(true);
+    });
+});
