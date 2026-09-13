@@ -415,3 +415,42 @@ describe("DeterministicAnswerView: an organization-scope refusal shows what is a
         expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
     });
 });
+
+/**
+ * CHAOS-5672: a stored clarification read back without its stored reading of
+ * the question carries `semantic_reading`, and the workbench says beside the
+ * options that the service could not check them. Without the field, no notice.
+ */
+describe("DeterministicAnswerView: a stored clarification whose reading was unavailable says so", () => {
+    function storedClarification(semanticReading?: unknown): InvestigationResult {
+        const base = structureMockScenarios()[0]!.result;
+        const clone = structuredClone(base) as unknown as Record<string, unknown>;
+        clone.status = "clarification_required";
+        if (semanticReading === undefined) delete clone.semantic_reading;
+        else clone.semantic_reading = semanticReading;
+        return clone as unknown as InvestigationResult;
+    }
+
+    it("renders a visible note for each reason", () => {
+        for (const [reason, phrase] of [
+            ["semantic_state_absent", "no stored reading of the question is available"],
+            ["semantic_state_unreadable", "its stored reading of the question could not be read"],
+        ] as const) {
+            const view = render(
+                <DeterministicAnswerView
+                    result={storedClarification({ status: "unavailable", reason })}
+                />,
+            );
+            const note = view.container.querySelector(`[data-semantic-reading="${reason}"]`);
+            expect(note).not.toBeNull();
+            expect(visibleText(note!)).toContain(phrase);
+            expect(visibleText(note!)).toContain("Ask the question again");
+            view.unmount();
+        }
+    });
+
+    it("renders nothing without the field", () => {
+        const view = render(<DeterministicAnswerView result={storedClarification()} />);
+        expect(view.container.querySelector("[data-semantic-reading]")).toBeNull();
+    });
+});
