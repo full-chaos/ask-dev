@@ -1438,7 +1438,11 @@ describe("investigation result contract — the declared-kind terminal basis (co
     });
 
     it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
-        for (const value of ["declared_kind_unmatched_", "DECLARED_KIND_UNMATCHED", "declared_kind"]) {
+        for (const value of [
+            "declared_kind_unmatched_",
+            "DECLARED_KIND_UNMATCHED",
+            "declared_kind",
+        ]) {
             expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(false);
         }
     });
