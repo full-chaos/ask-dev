@@ -1501,8 +1501,10 @@ describe("investigation result contract — the declared-kind terminal basis (co
  * capability the service has. Organization-wide counts of one kind of subject
  * are supported, and the document's own fixed sentence says so.
  *
- * It is NOT `declared_kind_unmatched`, which invites renaming a subject: nothing
- * retrieval could offer makes an organization-wide health question answerable.
+ * It is NOT `declared_kind_unmatched`, which refuses a question because none of
+ * the options found could be chosen to answer it: for an organization-wide
+ * health question no option could ever be the answer, because its subject is
+ * the organization itself.
  * It is not a frame refusal either. The field is carried at the same two places
  * as every other member, and the prior pin rejects the value, so the bump is
  * what turns this truthful refusal into an answer this workbench can render.

@@ -393,7 +393,7 @@ describe("DeterministicAnswerView: a refused continuation still shows the servic
  */
 describe("DeterministicAnswerView: an organization-scope refusal shows what is and is not supported", () => {
     const SENTENCE =
-        "This question was read as being about the organization as a whole. Organization-wide analysis of status, health or drivers is not supported; organization-wide counts of one kind of subject, such as how many repositories or teams there are, are supported. No canonical facts were read. The server refused this question on the basis organization_scope_unsupported.";
+        "This question was read as being about the organization as a whole. Organization-wide analysis of status, health or drivers is not supported; organization-wide counts of one kind of subject, such as how many repositories or teams there are, are supported. No canonical facts were read.";
 
     function refusedOrganizationQuestion(): InvestigationResult {
         const base = mockScenarios().find((s) => s.id === "complete")!.result;
@@ -411,6 +411,7 @@ describe("DeterministicAnswerView: an organization-scope refusal shows what is a
         const text = visibleText(article);
         expect(text).toContain(SENTENCE);
         expect(text).toContain("organization-wide counts");
+        expect(text).not.toContain("The server refused this question on the basis");
         expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
     });
 });
