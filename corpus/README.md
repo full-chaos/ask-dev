@@ -106,3 +106,21 @@ else to increment.
   a match. The prior scoring series for these seven rows stays in git
   history, never overwritten; every future run against them scores under
   this new expect.
+
+## Persisted family-confirmation link (CHAOS-5722)
+
+An `any_of` SERVE branch's family-confirmation link (previously always
+`unscored`/`family_confirmation_unavailable` — see CHAOS-5620 above) can now
+reach `agree` from the served result's PERSISTED semantic state (acr's M2
+`semantic_state` column), never the wire, which carries only the
+`semantic_reading` unavailable/absent/unreadable disclosure (D49). The
+runner supplies a `persisted_semantic_state(result_id) -> dict | None`
+adapter to `score`/`score_branch`/`build_verdict`; `semantic_verdict.py`
+never opens a connection of its own, and the two absent/unreadable reasons
+it reports reuse D49's own closed tokens
+(`expect_schema.SEMANTIC_STATE_ABSENT`/`SEMANTIC_STATE_UNREADABLE`), read
+from the synced contract schema, never hand-copied. Bumped
+`POLICY_VERSION` (`any_of-fail-closed-v2-persisted-family-link`) — a
+rescore under it is not comparable to a `v1` run without saying so.
+Omitting the adapter (every call site that predates this ticket) scores
+exactly as if it found no persisted row.

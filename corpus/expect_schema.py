@@ -48,6 +48,31 @@ def _read_question_family_vocabulary():
 
 FAMILIES = _read_question_family_vocabulary()
 
+
+def _read_semantic_reading_reasons():
+    """The two closed reasons a stored result's semantic-reading disclosure
+    can carry (D49, CHAOS-5672, acr
+    internal/contracts/v1/context_fabric_semantic_reading.go's
+    `ContextFabricSemanticReadingReason` vocabulary), read directly from the
+    pinned, synced contract schema's own `semantic_reading.reason` enum --
+    not hand-copied, so CHAOS-5722's persisted-state absent/unreadable
+    verdict reasons can never spell these two tokens differently from the
+    engine's own wire disclosure. Fails loudly at import time (never a
+    silent guess) if the synced schema's vocabulary ever stops being exactly
+    these two members."""
+    doc = json.loads((_SCHEMAS_DIR / "context_fabric_investigation_result.v1.schema.json").read_text())
+    enum = frozenset(doc["properties"]["semantic_reading"]["properties"]["reason"]["enum"])
+    absent, unreadable = "semantic_state_absent", "semantic_state_unreadable"
+    if enum != {absent, unreadable}:
+        raise RuntimeError(
+            "context_fabric_investigation_result.v1.schema.json's semantic_reading.reason "
+            f"vocabulary changed to {sorted(enum)!r} -- update expect_schema.py's mirror"
+        )
+    return absent, unreadable
+
+
+SEMANTIC_STATE_ABSENT, SEMANTIC_STATE_UNREADABLE = _read_semantic_reading_reasons()
+
 # Bump on any change to branch shape, vocabulary, or validation rule below --
 # a published semantic verdict record carries this so a rescore under a
 # changed schema is never silently compared to one scored under the old

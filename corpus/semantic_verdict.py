@@ -52,6 +52,18 @@ WHAT THIS DOES. It adds:
     unscored/unverifiable counts on every published verdict record, so a
     rescore under a changed policy is never mistaken for one under the old
     policy (see corpus/README.md).
+  * CHAOS-5722: an `any_of` SERVE branch's family-confirmation link, read
+    from the PERSISTED semantic state of the served result (acr's M2
+    `semantic_state` column -- internal/contextfabric/semantic_state.go),
+    not the wire. The wire carries only the `semantic_reading` disclosure
+    (unavailable/absent/unreadable, D49) -- never the accepted reading
+    itself -- so this module never opens a connection of its own: the
+    caller (the corpus runner) injects a `persisted_semantic_state(result_id)
+    -> dict | None` adapter, the same injection shape `legacy_score` already
+    uses, and every reason this function returns for it reuses D49's own two
+    closed tokens (`expect_schema.SEMANTIC_STATE_ABSENT`/
+    `SEMANTIC_STATE_UNREADABLE`) so a harness report can never spell "no
+    reading" differently from the engine's own disclosure.
 """
 
 import expect_schema as S
@@ -80,7 +92,14 @@ SCORER_VERSION = "chaos-5620-semantic-verdict-v1"
 # oracle agreement suffices without a caller-confirmation receipt") is a
 # product/data decision (see the design of record) and gets its own version
 # string, never a silent redefinition of this one.
-POLICY_VERSION = "any_of-fail-closed-v1"
+#
+# Bumped for CHAOS-5722: a serve branch's family-confirmation link is now
+# read from the served result's PERSISTED semantic state (when the caller
+# supplies the `persisted_semantic_state` adapter) instead of being
+# uniformly `unscored`/`family_confirmation_unavailable` -- a rescore under
+# this version is not comparable to one under `any_of-fail-closed-v1`
+# without saying so (see corpus/README.md).
+POLICY_VERSION = "any_of-fail-closed-v2-persisted-family-link"
 
 # Mirrors acr scripts/corpus/contract.py:63 (`is_success_status`) and its
 # `SERVED_STATUSES = frozenset({200})`. The producer's contract, not
@@ -100,6 +119,39 @@ class ValidatorUnavailable(Exception):
     exchange. Callers report this under its own reason
     (`validator_unavailable`), never conflated with `unreadable_exchange`
     (which means the DATA was bad, not the tooling)."""
+
+
+class PersistedSemanticStateUnreadable(Exception):
+    """CHAOS-5722: raised by a caller-supplied `persisted_semantic_state`
+    adapter when the trial store carries a row for the given result id but
+    it cannot be trusted (fails to decode, exceeds a bound, or otherwise
+    cannot be read) -- distinct from the adapter returning `None`, which
+    means no row exists at all. Mirrors acr's own absent-vs-unreadable
+    distinction for a stored semantic reading (D49,
+    internal/contracts/v1/context_fabric_semantic_reading.go). An adapter
+    that cannot tell the two apart should prefer raising this over
+    returning `None` -- "unreadable" is strictly more informative and this
+    module reports it under its own D49 reason
+    (`expect_schema.SEMANTIC_STATE_UNREADABLE`), never conflated with
+    `SEMANTIC_STATE_ABSENT`.
+    """
+
+
+# acr internal/contextfabric/semantic_state.go: SemanticStateFormatVersion.
+# Never on the wire (see this module's docstring), so unlike FAMILIES/
+# SEMANTIC_STATE_ABSENT/SEMANTIC_STATE_UNREADABLE above there is no synced
+# schema file to read this from -- mirrored here by hand, the same
+# discipline _SERVED_HTTP_STATUSES below already uses for an acr constant
+# this repo cannot import. A stored snapshot naming any other format is
+# unavailable to this scorer, exactly as it is to acr's own reader.
+_SEMANTIC_STATE_FORMAT_VERSION = "semantic-state.v1"
+
+# acr internal/contextfabric/frame_gate.go: FrameGateOutcome's accepted
+# member, FrameGatePassed. Hand-mirrored for the same reason as
+# _SEMANTIC_STATE_FORMAT_VERSION above -- FrameGateOutcome never reaches the
+# wire, so there is no synced contract file this module could read it from
+# instead.
+_GATE_OUTCOME_PASSED = "passed"
 
 
 def _validate_shape(schema_def, payload):
@@ -328,7 +380,59 @@ def audit_window_exchange(attempts):
         return {**out, "reason": "unreadable_exchange"}
 
 
-def score_branch(row, branch, bucket, status, final, audit, legacy_score, **identity):
+def _score_persisted_family_confirmation(observed_family, final, persisted_semantic_state):
+    """CHAOS-5722: the terminal step of a serve branch's family-confirmation
+    link, once the observed family matches the declared one and the
+    window-binding audit is clean (score_branch's caller already checked
+    both). Never called for a scalar row, a refuse branch, or a branch that
+    already failed an earlier check -- see score_branch.
+
+    `persisted_semantic_state` is `None` when the caller wired in no
+    adapter at all (every legacy `build_verdict`/`score` call site that
+    predates this ticket) -- treated exactly like an adapter that found no
+    row: `unscored`/`SEMANTIC_STATE_ABSENT`, never a crash and never a
+    promotion to `agree`.
+    """
+    detail = {}
+    if persisted_semantic_state is None:
+        return "unscored", S.SEMANTIC_STATE_ABSENT, detail
+    result_id = final.get("result_id") if isinstance(final, dict) else None
+    if not isinstance(result_id, str) or not result_id:
+        return "unscored", S.SEMANTIC_STATE_ABSENT, detail
+    detail["result_id"] = result_id
+    try:
+        persisted = persisted_semantic_state(result_id)
+    except PersistedSemanticStateUnreadable:
+        return "unscored", S.SEMANTIC_STATE_UNREADABLE, detail
+    if persisted is None:
+        return "unscored", S.SEMANTIC_STATE_ABSENT, detail
+    if not isinstance(persisted, dict):
+        return "unscored", S.SEMANTIC_STATE_UNREADABLE, detail
+    format_version = persisted.get("format_version")
+    detail["persisted_format_version"] = format_version
+    if format_version != _SEMANTIC_STATE_FORMAT_VERSION:
+        return "unscored", "semantic_state_version_unknown", detail
+    persisted_family = persisted.get("family")
+    validation = persisted.get("validation")
+    gate_outcome = validation.get("gate_outcome") if isinstance(validation, dict) else None
+    if not isinstance(persisted_family, str) or not isinstance(validation, dict) or not isinstance(gate_outcome, str):
+        # A row at a format_version this scorer knows must carry these
+        # fields (they are required, non-nullable, in that format) -- one
+        # missing or mistyped is the row failing to be what its own declared
+        # format promises, i.e. unreadable, never a mismatch verdict against
+        # values that were never really there.
+        return "unscored", S.SEMANTIC_STATE_UNREADABLE, detail
+    detail["persisted_family"] = persisted_family
+    if persisted_family != observed_family:
+        return "disagree", "persisted_family_mismatch", detail
+    detail["persisted_gate_outcome"] = gate_outcome
+    if gate_outcome != _GATE_OUTCOME_PASSED:
+        return "unscored", "gate_outcome_not_accepted", detail
+    return "agree", "family_confirmed", detail
+
+
+def score_branch(row, branch, bucket, status, final, audit, legacy_score, persisted_semantic_state=None,
+                  **identity):
     """Score one `any_of` alternative.
 
     `legacy_score(scalar_row, bucket, status, **identity) -> (verdict, reason)`
@@ -336,43 +440,82 @@ def score_branch(row, branch, bucket, status, final, audit, legacy_score, **iden
     production; a test double in ask-dev's own tests -- see
     test_semantic_verdict.py). This function never grants `agree` for a
     serve branch on outcome alone: it additionally requires the observed
-    family to match the declared one, and then requires a verified,
-    unmistaken family-confirmation link before calling it more than
-    `unscored` -- which the current wire cannot supply (see
-    audit_window_exchange), so a serve branch's ceiling today is
-    `unscored`/`family_confirmation_unavailable`, never `agree`.
+    family to match the declared one, the window-binding audit to have found
+    NO POSITIVE MISTAKE (`!= "mismatch"` -- see the next paragraph for why
+    this is not the same as "verified"), and (CHAOS-5722) the
+    family-confirmation link from the served result's PERSISTED semantic
+    state (`persisted_semantic_state`, injected the same way `legacy_score`
+    is -- this function never opens a connection of its own) -- see
+    `_score_persisted_family_confirmation`. Any step short of a complete,
+    matching link stays `unscored` under one of D49's two closed reasons; a
+    positive family mismatch (declared, or persisted) or a window-binding
+    mismatch is `disagree`, never `unscored`.
+
+    WHY `window_binding != "mismatch"`, NOT `== "verified"`. The window
+    audit (`audit_window_exchange`) and the persisted-family link below are
+    two INDEPENDENT sources of evidence about two DIFFERENT questions: the
+    audit asks "was a window-clarification receipt correctly offered and
+    applied", the persisted link asks "does the engine's own record of what
+    it served and validated match what was declared". A row that never went
+    through a window-clarification exchange at all (an ordinary single-turn
+    serve -- the audit's own default, `window_binding="unknown"`,
+    `reason="unsupported_exchange"`) has NOTHING for the first question to
+    confirm or deny; that says nothing about the second question, which the
+    persisted link answers on its own, from the engine's own stored state,
+    not from the corpus harness's capture of a conversation. Only a
+    POSITIVE, PROVEN mistake in the window mechanics (`"mismatch"` -- a
+    receipt applied to the wrong offer, a conflicting confirmation, ...)
+    contradicts what a served answer's family/gate says; an inconclusive or
+    absent audit does not, and must not silently downgrade a real,
+    independently-confirmed persisted link to `unscored`. See
+    `test_persisted_link_promotes_a_single_turn_serve_with_no_window_exchange_at_all`
+    for the executed proof, and the ticket's own rescore evidence (a real
+    single-turn `any_of` row, `window_binding="unknown"`, correctly reaching
+    `agree` from its persisted state).
+
+    Returns `(verdict, reason, detail)` -- `detail` is `{}` unless the
+    persisted-state check actually ran and read something, in which case it
+    carries exactly the fields this function consulted (`result_id`,
+    `persisted_format_version`, `persisted_family`,
+    `persisted_gate_outcome`), so a published record can show why a serve
+    branch won or did not without a reader needing to re-run the query.
     """
     scalar = {**row, "expect": branch["outcome"], "basis": branch.get("basis")}
     verdict, why = legacy_score(scalar, bucket, status, **identity)
     if branch["outcome"] != S.SERVE or verdict not in {"agree", "agree_weak"}:
-        return verdict, why
+        return verdict, why, {}
     # `final` is evidence, not a guaranteed shape: a row with no successful
     # result at all (error/no_match/turns-exhausted) legitimately has no
     # `final` payload to read a family from. Missing or malformed evidence
     # is `family_unavailable`, never an exception.
     observed = (final.get("answer_plan") or {}).get("family") if isinstance(final, dict) else None
     if observed is None:
-        return "unscored", "family_unavailable"
+        return "unscored", "family_unavailable", {}
     if observed != branch["answer"]["family"]:
-        return "disagree", "declared_family_mismatch"
+        return "disagree", "declared_family_mismatch", {}
     if audit["window_binding"] == "mismatch":
-        return "disagree", audit["reason"]
+        return "disagree", audit["reason"], {}
     if audit["family_relation"] == "changed":
-        return "unscored", "unratified_family_change"
-    return "unscored", "family_confirmation_unavailable"
+        return "unscored", "unratified_family_change", {}
+    return _score_persisted_family_confirmation(observed, final, persisted_semantic_state)
 
 
 _RANK = {"agree": 3, "agree_weak": 2, "unscored": 1, "disagree": 0}
 
 
-def score(row, bucket, status, final, audit, legacy_score, **identity):
+def score(row, bucket, status, final, audit, legacy_score, persisted_semantic_state=None, **identity):
     """(verdict, reason, branch_results) for one row/rep.
 
     `branch_results` is `[]` for a scalar/absent declaration (legacy_score's
     own verdict is authoritative and unchanged) and the full per-branch list
-    for an `any_of` declaration, in declaration order -- every branch result
-    is retained, never only the winner, so a report can show why an
-    undecidable alternative did not manufacture a pass.
+    of `(verdict, reason, detail)` triples for an `any_of` declaration, in
+    declaration order -- every branch result is retained, never only the
+    winner, so a report can show why an undecidable or losing alternative
+    did not manufacture a pass. `persisted_semantic_state` (CHAOS-5722) is
+    forwarded to `score_branch` unchanged; it is never consulted for a
+    scalar/absent declaration (this function never calls score_branch at
+    all in that case) or for a refuse/decline/clarify branch (score_branch
+    returns before reaching it -- see score_branch).
     """
     ok, reason, choices = S.parse_expect(row.get("expect") if isinstance(row, dict) else None)
     if not ok:
@@ -386,13 +529,16 @@ def score(row, bucket, status, final, audit, legacy_score, **identity):
     if choices is None:
         verdict, why = legacy_score(row, bucket, status, **identity)
         return verdict, why, []
-    results = [score_branch(row, b, bucket, status, final, audit, legacy_score, **identity) for b in choices]
+    results = [
+        score_branch(row, b, bucket, status, final, audit, legacy_score, persisted_semantic_state, **identity)
+        for b in choices
+    ]
     best = max(results, key=lambda r: _RANK[r[0]])
     return best[0], best[1], results
 
 
 def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_version,
-                   legacy_scorer_version, **identity):
+                   legacy_scorer_version, persisted_semantic_state=None, **identity):
     """The published, versioned semantic-verdict record for one row/rep.
 
     Carries SCORER_VERSION/POLICY_VERSION/`corpus_version` explicitly (a
@@ -411,8 +557,15 @@ def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_versio
     name its own scorer's identity (e.g. acr's git sha, or a test double's
     own label) so a rescore under a changed `legacy_score` is never
     mistaken for a rescore under the same one.
+
+    `persisted_semantic_state` (CHAOS-5722, optional) is the same adapter
+    `score`/`score_branch` take; omitting it (every call site that predates
+    this ticket) scores exactly as if the adapter found no persisted row for
+    every serve branch it would otherwise have consulted -- see
+    `_score_persisted_family_confirmation`.
     """
-    verdict, reason, branch_results = score(row, bucket, status, final, audit, legacy_score, **identity)
+    verdict, reason, branch_results = score(row, bucket, status, final, audit, legacy_score,
+                                             persisted_semantic_state, **identity)
     return {
         "scorer_version": SCORER_VERSION,
         "policy_version": POLICY_VERSION,
@@ -425,7 +578,7 @@ def build_verdict(row, bucket, status, final, audit, legacy_score, corpus_versio
         "reason": reason,
         "unscored": verdict == "unscored",
         "branch_results": [
-            {"verdict": v, "reason": r} for v, r in branch_results
+            {"verdict": v, "reason": r, **detail} for v, r, detail in branch_results
         ],
         "family_relation": audit.get("family_relation", "unknown"),
         "window_binding": audit.get("window_binding", "unknown"),
