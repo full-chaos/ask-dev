@@ -1,7 +1,11 @@
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
-import type { AnswerCompleteness, PlanRequirementOutcomeRow } from "@/lib/contracts";
+import type {
+    AnswerCompleteness,
+    PlanRequirementOutcomeRow,
+    RequirementRefinement,
+} from "@/lib/contracts";
 import {
     completenessStateTone,
     humanizeTerm,
@@ -27,6 +31,31 @@ function outcomeCauses(row: PlanRequirementOutcomeRow): readonly string[] {
     );
     if (causes.length === 0) return [];
     return row.cause_observed ? causes : causes.map((cause) => `${cause} (defaulted)`);
+}
+
+/**
+ * One `RequirementRefinement` step, as its own field=value pairs -- a
+ * closed-vocabulary trail, never prose. `basis`/`overrun`/`coverage` are
+ * not mutually exclusive on the wire (the schema requires at least one),
+ * so every one the step carries is shown.
+ */
+function RefinementStep({
+    step,
+    index,
+}: {
+    readonly step: RequirementRefinement;
+    readonly index: number;
+}) {
+    const causes = [
+        step.basis === undefined ? null : `basis: ${humanizeTerm(step.basis)}`,
+        step.overrun === undefined ? null : `overrun: ${humanizeTerm(step.overrun)}`,
+        step.coverage === undefined ? null : `coverage: ${humanizeTerm(step.coverage)}`,
+    ].filter((entry): entry is string => entry !== null);
+    return (
+        <li className="record__meta" data-testid="completeness-outcome-refinement-step">
+            {`${String(index + 1)}. ${humanizeTerm(step.stage)} — ${String(step.before)} → ${String(step.after)}${causes.length === 0 ? "" : ` (${causes.join(", ")})`}`}
+        </li>
+    );
 }
 
 /**
@@ -66,6 +95,17 @@ function outcomeCauses(row: PlanRequirementOutcomeRow): readonly string[] {
  * the contract guarantees that shape agrees with `state === "not_derived"`
  * (an empty outcome set is exactly what makes `state` `not_derived`), so
  * this view need not re-derive or assert that invariant itself.
+ *
+ * Every field on a row is either a visible column or a disclosed one, never
+ * silently absent (same "nothing is silently discarded" discipline as
+ * `CohortRankingPanel`/`CoveragePanel`): `obligation` renders beside the
+ * `requirement` identity (present exactly when `requirement` is, per the
+ * schema); `impact` is its own column, since "what the reader loses" is a
+ * different fact than the outcome that caused it; `served`/`declared` are
+ * their own column; the `refinements` step-by-step trail, when the row
+ * carries one, sits behind a per-row `<details>` (same pattern as
+ * `CoveragePanel`'s "Source details") rather than crowding the scannable
+ * row, since it is optional narrative depth on top of the row's own facts.
  *
  * `refusal_basis` is a machine field this panel does not render — same rule
  * `DeterministicAnswerView` already applies to the top-level field of the
@@ -120,12 +160,15 @@ export function CompletenessPanel({ completeness }: CompletenessPanelProps) {
                             <tr>
                                 <th scope="col">Requirement</th>
                                 <th scope="col">Outcome</th>
+                                <th scope="col">Impact</th>
+                                <th scope="col">Served / declared</th>
                                 <th scope="col">Reason</th>
                             </tr>
                         </thead>
                         <tbody>
                             {outcomes.map((row, index) => {
                                 const causes = outcomeCauses(row);
+                                const refinements = row.refinements ?? [];
                                 return (
                                     // Index key: rows carry no unique id on the
                                     // wire and this list is never reordered or
@@ -136,6 +179,17 @@ export function CompletenessPanel({ completeness }: CompletenessPanelProps) {
                                             {row.requirement === undefined
                                                 ? "—"
                                                 : humanizeTerm(row.requirement)}
+                                            {row.obligation === undefined ? null : (
+                                                <>
+                                                    <br />
+                                                    <span
+                                                        className="record__meta"
+                                                        data-testid="completeness-outcome-obligation"
+                                                    >
+                                                        {`obligation: ${humanizeTerm(row.obligation)}`}
+                                                    </span>
+                                                </>
+                                            )}
                                         </td>
                                         <td>
                                             <Badge
@@ -145,10 +199,33 @@ export function CompletenessPanel({ completeness }: CompletenessPanelProps) {
                                                 {humanizeTerm(row.outcome)}
                                             </Badge>
                                         </td>
+                                        <td>{humanizeTerm(row.impact)}</td>
+                                        <td>{`${String(row.served)} / ${String(row.declared)}`}</td>
                                         <td>
                                             {causes.length === 0
                                                 ? "—"
                                                 : causes.map(humanizeTerm).join(" · ")}
+                                            {refinements.length === 0 ? null : (
+                                                <details className="disclosure">
+                                                    <summary>
+                                                        {refinements.length === 1
+                                                            ? "1 refinement step"
+                                                            : `${String(refinements.length)} refinement steps`}
+                                                    </summary>
+                                                    <ul className="stack stack--tight">
+                                                        {refinements.map((step, stepIndex) => (
+                                                            // Index key: steps carry no unique
+                                                            // id on the wire and this chain is
+                                                            // never reordered or filtered.
+                                                            <RefinementStep
+                                                                key={stepIndex}
+                                                                step={step}
+                                                                index={stepIndex}
+                                                            />
+                                                        ))}
+                                                    </ul>
+                                                </details>
+                                            )}
                                         </td>
                                     </tr>
                                 );

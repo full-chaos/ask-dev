@@ -141,7 +141,48 @@ describe("CompletenessPanel — completeness.state badge", () => {
     });
 });
 
-function outcomeRow(overrides: Partial<PlanRequirementOutcomeRow> = {}): PlanRequirementOutcomeRow {
+/**
+ * The outcome badge's tone switch is exhaustive over the closed enum, same
+ * discipline as the `state` badge above -- every member gets its own
+ * tone-asserted test, not just the two an earlier wire-order test happens
+ * to use.
+ */
+describe("CompletenessPanel — outcome badge tone", () => {
+    const EXPECTED_TONE: Record<PlanRequirementOutcomeRow["outcome"], string> = {
+        satisfied: "badge--ok",
+        not_applicable: "badge--neutral",
+        narrowed: "badge--warn",
+        not_attempted: "badge--warn",
+        unavailable: "badge--bad",
+    };
+
+    for (const outcome of [
+        "satisfied",
+        "narrowed",
+        "unavailable",
+        "not_applicable",
+        "not_attempted",
+    ] as const) {
+        it(`renders the "${outcome}" outcome with its own title and tone`, () => {
+            const completeness: AnswerCompleteness = {
+                terminal_status: "partial",
+                claimed_facts_count: 1,
+                rows_count: 1,
+                state: "partial",
+                outcomes: [{ ...baseOutcomeRow(), outcome }],
+            };
+            const { unmount } = render(<CompletenessPanel completeness={completeness} />);
+
+            const badge = screen.getByTitle(`outcome: ${outcome}`);
+            expect(badge).toHaveTextContent(outcome.replaceAll("_", " "));
+            expect(badge).toHaveClass(EXPECTED_TONE[outcome]);
+
+            unmount();
+        });
+    }
+});
+
+function baseOutcomeRow(): PlanRequirementOutcomeRow {
     return {
         stage: "assembled_result",
         requirement: "identity.default_requirement",
@@ -151,8 +192,11 @@ function outcomeRow(overrides: Partial<PlanRequirementOutcomeRow> = {}): PlanReq
         cause_observed: true,
         served: 1,
         declared: 1,
-        ...overrides,
     };
+}
+
+function outcomeRow(overrides: Partial<PlanRequirementOutcomeRow> = {}): PlanRequirementOutcomeRow {
+    return { ...baseOutcomeRow(), ...overrides };
 }
 
 /**
@@ -283,6 +327,139 @@ describe("CompletenessPanel — requirement outcomes", () => {
         const rows = screen.getAllByTestId("completeness-outcome-row");
         expect(rows).toHaveLength(1);
         expect(rows[0]).toHaveTextContent("—");
+    });
+
+    /**
+     * `obligation` is present exactly when `requirement` is, per the
+     * schema -- both must render, not just the identity.
+     */
+    it("renders the row's obligation beside its requirement identity", () => {
+        const outcomes: PlanRequirementOutcomeRow[] = [
+            outcomeRow({ requirement: "readiness.release", obligation: "read" }),
+        ];
+        const completeness: AnswerCompleteness = {
+            terminal_status: "partial",
+            claimed_facts_count: 1,
+            rows_count: 1,
+            state: "partial",
+            outcomes,
+        };
+        render(<CompletenessPanel completeness={completeness} />);
+        expect(screen.getByTestId("completeness-outcome-obligation")).toHaveTextContent(
+            "obligation: read",
+        );
+    });
+
+    it("omits the obligation line when the row carries no obligation", () => {
+        const { obligation: _obligation, ...withoutObligation } = outcomeRow();
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "complete",
+                    claimed_facts_count: 1,
+                    rows_count: 1,
+                    state: "complete",
+                    outcomes: [withoutObligation],
+                }}
+            />,
+        );
+        expect(screen.queryByTestId("completeness-outcome-obligation")).not.toBeInTheDocument();
+    });
+
+    /**
+     * `impact` -- "what the reader loses" -- is a different fact than the
+     * outcome that caused it, so it is its own column.
+     */
+    it("shows the row's impact as its own visible column", () => {
+        const outcomes: PlanRequirementOutcomeRow[] = [
+            outcomeRow({ outcome: "narrowed", impact: "scope" }),
+        ];
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "partial",
+                    claimed_facts_count: 1,
+                    rows_count: 1,
+                    state: "partial",
+                    outcomes,
+                }}
+            />,
+        );
+        expect(screen.getByTestId("completeness-outcome-row")).toHaveTextContent("scope");
+    });
+
+    /** `served`/`declared` are their own column, alongside outcome and impact. */
+    it("shows the row's served and declared counts", () => {
+        const outcomes: PlanRequirementOutcomeRow[] = [outcomeRow({ served: 2, declared: 5 })];
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "partial",
+                    claimed_facts_count: 5,
+                    rows_count: 2,
+                    state: "partial",
+                    outcomes,
+                }}
+            />,
+        );
+        expect(screen.getByTestId("completeness-outcome-row")).toHaveTextContent("2 / 5");
+    });
+
+    /**
+     * The `refinements` step-by-step trail renders behind a per-row
+     * disclosure, every step's own fields visible once opened, never
+     * summarized away.
+     */
+    it("discloses every refinement step's own fields when the row carries a chain", () => {
+        const outcomes: PlanRequirementOutcomeRow[] = [
+            outcomeRow({
+                outcome: "narrowed",
+                impact: "scope",
+                refinements: [
+                    { stage: "planning", basis: "attention_rank", before: 10, after: 5 },
+                    { stage: "projection", overrun: "items", before: 5, after: 3 },
+                ],
+            }),
+        ];
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "partial",
+                    claimed_facts_count: 3,
+                    rows_count: 3,
+                    state: "partial",
+                    outcomes,
+                }}
+            />,
+        );
+        const row = screen.getByTestId("completeness-outcome-row");
+        expect(within(row).getByText("2 refinement steps")).toBeInTheDocument();
+        const steps = within(row).getAllByTestId("completeness-outcome-refinement-step");
+        expect(steps).toHaveLength(2);
+        expect(steps[0]).toHaveTextContent("planning");
+        expect(steps[0]).toHaveTextContent("10");
+        expect(steps[0]).toHaveTextContent("5");
+        expect(steps[0]).toHaveTextContent("attention rank");
+        expect(steps[1]).toHaveTextContent("projection");
+        expect(steps[1]).toHaveTextContent("items");
+    });
+
+    it("shows no refinement disclosure when the row carries no refinements", () => {
+        const outcomes: PlanRequirementOutcomeRow[] = [outcomeRow()];
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "complete",
+                    claimed_facts_count: 1,
+                    rows_count: 1,
+                    state: "complete",
+                    outcomes,
+                }}
+            />,
+        );
+        expect(
+            screen.queryByTestId("completeness-outcome-refinement-step"),
+        ).not.toBeInTheDocument();
     });
 
     /**
