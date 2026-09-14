@@ -305,7 +305,45 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // WIDENING ONLY, and load-bearing: acr main mints this claim, so without the
 // bump a response carrying it is rejected whole as `acr_contract_violation`
 // instead of rendering.
-export const SOURCE_COMMIT = "9e35fe9405d70879ed41600f3e4f484aea6411b2";
+// 9e35fe94 -> 7ae3719f: PROVISIONAL pin, re-pin to the merge sha before this
+// PR merges. Verified over the full tree
+// (`git diff 9e35fe9405d70879ed41600f3e4f484aea6411b2
+// 7ae3719fc2b214d60d51cc7d6144dc0a11318f05 -- contracts/`): four files
+// change, and two of them are part of this repo's vendored surface.
+//   - `context_fabric_common.v1`'s `CoverageDetail.code` closed enum gains
+//     an 18th value, `kind_census_truncated`: a discovered cohort's kind-
+//     scoped census (the term-free fetch of a declared member kind) was cut
+//     at its own row bound. Three new additive properties ride with it,
+//     required together and only for this code: `kind` (the subject kind
+//     the census was for), `declared` (the census figure observed -- a
+//     floor) and `served` (how many of that kind made the answer). No
+//     other property, `$def`, or required-list change in this or the
+//     answer-projection schema.
+//   - `context_fabric_answer_projection.v1` carries the identical addition
+//     (this repo's own vendored copy of the coverage-detail shape).
+//   - `mcp_investigate_question_response.v1` and
+//     `mcp_investigation_result_response.v1` also carry the identical
+//     addition but are not part of this repo's vendored surface -- the
+//     same exclusion as every bump above.
+//   - `kind` is closed to the same 15-member subject-kind enum
+//     `SubjectRef.kind` already publishes (was an unenumerated string in
+//     the first cut of this pin) -- safe to tighten pre-merge since the
+//     field carries no production traffic yet.
+// `context_fabric_investigation_request.v1`, `error.v1`, and every pinned
+// example are byte-identical to the prior pin.
+//
+// WIDENING ONLY, and load-bearing once acr deploys this sha: the row is
+// additive, so every previously-valid response still validates; a response
+// carrying the new code is what an un-bumped ask-dev leg would reject as
+// acr_contract_violation.
+// 7ae3719f -> 72c9e3ea: `git diff 7ae3719fc2b214d60d51cc7d6144dc0a11318f05
+// 72c9e3ea21b2e10e1537c502bd13d2be5e446664 -- contracts/ internal/mcp/schemas/`
+// is empty: no schema, example, or manifest content changed. Every vendored
+// file stays byte-identical to the prior pin; only this pointer moves.
+// 72c9e3ea -> a57b599b: the acr PR merged (squash). Final pin -- every
+// vendored file byte-identical to the pre-merge pin (squash preserves the
+// tree; verified per-file blob shas against the merged sha on acr main).
+export const SOURCE_COMMIT = "a57b599b88a28c170444e786d701af980911db9d";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

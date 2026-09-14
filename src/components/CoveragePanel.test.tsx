@@ -1015,12 +1015,14 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "requirement_read_not_planned",
             "read_population_unverified",
             "fact_read_origin_state",
+            "kind_census_truncated",
         ]);
     });
 
     /**
-     * Exactly ONE code gets rendering of its own: `fact_read_origin_state`,
-     * which also produces a per-kind read-state row. Every other code renders
+     * Exactly TWO codes get rendering of their own: `fact_read_origin_state`
+     * (a per-kind read-state row) and `kind_census_truncated` (a per-kind
+     * census row, its own "Kind census" section). Every other code renders
      * identically for identical text.
      *
      * What this pins is the exception SET, so a code quietly GAINING its own
@@ -1028,17 +1030,19 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
      * own — one with no arm is indistinguishable from one that needs none. The
      * vocabulary cell above is what stops a new member arriving unnoticed.
      */
-    it("exactly one code renders anything beyond the shared reason rendering", () => {
+    it("exactly two codes render anything beyond the shared reason rendering", () => {
         const baseline = renderWithCode("fact_provider_reported");
         const different = CODES.filter(
             (code) => JSON.stringify(renderWithCode(code)) !== JSON.stringify(baseline),
         );
-        expect(different).toEqual(["fact_read_origin_state"]);
+        expect(different).toEqual(["fact_read_origin_state", "kind_census_truncated"]);
     });
 
     it("every other code renders identically for identical text", () => {
         const baseline = renderWithCode("fact_provider_reported");
-        for (const code of CODES.filter((c) => c !== "fact_read_origin_state")) {
+        for (const code of CODES.filter(
+            (c) => c !== "fact_read_origin_state" && c !== "kind_census_truncated",
+        )) {
             expect(renderWithCode(code)).toEqual(baseline);
         }
     });
@@ -1056,6 +1060,146 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
         expect(visible).not.toContain("Complete — every source contributed.");
         // The per-source state stays visible on the chip, beside the detail.
         expect(visible).toContain("unavailable");
+    });
+});
+
+/**
+ * kind_census_truncated: a discovered cohort's kind-scoped census was cut,
+ * with kind/declared/served — additive fields present exactly on this code.
+ * The whole input domain (present, absent, and the boundary served===declared
+ * shape) is exercised through the real component render.
+ */
+describe("CoveragePanel — kind_census_truncated (D47)", () => {
+    function coverageWithKindCensusDetail(
+        detail: Partial<Record<"kind" | "declared" | "served" | "phrasing", unknown>>,
+    ) {
+        return {
+            sources: [{ source: "context-fabric:graph", state: "available" }],
+            partial: true,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-census-01",
+                    source: "context-fabric:graph",
+                    code: "kind_census_truncated",
+                    degrading: true,
+                    label: "At least 2000 team found; 25 included",
+                    raw: "kind_census_truncated:team:2000:25",
+                    ...detail,
+                },
+            ],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+    }
+
+    it("shows the kind, the declared/served numbers, and the engine label under its own 'Kind census' heading", () => {
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageWithKindCensusDetail({
+                    kind: "team",
+                    declared: 2000,
+                    served: 25,
+                })}
+            />,
+        );
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+        const visible = visibleText(panel);
+        expect(visible).toContain("Kind census");
+        expect(visible).toContain("team");
+        expect(visible).toContain("At least 2000 team found; 25 included");
+        expect(visible).toContain("declared 2000 (floor) · served 25");
+    });
+
+    it("prefers the synthesis phrasing over the label when both are present, keeping the numbers line separate", () => {
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageWithKindCensusDetail({
+                    kind: "team",
+                    declared: 2000,
+                    served: 25,
+                    phrasing: "There are far more teams than the census could enumerate.",
+                })}
+            />,
+        );
+        const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
+        expect(visible).toContain("There are far more teams than the census could enumerate.");
+        expect(visible).toContain("At least 2000 team found; 25 included");
+        expect(visible).toContain("declared 2000 (floor) · served 25");
+    });
+
+    it("omits the kind label and the numbers line when kind/declared/served are absent (legacy-shaped detail)", () => {
+        const { container } = render(<CoveragePanel coverage={coverageWithKindCensusDetail({})} />);
+        const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
+        expect(visible).toContain("Kind census");
+        expect(visible).toContain("At least 2000 team found; 25 included");
+        expect(visible).not.toContain("declared");
+        expect(visible).not.toContain("served");
+    });
+
+    it("renders the boundary shape served === declared (an uncut census reported some other way) without dividing by anything odd", () => {
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageWithKindCensusDetail({ kind: "team", declared: 5, served: 5 })}
+            />,
+        );
+        const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
+        expect(visible).toContain("declared 5 (floor) · served 5");
+    });
+
+    it("renders served === 0 (no cohort of this kind was assembled) as a real number, not a fallback", () => {
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageWithKindCensusDetail({ kind: "team", declared: 2000, served: 0 })}
+            />,
+        );
+        const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
+        expect(visible).toContain("declared 2000 (floor) · served 0");
+    });
+
+    it("does not double-render the row in the generic 'Degraded reasons' list", () => {
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageWithKindCensusDetail({
+                    kind: "team",
+                    declared: 2000,
+                    served: 25,
+                })}
+            />,
+        );
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+        expect(panel.textContent ?? "").not.toContain("Degraded reasons");
+    });
+
+    it("still shows a generic degraded reason alongside a kind_census_truncated row, without merging the two", () => {
+        const coverage = {
+            sources: [{ source: "context-fabric:graph", state: "available" }],
+            partial: true,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-census-01",
+                    source: "context-fabric:graph",
+                    code: "kind_census_truncated",
+                    degrading: true,
+                    label: "At least 2000 team found; 25 included",
+                    kind: "team",
+                    declared: 2000,
+                    served: 25,
+                },
+                {
+                    detail_id: "cov-fact-01",
+                    source: "canonical_fact:status",
+                    code: "fact_read_failed",
+                    degrading: true,
+                    label: "Status facts could not be read",
+                },
+            ],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+        const { container } = render(<CoveragePanel coverage={coverage} />);
+        const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
+        expect(visible).toContain("Kind census");
+        expect(visible).toContain("Degraded reasons");
+        expect(visible).toContain("At least 2000 team found; 25 included");
+        expect(visible).toContain("Status facts could not be read");
     });
 });
 
