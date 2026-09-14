@@ -305,10 +305,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // WIDENING ONLY, and load-bearing: acr main mints this claim, so without the
 // bump a response carrying it is rejected whole as `acr_contract_violation`
 // instead of rendering.
-// 9e35fe94 -> 0b52363b: PROVISIONAL pin, re-pin to the merge sha before this
+// 9e35fe94 -> 7ae3719f: PROVISIONAL pin, re-pin to the merge sha before this
 // PR merges. Verified over the full tree
 // (`git diff 9e35fe9405d70879ed41600f3e4f484aea6411b2
-// 0b52363ba45945350e1ff87d6a40d3df2cb42158 -- contracts/`): four files
+// 7ae3719fc2b214d60d51cc7d6144dc0a11318f05 -- contracts/`): four files
 // change, and two of them are part of this repo's vendored surface.
 //   - `context_fabric_common.v1`'s `CoverageDetail.code` closed enum gains
 //     an 18th value, `kind_census_truncated`: a discovered cohort's kind-
@@ -325,6 +325,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 //     `mcp_investigation_result_response.v1` also carry the identical
 //     addition but are not part of this repo's vendored surface -- the
 //     same exclusion as every bump above.
+//   - `kind` is closed to the same 15-member subject-kind enum
+//     `SubjectRef.kind` already publishes (was an unenumerated string in
+//     the first cut of this pin) -- safe to tighten pre-merge since the
+//     field carries no production traffic yet.
 // `context_fabric_investigation_request.v1`, `error.v1`, and every pinned
 // example are byte-identical to the prior pin.
 //
@@ -332,7 +336,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // additive, so every previously-valid response still validates; a response
 // carrying the new code is what an un-bumped ask-dev leg would reject as
 // acr_contract_violation.
-export const SOURCE_COMMIT = "0b52363ba45945350e1ff87d6a40d3df2cb42158";
+export const SOURCE_COMMIT = "7ae3719fc2b214d60d51cc7d6144dc0a11318f05";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
