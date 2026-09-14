@@ -336,12 +336,14 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // additive, so every previously-valid response still validates; a response
 // carrying the new code is what an un-bumped ask-dev leg would reject as
 // acr_contract_violation.
-// 7ae3719f -> 72c9e3ea: PROVISIONAL pin, re-pin to the merge sha before this
-// PR merges. `git diff 7ae3719fc2b214d60d51cc7d6144dc0a11318f05
+// 7ae3719f -> 72c9e3ea: `git diff 7ae3719fc2b214d60d51cc7d6144dc0a11318f05
 // 72c9e3ea21b2e10e1537c502bd13d2be5e446664 -- contracts/ internal/mcp/schemas/`
 // is empty: no schema, example, or manifest content changed. Every vendored
 // file stays byte-identical to the prior pin; only this pointer moves.
-export const SOURCE_COMMIT = "72c9e3ea21b2e10e1537c502bd13d2be5e446664";
+// 72c9e3ea -> a57b599b: the acr PR merged (squash). Final pin -- every
+// vendored file byte-identical to the pre-merge pin (squash preserves the
+// tree; verified per-file blob shas against the merged sha on acr main).
+export const SOURCE_COMMIT = "a57b599b88a28c170444e786d701af980911db9d";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
