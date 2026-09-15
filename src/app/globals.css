@@ -1267,30 +1267,27 @@ body {
     list-style: none;
 }
 
-/* Long producer labels stay inside the answer panel so status and evidence
-   remain visible beside them. The cell title still carries the full ID. */
+/* Keep this table within its answer panel while letting its intrinsic columns
+   accommodate short headers and wrap long member labels without truncation. */
 .work-item-status__table {
+    width: 100%;
     min-width: 0;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
 .work-item-status__table th,
 .work-item-status__table td {
     vertical-align: top;
     white-space: normal;
+}
+
+.work-item-status__table th {
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.work-item-status__table td {
     overflow-wrap: anywhere;
-}
-
-.work-item-status__table th:first-child {
-    width: 50%;
-}
-
-.work-item-status__table th:nth-child(2) {
-    width: 22%;
-}
-
-.work-item-status__table th:nth-child(3) {
-    width: 28%;
 }
 
 .fact-chart {

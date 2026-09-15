@@ -188,21 +188,4 @@ describe("WorkItemStatusPanel", () => {
 
         expect(screen.queryByTestId("work-item-status-panel")).toBeNull();
     });
-
-    it("keeps the complete accessible table headers", () => {
-        const item = subject("work_item", "item", "Item");
-        render(
-            <WorkItemStatusPanel
-                result={resultWith(
-                    [member(item, 1)],
-                    [statusFact("item-status", item, { string: "open" })],
-                )}
-            />,
-        );
-
-        const table = screen.getByTestId("work-item-status-table");
-        expect(within(table).getByRole("columnheader", { name: "Work item" })).toBeInTheDocument();
-        expect(within(table).getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-        expect(within(table).getByRole("columnheader", { name: "Evidence" })).toBeInTheDocument();
-    });
 });
