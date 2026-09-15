@@ -1,1 +1,523 @@
-{"schema_version":"context_fabric_investigation_result.v1","result_id":"result_tuple_producer_001","request_id":"req_00000000000000000000000000000001","generated_at":"2026-09-14T12:00:00Z","status":"complete","question":"What is the state and count of Project Alpha work items?","interpretation":{"shape":"discovered_cohort","requested_judgment":"status","subject_terms":["Project Alpha"],"time_context":{"axis":"current"},"fact_requirements":[{"kind":"health"}],"clarification_needed":false},"subject_resolution":{"candidates":[{"receipt_id":"receipt_tuple_project","subject":{"kind":"project","canonical_id":"project.v2:linear:P1","label":"Project Alpha"},"state":"committed","matched_terms":["Project Alpha"],"match_reasons":["Exact canonical subject label match."],"confidence":1,"match_mechanisms":["exact"]}],"committed":[{"kind":"project","canonical_id":"project.v2:linear:P1","label":"Project Alpha"}],"commit_decision_digests":[{"subject":{"kind":"project","canonical_id":"project.v2:linear:P1","label":"Project Alpha"}}]},"answer_plan":{"family":"scoped_cohort_status","family_source":"model","family_version":"question-family.v3","member_kind":"work_item","require_drivers":false,"require_ranking":false,"render_kinds":["table"],"fact_kinds":["status","work"],"axes":["subject_anchor","expected_kind","window"],"budget":{"max_items":50,"max_serialized_bytes":262144,"max_members":12,"synthesis_headroom":16,"narrowing_basis":"canonical_id_lexical"},"requirements":[{"requirement":"count/member/work_item","obligation":"count","role":"member","subject":"work_item","kind":"computed","scope":"each_member","quantifier":"none","unavailable":"computed_population_absent"},{"requirement":"health/member/work_item","obligation":"health","role":"member","subject":"work_item","kind":"read","scope":"each_member","quantifier":"none","unavailable":"no_declaring_producer"},{"requirement":"state/member/work_item","obligation":"state","role":"member","subject":"work_item","kind":"read","fact_kinds":["status"],"scope":"each_member","quantifier":"corroborated"}]},"cohort":{"kind":"work_item","members":[{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-00","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00"},"rank":1,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-00"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-01","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01"},"rank":2,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-01"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-02","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02"},"rank":3,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-02"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-03","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03"},"rank":4,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-03"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-04","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04"},"rank":5,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-04"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-05","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-05"},"rank":6,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-05"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-06","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-06"},"rank":7,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-06"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-07","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-07"},"rank":8,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-07"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-08","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-08"},"rank":9,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-08"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-09","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-09"},"rank":10,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-09"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-10","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10"},"rank":11,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-10"]},{"subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-11","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11"},"rank":12,"inclusion_reasons":["Work items are members of the resolved project within the authorized scope."],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-11"]}],"rationale":"Work items are members of the resolved project within the authorized scope.","complete":true,"truncated":false},"direct_judgment":"This investigation is complete.","current_state":"Current observed values: status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04; status. […truncated]","strongest_pressures":[],"drivers":[],"remaining_work":[],"readiness_gaps":[],"paths":[],"conflicts":[],"limitations":[],"evidence_ref_ids":["acr:v1:work-item:repo-1:work-00","acr:v1:work-item:repo-1:work-01","acr:v1:work-item:repo-1:work-02","acr:v1:work-item:repo-1:work-03","acr:v1:work-item:repo-1:work-04","acr:v1:work-item:repo-1:work-05","acr:v1:work-item:repo-1:work-06","acr:v1:work-item:repo-1:work-07","acr:v1:work-item:repo-1:work-08","acr:v1:work-item:repo-1:work-09","acr:v1:work-item:repo-1:work-10","acr:v1:work-item:repo-1:work-11"],"claimed_facts":[{"claim_id":"claim_tuple_0","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-00","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_1","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-01","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_2","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-02","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_3","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-03","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_4","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-04","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_5","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-05","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-05"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_6","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-06","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-06"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_7","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-07","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-07"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_8","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-08","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-08"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_9","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-09","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-09"},"field":"status","value":{"string":"waiting"}},{"claim_id":"claim_tuple_10","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-10","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10"},"field":"status","value":{"string":"open"}},{"claim_id":"claim_tuple_11","kind":"status","subject":{"kind":"work_item","canonical_id":"work_item.v2:repo-1:work-11","label":"Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11"},"field":"status","value":{"string":"open"}},{"claim_id":"server:cardinality:work_item","kind":"cardinality","subject":{"kind":"organization","canonical_id":"org_1","label":"org_1"},"field":"work_item_count","value":{"integer":12}}],"coverage":{"sources":[{"source":"canonical_fact:status","state":"available","label":"Canonical facts — status","state_label":"available"},{"source":"canonical_fact:work","state":"available","label":"Canonical facts — work","state_label":"available"}],"partial":false},"evidence_ref_labels":{"acr:v1:work-item:repo-1:work-00":"Work item: repo-1:work-00","acr:v1:work-item:repo-1:work-01":"Work item: repo-1:work-01","acr:v1:work-item:repo-1:work-02":"Work item: repo-1:work-02","acr:v1:work-item:repo-1:work-03":"Work item: repo-1:work-03","acr:v1:work-item:repo-1:work-04":"Work item: repo-1:work-04","acr:v1:work-item:repo-1:work-05":"Work item: repo-1:work-05","acr:v1:work-item:repo-1:work-06":"Work item: repo-1:work-06","acr:v1:work-item:repo-1:work-07":"Work item: repo-1:work-07","acr:v1:work-item:repo-1:work-08":"Work item: repo-1:work-08","acr:v1:work-item:repo-1:work-09":"Work item: repo-1:work-09","acr:v1:work-item:repo-1:work-10":"Work item: repo-1:work-10","acr:v1:work-item:repo-1:work-11":"Work item: repo-1:work-11"},"versions":{"service_version":"tuple-test","contract_version":"context_fabric_investigation_result.v1","backend":"graph","projection_version":"projection-v1","query_version":"query-v1","interpretation_version":"schema-v1","synthesis_version":"prompt-v1+model-v1","canonical_service_version":"context-fabric-facts.v2","model_identity":"test-provider/test-model"},"deterministic_answer":"This investigation is complete. Counted 12 work items.","warnings":[],"reused":false,"effective_evidence_window":{"start":"2026-06-16T12:00:00Z","end":"2026-09-14T12:00:00Z","relative_id":"trailing_90d","provenance":"question_stated"},"completeness":{"terminal_status":"complete","claimed_facts_count":13,"rows_count":0,"state":"degraded","outcomes":[{"stage":"planning","requirement":"count/member/work_item","obligation":"count","outcome":"unavailable","impact":"dimension","cause_coverage":"fact_pruned","cause_observed":true,"served":0,"declared":0},{"stage":"planning","requirement":"health/member/work_item","obligation":"health","outcome":"unavailable","impact":"dimension","cause_coverage":"fact_unconfigured","cause_observed":true,"served":0,"declared":0},{"stage":"planning","requirement":"state/member/work_item","obligation":"state","outcome":"satisfied","impact":"none","cause_observed":false,"served":0,"declared":0},{"stage":"assembled_result","requirement":"count/member/work_item","obligation":"count","outcome":"satisfied","impact":"none","cause_observed":false,"served":12,"declared":12},{"stage":"assembled_result","requirement":"state/member/work_item","obligation":"state","outcome":"narrowed","impact":"depth","cause_coverage":"fact_narrowed","cause_observed":false,"served":1,"declared":2}]}}
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_tuple_producer_001",
+    "request_id": "req_00000000000000000000000000000001",
+    "generated_at": "2026-09-14T12:00:00Z",
+    "status": "complete",
+    "question": "What is the state and count of Project Alpha work items?",
+    "interpretation": {
+        "shape": "discovered_cohort",
+        "requested_judgment": "status",
+        "subject_terms": ["Project Alpha"],
+        "time_context": { "axis": "current" },
+        "fact_requirements": [{ "kind": "health" }],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [
+            {
+                "receipt_id": "receipt_tuple_project",
+                "subject": {
+                    "kind": "project",
+                    "canonical_id": "project.v2:linear:P1",
+                    "label": "Project Alpha"
+                },
+                "state": "committed",
+                "matched_terms": ["Project Alpha"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            }
+        ],
+        "committed": [
+            { "kind": "project", "canonical_id": "project.v2:linear:P1", "label": "Project Alpha" }
+        ],
+        "commit_decision_digests": [
+            {
+                "subject": {
+                    "kind": "project",
+                    "canonical_id": "project.v2:linear:P1",
+                    "label": "Project Alpha"
+                }
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "scoped_cohort_status",
+        "family_source": "model",
+        "family_version": "question-family.v3",
+        "member_kind": "work_item",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["table"],
+        "fact_kinds": ["status", "work"],
+        "axes": ["subject_anchor", "expected_kind", "window"],
+        "budget": {
+            "max_items": 50,
+            "max_serialized_bytes": 262144,
+            "max_members": 12,
+            "synthesis_headroom": 16,
+            "narrowing_basis": "canonical_id_lexical"
+        },
+        "requirements": [
+            {
+                "requirement": "count/member/work_item",
+                "obligation": "count",
+                "role": "member",
+                "subject": "work_item",
+                "kind": "computed",
+                "scope": "each_member",
+                "quantifier": "none",
+                "unavailable": "computed_population_absent"
+            },
+            {
+                "requirement": "health/member/work_item",
+                "obligation": "health",
+                "role": "member",
+                "subject": "work_item",
+                "kind": "read",
+                "scope": "each_member",
+                "quantifier": "none",
+                "unavailable": "no_declaring_producer"
+            },
+            {
+                "requirement": "state/member/work_item",
+                "obligation": "state",
+                "role": "member",
+                "subject": "work_item",
+                "kind": "read",
+                "fact_kinds": ["status"],
+                "scope": "each_member",
+                "quantifier": "corroborated"
+            }
+        ]
+    },
+    "cohort": {
+        "kind": "work_item",
+        "members": [
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-00",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00"
+                },
+                "rank": 1,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-00"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-01",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01"
+                },
+                "rank": 2,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-01"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-02",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02"
+                },
+                "rank": 3,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-02"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-03",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03"
+                },
+                "rank": 4,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-03"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-04",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04"
+                },
+                "rank": 5,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-04"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-05",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-05"
+                },
+                "rank": 6,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-05"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-06",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-06"
+                },
+                "rank": 7,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-06"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-07",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-07"
+                },
+                "rank": 8,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-07"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-08",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-08"
+                },
+                "rank": 9,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-08"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-09",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-09"
+                },
+                "rank": 10,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-09"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-10",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10"
+                },
+                "rank": 11,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-10"]
+            },
+            {
+                "subject": {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:repo-1:work-11",
+                    "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11"
+                },
+                "rank": 12,
+                "inclusion_reasons": [
+                    "Work items are members of the resolved project within the authorized scope."
+                ],
+                "evidence_ref_ids": ["acr:v1:work-item:repo-1:work-11"]
+            }
+        ],
+        "rationale": "Work items are members of the resolved project within the authorized scope.",
+        "complete": true,
+        "truncated": false
+    },
+    "direct_judgment": "This investigation is complete.",
+    "current_state": "Current observed values: status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03; status.status=open for Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04; status. […truncated]",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [
+        "acr:v1:work-item:repo-1:work-00",
+        "acr:v1:work-item:repo-1:work-01",
+        "acr:v1:work-item:repo-1:work-02",
+        "acr:v1:work-item:repo-1:work-03",
+        "acr:v1:work-item:repo-1:work-04",
+        "acr:v1:work-item:repo-1:work-05",
+        "acr:v1:work-item:repo-1:work-06",
+        "acr:v1:work-item:repo-1:work-07",
+        "acr:v1:work-item:repo-1:work-08",
+        "acr:v1:work-item:repo-1:work-09",
+        "acr:v1:work-item:repo-1:work-10",
+        "acr:v1:work-item:repo-1:work-11"
+    ],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_tuple_0",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-00",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-00"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_1",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-01",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-01"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_2",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-02",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-02"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_3",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-03",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-03"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_4",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-04",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-04"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_5",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-05",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-05"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_6",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-06",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-06"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_7",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-07",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-07"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_8",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-08",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-08"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_9",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-09",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-09"
+            },
+            "field": "status",
+            "value": { "string": "waiting" }
+        },
+        {
+            "claim_id": "claim_tuple_10",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-10",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-10"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "claim_tuple_11",
+            "kind": "status",
+            "subject": {
+                "kind": "work_item",
+                "canonical_id": "work_item.v2:repo-1:work-11",
+                "label": "Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title Long descriptive title work-11"
+            },
+            "field": "status",
+            "value": { "string": "open" }
+        },
+        {
+            "claim_id": "server:cardinality:work_item",
+            "kind": "cardinality",
+            "subject": { "kind": "organization", "canonical_id": "org_1", "label": "org_1" },
+            "field": "work_item_count",
+            "value": { "integer": 12 }
+        }
+    ],
+    "coverage": {
+        "sources": [
+            {
+                "source": "canonical_fact:status",
+                "state": "available",
+                "label": "Canonical facts — status",
+                "state_label": "available"
+            },
+            {
+                "source": "canonical_fact:work",
+                "state": "available",
+                "label": "Canonical facts — work",
+                "state_label": "available"
+            }
+        ],
+        "partial": false
+    },
+    "evidence_ref_labels": {
+        "acr:v1:work-item:repo-1:work-00": "Work item: repo-1:work-00",
+        "acr:v1:work-item:repo-1:work-01": "Work item: repo-1:work-01",
+        "acr:v1:work-item:repo-1:work-02": "Work item: repo-1:work-02",
+        "acr:v1:work-item:repo-1:work-03": "Work item: repo-1:work-03",
+        "acr:v1:work-item:repo-1:work-04": "Work item: repo-1:work-04",
+        "acr:v1:work-item:repo-1:work-05": "Work item: repo-1:work-05",
+        "acr:v1:work-item:repo-1:work-06": "Work item: repo-1:work-06",
+        "acr:v1:work-item:repo-1:work-07": "Work item: repo-1:work-07",
+        "acr:v1:work-item:repo-1:work-08": "Work item: repo-1:work-08",
+        "acr:v1:work-item:repo-1:work-09": "Work item: repo-1:work-09",
+        "acr:v1:work-item:repo-1:work-10": "Work item: repo-1:work-10",
+        "acr:v1:work-item:repo-1:work-11": "Work item: repo-1:work-11"
+    },
+    "versions": {
+        "service_version": "tuple-test",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "schema-v1",
+        "synthesis_version": "prompt-v1+model-v1",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "test-provider/test-model"
+    },
+    "deterministic_answer": "This investigation is complete. Counted 12 work items.",
+    "warnings": [],
+    "reused": false,
+    "effective_evidence_window": {
+        "start": "2026-06-16T12:00:00Z",
+        "end": "2026-09-14T12:00:00Z",
+        "relative_id": "trailing_90d",
+        "provenance": "question_stated"
+    },
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 13,
+        "rows_count": 0,
+        "state": "degraded",
+        "outcomes": [
+            {
+                "stage": "planning",
+                "requirement": "count/member/work_item",
+                "obligation": "count",
+                "outcome": "unavailable",
+                "impact": "dimension",
+                "cause_coverage": "fact_pruned",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "planning",
+                "requirement": "health/member/work_item",
+                "obligation": "health",
+                "outcome": "unavailable",
+                "impact": "dimension",
+                "cause_coverage": "fact_unconfigured",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "planning",
+                "requirement": "state/member/work_item",
+                "obligation": "state",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "count/member/work_item",
+                "obligation": "count",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 12,
+                "declared": 12
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "state/member/work_item",
+                "obligation": "state",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_coverage": "fact_narrowed",
+                "cause_observed": false,
+                "served": 1,
+                "declared": 2
+            }
+        ]
+    }
+}
