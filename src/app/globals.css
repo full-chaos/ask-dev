@@ -1281,12 +1281,13 @@ body {
     white-space: normal;
 }
 
-.work-item-status__table th {
+.work-item-status__table thead th {
     overflow-wrap: normal;
     word-break: normal;
 }
 
-.work-item-status__table td {
+.work-item-status__table tbody th,
+.work-item-status__table tbody td {
     overflow-wrap: anywhere;
 }
 
