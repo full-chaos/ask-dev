@@ -19,6 +19,7 @@ import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptD
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
+import { WorkItemStatusPanel } from "@/components/WorkItemStatusPanel";
 import { choiceDisposition } from "@/lib/clarification";
 import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
 import type {
@@ -424,6 +425,7 @@ export function DeterministicAnswerView({
                 shape={result.interpretation.shape}
             />
             <CohortGroupsPanel cohort={result.cohort} />
+            <WorkItemStatusPanel result={result} />
             {isCohortIntent(result.interpretation.shape) &&
             result.cohort !== undefined &&
             rankingTable(result.cohort.members) !== null ? (

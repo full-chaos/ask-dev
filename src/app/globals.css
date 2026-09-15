@@ -1259,6 +1259,38 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+.work-item-status__observations {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Keep this table within its answer panel while letting its intrinsic columns
+   accommodate short headers and wrap long member labels without truncation. */
+.work-item-status__table {
+    width: 100%;
+    min-width: 0;
+    table-layout: auto;
+}
+
+.work-item-status__table th,
+.work-item-status__table td {
+    vertical-align: top;
+    white-space: normal;
+}
+
+.work-item-status__table thead th {
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.work-item-status__table tbody th,
+.work-item-status__table tbody td {
+    overflow-wrap: anywhere;
+}
+
 .fact-chart {
     display: flex;
     flex-direction: column;
