@@ -119,6 +119,48 @@ describe("WorkItemStatusPanel", () => {
         expect(within(rows[3]!).getByTestId("work-item-status-value")).toHaveTextContent("false");
     });
 
+    it("shows recorded blank values while keeping missing status distinct", () => {
+        const blank = subject("work_item", "blank", "Blank");
+        const whitespace = subject("work_item", "whitespace", "Whitespace");
+        const missing = subject("work_item", "missing", "Missing");
+        const unknown = subject("work_item", "unknown", "Unknown");
+        const zero = subject("work_item", "zero", "Zero");
+        const falseValue = subject("work_item", "false", "False");
+        const result = resultWith(
+            [
+                member(blank, 1),
+                member(whitespace, 2),
+                member(missing, 3),
+                member(unknown, 4),
+                member(zero, 5),
+                member(falseValue, 6),
+            ],
+            [
+                statusFact("blank-status", blank, { string: "" }),
+                statusFact("whitespace-status", whitespace, { string: "   " }),
+                statusFact("unknown-status", unknown, { string: "unknown" }),
+                statusFact("zero-status", zero, { integer: 0 }),
+                statusFact("false-status", falseValue, { boolean: false }),
+            ],
+        );
+
+        render(<WorkItemStatusPanel result={result} />);
+
+        const rows = screen.getAllByTestId("work-item-status-row");
+        expect(within(rows[0]!).getByTestId("work-item-status-blank")).toHaveTextContent(
+            "Recorded blank value",
+        );
+        expect(within(rows[1]!).getByTestId("work-item-status-blank")).toHaveTextContent(
+            "Recorded blank value",
+        );
+        expect(within(rows[2]!).getByTestId("work-item-status-missing")).toHaveTextContent(
+            "No status evidence in this answer",
+        );
+        expect(within(rows[3]!).getByTestId("work-item-status-value")).toHaveTextContent("unknown");
+        expect(within(rows[4]!).getByTestId("work-item-status-value")).toHaveTextContent("0");
+        expect(within(rows[5]!).getByTestId("work-item-status-value")).toHaveTextContent("false");
+    });
+
     it("preserves multiple status observations and the member evidence references", () => {
         const alpha = subject("work_item", "alpha", "Alpha");
         const result = resultWith(

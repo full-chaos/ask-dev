@@ -5,6 +5,7 @@ import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { ClaimedFact, CohortMember, InvestigationResult, SubjectRef } from "@/lib/contracts";
 import { cellText } from "@/lib/fact-rows";
 import { isCohortIntent } from "@/lib/cohort-ranking";
+import { nonBlank } from "@/lib/presentation";
 
 export type WorkItemStatusPanelProps = {
     readonly result: InvestigationResult;
@@ -54,11 +55,20 @@ function StatusCell({ facts }: { readonly facts: readonly ClaimedFact[] }) {
 
     return (
         <ul className="work-item-status__observations">
-            {facts.map((fact, index) => (
-                <li data-claim-id={fact.claim_id} key={`${fact.claim_id}-${index}`}>
-                    <SafeAnswerText text={cellText(fact.value)} />
-                </li>
-            ))}
+            {facts.map((fact, index) => {
+                const displayValue = nonBlank(cellText(fact.value));
+                return (
+                    <li data-claim-id={fact.claim_id} key={`${fact.claim_id}-${index}`}>
+                        {displayValue === undefined ? (
+                            <span className="panel__empty" data-testid="work-item-status-blank">
+                                Recorded blank value
+                            </span>
+                        ) : (
+                            <SafeAnswerText text={displayValue} />
+                        )}
+                    </li>
+                );
+            })}
         </ul>
     );
 }
