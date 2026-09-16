@@ -373,7 +373,17 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // this pointer moves.
 // 00175bc8 -> d8e00829: the acr PR squash-merged to main -- same tree, a new
 // sha; only this pointer moves.
-export const SOURCE_COMMIT = "d8e008298a4057051f67124036f3a5262ba1014a";
+// d8e00829 -> the current pin: verified per-file directly against acr's own
+// history. Exactly one vendored file changed:
+//   - `context_fabric_common.v1.schema.json`: `$defs.StructureDisposition`
+//     (a `ConfirmedStructureEntry`'s closed veto/applied vocabulary) gains
+//     one additive member, `superseded_by_caller` -- a carried member the
+//     caller's own request already contests (a hint or a redeemed receipt
+//     naming a different subject of the same kind), distinct from every
+//     `vetoed_*` value (a post-resolution disagreement or absence).
+// `context_fabric_investigation_request.v1.schema.json`, `error.v1.schema.json`
+// and all four pinned examples are byte-identical to the prior pin.
+export const SOURCE_COMMIT = "caaa25a723422bb8a4652aa4914c1bd0084af26b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

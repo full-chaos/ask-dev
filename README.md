@@ -207,7 +207,34 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `9e2bbede5447843ad35eb2083c9c98465fb767bd` (acr main tip
+Currently pinned: `caaa25a723422bb8a4652aa4914c1bd0084af26b` (verified
+per-file directly against acr's own history, on top of acr main's own
+`d8e008298a4057051f67124036f3a5262ba1014a` squash). One vendored file changed
+across the acr branch's own two additive bumps since the prior content pin,
+`a57b599b88a28c170444e786d701af980911db9d`: `context_fabric_common.v1.schema.json`'s
+`$defs.StructureProvenance` gains one additive member, `engine_committed` — a
+carried `subject_anchor` confirmation the producer bound to a question's own
+scope anchor by resolving it, with no clarification ever offered for a caller
+to confirm, distinct from `clarification_confirmed` (a caller-picked offer)
+— and its `$defs.StructureDisposition` gains one additive member,
+`superseded_by_caller` — a carried member the caller's own request already
+contests (a hint or a redeemed receipt naming a different subject of the
+same kind), distinct from every `vetoed_*` value. Neither `provenance` nor
+`disposition` is exhaustively switched over everywhere in this repo — both
+render as free text in `StructureConfirmationRecords` — so each bump adds a
+tone/sentence case only where `src/lib/presentation.ts` and
+`src/lib/structure-disposition.ts` already switch exhaustively, plus a
+consumer test proving the closed-enum validator accepts the new value
+(`src/lib/acr/validate.test.ts`). The other three vendored schemas and all
+four pinned examples are byte-identical to the prior pin.
+
+Previous pin `a57b599b88a28c170444e786d701af980911db9d`. The README's own
+prior-pin history below this point was not kept current with every
+intermediate bump; the live pin is always `SOURCE_COMMIT` in
+`scripts/sync-acr-contracts.mjs` and `src/contracts/manifest.json`, not this
+prose block. What follows is retained as historical record.
+
+`9e2bbede5447843ad35eb2083c9c98465fb767bd` (acr main tip
 #382, CHAOS-4825 — anchor the published JSON Schemas to the Go wire structs;
 contains #383, CHAOS-4831 — the answer-reuse evidence-containment degrade
 fix, which merged first onto the same tip). ONE file in the CONSUMED surface

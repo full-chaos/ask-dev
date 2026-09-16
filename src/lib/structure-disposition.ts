@@ -43,6 +43,8 @@ function dispositionSentence(disposition: StructureDisposition, member: Structur
             return `Your ${label} selection conflicted with another value in the same request and was NOT applied. Fresh offers are shown below — try again.`;
         case "vetoed_stale":
             return `Your ${label} selection was for an offer that is no longer current (superseded by a later confirmation) and was NOT applied. Fresh offers are shown below — try again.`;
+        case "superseded_by_caller":
+            return `Your request already specified ${label} directly, so the carried value from an earlier turn was not applied.`;
     }
 }
 
