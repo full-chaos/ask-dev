@@ -359,7 +359,9 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 31d7dc2b -> a9e52ede: same acr branch, later tip -- only description
 // strings in the vendored schemas changed (a citation-count trim), no
 // field, type, enum, or requiredness changed.
-export const SOURCE_COMMIT = "a9e52edeee2f3c2674d9447ece62db3aa5bd8bc6";
+// a9e52ede -> 3f892741: same acr branch, later tip -- a guard/prompt fix
+// with no vendored-schema-touching change at all; only this pointer moves.
+export const SOURCE_COMMIT = "3f892741cde241b949243382d32c8a419aa6c531";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
