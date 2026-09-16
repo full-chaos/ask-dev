@@ -364,7 +364,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 3f892741 -> 3e49b619: same acr branch, rebased onto a later acr main and
 // carrying a further guard/telemetry fix -- again no vendored-schema-
 // touching change; only this pointer moves.
-export const SOURCE_COMMIT = "3e49b619b7beb10fcbcc803bd8437e80e4190691";
+// 3e49b619 -> 7eadb645: same acr branch, later tip -- another guard-only
+// fix with no vendored-schema-touching change at all; only this pointer
+// moves.
+export const SOURCE_COMMIT = "7eadb645a65d1563cf4cc7b592b14f1b99e12c48";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
