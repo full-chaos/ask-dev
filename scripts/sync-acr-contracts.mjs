@@ -371,7 +371,12 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // amended in place onto the same unpushed commit (a guard fix, then a
 // comment-only reword) -- still no vendored-schema-touching change; only
 // this pointer moves.
-export const SOURCE_COMMIT = "55005234cea624b8b3e4d9f398d6a7c89fa6b922";
+// 55005234 -> 4fd04245 -> 00175bc8: a NEW commit (55005234 is pushed
+// history), removing the acr-side lexical guard entirely, then amended once
+// more (still unpushed) to collapse an over-granular prompt-version history
+// comment -- Go-only both times, still no vendored-schema-touching change;
+// only this pointer moves.
+export const SOURCE_COMMIT = "00175bc86845f12fdd63b42ce80ab833e9603a54";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
