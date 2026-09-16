@@ -383,7 +383,13 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 //     `vetoed_*` value (a post-resolution disagreement or absence).
 // `context_fabric_investigation_request.v1.schema.json`, `error.v1.schema.json`
 // and all four pinned examples are byte-identical to the prior pin.
-export const SOURCE_COMMIT = "caaa25a723422bb8a4652aa4914c1bd0084af26b";
+// (prior d8e00829 pin) -> the current pin: verified per-file. Exactly one
+// vendored file changed: `context_fabric_common.v1.schema.json`'s
+// `$defs.StructureDisposition` gains a second additive member,
+// `not_evaluated` -- a carried member on a turn that ends before its own
+// resolution ever runs, passed forward unchanged rather than claimed as
+// applied.
+export const SOURCE_COMMIT = "9292c2e21ea29917856622e9c8cb0965b9afd98c";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

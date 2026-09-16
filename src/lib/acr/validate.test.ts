@@ -2159,3 +2159,72 @@ describe("investigation result contract — structure disposition superseded_by_
         expect(enumRejections.length).toBeGreaterThan(0);
     });
 });
+
+/**
+ * The structure-disposition pin's second additive member, `not_evaluated`
+ * (context_fabric_common.v1's `$defs.StructureDisposition`): a carried
+ * member on a turn that ends before its own resolution ever runs, passed
+ * forward unchanged rather than claimed as `applied`. Same discipline as
+ * the `superseded_by_caller` pin above: no component in this repo
+ * exhaustively switches over `disposition` outside the tone/sentence maps
+ * already updated for it, so the risk this class of pin usually carries
+ * does not apply; what DOES apply, and what the EXECUTED repro below
+ * proves, is the closed-enum validator itself.
+ */
+describe("investigation result contract — structure disposition not_evaluated (consumer pin)", () => {
+    function withUnevaluatedAnchor(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            confirmed_structure?: unknown[];
+        };
+        result.confirmed_structure = [
+            {
+                member: "subject_anchor",
+                applied_value: "repository:full-chaos/dev-health-acr",
+                source: "carried",
+                prior_result_id: "result_prior_ask_dev1",
+                provenance: "engine_committed",
+                disposition: "not_evaluated",
+            },
+        ];
+        return result;
+    }
+
+    it("a carried anchor this turn never got the chance to evaluate validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withUnevaluatedAnchor(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized disposition still rejects — the enum stays closed", () => {
+        const tampered = withUnevaluatedAnchor() as {
+            confirmed_structure: Array<Record<string, unknown>>;
+        };
+        tampered.confirmed_structure[0]!.disposition = "not_evaluated_bogus";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("EXECUTED repro: this response would fail closed under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { StructureDisposition: { enum: string[] } };
+        };
+        const dispositionDef = priorSchema.$defs.StructureDisposition;
+        expect(dispositionDef.enum).toContain("not_evaluated");
+        dispositionDef.enum = dispositionDef.enum.filter((value) => value !== "not_evaluated");
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(withUnevaluatedAnchor())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});
