@@ -2016,3 +2016,215 @@ describe("investigation result contract — the cardinality claim kind (consumer
         expect(validate(withClaim("readiness"))).toBe(true);
     });
 });
+
+/**
+ * The structure-provenance pin (context_fabric_common.v1's
+ * `$defs.StructureProvenance`, a `ConfirmedStructureEntry.provenance`):
+ * gains one additive member, `engine_committed`, distinct from
+ * `clarification_confirmed` (a caller-picked offer). No component in this
+ * repo exhaustively switches over `provenance` — it renders as free text in
+ * `StructureConfirmationRecords` — so the risk this class of pin usually
+ * carries (a value with no rendering case) does not apply here; what DOES
+ * apply, and what the EXECUTED repro below proves, is the closed-enum
+ * validator itself: before this pin, a response carrying this value failed
+ * closed as an upstream contract violation.
+ */
+describe("investigation result contract — structure provenance engine_committed (consumer pin)", () => {
+    function withEngineCommittedAnchor(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            confirmed_structure?: unknown[];
+        };
+        result.confirmed_structure = [
+            {
+                member: "subject_anchor",
+                applied_value: "repository:full-chaos/dev-health-acr",
+                source: "carried",
+                prior_result_id: "result_prior_ask_dev1",
+                provenance: "engine_committed",
+                disposition: "applied",
+            },
+        ];
+        return result;
+    }
+
+    it("a carried, engine-committed anchor confirmation validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withEngineCommittedAnchor(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized provenance still rejects — the enum stays closed", () => {
+        const tampered = withEngineCommittedAnchor() as {
+            confirmed_structure: Array<Record<string, unknown>>;
+        };
+        tampered.confirmed_structure[0]!.provenance = "engine_committed_bogus";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("EXECUTED repro: this response would fail closed under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { StructureProvenance: { enum: string[] } };
+        };
+        const provenanceDef = priorSchema.$defs.StructureProvenance;
+        expect(provenanceDef.enum).toContain("engine_committed");
+        provenanceDef.enum = provenanceDef.enum.filter((value) => value !== "engine_committed");
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(withEngineCommittedAnchor())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});
+
+/**
+ * The structure-disposition pin (context_fabric_common.v1's
+ * `$defs.StructureDisposition`, a `ConfirmedStructureEntry.disposition`):
+ * gains one additive member, `superseded_by_caller`, disclosing a carried
+ * member a caller's own request already contests, distinct from every
+ * `vetoed_*` value (a post-resolution disagreement or absence). No
+ * component in this repo exhaustively switches over `disposition` — it
+ * renders as free text in `StructureConfirmationRecords` — so the risk
+ * this class of pin usually carries (a value with no rendering case) does
+ * not apply here; what DOES apply, and what the EXECUTED repro below
+ * proves, is the closed-enum validator itself: before this pin, a response
+ * carrying this value failed closed as an upstream contract violation.
+ */
+describe("investigation result contract — structure disposition superseded_by_caller (consumer pin)", () => {
+    function withSupersededAnchor(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            confirmed_structure?: unknown[];
+        };
+        result.confirmed_structure = [
+            {
+                member: "subject_anchor",
+                applied_value: "repository:full-chaos/dev-health-acr",
+                source: "carried",
+                prior_result_id: "result_prior_ask_dev1",
+                provenance: "engine_committed",
+                disposition: "superseded_by_caller",
+            },
+        ];
+        return result;
+    }
+
+    it("a carried anchor a caller's own hint already superseded validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withSupersededAnchor(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized disposition still rejects — the enum stays closed", () => {
+        const tampered = withSupersededAnchor() as {
+            confirmed_structure: Array<Record<string, unknown>>;
+        };
+        tampered.confirmed_structure[0]!.disposition = "superseded_by_caller_bogus";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("EXECUTED repro: this response would fail closed under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { StructureDisposition: { enum: string[] } };
+        };
+        const dispositionDef = priorSchema.$defs.StructureDisposition;
+        expect(dispositionDef.enum).toContain("superseded_by_caller");
+        dispositionDef.enum = dispositionDef.enum.filter(
+            (value) => value !== "superseded_by_caller",
+        );
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(withSupersededAnchor())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});
+
+/**
+ * The structure-disposition pin's second additive member, `not_evaluated`
+ * (context_fabric_common.v1's `$defs.StructureDisposition`): a carried
+ * member on a turn that ends before its own resolution ever runs, passed
+ * forward unchanged rather than claimed as `applied`. Same discipline as
+ * the `superseded_by_caller` pin above: no component in this repo
+ * exhaustively switches over `disposition` outside the tone/sentence maps
+ * already updated for it, so the risk this class of pin usually carries
+ * does not apply; what DOES apply, and what the EXECUTED repro below
+ * proves, is the closed-enum validator itself.
+ */
+describe("investigation result contract — structure disposition not_evaluated (consumer pin)", () => {
+    function withUnevaluatedAnchor(): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            confirmed_structure?: unknown[];
+        };
+        result.confirmed_structure = [
+            {
+                member: "subject_anchor",
+                applied_value: "repository:full-chaos/dev-health-acr",
+                source: "carried",
+                prior_result_id: "result_prior_ask_dev1",
+                provenance: "engine_committed",
+                disposition: "not_evaluated",
+            },
+        ];
+        return result;
+    }
+
+    it("a carried anchor this turn never got the chance to evaluate validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            withUnevaluatedAnchor(),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized disposition still rejects — the enum stays closed", () => {
+        const tampered = withUnevaluatedAnchor() as {
+            confirmed_structure: Array<Record<string, unknown>>;
+        };
+        tampered.confirmed_structure[0]!.disposition = "not_evaluated_bogus";
+
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            tampered,
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    it("EXECUTED repro: this response would fail closed under the prior pin's own schema", () => {
+        const priorSchema = structuredClone(commonSchema) as unknown as {
+            $defs: { StructureDisposition: { enum: string[] } };
+        };
+        const dispositionDef = priorSchema.$defs.StructureDisposition;
+        expect(dispositionDef.enum).toContain("not_evaluated");
+        dispositionDef.enum = dispositionDef.enum.filter((value) => value !== "not_evaluated");
+
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(priorSchema, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(investigationResultSchema);
+
+        expect(validate(withUnevaluatedAnchor())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});

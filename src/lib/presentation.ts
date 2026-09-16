@@ -82,6 +82,9 @@ export function structureDispositionTone(disposition: StructureDisposition): Ton
         case "vetoed_conflict":
         case "vetoed_stale":
             return "bad";
+        case "superseded_by_caller":
+        case "not_evaluated":
+            return "neutral";
     }
 }
 
