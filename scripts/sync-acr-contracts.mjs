@@ -343,7 +343,37 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 72c9e3ea -> a57b599b: the acr PR merged (squash). Final pin -- every
 // vendored file byte-identical to the pre-merge pin (squash preserves the
 // tree; verified per-file blob shas against the merged sha on acr main).
-export const SOURCE_COMMIT = "a57b599b88a28c170444e786d701af980911db9d";
+// a57b599b -> a9e52ede (PRE-MERGE, acr branch fix/5774-attention-ranking-meaning,
+// pushed as acr PR #569, not yet merged to acr main -- this pin must be
+// re-pinned to the real squash sha once that PR merges): Cohort grows
+// two new fields, both `additionalProperties:false`-safe because they are
+// schema-OPTIONAL -- `score_meaning` (closed vocabulary, what the ranking
+// formula measures) and `judgment_mismatch` (server-computed bool, true
+// when the requested judgment does not match that meaning).
+// InterpretedQuestion grows one new optional field, `requested_judgment_kind`
+// (closed vocabulary, the interpreter's own pick of what basis the
+// requested judgment asks for). Every new field is additive-optional --
+// this pin validates BOTH the pre-fix and the fixed acr response shapes --
+// so this is the same normal two-step-deploy shape earlier pins in this
+// file already document (consumer pin first, acr server second).
+// 31d7dc2b -> a9e52ede: same acr branch, later tip -- only description
+// strings in the vendored schemas changed (a citation-count trim), no
+// field, type, enum, or requiredness changed.
+// a9e52ede -> 3f892741: same acr branch, later tip -- a guard/prompt fix
+// with no vendored-schema-touching change at all; only this pointer moves.
+// 3f892741 -> 3e49b619: same acr branch, rebased onto a later acr main and
+// carrying a further guard/telemetry fix -- again no vendored-schema-
+// touching change; only this pointer moves.
+// 3e49b619 -> 7eadb645: same acr branch, later tip -- another guard-only
+// fix with no vendored-schema-touching change at all; only this pointer
+// moves.
+// 7eadb645 -> b4ce2797 -> 55005234: same acr branch, both later tips
+// amended in place onto the same unpushed commit (a guard fix, then a
+// comment-only reword) -- still no vendored-schema-touching change; only
+// this pointer moves.
+// 00175bc8 -> d8e00829: the acr PR squash-merged to main -- same tree, a new
+// sha; only this pointer moves.
+export const SOURCE_COMMIT = "d8e008298a4057051f67124036f3a5262ba1014a";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
