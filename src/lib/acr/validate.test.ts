@@ -1871,9 +1871,19 @@ describe("coverage detail contract — the kind_census_truncated code (consumer 
 
 /**
  * `ClaimedFact.kind` gains a 23rd member, `cardinality`: the count the service
- * computes over a resolved member set, minted as a claimed fact whose subject
- * is the organization, on an answer whose question owes a count. Its value is
- * the SERVED member count, as an integer.
+ * computes over a resolved member set, minted as a claimed fact on an answer
+ * whose question owes a count. Its value is the SERVED member count, as an
+ * integer.
+ *
+ * THE SUBJECT IS THE COUNTED POPULATION, not always the organization: an
+ * anchor-bound count (a question counting members under a named anchor whose
+ * anchor resolved) names the anchor itself, of the anchor's own kind and
+ * canonical id; every other count -- nothing anchors the population -- names
+ * the organization. `subject` is the general `SubjectRef` shape already, with
+ * no `kind` restriction tied to `ClaimedFact.kind == "cardinality"` at the
+ * schema level, so both shapes validate identically here; the two GREEN tests
+ * below exercise each shape rather than asserting a schema constraint that
+ * does not exist.
  *
  * It is a CLAIM kind only. The four requestable fact-kind vocabularies --
  * `FactRequirement.kind`, `AnswerPlan.fact_kinds`, `PlanRequirement.fact_kinds`
@@ -1913,6 +1923,19 @@ describe("investigation result contract — the cardinality claim kind (consumer
         };
     }
 
+    // The ANCHOR-BOUND shape: subject is a project, not the organization. See
+    // this describe block's own doc comment -- both shapes are the general
+    // SubjectRef, so both must validate identically.
+    function anchoredCardinalityClaim(kind: string): Record<string, unknown> {
+        return {
+            claim_id: "server:cardinality:work_item",
+            kind,
+            subject: { kind: "project", canonical_id: "project_ask_dev", label: "Ask Dev" },
+            field: "work_item_count",
+            value: { integer: 7 },
+        };
+    }
+
     function withClaim(kind: string): Record<string, unknown> {
         const doc = structuredClone(canonicalResult) as unknown as {
             claimed_facts: Array<Record<string, unknown>>;
@@ -1921,8 +1944,22 @@ describe("investigation result contract — the cardinality claim kind (consumer
         return doc;
     }
 
+    function withAnchoredClaim(kind: string): Record<string, unknown> {
+        const doc = structuredClone(canonicalResult) as unknown as {
+            claimed_facts: Array<Record<string, unknown>>;
+        };
+        doc.claimed_facts = [...doc.claimed_facts, anchoredCardinalityClaim(kind)];
+        return doc;
+    }
+
     it("GREEN: a cardinality claim validates at this pin", () => {
         const validation = validateContract(RESULT, withClaim(MEMBER));
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("GREEN: an anchor-bound cardinality claim (subject = project, not organization) validates too", () => {
+        const validation = validateContract(RESULT, withAnchoredClaim(MEMBER));
         expect(validation.errors).toEqual([]);
         expect(validation.valid).toBe(true);
     });
