@@ -389,7 +389,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // `not_evaluated` -- a carried member on a turn that ends before its own
 // resolution ever runs, passed forward unchanged rather than claimed as
 // applied.
-export const SOURCE_COMMIT = "9292c2e21ea29917856622e9c8cb0965b9afd98c";
+// (prior pin) -> cc498982: the acr PR squash-merged to main -- same tree
+// as the prior pin (squash preserves the tree; verified per-file), a new
+// sha; only this pointer moves.
+export const SOURCE_COMMIT = "cc498982bf1c0b4de9bd8e1964fa0b67a26f915b";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
