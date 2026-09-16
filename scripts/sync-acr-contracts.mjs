@@ -343,10 +343,9 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 72c9e3ea -> a57b599b: the acr PR merged (squash). Final pin -- every
 // vendored file byte-identical to the pre-merge pin (squash preserves the
 // tree; verified per-file blob shas against the merged sha on acr main).
-// a57b599b -> 31d7dc2b (PRE-MERGE, unpushed acr branch fix/5774-attention-ranking-meaning,
-// not yet on acr main -- this pin exists only to run the generative trial
-// against the not-yet-merged fields; it must be re-pinned to the real
-// squash sha before this ask-dev branch is pushed or merged): Cohort grows
+// a57b599b -> a9e52ede (PRE-MERGE, acr branch fix/5774-attention-ranking-meaning,
+// pushed as acr PR #569, not yet merged to acr main -- this pin must be
+// re-pinned to the real squash sha once that PR merges): Cohort grows
 // two new fields, both `additionalProperties:false`-safe because they are
 // schema-OPTIONAL -- `score_meaning` (closed vocabulary, what the ranking
 // formula measures) and `judgment_mismatch` (server-computed bool, true
@@ -357,7 +356,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // this pin validates BOTH the pre-fix and the fixed acr response shapes --
 // so this is the same normal two-step-deploy shape earlier pins in this
 // file already document (consumer pin first, acr server second).
-export const SOURCE_COMMIT = "31d7dc2b119b92ca21b735fca0632860670baf9c";
+// 31d7dc2b -> a9e52ede: same acr branch, later tip -- only description
+// strings in the vendored schemas changed (a citation-count trim), no
+// field, type, enum, or requiredness changed.
+export const SOURCE_COMMIT = "a9e52edeee2f3c2674d9447ece62db3aa5bd8bc6";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
