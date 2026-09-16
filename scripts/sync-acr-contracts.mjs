@@ -343,7 +343,21 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 72c9e3ea -> a57b599b: the acr PR merged (squash). Final pin -- every
 // vendored file byte-identical to the pre-merge pin (squash preserves the
 // tree; verified per-file blob shas against the merged sha on acr main).
-export const SOURCE_COMMIT = "a57b599b88a28c170444e786d701af980911db9d";
+// a57b599b -> 31d7dc2b (PRE-MERGE, unpushed acr branch fix/5774-attention-ranking-meaning,
+// not yet on acr main -- this pin exists only to run the generative trial
+// against the not-yet-merged fields; it must be re-pinned to the real
+// squash sha before this ask-dev branch is pushed or merged): Cohort grows
+// two new fields, both `additionalProperties:false`-safe because they are
+// schema-OPTIONAL -- `score_meaning` (closed vocabulary, what the ranking
+// formula measures) and `judgment_mismatch` (server-computed bool, true
+// when the requested judgment does not match that meaning).
+// InterpretedQuestion grows one new optional field, `requested_judgment_kind`
+// (closed vocabulary, the interpreter's own pick of what basis the
+// requested judgment asks for). Every new field is additive-optional --
+// this pin validates BOTH the pre-fix and the fixed acr response shapes --
+// so this is the same normal two-step-deploy shape earlier pins in this
+// file already document (consumer pin first, acr server second).
+export const SOURCE_COMMIT = "31d7dc2b119b92ca21b735fca0632860670baf9c";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
