@@ -999,6 +999,8 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
     it("the whole pinned vocabulary is fixed by value, so no member can arrive unnoticed", () => {
         expect(CODES).toEqual([
             "fact_unconfigured",
+            "fact_no_declaring_producer",
+            "fact_table_shape_undeclared",
             "fact_scope_unexpanded",
             "fact_read_failed",
             "fact_provider_reported",
