@@ -389,10 +389,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // `not_evaluated` -- a carried member on a turn that ends before its own
 // resolution ever runs, passed forward unchanged rather than claimed as
 // applied.
-// (prior pin) -> cc498982: the acr PR squash-merged to main -- same tree
-// as the prior pin (squash preserves the tree; verified per-file), a new
-// sha; only this pointer moves.
-export const SOURCE_COMMIT = "cc498982bf1c0b4de9bd8e1964fa0b67a26f915b";
+// cc498982 -> f4b35b07: the completeness-authority coverage-detail
+// vocabulary split (fact_unconfigured into fact_no_declaring_producer /
+// fact_table_shape_undeclared).
+export const SOURCE_COMMIT = "f4b35b07849ef17e884dc38af004d49c38d86789";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
