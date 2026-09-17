@@ -15,13 +15,14 @@ import {
     type NarrowingContinuationAxis,
 } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
-import { MAX_CONVERSATION_TURNS_ON_WIRE } from "@/lib/conversation";
+import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
     InvestigationRequest,
     InvestigationResult,
     StructureSubjectKind,
+    SubjectHint,
 } from "@/lib/contracts";
 
 /**
@@ -102,6 +103,14 @@ export type InvestigationOptions = {
     // question at a time by design), so it defaults to empty below exactly
     // as it always has.
     readonly conversation?: readonly ConversationTurn[] | undefined;
+    /**
+     * CHAOS-5837: same-conversation carry. `@/lib/conversation`'s
+     * `deriveParentReference` is the chat surface's own producer of both —
+     * undefined/empty on a first turn, set together on a follow-up whose
+     * immediately preceding turn answered.
+     */
+    readonly parentResultId?: string | undefined;
+    readonly subjectHints?: readonly SubjectHint[] | undefined;
     readonly signal?: AbortSignal;
 };
 
@@ -145,6 +154,8 @@ export function buildInvestigationRequest(
     } = {},
     conversation: readonly ConversationTurn[] = [],
     expectedKinds: readonly StructureSubjectKind[] = [],
+    parentResultId: string | undefined = undefined,
+    subjectHints: readonly SubjectHint[] = [],
 ): InvestigationRequest {
     // Deduplicated (the contract requires uniqueItems) and capped at the
     // contract's maxItems, so an over-long or repeated selection fails here
@@ -240,6 +251,14 @@ export function buildInvestigationRequest(
         MAX_EXPECTED_KINDS,
     ) as NonNullable<InvestigationRequest["expected_kinds"]>;
 
+    // Capped to the wire's own bound here too — defense in
+    // depth, same reasoning as `conversationTurns` above, since
+    // `deriveParentReference` (the chat surface's only caller) already caps
+    // lower. Attached only when non-empty; `parent_result_id` is attached
+    // whenever supplied, independent of whether any hint came with it (a
+    // prior result with nothing committed still names a parent).
+    const boundedSubjectHints = subjectHints.slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
+
     return {
         schema_version: "context_fabric_investigation_request.v1",
         request_id: requestId(),
@@ -248,6 +267,10 @@ export function buildInvestigationRequest(
         prior_subject_receipts: receipts,
         ...structureFields,
         ...(dedupedExpectedKinds.length > 0 ? { expected_kinds: dedupedExpectedKinds } : {}),
+        ...(parentResultId !== undefined ? { parent_result_id: parentResultId } : {}),
+        ...(boundedSubjectHints.length > 0
+            ? { requested_scope: { subject_hints: boundedSubjectHints } }
+            : {}),
         time_context: { axis: "current" },
         options: {
             max_subject_candidates: 10,
@@ -525,6 +548,8 @@ export async function investigate(
         },
         options.conversation ?? [],
         options.expectedKinds ?? [],
+        options.parentResultId,
+        options.subjectHints ?? [],
     );
     const body = JSON.stringify(request);
 

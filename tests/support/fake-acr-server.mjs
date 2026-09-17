@@ -33,7 +33,9 @@
  * instead, TRIGGER_MIXED returns one with BOTH clarification and kind offers
  * at once, TRIGGER_CONVERSATION_ECHO returns a decisive result whose
  * `deterministic_answer` reports back what `conversation` the request itself
- * carried, and TRIGGER_COHORT (CHAOS-4449) returns the canonical example with
+ * carried, TRIGGER_PARENT_REFERENCE_ECHO reports back this same
+ * request's own `parent_result_id`/`requested_scope.subject_hints` instead,
+ * and TRIGGER_COHORT (CHAOS-4449) returns the canonical example with
  * `interpretation.shape` overridden to `discovered_cohort` and nothing else
  * changed. Every other question returns the canonical `complete` example
  * unchanged apart from `question`/`result_id`/`request_id`, so it never
@@ -64,8 +66,9 @@
  *       starts every `webServer` entry up front — this process just sits
  *       idle for any spec that never talks to it). Only `tests/chat.spec.ts`'s
  *       `"clarification chips"`, `"structure needs chips"`, `"mixed receipt
- *       families"`, and `"conversation threading"` describe blocks actually
- *       TALK to it, along with `"cohort ranking"` (CHAOS-4449), by overriding
+ *       families"`, `"conversation threading"`, and `"same-conversation
+ *       carry"` describe blocks actually TALK to it, along with
+ *       `"cohort ranking"` (CHAOS-4449), by overriding
  *       `baseURL` to the configured app instance that points at it (codex
  *       review round 2, correcting an earlier version of this comment that
  *       implied the double itself was scoped to one spec; extended again in
@@ -104,6 +107,13 @@ export const TRIGGER_MIXED = "e2e-mixed-me";
 // turn 1's own content rather than merely asserting the request "looks
 // fine" some other way.
 export const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
+// CHAOS-5837: same-conversation carry follow-up. Same purpose as
+// TRIGGER_CONVERSATION_ECHO immediately above, one field over: echoes back
+// whether THIS request carried `parent_result_id` and how many
+// `requested_scope.subject_hints` rode with it, so an e2e spec can prove a
+// typed follow-up (no chip click) actually names the turn it follows rather
+// than merely asserting the request "looks fine" some other way.
+export const TRIGGER_PARENT_REFERENCE_ECHO = "e2e-parent-reference-echo";
 // CHAOS-4171/CHAOS-4012: the candidate-list offer axis — mirrors
 // TRIGGER_STRUCTURE_NEEDS exactly, one member over (`subject_candidate`
 // instead of `expected_kind`), so the real-HTTP round trip for
@@ -414,6 +424,24 @@ function conversationEchoResult(question, conversation) {
     };
 }
 
+// Same purpose as `conversationEchoResult` above, one field
+// over — `parentResultId`/`subjectHints` are this request's OWN
+// `parent_result_id`/`requested_scope.subject_hints`, read by this double's
+// request handler exactly as `conversation` is read for the sibling trigger.
+function parentReferenceEchoResult(question, parentResultId, subjectHints) {
+    const hints = Array.isArray(subjectHints) ? subjectHints : [];
+    const hintIds = hints.map((hint) => hint?.id).join(",");
+    const result = structuredClone(canonical);
+    return {
+        ...result,
+        result_id: "result_e2e_parent_reference_0001",
+        request_id: "request_e2e_parent_reference_0001",
+        question,
+        status: "complete",
+        deterministic_answer: `parent_result_id=${String(parentResultId)}; subject_hint_ids=${hintIds}`,
+    };
+}
+
 const server = createServer((request, response) => {
     // Playwright's `webServer.url` readiness probe is a plain GET / — answer
     // it distinctly from the (POST-only) investigation endpoint.
@@ -440,10 +468,19 @@ const server = createServer((request, response) => {
         let hasKindReceipt = false;
         let hasCandidateReceipt = false;
         let conversation;
+        let parentResultId;
+        let subjectHints;
         try {
             const parsed = JSON.parse(body);
             question = typeof parsed.question === "string" ? parsed.question : "";
             conversation = parsed.conversation;
+            // `parent_result_id` and `requested_scope.subject_hints`
+            // are the pinned wire contract's own field names (same "the
+            // client renames it, not the route" pattern the comment below
+            // documents for the receipt fields) — read here exactly as
+            // `conversation` is read for the sibling echo trigger above.
+            parentResultId = parsed.parent_result_id;
+            subjectHints = parsed.requested_scope?.subject_hints;
             // `prior_subject_receipts` — the PINNED WIRE CONTRACT'S own
             // snake_case field name (see
             // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json).
@@ -539,17 +576,19 @@ const server = createServer((request, response) => {
                 : mixedResult(question)
             : question.includes(TRIGGER_CONVERSATION_ECHO)
               ? conversationEchoResult(question, conversation)
-              : question.includes(TRIGGER_COHORT)
-                ? cohortResult(question)
-                : hasChosenReceipt
-                  ? answeredResult(question)
-                  : question.includes(TRIGGER_STRUCTURE_NEEDS)
-                    ? structureNeedsResult(question)
-                    : question.includes(TRIGGER_CANDIDATE_NEEDS)
-                      ? candidateNeedsResult(question)
-                      : question.includes(TRIGGER_CLARIFICATION)
-                        ? clarificationResult(question)
-                        : answeredResult(question);
+              : question.includes(TRIGGER_PARENT_REFERENCE_ECHO)
+                ? parentReferenceEchoResult(question, parentResultId, subjectHints)
+                : question.includes(TRIGGER_COHORT)
+                  ? cohortResult(question)
+                  : hasChosenReceipt
+                    ? answeredResult(question)
+                    : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                      ? structureNeedsResult(question)
+                      : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                        ? candidateNeedsResult(question)
+                        : question.includes(TRIGGER_CLARIFICATION)
+                          ? clarificationResult(question)
+                          : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

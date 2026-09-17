@@ -21,6 +21,8 @@ const TRIGGER_MIXED = "e2e-mixed-me";
 const TRIGGER_COHORT = "e2e-cohort-me";
 // Kept in sync by hand with `TRIGGER_CONVERSATION_ECHO` for the same reason.
 const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
+// Kept in sync by hand with `TRIGGER_PARENT_REFERENCE_ECHO` for the same reason.
+const TRIGGER_PARENT_REFERENCE_ECHO = "e2e-parent-reference-echo";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -650,6 +652,58 @@ test.describe("conversation threading", () => {
         // fake-acr-server.mjs's own `conversationEchoResult`).
         await expect(turns.last()).toContainText("conversation_turns=2");
         await expect(turns.last()).toContainText("What is Ask Dev");
+    });
+});
+
+/**
+ * Same-conversation carry (CHAOS-5837).
+ *
+ * The pinned request contract declares `parent_result_id` and
+ * `requested_scope.subject_hints`; a chat surface that sends neither leaves
+ * acr's confirmed-need ledger reporting `miss_no_reference` on every
+ * follow-up, and its engine-committed anchor carry (acr CHAOS-5788) never
+ * engages. This proves turn 2's re-ask actually carries turn 1's OWN
+ * `result_id` and committed subject — a real HTTP round trip through the
+ * server hop, not a client-side-only assertion — for a plain TYPED
+ * follow-up with no chip click involved.
+ */
+test.describe("same-conversation carry", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("POSITIVE: turn 2 carries turn 1's own result_id and committed subject, turn 1 carries neither", async ({
+        page,
+    }) => {
+        await page.goto("/");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`What is Ask Dev, ${TRIGGER_PARENT_REFERENCE_ECHO}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        await expect(turns).toHaveCount(1);
+        // A turn's own FIRST ask names no parent to follow.
+        await expect(turns.first()).toContainText("parent_result_id=undefined");
+
+        await page
+            .getByLabel("Ask a question")
+            .fill(`Follow-up question, ${TRIGGER_PARENT_REFERENCE_ECHO}?`);
+        await page.getByRole("button", { name: "Send" }).click();
+
+        await expect(turns).toHaveCount(2);
+        // The discriminating proof: the SERVER, not just the client, saw
+        // turn 1's own `result_id` as `parent_result_id`, and turn 1's own
+        // committed subject (the canonical example's `project_ask_dev`) as a
+        // `requested_scope.subject_hints` entry — the fake-ACR double echoes
+        // back exactly what it received (see fake-acr-server.mjs's own
+        // `parentReferenceEchoResult`). `parentReferenceEchoResult` (turn 1's
+        // own responder here) fixes every turn's `result_id` at
+        // `result_e2e_parent_reference_0001`, so this is turn 1's REAL id,
+        // not a guess turn 2 happened to match.
+        await expect(turns.last()).toContainText(
+            "parent_result_id=result_e2e_parent_reference_0001",
+        );
+        await expect(turns.last()).toContainText("subject_hint_ids=project_ask_dev");
     });
 });
 

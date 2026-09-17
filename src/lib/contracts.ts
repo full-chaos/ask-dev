@@ -85,6 +85,8 @@ export type {
     ConversationTurn,
     HandleBoundReceipt,
     KindBoundReceipt,
+    // CHAOS-5837: one caller-supplied hint into `requested_scope.subject_hints`.
+    SubjectHint,
     WindowBoundReceipt,
 } from "@/contracts/generated/investigation-request";
 

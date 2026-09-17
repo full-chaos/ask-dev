@@ -338,6 +338,94 @@ describe("buildInvestigationRequest", () => {
             ).toBe(true);
         });
     });
+
+    /**
+     * CHAOS-5837: same-conversation carry. `parent_result_id` seeds acr's
+     * confirmed-need ledger walk; `requested_scope.subject_hints` restates
+     * what the parent result committed. Same wire-minimization discipline as
+     * every other optional field above.
+     */
+    describe("same-conversation carry (parent_result_id / requested_scope.subject_hints)", () => {
+        it("omits both on a first turn (called with no parent reference)", () => {
+            const request = buildInvestigationRequest("q");
+
+            expect(request).not.toHaveProperty("parent_result_id");
+            expect(request).not.toHaveProperty("requested_scope");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("omits both even when called with an explicit undefined id and empty hints", () => {
+            const request = buildInvestigationRequest("q", [], {}, [], [], undefined, []);
+
+            expect(request).not.toHaveProperty("parent_result_id");
+            expect(request).not.toHaveProperty("requested_scope");
+        });
+
+        it("sends the exact prior result id and hints on a follow-up", () => {
+            const hints = [
+                {
+                    kind: "repository" as const,
+                    id: "repo_1",
+                    label: "dev-health-ops",
+                    source: "ask_dev_parent_result_subject",
+                },
+            ];
+            const request = buildInvestigationRequest(
+                "And last month?",
+                [],
+                {},
+                [],
+                [],
+                "result_abc123",
+                hints,
+            );
+
+            expect(request.parent_result_id).toBe("result_abc123");
+            expect(request.requested_scope).toEqual({ subject_hints: hints });
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("sends parent_result_id alone when the prior result committed nothing (no requested_scope key)", () => {
+            const request = buildInvestigationRequest(
+                "And last month?",
+                [],
+                {},
+                [],
+                [],
+                "result_no_commit",
+                [],
+            );
+
+            expect(request.parent_result_id).toBe("result_no_commit");
+            expect(request).not.toHaveProperty("requested_scope");
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+
+        it("caps requested_scope.subject_hints at the contract's maxItems (50)", () => {
+            const many = Array.from({ length: 55 }, (_, index) => ({
+                kind: "work_item" as const,
+                id: `wi_${String(index)}`,
+                label: `Item ${String(index)}`,
+                source: "ask_dev_parent_result_subject",
+            }));
+            const request = buildInvestigationRequest("q", [], {}, [], [], "result_many", many);
+
+            expect(request.requested_scope?.subject_hints).toHaveLength(50);
+            expect(
+                validateContract("context_fabric_investigation_request.v1.schema.json", request)
+                    .valid,
+            ).toBe(true);
+        });
+    });
 });
 
 describe("investigate — upstream text never reaches the caller", () => {

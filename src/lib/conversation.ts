@@ -1,4 +1,4 @@
-import type { ConversationTurn } from "@/lib/contracts";
+import type { ConversationTurn, SubjectHint, SubjectRef } from "@/lib/contracts";
 import { nonBlank } from "@/lib/presentation";
 
 /**
@@ -54,7 +54,15 @@ export type ConversationSourceTurn =
               | { readonly kind: "failed" }
               | {
                     readonly kind: "answered";
-                    readonly result: { readonly deterministic_answer: string };
+                    readonly result: {
+                        readonly deterministic_answer: string;
+                        // Read by `deriveParentReference` below,
+                        // never by `buildConversationTurns` above.
+                        readonly result_id: string;
+                        readonly subject_resolution: {
+                            readonly committed: readonly SubjectRef[];
+                        };
+                    };
                 };
       };
 
@@ -111,4 +119,72 @@ export function buildConversationTurns(
         });
     }
     return settled.slice(-MAX_CONVERSATION_TURNS_SENT);
+}
+
+/**
+ * Same-conversation carry (CHAOS-5837): `parent_result_id` names the
+ * investigation a follow-up turn builds on, and `requested_scope.subject_hints`
+ * restates the subject(s) THAT result committed, so acr's confirmed-need
+ * ledger and its caller-hint subject resolution both have something to bind
+ * to on turn 2+. `parent_result_id` "seeds the same-conversation carry walk
+ * only; it never binds the named result's subjects into this turn" (the
+ * pinned contract's own doc comment) — the hints are the separate, explicit
+ * statement of what committed.
+ *
+ * The contract's own bound on `requested_scope.subject_hints` (`@maxItems 50`).
+ */
+export const MAX_SUBJECT_HINTS_ON_WIRE = 50;
+
+/**
+ * The `SubjectHint.source` value stamped on every hint this module derives.
+ * Never one of acr's own engine-minted `hintsource` constants
+ * (`prior_subject_receipt`, `answer_reuse_authorization_recheck`,
+ * `cohort_group_authorization`, `engine_committed_anchor_carry`) — sending
+ * one of those would misclassify a caller-authored hint as the engine's own
+ * and change which policy it gets. Anything else is, by that package's own
+ * definition, read as caller-authored.
+ */
+export const PARENT_SUBJECT_HINT_SOURCE = "ask_dev_parent_result_subject";
+
+export type ParentReference = {
+    readonly parentResultId: string | undefined;
+    readonly subjectHints: readonly SubjectHint[];
+};
+
+/**
+ * Derives the carry for a re-ask from the chat timeline's own prior turns —
+ * same "before the fresh pair is appended" contract as `buildConversationTurns`
+ * above, and the same caller (`src/app/page.tsx`'s `ask`/`confirmSelections`).
+ *
+ * Reads ONLY the LAST entry: the timeline's strictly alternating
+ * user/assistant shape (every append adds a user/assistant pair together)
+ * means that entry is the one turn this re-ask follows. A first turn
+ * (`priorTurns` empty) or a turn that never answered (pending or failed —
+ * there is no result to name) returns neither field: naming a predecessor
+ * that is not there would misattribute this question to a result it never
+ * followed.
+ *
+ * `subjectHints` maps `SubjectRef` straight across — kind, canonical id, and
+ * label exactly as that result committed them, never inferred or reworded —
+ * and is capped to the wire's own bound; a result with nothing committed
+ * yields an empty list alongside a defined `parentResultId`, which is itself
+ * a fact worth sending (this turn follows one that resolved nothing yet).
+ */
+export function deriveParentReference(
+    priorTurns: readonly ConversationSourceTurn[],
+): ParentReference {
+    const last = priorTurns[priorTurns.length - 1];
+    if (last === undefined || last.role !== "assistant" || last.outcome.kind !== "answered") {
+        return { parentResultId: undefined, subjectHints: [] };
+    }
+    const { result } = last.outcome;
+    const subjectHints: readonly SubjectHint[] = result.subject_resolution.committed
+        .slice(0, MAX_SUBJECT_HINTS_ON_WIRE)
+        .map((subject) => ({
+            kind: subject.kind,
+            id: subject.canonical_id,
+            label: subject.label,
+            source: PARENT_SUBJECT_HINT_SOURCE,
+        }));
+    return { parentResultId: result.result_id, subjectHints };
 }
