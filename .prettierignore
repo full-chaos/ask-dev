@@ -24,3 +24,8 @@ pnpm-lock.yaml
 # committed (kept untracked out of the tree), and not ours to format.
 .codex-review-context.md
 prompt.md
+round.pid
+round-launch.out
+/lane-*.md
+/lane-*.log
+/lane-*-worktree-residue/

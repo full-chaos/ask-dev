@@ -12,6 +12,7 @@ import {
     type ConversationTurn,
     type StructureNeedKind,
     type StructureSubjectKind,
+    type SubjectHint,
 } from "@/lib/contracts";
 import { emitTelemetryEvent } from "@/lib/telemetry/emit";
 import {
@@ -82,6 +83,20 @@ type InvestigateBody = {
     readonly expectedKinds?: unknown;
     /** Chat-surface conversation threading. See src/lib/conversation.ts's own header. */
     readonly conversation?: unknown;
+    /**
+     * CHAOS-5837: the result id of the investigation this turn follows.
+     * `@/lib/conversation`'s `deriveParentReference` is the chat surface's
+     * own producer — absent on a first turn.
+     */
+    readonly parentResultId?: unknown;
+    /**
+     * The subject(s) that parent result committed, restated so acr's
+     * caller-hint subject resolution has an explicit identity to bind to.
+     * Same producer as `parentResultId` above; always empty when that field
+     * is absent, but may also be empty alongside a DEFINED `parentResultId`
+     * — a parent that committed nothing still names itself.
+     */
+    readonly subjectHints?: unknown;
     /**
      * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
      * `useStructureSelections` builds this client-side (never hand-typed by
@@ -253,6 +268,100 @@ class MalformedExpectedKindsError extends Error {
     override readonly name = "MalformedExpectedKindsError";
 }
 
+/**
+ * Same discipline as `parseExpectedKinds` above — a bound check,
+ * malformed REJECTS the whole request. Matches acr's own
+ * `ContextFabricInvestigationRequest.ParentResultID` bound ("bounded
+ * identically to prior_*_receipts[].result_id", the pinned contract's own
+ * doc comment) — the same 8..256 range `parseReceipts` already checks each
+ * receipt's `result_id` against. `@/lib/conversation`'s `deriveParentReference`
+ * is the only producer, so a malformed value should be unreachable in
+ * practice — checked anyway.
+ */
+const MIN_PARENT_RESULT_ID_LENGTH = 8;
+const MAX_PARENT_RESULT_ID_LENGTH = 256;
+
+function parseParentResultId(value: unknown): string | undefined {
+    if (value === undefined) return undefined;
+    if (
+        typeof value !== "string" ||
+        codePointLength(value) < MIN_PARENT_RESULT_ID_LENGTH ||
+        codePointLength(value) > MAX_PARENT_RESULT_ID_LENGTH
+    ) {
+        throw new MalformedParentResultIdError();
+    }
+    return value;
+}
+
+class MalformedParentResultIdError extends Error {
+    override readonly name = "MalformedParentResultIdError";
+}
+
+/**
+ * Same discipline as `parseExpectedKinds`/`parseConversation`
+ * above — full contract shape (`SubjectHint`'s own `additionalProperties:
+ * false`), malformed REJECTS the whole request. `@/lib/conversation`'s
+ * `deriveParentReference` is the only producer, so a malformed entry should
+ * be unreachable in practice — checked anyway, same "should be is not is"
+ * reasoning as every other field this route parses.
+ */
+const MAX_SUBJECT_HINTS = 50;
+const MAX_SUBJECT_HINT_ID_LENGTH = 256;
+const MAX_SUBJECT_HINT_LABEL_LENGTH = 512;
+const MAX_SUBJECT_HINT_SOURCE_LENGTH = 64;
+const SUBJECT_HINT_KEYS: ReadonlySet<string> = new Set(["kind", "id", "label", "source"]);
+
+function parseSubjectHints(value: unknown): readonly SubjectHint[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value)) throw new MalformedSubjectHintError();
+    if (value.length > MAX_SUBJECT_HINTS) throw new MalformedSubjectHintError();
+    return value.map((entry) => {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+            throw new MalformedSubjectHintError();
+        }
+        const record = entry as Record<string, unknown>;
+        if (!Object.keys(record).every((key) => SUBJECT_HINT_KEYS.has(key))) {
+            throw new MalformedSubjectHintError();
+        }
+        const { kind, id, label, source } = record;
+        if (typeof kind !== "string" || !SUBJECT_KIND_SET.has(kind)) {
+            throw new MalformedSubjectHintError();
+        }
+        if (
+            id !== undefined &&
+            (typeof id !== "string" || codePointLength(id) > MAX_SUBJECT_HINT_ID_LENGTH)
+        ) {
+            throw new MalformedSubjectHintError();
+        }
+        if (
+            label !== undefined &&
+            (typeof label !== "string" || codePointLength(label) > MAX_SUBJECT_HINT_LABEL_LENGTH)
+        ) {
+            throw new MalformedSubjectHintError();
+        }
+        if (
+            typeof source !== "string" ||
+            codePointLength(source) < 1 ||
+            codePointLength(source) > MAX_SUBJECT_HINT_SOURCE_LENGTH
+        ) {
+            throw new MalformedSubjectHintError();
+        }
+        if ((id === undefined || id === "") && (label === undefined || label === "")) {
+            throw new MalformedSubjectHintError();
+        }
+        return {
+            kind: kind as StructureSubjectKind,
+            ...(id !== undefined ? { id } : {}),
+            ...(label !== undefined ? { label } : {}),
+            source,
+        };
+    });
+}
+
+class MalformedSubjectHintError extends Error {
+    override readonly name = "MalformedSubjectHintError";
+}
+
 const STRUCTURE_SELECTION_EVENT_MEMBERS: ReadonlySet<string> = new Set(
     STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER,
 );
@@ -328,6 +437,11 @@ function failureResponse(
     startedAt: number,
     failure: WorkbenchFailure,
     status: number,
+    // Set only by the exits that ran far enough to attempt an
+    // ACR call (this route's carry parsing happens before any of them) --
+    // every earlier exit (a malformed body field, a config fault) never
+    // attempted one, so it correctly reports neither.
+    carry?: { readonly parentResultIdCarried: boolean; readonly subjectHintCount: number },
 ): NextResponse {
     emitTelemetryEvent(
         buildOutcomeEvent({
@@ -335,6 +449,8 @@ function failureResponse(
             renderSurface: "deterministic",
             failureCode: failure.code,
             upstreamStatus: failure.httpStatus,
+            parentResultIdCarried: carry?.parentResultIdCarried,
+            subjectHintCount: carry?.subjectHintCount,
         }),
     );
     return NextResponse.json({ failure }, { status });
@@ -506,6 +622,40 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
     }
 
+    // Same-conversation carry — malformed REJECTS the whole
+    // request, same discipline as every field above.
+    let parentResultId: string | undefined;
+    try {
+        parentResultId = parseParentResultId(body.parentResultId);
+    } catch {
+        return failureResponse(
+            requestStartedAt,
+            {
+                code: "acr_rejected_request",
+                message:
+                    "The supplied parent result id was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+
+    let subjectHints: readonly SubjectHint[];
+    try {
+        subjectHints = parseSubjectHints(body.subjectHints);
+    } catch {
+        return failureResponse(
+            requestStartedAt,
+            {
+                code: "acr_rejected_request",
+                message:
+                    "A supplied subject hint was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+
     // CHAOS-4171 standing order: emitted here, not where the selection was
     // made — this route is the one place a browser click becomes a server
     // log line (see `emitTelemetryEvent`'s own header for why). Independent
@@ -561,6 +711,8 @@ export async function POST(request: Request): Promise<NextResponse> {
             priorCandidateReceipts: structureReceipts.priorCandidateReceipts,
             conversation,
             expectedKinds,
+            parentResultId,
+            subjectHints,
             signal: request.signal,
         });
         // See failureResponse's own doc comment for requestStartedAt and
@@ -571,12 +723,26 @@ export async function POST(request: Request): Promise<NextResponse> {
                 latencyMs: Date.now() - requestStartedAt,
                 renderSurface: "deterministic",
                 result,
+                parentResultIdCarried: parentResultId !== undefined,
+                subjectHintCount: subjectHints.length,
             }),
         );
         return NextResponse.json({ result }, { status: 200 });
     } catch (error) {
+        // This request's own carry state, known here regardless
+        // of how `investigate()` failed — the same fields the success exit
+        // above records, on the one existing sink (`workbench_investigation`).
+        const carry = {
+            parentResultIdCarried: parentResultId !== undefined,
+            subjectHintCount: subjectHints.length,
+        };
         if (error instanceof AcrRequestError) {
-            return failureResponse(requestStartedAt, error.failure, statusFor(error.failure));
+            return failureResponse(
+                requestStartedAt,
+                error.failure,
+                statusFor(error.failure),
+                carry,
+            );
         }
         // An unexpected throw must not leak a stack or a header value.
         console.error("investigation failed", error);
@@ -588,6 +754,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 retryable: true,
             },
             502,
+            carry,
         );
     }
 }

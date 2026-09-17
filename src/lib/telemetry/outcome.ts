@@ -139,6 +139,22 @@ export type OutcomeEvent = {
      */
     readonly clarificationChoiceHonoured: boolean | undefined;
 
+    /**
+     * CHAOS-5837: whether this request named the investigation it follows
+     * (`parent_result_id`) — the same-conversation carry a typed follow-up
+     * turn sends with no chip click involved. Distinct from
+     * `clarificationChoiceCarried` above: that is a receipt the tester
+     * picked from an offer, this is the ordinary continuation of a
+     * conversation.
+     */
+    readonly parentResultIdCarried: boolean;
+    /**
+     * How many `requested_scope.subject_hints` rode with it — a count, never
+     * which subject, the same content-safety discipline as
+     * `committedSubjectCount` above.
+     */
+    readonly subjectHintCount: number;
+
     readonly usefulness: UsefulnessFeedback | undefined;
     readonly correctness: CorrectnessFeedback | undefined;
 
@@ -162,6 +178,8 @@ export type OutcomeInput = {
     readonly enrichmentFallbackPredicates?: readonly EnrichmentPredicate[] | undefined;
     readonly clarificationChoiceCarried?: boolean | undefined;
     readonly clarificationChoiceHonoured?: boolean | undefined;
+    readonly parentResultIdCarried?: boolean | undefined;
+    readonly subjectHintCount?: number | undefined;
     readonly usefulness?: UsefulnessFeedback | undefined;
     readonly correctness?: CorrectnessFeedback | undefined;
 };
@@ -277,6 +295,9 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
 
         clarificationChoiceCarried: input.clarificationChoiceCarried ?? false,
         clarificationChoiceHonoured: input.clarificationChoiceHonoured,
+
+        parentResultIdCarried: input.parentResultIdCarried ?? false,
+        subjectHintCount: input.subjectHintCount ?? 0,
 
         usefulness: input.usefulness,
         correctness: input.correctness,

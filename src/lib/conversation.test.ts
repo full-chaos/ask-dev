@@ -3,9 +3,13 @@ import { describe, expect, it } from "vitest";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import { buildInvestigationRequest } from "@/lib/acr/client";
 import { validateContract } from "@/lib/acr/validate";
+import type { SubjectRef } from "@/lib/contracts";
 import {
     MAX_CONVERSATION_TURNS_SENT,
+    MAX_SUBJECT_HINTS_ON_WIRE,
+    PARENT_SUBJECT_HINT_SOURCE,
     buildConversationTurns,
+    deriveParentReference,
     type ConversationSourceTurn,
 } from "@/lib/conversation";
 
@@ -16,12 +20,21 @@ const answeredAssistantTurn = (
     id: number,
     deterministicAnswer: string,
     createdAt = "2026-01-01T00:00:01.000Z",
+    resultId = `result_${String(id)}`,
+    committed: readonly SubjectRef[] = [],
 ) =>
     ({
         role: "assistant",
         id,
         createdAt,
-        outcome: { kind: "answered", result: { deterministic_answer: deterministicAnswer } },
+        outcome: {
+            kind: "answered",
+            result: {
+                deterministic_answer: deterministicAnswer,
+                result_id: resultId,
+                subject_resolution: { committed },
+            },
+        },
     }) as const;
 
 const pendingAssistantTurn = (id: number, createdAt = "2026-01-01T00:00:01.000Z") =>
@@ -136,5 +149,168 @@ describe("buildConversationTurns", () => {
         expect(built).toHaveLength(MAX_CONVERSATION_TURNS_SENT);
         expect(built[0]?.turn_id).toBe("turn_4");
         expect(built.at(-1)?.turn_id).toBe(`turn_${String(MAX_CONVERSATION_TURNS_SENT + 3)}`);
+    });
+});
+
+describe("deriveParentReference", () => {
+    it("sends neither on a first turn (an empty timeline)", () => {
+        expect(deriveParentReference([])).toEqual({
+            parentResultId: undefined,
+            subjectHints: [],
+        });
+    });
+
+    it("sends neither when the immediately preceding turn is still pending", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the status of dev-health-ops?"),
+            pendingAssistantTurn(1),
+        ];
+        expect(deriveParentReference(turns)).toEqual({
+            parentResultId: undefined,
+            subjectHints: [],
+        });
+    });
+
+    it("sends neither when the immediately preceding turn failed", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the status of dev-health-ops?"),
+            failedAssistantTurn(1),
+        ];
+        expect(deriveParentReference(turns)).toEqual({
+            parentResultId: undefined,
+            subjectHints: [],
+        });
+    });
+
+    it("sends the exact prior result id and mapped subject hints on a follow-up", () => {
+        const committed: readonly SubjectRef[] = [
+            { kind: "repository", canonical_id: "repo_1", label: "dev-health-ops" },
+            { kind: "team", canonical_id: "team_1", label: "Platform" },
+        ];
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the status of dev-health-ops?"),
+            answeredAssistantTurn(1, "It is on track.", undefined, "result_abc123", committed),
+        ];
+
+        expect(deriveParentReference(turns)).toEqual({
+            parentResultId: "result_abc123",
+            subjectHints: [
+                {
+                    kind: "repository",
+                    id: "repo_1",
+                    label: "dev-health-ops",
+                    source: PARENT_SUBJECT_HINT_SOURCE,
+                },
+                {
+                    kind: "team",
+                    id: "team_1",
+                    label: "Platform",
+                    source: PARENT_SUBJECT_HINT_SOURCE,
+                },
+            ],
+        });
+    });
+
+    it("sends the parent reference with an empty hints list when the prior result committed nothing", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the actual status of Ask Dev?"),
+            answeredAssistantTurn(1, "", undefined, "result_no_commit", []),
+        ];
+
+        expect(deriveParentReference(turns)).toEqual({
+            parentResultId: "result_no_commit",
+            subjectHints: [],
+        });
+    });
+
+    it("reads ONLY the last entry, never an earlier answered turn behind a later failure", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the status of dev-health-ops?"),
+            answeredAssistantTurn(1, "It is on track.", undefined, "result_first", [
+                { kind: "repository", canonical_id: "repo_1", label: "dev-health-ops" },
+            ]),
+            userTurn(2, "And last month?", "2026-01-01T00:00:02.000Z"),
+            failedAssistantTurn(3, "2026-01-01T00:00:03.000Z"),
+        ];
+
+        expect(deriveParentReference(turns)).toEqual({
+            parentResultId: undefined,
+            subjectHints: [],
+        });
+    });
+
+    it("caps subject hints at MAX_SUBJECT_HINTS_ON_WIRE, keeping the committed order", () => {
+        const committed: SubjectRef[] = [];
+        for (let i = 0; i < MAX_SUBJECT_HINTS_ON_WIRE + 5; i += 1) {
+            committed.push({
+                kind: "work_item",
+                canonical_id: `wi_${String(i)}`,
+                label: `Item ${String(i)}`,
+            });
+        }
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "Which work items are open?"),
+            answeredAssistantTurn(1, "Several.", undefined, "result_many", committed),
+        ];
+
+        const { subjectHints } = deriveParentReference(turns);
+        expect(subjectHints).toHaveLength(MAX_SUBJECT_HINTS_ON_WIRE);
+        expect(subjectHints[0]?.id).toBe("wi_0");
+        expect(subjectHints.at(-1)?.id).toBe(`wi_${String(MAX_SUBJECT_HINTS_ON_WIRE - 1)}`);
+    });
+
+    it("round-trips through buildInvestigationRequest into a schema-valid wire request", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            userTurn(0, "What is the status of dev-health-ops?"),
+            answeredAssistantTurn(1, "It is on track.", undefined, "result_wire_check", [
+                { kind: "repository", canonical_id: "repo_1", label: "dev-health-ops" },
+            ]),
+        ];
+        const { parentResultId, subjectHints } = deriveParentReference(turns);
+
+        const request = buildInvestigationRequest(
+            "And last month?",
+            [],
+            {},
+            buildConversationTurns(turns),
+            [],
+            parentResultId,
+            subjectHints,
+        );
+
+        expect(request.parent_result_id).toBe("result_wire_check");
+        expect(request.requested_scope).toEqual({
+            subject_hints: [
+                {
+                    kind: "repository",
+                    id: "repo_1",
+                    label: "dev-health-ops",
+                    source: PARENT_SUBJECT_HINT_SOURCE,
+                },
+            ],
+        });
+
+        const validation = validateContract(
+            "context_fabric_investigation_request.v1.schema.json",
+            request,
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("omits both parent_result_id and requested_scope on a first turn's wire request", () => {
+        const { parentResultId, subjectHints } = deriveParentReference([]);
+        const request = buildInvestigationRequest(
+            "A fresh question",
+            [],
+            {},
+            [],
+            [],
+            parentResultId,
+            subjectHints,
+        );
+
+        expect(request.parent_result_id).toBeUndefined();
+        expect(request.requested_scope).toBeUndefined();
     });
 });

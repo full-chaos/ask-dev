@@ -12,11 +12,12 @@ import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
 import { subjectForReceipt } from "@/lib/clarification";
 import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarification-popup";
-import { buildConversationTurns } from "@/lib/conversation";
+import { buildConversationTurns, deriveParentReference } from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
     InvestigationResult,
+    SubjectHint,
     SubjectRef,
 } from "@/lib/contracts";
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
@@ -202,6 +203,11 @@ async function fireInvestigation(params: {
     readonly question: string;
     readonly priorSubjectReceipts: readonly ClarificationChoice[];
     readonly conversation: readonly ConversationTurn[];
+    // CHAOS-5837: same-conversation carry. Undefined/empty on a first turn —
+    // see `deriveParentReference`'s own doc comment, this function's only
+    // producer of both.
+    readonly parentResultId: string | undefined;
+    readonly subjectHints: readonly SubjectHint[];
     readonly structureReceiptFields: Record<string, unknown>;
     readonly selectionEvents: readonly PendingSelectionEvent[];
 }): Promise<AssistantOutcome> {
@@ -218,6 +224,10 @@ async function fireInvestigation(params: {
                 question: params.question,
                 priorSubjectReceipts: params.priorSubjectReceipts,
                 conversation: params.conversation,
+                ...(params.parentResultId !== undefined
+                    ? { parentResultId: params.parentResultId }
+                    : {}),
+                ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
                 ...params.structureReceiptFields,
                 ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
                 ...(params.selectionEvents.length > 0
@@ -409,6 +419,9 @@ export default function ChatPage() {
         // is appended — a re-ask's own not-yet-answered turn must never be
         // threaded as its own prior context.
         const conversation = buildConversationTurns(turns);
+        // Same "before the pending pair" capture, same source —
+        // the immediately preceding turn's own result_id/committed subjects.
+        const { parentResultId, subjectHints } = deriveParentReference(turns);
         structureSelections.reset();
         // A plain new ask (the common composer path) must clear any
         // unconfirmed candidate picks left over from the turn it supersedes
@@ -458,6 +471,8 @@ export default function ChatPage() {
             question,
             priorSubjectReceipts,
             conversation,
+            parentResultId,
+            subjectHints,
             structureReceiptFields,
             selectionEvents,
         });
@@ -530,6 +545,11 @@ export default function ChatPage() {
         const question = result.question;
         if (subjectChoices.length === 0 && structureCandidateReceipts.length === 0) return;
         const conversation = buildConversationTurns(turns);
+        // Same source and same "before any reset()" timing as
+        // `conversation` above — the receipts fired below already name a
+        // subject explicitly, but the carry still applies (this re-ask
+        // follows `result` exactly as much as a plain typed follow-up would).
+        const { parentResultId, subjectHints } = deriveParentReference(turns);
         // Read BEFORE any reset() — a plain synchronous read at the top of
         // this ONE call, never re-read after a loop iteration's own
         // re-render (codex review: a stale closure re-reading a hook after
@@ -602,6 +622,8 @@ export default function ChatPage() {
                 question,
                 priorSubjectReceipts,
                 conversation,
+                parentResultId,
+                subjectHints,
                 structureReceiptFields,
                 selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             }).then((outcome) => {

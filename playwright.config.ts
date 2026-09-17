@@ -11,9 +11,9 @@ const resultsDirectory = process.env["PLAYWRIGHT_RESULTS_DIR"] ?? "test-results/
 // Runs against the SAME production build as the unconfigured instance above
 // (`next start` only reads `.next`, so two instances on different ports are
 // safe); it exists purely so the chat surface's clarification-chip,
-// structure-needs-chip, mixed-receipt-family, and conversation-threading
-// coverage can drive real, schema-valid responses, which the unconfigured
-// instance can never produce.
+// structure-needs-chip, mixed-receipt-family, conversation-threading, and
+// same-conversation-carry (CHAOS-5837) coverage can drive real, schema-valid
+// responses, which the unconfigured instance can never produce.
 // Fixed default ports, same convention as `PLAYWRIGHT_WEB_PORT`/
 // `PLAYWRIGHT_BASE_URL` above (both pre-existing): every port here is
 // independently overridable so two concurrent local runs of THIS repo can

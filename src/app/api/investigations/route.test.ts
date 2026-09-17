@@ -398,6 +398,103 @@ describe("expectedKinds (CHAOS-4343 item 3)", () => {
 });
 
 /**
+ * CHAOS-5837: same-conversation carry. `@/lib/conversation`'s
+ * `deriveParentReference` is the chat surface's own producer of both fields,
+ * so a malformed value should be unreachable in practice — same "malformed
+ * rejects the whole request" discipline as every other field this route
+ * parses, checked anyway.
+ */
+describe("same-conversation carry", () => {
+    it("accepts an absent parentResultId/subjectHints (a first turn, past validation)", async () => {
+        const response = await POST(post(JSON.stringify({ question: "status?" })));
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    it("accepts a well-formed parentResultId with subjectHints (past validation)", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    parentResultId: "result_e2e_answered_0001",
+                    subjectHints: [
+                        {
+                            kind: "repository",
+                            id: "repo_1",
+                            label: "dev-health-ops",
+                            source: "ask_dev_parent_result_subject",
+                        },
+                    ],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    it("accepts a parentResultId with an empty subjectHints list (a prior result with nothing committed)", async () => {
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    parentResultId: "result_e2e_answered_0001",
+                    subjectHints: [],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(500);
+        expect((await failureOf(response)).code).toBe("workbench_misconfigured");
+    });
+
+    for (const [label, malformed] of [
+        ["not a string", 12345],
+        ["shorter than the 8-character bound", "short"],
+        ["longer than the 256-character bound", "r".repeat(257)],
+    ] as const) {
+        it(`rejects the whole request with a 400 when parentResultId is ${label}`, async () => {
+            const response = await POST(
+                post(JSON.stringify({ question: "status?", parentResultId: malformed })),
+            );
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    }
+
+    for (const [label, malformed] of [
+        ["not an array", "repository"],
+        ["an entry that is not an object", [123]],
+        ["an entry with an unrecognized kind", [{ kind: "not_a_real_kind", id: "x", source: "s" }]],
+        ["an entry with neither id nor label", [{ kind: "repository", source: "s" }]],
+        ["an entry with an empty source", [{ kind: "repository", id: "x", source: "" }]],
+        [
+            "an entry with an unexpected extra key",
+            [{ kind: "repository", id: "x", source: "s", extra: "nope" }],
+        ],
+        [
+            "more than 50 entries",
+            Array.from({ length: 51 }, () => ({
+                kind: "repository" as const,
+                id: "x",
+                source: "s",
+            })),
+        ],
+    ] as const) {
+        it(`rejects the whole request with a 400 when subjectHints is ${label}`, async () => {
+            const response = await POST(
+                post(JSON.stringify({ question: "status?", subjectHints: malformed })),
+            );
+
+            expect(response.status).toBe(400);
+            expect((await failureOf(response)).code).toBe("acr_rejected_request");
+        });
+    }
+});
+
+/**
  * CHAOS-4171 standing order: telemetry baked into new logic, same PR. A
  * browser `console.info` lands only in that one viewer's own devtools and
  * is collected nowhere in prod (team-lead ruling, 2026-08-24) — so
@@ -706,6 +803,82 @@ describe("workbench_investigation telemetry (CHAOS-5621)", () => {
         expect(event["failureCode"]).toBeUndefined();
         expect(typeof event["latencyMs"]).toBe("number");
         expect(event["latencyMs"] as number).toBeGreaterThanOrEqual(0);
+        // A first turn (no parentResultId in the body) reports
+        // neither carried.
+        expect(event["parentResultIdCarried"]).toBe(false);
+        expect(event["subjectHintCount"]).toBe(0);
+
+        consoleInfo.mockRestore();
+    });
+
+    /**
+     * Same-conversation carry — this request's OWN shape, not
+     * the result's, so it is set at the call site (route.ts) rather than
+     * derived from `result`. Proven on the ONE existing sink, extended
+     * rather than a new one.
+     */
+    it("emits parentResultIdCarried=true and the exact subjectHintCount on a follow-up that carries both", async () => {
+        stubAcrConfig();
+        respondWith(canonicalResult);
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    parentResultId: "result_e2e_answered_0001",
+                    subjectHints: [
+                        {
+                            kind: "repository",
+                            id: "repo_1",
+                            label: "dev-health-ops",
+                            source: "ask_dev_parent_result_subject",
+                        },
+                        {
+                            kind: "team",
+                            id: "team_1",
+                            label: "Platform",
+                            source: "ask_dev_parent_result_subject",
+                        },
+                    ],
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(200);
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        const event = events[0] as Record<string, unknown>;
+        expect(event["parentResultIdCarried"]).toBe(true);
+        expect(event["subjectHintCount"]).toBe(2);
+
+        consoleInfo.mockRestore();
+    });
+
+    it("emits parentResultIdCarried=true even when the ACR call itself fails", async () => {
+        stubAcrConfig();
+        vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+        const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => {});
+
+        const response = await POST(
+            post(
+                JSON.stringify({
+                    question: "status?",
+                    parentResultId: "result_e2e_answered_0001",
+                }),
+            ),
+        );
+
+        expect(response.status).toBe(502);
+        const events = consoleInfo.mock.calls
+            .map(([line]) => JSON.parse(line as string) as { event: string })
+            .filter((event) => event.event === "workbench_investigation");
+        expect(events).toHaveLength(1);
+        const event = events[0] as Record<string, unknown>;
+        expect(event["parentResultIdCarried"]).toBe(true);
+        expect(event["subjectHintCount"]).toBe(0);
 
         consoleInfo.mockRestore();
     });
