@@ -428,17 +428,27 @@ function conversationEchoResult(question, conversation) {
 // over — `parentResultId`/`subjectHints` are this request's OWN
 // `parent_result_id`/`requested_scope.subject_hints`, read by this double's
 // request handler exactly as `conversation` is read for the sibling trigger.
+// A FIXED id here (every earlier trigger's own pattern) would let a mutant
+// that pins the wire's `parent_result_id` to that same constant survive: the
+// echoed value would happen to match turn 1's id whether or not the client
+// actually carried it forward. Minted DISTINCT per call instead, so the e2e
+// spec must capture turn 1's own real id and assert turn 2's echo matches
+// THAT value, never a hardcoded one.
+let parentReferenceCounter = 0;
+
 function parentReferenceEchoResult(question, parentResultId, subjectHints) {
     const hints = Array.isArray(subjectHints) ? subjectHints : [];
     const hintIds = hints.map((hint) => hint?.id).join(",");
+    parentReferenceCounter += 1;
+    const resultId = `result_e2e_parent_reference_${String(parentReferenceCounter).padStart(4, "0")}`;
     const result = structuredClone(canonical);
     return {
         ...result,
-        result_id: "result_e2e_parent_reference_0001",
-        request_id: "request_e2e_parent_reference_0001",
+        result_id: resultId,
+        request_id: `request_e2e_parent_reference_${String(parentReferenceCounter).padStart(4, "0")}`,
         question,
         status: "complete",
-        deterministic_answer: `parent_result_id=${String(parentResultId)}; subject_hint_ids=${hintIds}`,
+        deterministic_answer: `result_id=${resultId}; parent_result_id=${String(parentResultId)}; subject_hint_ids=${hintIds}`,
     };
 }
 

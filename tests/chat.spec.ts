@@ -685,6 +685,16 @@ test.describe("same-conversation carry", () => {
         // A turn's own FIRST ask names no parent to follow.
         await expect(turns.first()).toContainText("parent_result_id=undefined");
 
+        // Captured from the LIVE page, not hardcoded: `parentReferenceEchoResult`
+        // mints a DISTINCT `result_id` per call precisely so a mutant that pins
+        // the wire's `parent_result_id` to a constant cannot survive this
+        // assertion — the value asserted below must be the one this specific
+        // run actually produced.
+        const turnOneText = await turns.first().textContent();
+        const turnOneResultId = turnOneText?.match(/result_id=(\S+?);/)?.[1];
+        expect(turnOneResultId).toBeDefined();
+        expect(turnOneResultId).toMatch(/^result_e2e_parent_reference_\d{4}$/);
+
         await page
             .getByLabel("Ask a question")
             .fill(`Follow-up question, ${TRIGGER_PARENT_REFERENCE_ECHO}?`);
@@ -692,18 +702,20 @@ test.describe("same-conversation carry", () => {
 
         await expect(turns).toHaveCount(2);
         // The discriminating proof: the SERVER, not just the client, saw
-        // turn 1's own `result_id` as `parent_result_id`, and turn 1's own
-        // committed subject (the canonical example's `project_ask_dev`) as a
-        // `requested_scope.subject_hints` entry — the fake-ACR double echoes
-        // back exactly what it received (see fake-acr-server.mjs's own
-        // `parentReferenceEchoResult`). `parentReferenceEchoResult` (turn 1's
-        // own responder here) fixes every turn's `result_id` at
-        // `result_e2e_parent_reference_0001`, so this is turn 1's REAL id,
-        // not a guess turn 2 happened to match.
-        await expect(turns.last()).toContainText(
-            "parent_result_id=result_e2e_parent_reference_0001",
-        );
+        // turn 1's own REAL, distinct `result_id` as `parent_result_id`, and
+        // turn 1's own committed subject (the canonical example's
+        // `project_ask_dev`) as a `requested_scope.subject_hints` entry — the
+        // fake-ACR double echoes back exactly what it received (see
+        // fake-acr-server.mjs's own `parentReferenceEchoResult`).
+        await expect(turns.last()).toContainText(`parent_result_id=${turnOneResultId}`);
         await expect(turns.last()).toContainText("subject_hint_ids=project_ask_dev");
+
+        // turn 2 minted its OWN distinct id too — the match above is not an
+        // accident of both turns sharing one constant.
+        const turnTwoText = await turns.last().textContent();
+        const turnTwoResultId = turnTwoText?.match(/result_id=(\S+?);/)?.[1];
+        expect(turnTwoResultId).toBeDefined();
+        expect(turnTwoResultId).not.toBe(turnOneResultId);
     });
 });
 
