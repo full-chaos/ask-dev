@@ -253,3 +253,364 @@ ANCHOR_KIND = {
 assert set(ANCHOR_KIND) == {row["id"] for row in CORPUS}, "ANCHOR_KIND must cover every row"
 for _row in CORPUS:
     _row["anchor_kind"] = ANCHOR_KIND[_row["id"]]
+
+# =====================================================================================
+# CONVERSATIONS -- DRAFT, isolated from CORPUS. lane-corpus-conversation-draft, 2026-09-17.
+#
+# NOT wired into CORPUS, REQUESTED_KIND, ANCHOR_KIND, harness.py, or any existing assert.
+# Nothing above this line sees this section; nothing below reads it either yet -- it is
+# a schema proposal, scored/consumed only by a future harness extension (see the design
+# note in .remember/lanes/lane-corpus-conversation-draft/PICKUP.md, which names ids and
+# shapes only -- never this file's question text).
+#
+# WHY THIS EXISTS: the 36-row CORPUS above is structurally blind to conversations. Every
+# multi-turn row in it is a CLARIFICATION LOOP -- the harness resends the same bare
+# question with a receipt (priorKindReceipts / priorWindowReceipts / priorSubjectReceipts)
+# until the subject commits on the terminal turn. No row has "turn 1 is answered, then an
+# independent follow-up arrives" -- the shape a real Ask Dev conversation actually sends
+# (parentResultId + subject_hints, ask-dev src/lib/conversation.ts deriveParentReference).
+# Each entry below is instead an AUTHORED multi-turn conversation: every turn has its own
+# text and its own `expect`, and turn N>1's parent is turn N-1's result (not a receipt).
+#
+# SUBJECTS: every named subject below is REAL, read confirmed 2026-09-17 by a read-only
+# GRAPH.QUERY against the k3s acr-trial-data trial-falkordb graph
+# (acr-cf-fa7030e2106de7411bfbf8ebce74c620), never the ambiguous "fullchaos" family
+# (three distinct nodes share near-identical labels: Fullchaos/team:CHAOS,
+# fullchaos/team:gl:full.chaos, Full Chaos/team:FC) and never the unresolvable `acr`
+# project token except in the one designated unanswerable row. Real, unambiguous
+# subjects used: team:DATA (label "DATA"), team:gh:ops-team (label "Ops Team"),
+# team:AUTH (label "AUTH"), team:SRCH (label "SRCH"), team:ML (label "ML"),
+# team:BILL (label "Billing"), project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d
+# (label "Dev Health Ops"), project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244
+# (label "Ask Dev"), project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72
+# (label "Auth Control Plane"). Nonexistent (reused from CORPUS's own confirmed-absent
+# negative control): project "Quantum Leap".
+#
+# Per turn: text (the ONLY place this text may ever appear), family/variant/member_kind/
+# group_kind mirroring CORPUS's own vocabulary, requested_kind/anchor_kind ("" / None
+# where no kind confirmation or no anchor is expected, matching CORPUS's own convention),
+# expect in the SAME vocabulary expectations.py already scores (serve/decline/refuse/
+# clarify/any_of -- CLARIFY is an existing scorer constant, not a new one), and for an
+# expected serve, expected_subject={"kind":..., "canonical_id":...}; for an expected
+# clarify, clarify_candidates=[{"kind":..., "canonical_id":..., "remembered": bool}, ...]
+# with the remembered (pre-selected, per the CHAOS-5835 step-2 conservative contract)
+# candidate FIRST. `parent` = "turn{n-1}" for every turn after the first (the harness
+# extension resolves this to that turn's own result_id, never a receipt).
+# =====================================================================================
+
+CONVERSATIONS = [
+    dict(
+        id="conv-identical-repeat-team",
+        shape="(a) identical question repeated -> same answer, same subject",
+        turns=[
+            dict(n=1, text="What is the DATA team's status?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What is the DATA team's status?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 note="turn 2: byte-identical text re-asked; same subject, same answer (chris's "
+                      "5-second-later example -- resolves via the turn's own text, no carry needed)"),
+        ],
+    ),
+    dict(
+        id="conv-followup-no-subject-devhealthops",
+        shape="(b) follow-up naming no subject (pronoun) after a served turn -> clarify, "
+              "remembered subject pre-selected first",
+        turns=[
+            dict(n=1, text="What is the status of the Dev Health Ops project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What's driving that?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind=None,
+                 expect="clarify",
+                 clarify_candidates=[
+                     {"kind": "project",
+                      "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d",
+                      "remembered": True},
+                 ],
+                 note="turn 2: own text names no subject; remembered Dev Health Ops offered as "
+                      "the PRE-SELECTED clarification option, never a silent serve; "
+                      "refusal-with-reason for a non-clarifying caller"),
+        ],
+    ),
+    dict(
+        id="conv-followup-different-project-same-kind",
+        shape="(c) follow-up naming a DIFFERENT subject of the same kind -> clarify, never a "
+              "silent serve of either",
+        turns=[
+            dict(n=1, text="What is the status of the Dev Health Ops project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What about the Ask Dev project?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="clarify",
+                 clarify_candidates=[
+                     {"kind": "project",
+                      "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d",
+                      "remembered": True},
+                     {"kind": "project",
+                      "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244",
+                      "remembered": False},
+                 ],
+                 note="turn 2: own text names a different same-kind subject; clarify with both "
+                      "candidates, never a silent serve of the remembered OR the named one"),
+        ],
+    ),
+    dict(
+        id="conv-followup-different-kind-team-to-project",
+        shape="(d) follow-up naming a subject of a DIFFERENT kind -> clarify",
+        turns=[
+            dict(n=1, text="What is the DATA team's status?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What about the Auth Control Plane project?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="clarify",
+                 clarify_candidates=[
+                     {"kind": "team", "canonical_id": "team:DATA", "remembered": True},
+                     {"kind": "project",
+                      "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72",
+                      "remembered": False},
+                 ],
+                 note="turn 2: own text names a subject of a different KIND (team->project); "
+                      "clarify, never a silent serve of either"),
+        ],
+    ),
+    dict(
+        id="conv-followup-different-kind-project-to-team",
+        shape="(d) follow-up naming a subject of a DIFFERENT kind, opposite direction "
+              "(project->team) -> clarify",
+        turns=[
+            dict(n=1, text="What is the status of the Ask Dev project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What about the Billing team?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="clarify",
+                 clarify_candidates=[
+                     {"kind": "project",
+                      "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244",
+                      "remembered": True},
+                     {"kind": "team", "canonical_id": "team:BILL", "remembered": False},
+                 ],
+                 note="turn 2: own text names a subject of a different KIND (project->team); "
+                      "clarify, never a silent serve of either"),
+        ],
+    ),
+    dict(
+        id="conv-window-change-ops-team",
+        shape="(e) same subject, changed time window -> served for the same subject with the "
+              "new window (CHAOS-5895 shape: a follow-up must not veto its own range axis)",
+        turns=[
+            dict(n=1, text="Which projects has the Ops Team shipped in the last 30 days?",
+                 family="scoped_cohort_status", variant="children_of_scope",
+                 member_kind="project", group_kind=None, requested_kind="project",
+                 anchor_kind="team", temporal="bounded_window_30d",
+                 expect="serve",
+                 expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
+                 note="turn 1: scoped cohort, bounded window, serve"),
+            dict(n=2, text="What about the last 90 days?", parent="turn1",
+                 family="scoped_cohort_status", variant="children_of_scope",
+                 member_kind="project", group_kind=None, requested_kind="project",
+                 anchor_kind=None, temporal="bounded_window_90d",
+                 expect="serve",
+                 expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
+                 note="turn 2: own text names no subject, only a new window; SAME subject "
+                      "carries, window updates to 90d -- must not refuse/veto the range axis"),
+        ],
+    ),
+    dict(
+        id="conv-obligation-state-to-drivers-askdev",
+        shape="(f) same subject, different obligation (state -> drivers) -> served for the "
+              "same subject",
+        turns=[
+            dict(n=1, text="What is the status of the Ask Dev project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 1: state obligation, serve"),
+            dict(n=2, text="What's driving the Ask Dev project's status right now?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 2: own text re-names the SAME subject explicitly, obligation "
+                      "changes state->drivers; serve, same subject"),
+        ],
+    ),
+    dict(
+        id="conv-obligation-state-to-completion-authcp",
+        shape="(f) same subject, different obligation (state -> completion roll-up) -> served "
+              "for the same subject",
+        turns=[
+            dict(n=1, text="What is the status of the Auth Control Plane project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72"},
+                 note="turn 1: state obligation, serve"),
+            dict(n=2, text="How much of the Auth Control Plane project's roadmap is complete?",
+                 parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72"},
+                 note="turn 2: own text re-names the SAME subject explicitly, obligation "
+                      "changes state->completion; serve, same subject, roll-up basis disclosed "
+                      "per the Completion=roll-up ruling"),
+        ],
+    ),
+    dict(
+        id="conv-laundering-subject-change-then-repeat",
+        shape="(g) three-turn chain: turn 2 changes subject, turn 3 repeats turn 2's own "
+              "question -> turn 3 must bind to turn 2's subject, NEVER turn 1's "
+              "(the wrong-subject/'laundering' shape)",
+        turns=[
+            dict(n=1, text="What is the SRCH team's status?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:SRCH"},
+                 note="turn 1: named subject, serve"),
+            dict(n=2, text="What is the ML team's status?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="clarify",
+                 clarify_candidates=[
+                     {"kind": "team", "canonical_id": "team:SRCH", "remembered": True},
+                     {"kind": "team", "canonical_id": "team:ML", "remembered": False},
+                 ],
+                 note="turn 2: own text names a different same-kind subject with no hint; "
+                      "clarify (subject-change always clarifies), never a silent serve"),
+            dict(n=3, text="What is the ML team's status?", parent="turn2",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:ML"},
+                 note="turn 3: byte-identical repeat of turn 2's own text; must bind to turn "
+                      "2's subject (ML) via its own text, and must NEVER revert to turn 1's "
+                      "remembered subject (SRCH) -- the laundering guard this shape exists to "
+                      "prove"),
+        ],
+    ),
+    dict(
+        id="conv-followup-after-decline-no-memory",
+        shape="(h) follow-up after a turn that was REFUSED/DECLINED -> no remembered subject "
+              "exists to offer",
+        turns=[
+            dict(n=1, text="What is the status of the 'Quantum Leap' project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 expect="decline", nonexistent=True,
+                 note="turn 1: nonexistent project (CORPUS's own confirmed-absent negative "
+                      "control); decline, commits no subject"),
+            dict(n=2, text="What's driving that?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind=None,
+                 expect="decline",
+                 note="turn 2: own text names no subject; turn 1 committed nothing, so no "
+                      "remembered subject exists to pre-select -- decline (unresolvable), "
+                      "NOT the clarify-with-remembered-option shape of (b)"),
+        ],
+    ),
+    dict(
+        id="conv-cohort-then-named-member",
+        shape="(i) follow-up to a cohort answer, asking about one member by name -> served, "
+              "bound to that member",
+        turns=[
+            dict(n=1, text="Which teams are struggling, and why?",
+                 family="discovered_cohort_ranking", variant="discovered_kind",
+                 member_kind="team", group_kind=None, requested_kind="team", anchor_kind=None,
+                 expect="serve",
+                 note="turn 1: discovered cohort of teams, serve; no single subject committed"),
+            dict(n=2, text="What about the DATA team specifically?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 note="turn 2: own text names one real member of the prior cohort's kind by "
+                      "name; serve, bound to that member"),
+        ],
+    ),
+    dict(
+        id="conv-window-change-askdev-project",
+        shape="(e) same subject, changed time window -- project-kind variant of the "
+              "CHAOS-5895 shape (subject kind diversity from conv-window-change-ops-team's "
+              "team-kind case)",
+        turns=[
+            dict(n=1, text="What was the Ask Dev project's status over the last 30 days?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 temporal="bounded_window_30d",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 1: named subject, bounded window, serve"),
+            dict(n=2, text="What about the last 90 days?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind=None,
+                 temporal="bounded_window_90d",
+                 expect="serve",
+                 expected_subject={"kind": "project",
+                                   "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 2: own text names no subject, only a new window; SAME subject "
+                      "carries, window updates to 90d"),
+        ],
+    ),
+    dict(
+        id="conv-unanswerable-acr-token",
+        shape="(j) designated unanswerable case: the unresolvable 'acr' project acronym "
+              "token, and a follow-up compounding it",
+        turns=[
+            dict(n=1, text="What is the status of the acr project?",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 # no `expect` key: intentionally UNSET, mirroring CORPUS's own
+                 # cv-named-project-completion / neg-single-subject-why rows (D24/1952:
+                 # the bare acronym does not resolve to a real project token; unanswerable
+                 # without offering real project options, per the CHAOS-5660 backlog note)
+                 note="turn 1: unresolvable acronym token; UNSET (unanswerable-without-"
+                      "options), per ruling 1952 -- the one designated case using this token"),
+            dict(n=2, text="What about now?", parent="turn1",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind=None,
+                 note="turn 2: own text names no subject; turn 1 never committed one, so "
+                      "nothing is remembered -- UNSET for the same reason as turn 1, not the "
+                      "clarify-with-remembered-option shape of (b)"),
+        ],
+    ),
+]
+
+assert 10 <= len(CONVERSATIONS) <= 14, f"expected 10-14 conversations, got {len(CONVERSATIONS)}"
+assert len({c["id"] for c in CONVERSATIONS}) == len(CONVERSATIONS), "duplicate conversation id"
+for _conv in CONVERSATIONS:
+    assert len(_conv["turns"]) >= 2, f"{_conv['id']}: every conversation needs >=2 turns"
+    assert _conv["turns"][0].get("parent") is None, f"{_conv['id']}: turn 1 must have no parent"
+    for _i, _t in enumerate(_conv["turns"][1:], start=2):
+        assert _t.get("parent") == f"turn{_i - 1}", (
+            f"{_conv['id']} turn{_i}: parent must be the immediately preceding turn's result "
+            "(never a receipt)")
