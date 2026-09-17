@@ -389,11 +389,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // `not_evaluated` -- a carried member on a turn that ends before its own
 // resolution ever runs, passed forward unchanged rather than claimed as
 // applied.
-// cc498982 -> aa59a530: the completeness-authority coverage-detail
+// cc498982 -> f4b35b07: the completeness-authority coverage-detail
 // vocabulary split (fact_unconfigured into fact_no_declaring_producer /
-// fact_table_shape_undeclared). Pinned to the open acr PR's tip; re-pins to
-// the squash once that PR merges.
-export const SOURCE_COMMIT = "aa59a530b69d58ff836daec1e6ddd6631e9f7490";
+// fact_table_shape_undeclared).
+export const SOURCE_COMMIT = "f4b35b07849ef17e884dc38af004d49c38d86789";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
