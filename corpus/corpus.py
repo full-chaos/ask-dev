@@ -68,7 +68,8 @@ CORPUS = [
          note="analog of recorded-13 C1 (grouped team->project, assess+trend, time_series)", expect="serve"),
     dict(id="cv-c3-grouped-explain-change", text="How have each team's project statuses changed compared to last month?",
          family="grouped_cohort_status", variant="grouped_members", member_kind="project", group_kind="team",
-         note="analog of recorded-13 C3 (grouped team->project, explain_change, period_comparison)", expect="refuse"),
+         note="analog of recorded-13 C3 (grouped team->project, explain_change, period_comparison); CHAOS-5989: "
+              "ruled SERVABLE, rescored serve -- was expect refuse", expect="serve"),
     dict(id="cv-c4-discovered-rank-both-ends", text="Rank the teams from best to worst performing, and call out both the strongest and weakest.",
          family="discovered_cohort_ranking", variant="discovered_kind", member_kind="team", group_kind=None,
          note="analog of recorded-13 C4 (discovered team, rank, both-ends emphasis)", expect="serve"),
@@ -116,17 +117,18 @@ CORPUS = [
          expect={"any_of": [{"outcome": "serve", "answer": {"family": "discovered_cohort_ranking"}}, {"outcome": "refuse"}]}),
     dict(id="basis-scoped-workitems-by-project", text="What work items does the Dev Health Ops project have?",
          family="scoped_cohort_status", variant="children_of_scope", member_kind="work_item", group_kind=None,
-         note="CHAOS-4926 class; anchor=Dev Health Ops/project; expect refuse basis=member_kind_unservable",
-         expect="refuse"),
+         note="CHAOS-4926 class; anchor=Dev Health Ops/project; CHAOS-5989: ruled SERVABLE, rescored serve -- "
+              "was expect refuse basis=member_kind_unservable",
+         expect="serve"),
     dict(id="basis-discovered-documents", text="What documents exist in the organization?",
          family="discovered_cohort_ranking", variant="discovered_kind", member_kind="document", group_kind=None,
          note="CHAOS-4926 class; expect refuse basis=member_kind_unservable",
          expect="refuse"),
     dict(id="basis-grouped-metric-by-repo", text="Show me metrics per repository.",
          family="grouped_cohort_status", variant="grouped_members", member_kind="metric", group_kind="repository",
-         note="CHAOS-4926 class; CHAOS-5721: rescored any_of (D27/D28/D33 overtook the scalar refuse; corpus "
-              "version bump, old scoring series kept as history) -- was expect refuse basis=member_kind_unservable",
-         expect={"any_of": [{"outcome": "serve", "answer": {"family": "grouped_cohort_status"}}, {"outcome": "refuse"}]}),
+         note="CHAOS-4926 class; CHAOS-5721 rescored any_of (D27/D28/D33 overtook the scalar refuse); CHAOS-5989: "
+              "ruled SERVABLE, drops any_of, rescored scalar serve -- was expect refuse basis=member_kind_unservable",
+         expect="serve"),
 
     # --- D. Additional servable coverage -- goal/temporal breadth on servable kinds (team/project) ---
     dict(id="cv-discovered-project-behind", text="Which projects are behind schedule?",
