@@ -106,6 +106,12 @@ else to increment.
   a match. The prior scoring series for these seven rows stays in git
   history, never overwritten; every future run against them scores under
   this new expect.
+- **CHAOS-5989** — three rows ruled SERVABLE and rescored `expect="serve"`:
+  `cv-c3-grouped-explain-change`, `basis-scoped-workitems-by-project`
+  (both were scalar `refuse`), and `basis-grouped-metric-by-repo` (drops
+  its CHAOS-5721 `any_of`, becomes a scalar serve). Question text and row
+  ids are unchanged. The prior scoring series for these three rows stays
+  in git history, never overwritten.
 
 ## Persisted family-confirmation link (CHAOS-5722)
 

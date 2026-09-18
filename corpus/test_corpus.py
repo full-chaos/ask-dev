@@ -444,9 +444,11 @@ def _self_test_baseline_guard_fires():
 # basis-discovered-repo-count, basis-grouped-pr-by-project,
 # basis-discovered-incidents, basis-grouped-metric-by-repo) moved OFF this
 # scalar pin -- rescored any_of, now pinned by PINNED_5721_ANY_OF below.
+#
+# CHAOS-5989: basis-scoped-workitems-by-project moved OFF this scalar pin --
+# ruled SERVABLE, rescored serve.
 PINNED_REFUSE_DECLINE_EXPECT = {
     "basis-grouped-deployment-by-team": "refuse",
-    "basis-scoped-workitems-by-project": "refuse",
     "basis-discovered-documents": "refuse",
     "neg-nonexistent-team": "decline",
     "neg-nonexistent-project": "decline",
@@ -463,8 +465,10 @@ PINNED_REFUSE_DECLINE_EXPECT = {
 #
 # CHAOS-5721: cv-org-count-projects moved OFF this scalar pin -- rescored
 # any_of, now pinned by PINNED_5721_ANY_OF below.
+#
+# CHAOS-5989: cv-c3-grouped-explain-change moved OFF this scalar pin --
+# ruled SERVABLE, rescored serve.
 PINNED_D24_REFUSE_DECLINE_EXPECT = {
-    "cv-c3-grouped-explain-change": "refuse",
     "cv-b5-org-health": "refuse",
     "neg-open-question": "decline",
     "neg-open-vague": "decline",
@@ -581,13 +585,15 @@ def _self_test_pin_guard_fires():
 # silent edit to any of the seven rows' accepted alternatives is caught
 # here, not "fixed" by updating the pin to match (corpus/README.md
 # "## Ownership": row expectations are chris's call).
+#
+# CHAOS-5989: basis-grouped-metric-by-repo moved OFF this any_of pin --
+# ruled SERVABLE, drops any_of, rescored scalar serve.
 PINNED_5721_ANY_OF = {
     "pos-grouped-per-phrasing": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
     "cv-org-count-projects": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
     "basis-discovered-repo-count": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
     "basis-grouped-pr-by-project": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
     "basis-discovered-incidents": frozenset({("serve", "discovered_cohort_ranking"), ("refuse", None)}),
-    "basis-grouped-metric-by-repo": frozenset({("serve", "grouped_cohort_status"), ("refuse", None)}),
     "cv-scoped-projects-by-team-bounded": frozenset({("serve", "scoped_cohort_status")}),
 }
 
