@@ -340,6 +340,12 @@ CONVERSATIONS = [
                  note="turn 2: own text names no subject; remembered Dev Health Ops offered as "
                       "the PRE-SELECTED clarification option, never a silent serve; "
                       "refusal-with-reason for a non-clarifying caller"),
+            dict(n=3, text="What's driving that?", parent="turn2",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 redeem={"kind": "project", "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d"},
+                 expect="serve", expected_subject={"kind": "project", "canonical_id": "project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d"},
+                 note="turn 3: REDEMPTION -- selects the offered remembered option; the engine must serve an answer with data for that subject"),
         ],
     ),
     dict(
@@ -368,6 +374,12 @@ CONVERSATIONS = [
                  ],
                  note="turn 2: own text names a different same-kind subject; clarify with both "
                       "candidates, never a silent serve of the remembered OR the named one"),
+            dict(n=3, text='What about the Ask Dev project?', parent="turn2",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 redeem={"kind": "project", "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 expect="serve", expected_subject={"kind": "project", "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
+                 note="turn 3: REDEMPTION -- selects the newly named option; must serve with data for that subject"),
         ],
     ),
     dict(
@@ -391,6 +403,12 @@ CONVERSATIONS = [
                  ],
                  note="turn 2: own text names a subject of a different KIND (team->project); "
                       "clarify, never a silent serve of either"),
+            dict(n=3, text='What about the Auth Control Plane project?', parent="turn2",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
+                 redeem={"kind": "project", "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72"},
+                 expect="serve", expected_subject={"kind": "project", "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72"},
+                 note="turn 3: REDEMPTION -- selects the newly named project option; must serve with data for that subject"),
         ],
     ),
     dict(
@@ -417,6 +435,12 @@ CONVERSATIONS = [
                  ],
                  note="turn 2: own text names a subject of a different KIND (project->team); "
                       "clarify, never a silent serve of either"),
+            dict(n=3, text='What about the Billing team?', parent="turn2",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 redeem={"kind": "team", "canonical_id": "team:BILL"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:BILL"},
+                 note="turn 3: REDEMPTION -- selects the newly named team option; must serve with data for that subject"),
         ],
     ),
     dict(
@@ -489,8 +513,8 @@ CONVERSATIONS = [
     ),
     dict(
         id="conv-laundering-subject-change-then-repeat",
-        shape="(g) three-turn chain: turn 2 changes subject, turn 3 repeats turn 2's own "
-              "question -> turn 3 must bind to turn 2's subject, NEVER turn 1's "
+        shape="(g) four-turn chain: turn 2 changes subject (clarify), turn 3 redeems it, turn 4 "
+              "repeats turn 2's own question -> turn 4 must bind to turn 2's subject, NEVER turn 1's "
               "(the wrong-subject/'laundering' shape)",
         turns=[
             dict(n=1, text="What is the SRCH team's status?",
@@ -511,8 +535,14 @@ CONVERSATIONS = [
             dict(n=3, text="What is the ML team's status?", parent="turn2",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 redeem={"kind": "team", "canonical_id": "team:ML"},
                  expect="serve", expected_subject={"kind": "team", "canonical_id": "team:ML"},
-                 note="turn 3: byte-identical repeat of turn 2's own text; must bind to turn "
+                 note="turn 3: REDEMPTION -- selects the newly named ML option offered by turn 2; must serve with data for ML"),
+            dict(n=4, text="What is the ML team's status?", parent="turn3",
+                 family="subject_investigation", variant="named_subject",
+                 member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:ML"},
+                 note="turn 4: byte-identical repeat of turn 2's own text; must bind to turn "
                       "2's subject (ML) via its own text, and must NEVER revert to turn 1's "
                       "remembered subject (SRCH) -- the laundering guard this shape exists to "
                       "prove"),
@@ -604,6 +634,16 @@ CONVERSATIONS = [
         ],
     ),
 ]
+
+# Every clarify turn is followed by a redemption turn (a clarification counts only when the next
+# turn selects the offered option and the engine serves with data for that subject).
+for _c in CONVERSATIONS:
+    for _i, _t in enumerate(_c["turns"]):
+        if _t.get("expect") == "clarify":
+            assert _i + 1 < len(_c["turns"]) and _c["turns"][_i + 1].get("redeem"), (
+                f"{_c['id']} turn{_i + 1}: clarify turn needs a redemption turn after it")
+        if _t.get("redeem"):
+            assert _c["turns"][_i - 1].get("expect") == "clarify" and _t.get("expect") == "serve"
 
 assert 10 <= len(CONVERSATIONS) <= 14, f"expected 10-14 conversations, got {len(CONVERSATIONS)}"
 assert len({c["id"] for c in CONVERSATIONS}) == len(CONVERSATIONS), "duplicate conversation id"
