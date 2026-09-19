@@ -272,19 +272,16 @@ for _row in CORPUS:
 # Each entry below is instead an AUTHORED multi-turn conversation: every turn has its own
 # text and its own `expect`, and turn N>1's parent is turn N-1's result (not a receipt).
 #
-# SUBJECTS: every named subject below is REAL, read confirmed 2026-09-17 by a read-only
-# GRAPH.QUERY against the k3s acr-trial-data trial-falkordb graph
-# (acr-cf-fa7030e2106de7411bfbf8ebce74c620), never the ambiguous "fullchaos" family
-# (three distinct nodes share near-identical labels: Fullchaos/team:CHAOS,
-# fullchaos/team:gl:full.chaos, Full Chaos/team:FC) and never the unresolvable `acr`
-# project token except in the one designated unanswerable row. Real, unambiguous
-# subjects used: team:DATA (label "DATA"), team:gh:ops-team (label "Ops Team"),
-# team:AUTH (label "AUTH"), team:SRCH (label "SRCH"), team:ML (label "ML"),
-# team:BILL (label "Billing"), project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d
+# SUBJECTS: every named team subject below is SERVED by the data venue (k3s acr-trial-data
+# trial-clickhouse dh_0906 carries team_repo_ownership rows only for gh:ops-team, gl:full.chaos
+# and CHAOS; team authorization is ownership-derived). Teams used: team:gh:ops-team (label
+# "Ops Team") and team:gl:full.chaos (label "fullchaos"); the ambiguous "fullchaos" family
+# (team:CHAOS / team:FC) is not used as a named subject. Projects: project.v2:linear:6241316a-85be-42ce-b243-8e41f2b18c8d
 # (label "Dev Health Ops"), project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244
 # (label "Ask Dev"), project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72
 # (label "Auth Control Plane"). Nonexistent (reused from CORPUS's own confirmed-absent
-# negative control): project "Quantum Leap".
+# negative control): project "Quantum Leap"; the unresolvable `acr` project token appears
+# only in the one designated unanswerable row.
 #
 # Per turn: text (the ONLY place this text may ever appear), family/variant/member_kind/
 # group_kind mirroring CORPUS's own vocabulary, requested_kind/anchor_kind ("" / None
@@ -303,15 +300,15 @@ CONVERSATIONS = [
         id="conv-identical-repeat-team",
         shape="(a) identical question repeated -> same answer, same subject",
         turns=[
-            dict(n=1, text="What is the DATA team's status?",
+            dict(n=1, text="What is the Ops Team's status?",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 1: named subject, serve"),
-            dict(n=2, text="What is the DATA team's status?", parent="turn1",
+            dict(n=2, text="What is the Ops Team's status?", parent="turn1",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 2: byte-identical text re-asked; same subject, same answer (chris's "
                       "5-second-later example -- resolves via the turn's own text, no carry needed)"),
         ],
@@ -386,17 +383,17 @@ CONVERSATIONS = [
         id="conv-followup-different-kind-team-to-project",
         shape="(d) follow-up naming a subject of a DIFFERENT kind -> clarify",
         turns=[
-            dict(n=1, text="What is the DATA team's status?",
+            dict(n=1, text="What is the Ops Team's status?",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 1: named subject, serve"),
             dict(n=2, text="What about the Auth Control Plane project?", parent="turn1",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="project", anchor_kind="project",
                  expect="clarify",
                  clarify_candidates=[
-                     {"kind": "team", "canonical_id": "team:DATA", "remembered": True},
+                     {"kind": "team", "canonical_id": "team:gh:ops-team", "remembered": True},
                      {"kind": "project",
                       "canonical_id": "project.v2:linear:523e2582-b54b-4e86-8f4d-0db6e5224b72",
                       "remembered": False},
@@ -423,7 +420,7 @@ CONVERSATIONS = [
                  expected_subject={"kind": "project",
                                    "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244"},
                  note="turn 1: named subject, serve"),
-            dict(n=2, text="What about the Billing team?", parent="turn1",
+            dict(n=2, text="What about the Ops Team?", parent="turn1",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
                  expect="clarify",
@@ -431,15 +428,15 @@ CONVERSATIONS = [
                      {"kind": "project",
                       "canonical_id": "project.v2:linear:13e65c04-40ec-4a95-8216-f7c2ce233244",
                       "remembered": True},
-                     {"kind": "team", "canonical_id": "team:BILL", "remembered": False},
+                     {"kind": "team", "canonical_id": "team:gh:ops-team", "remembered": False},
                  ],
                  note="turn 2: own text names a subject of a different KIND (project->team); "
                       "clarify, never a silent serve of either"),
-            dict(n=3, text='What about the Billing team?', parent="turn2",
+            dict(n=3, text='What about the Ops Team?', parent="turn2",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 redeem={"kind": "team", "canonical_id": "team:BILL"},
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:BILL"},
+                 redeem={"kind": "team", "canonical_id": "team:gh:ops-team"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 3: REDEMPTION -- selects the newly named team option; must serve with data for that subject"),
         ],
     ),
@@ -517,34 +514,34 @@ CONVERSATIONS = [
               "repeats turn 2's own question -> turn 4 must bind to turn 2's subject, NEVER turn 1's "
               "(the wrong-subject/'laundering' shape)",
         turns=[
-            dict(n=1, text="What is the SRCH team's status?",
+            dict(n=1, text="What is the Ops Team's status?",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:SRCH"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 1: named subject, serve"),
-            dict(n=2, text="What is the ML team's status?", parent="turn1",
+            dict(n=2, text="What is the full.chaos team's status?", parent="turn1",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
                  expect="clarify",
                  clarify_candidates=[
-                     {"kind": "team", "canonical_id": "team:SRCH", "remembered": True},
-                     {"kind": "team", "canonical_id": "team:ML", "remembered": False},
+                     {"kind": "team", "canonical_id": "team:gh:ops-team", "remembered": True},
+                     {"kind": "team", "canonical_id": "team:gl:full.chaos", "remembered": False},
                  ],
                  note="turn 2: own text names a different same-kind subject with no hint; "
                       "clarify (subject-change always clarifies), never a silent serve"),
-            dict(n=3, text="What is the ML team's status?", parent="turn2",
+            dict(n=3, text="What is the full.chaos team's status?", parent="turn2",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 redeem={"kind": "team", "canonical_id": "team:ML"},
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:ML"},
-                 note="turn 3: REDEMPTION -- selects the newly named ML option offered by turn 2; must serve with data for ML"),
-            dict(n=4, text="What is the ML team's status?", parent="turn3",
+                 redeem={"kind": "team", "canonical_id": "team:gl:full.chaos"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gl:full.chaos"},
+                 note="turn 3: REDEMPTION -- selects the newly named full.chaos option offered by turn 2; must serve with data for full.chaos"),
+            dict(n=4, text="What is the full.chaos team's status?", parent="turn3",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:ML"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gl:full.chaos"},
                  note="turn 4: byte-identical repeat of turn 2's own text; must bind to turn "
-                      "2's subject (ML) via its own text, and must NEVER revert to turn 1's "
-                      "remembered subject (SRCH) -- the laundering guard this shape exists to "
+                      "2's subject (full.chaos) via its own text, and must NEVER revert to turn 1's "
+                      "remembered subject (Ops Team) -- the laundering guard this shape exists to "
                       "prove"),
         ],
     ),
@@ -578,10 +575,10 @@ CONVERSATIONS = [
                  member_kind="team", group_kind=None, requested_kind="team", anchor_kind=None,
                  expect="serve",
                  note="turn 1: discovered cohort of teams, serve; no single subject committed"),
-            dict(n=2, text="What about the DATA team specifically?", parent="turn1",
+            dict(n=2, text="What about the Ops Team specifically?", parent="turn1",
                  family="subject_investigation", variant="named_subject",
                  member_kind=None, group_kind=None, requested_kind="", anchor_kind="team",
-                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:DATA"},
+                 expect="serve", expected_subject={"kind": "team", "canonical_id": "team:gh:ops-team"},
                  note="turn 2: own text names one real member of the prior cohort's kind by "
                       "name; serve, bound to that member"),
         ],
