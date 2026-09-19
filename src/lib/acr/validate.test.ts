@@ -1346,8 +1346,10 @@ describe("investigation result contract — the continuation-refusal basis (cons
         ).$defs.AnswerCompleteness.properties.refusal_basis.enum;
         expect(resultEnum).toContain("continuation_context_unverifiable");
         expect(commonEnum).toContain("continuation_context_unverifiable");
-        expect(resultEnum).toHaveLength(6);
-        expect(commonEnum).toHaveLength(6);
+        expect(resultEnum).toContain("subject_identity_unconfirmed");
+        expect(commonEnum).toContain("subject_identity_unconfirmed");
+        expect(resultEnum).toHaveLength(7);
+        expect(commonEnum).toHaveLength(7);
         expect([...resultEnum].sort()).toEqual([...commonEnum].sort());
     });
 
@@ -2224,6 +2226,79 @@ describe("investigation result contract — structure disposition not_evaluated 
         const validate = ajv.compile(investigationResultSchema);
 
         expect(validate(withUnevaluatedAnchor())).toBe(false);
+        const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
+        expect(enumRejections.length).toBeGreaterThan(0);
+    });
+});
+
+/**
+ * The subject-identity-unconfirmed pin (acr a618ca15): `refusal_basis`'s closed
+ * enum gains `subject_identity_unconfirmed` — a follow-up that resolved to a
+ * different subject than the answer it continues, refused for a caller that
+ * cannot be asked to choose.
+ *
+ * Without this bump such an answer fails CLOSED here with
+ * `acr_contract_violation` and reads as a rig failure rather than a pin gap, so
+ * the new acr member and its consumer pin travel together.
+ */
+describe("refusal basis — subject_identity_unconfirmed (acr a618ca15 consumer pin)", () => {
+    function refusedResult(basis: string): Record<string, unknown> {
+        const result = structuredClone(canonicalResult) as {
+            refusal_basis?: string;
+            completeness?: { refusal_basis?: string };
+        };
+        result.refusal_basis = basis;
+        if (result.completeness !== undefined) result.completeness.refusal_basis = basis;
+        return result;
+    }
+
+    it("a subject-identity-unconfirmed refusal validates as-is", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            refusedResult("subject_identity_unconfirmed"),
+        );
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
+    });
+
+    it("RED CONTROL: an unrecognized refusal basis still rejects — the enum stays closed", () => {
+        const validation = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            refusedResult("subject_identity_unconfirmed_bogus"),
+        );
+        expect(validation.valid).toBe(false);
+    });
+
+    /**
+     * Reproduces the PRIOR pin's own validator: the same document against the
+     * schemas with `subject_identity_unconfirmed` stripped from every
+     * `refusal_basis` enum — exactly the `acr_contract_violation` this answer
+     * hits under the unbumped pin. RED against that reproduction, GREEN against
+     * the real pinned schema above.
+     */
+    it("EXECUTED repro: the refusal would fail under the prior pin's own schemas", () => {
+        const strip = (schema: unknown): unknown => {
+            const clone = structuredClone(schema);
+            const walk = (node: unknown): void => {
+                if (Array.isArray(node)) return node.forEach(walk);
+                if (node === null || typeof node !== "object") return;
+                const record = node as Record<string, unknown>;
+                const basis = record["refusal_basis"] as { enum?: string[] } | undefined;
+                if (basis?.enum !== undefined) {
+                    basis.enum = basis.enum.filter(
+                        (value) => value !== "subject_identity_unconfirmed",
+                    );
+                }
+                Object.values(record).forEach(walk);
+            };
+            walk(clone);
+            return clone;
+        };
+        const ajv = new Ajv2020({ allErrors: true, strictSchema: false, strictTypes: false });
+        ajv.addSchema(strip(commonSchema) as object, "context_fabric_common.v1.schema.json");
+        const validate = ajv.compile(strip(investigationResultSchema) as object);
+
+        expect(validate(refusedResult("subject_identity_unconfirmed"))).toBe(false);
         const enumRejections = (validate.errors ?? []).filter((error) => error.keyword === "enum");
         expect(enumRejections.length).toBeGreaterThan(0);
     });

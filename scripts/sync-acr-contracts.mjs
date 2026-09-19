@@ -389,10 +389,12 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // `not_evaluated` -- a carried member on a turn that ends before its own
 // resolution ever runs, passed forward unchanged rather than claimed as
 // applied.
-// cc498982 -> f4b35b07: the completeness-authority coverage-detail
-// vocabulary split (fact_unconfigured into fact_no_declaring_producer /
-// fact_table_shape_undeclared).
-export const SOURCE_COMMIT = "f4b35b07849ef17e884dc38af004d49c38d86789";
+// f4b35b07 -> a618ca15: the refusal-basis vocabulary gains
+// `subject_identity_unconfirmed` (a follow-up that resolved to a different
+// subject than the answer it continues, refused for a caller that cannot be
+// asked to choose). Additive enum member: acr must not serve it before this
+// pin lands, because every result is strict-validated here.
+export const SOURCE_COMMIT = "a618ca15ff2681cdf7ba24cfd2ddfceb1c31f0da";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
