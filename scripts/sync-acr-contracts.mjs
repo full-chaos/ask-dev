@@ -394,7 +394,15 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // subject than the answer it continues, refused for a caller that cannot be
 // asked to choose). Additive enum member: acr must not serve it before this
 // pin lands, because every result is strict-validated here.
-export const SOURCE_COMMIT = "a618ca15ff2681cdf7ba24cfd2ddfceb1c31f0da";
+// a618ca15 -> f32774cf: no vendored file changes (verified per-file: `git diff
+// a618ca15 f32774cf -- <the ten vendored contract paths>` is empty). The pin
+// moves because acr widened its served surface -- evidence refs scoped by
+// `result_id` (#672), the truncation disclosure and limitation sentences
+// (#677, #678), and a team's investment mix served as its own standalone fact
+// with the `devhealthfacts.clickhouse.v16` query version (#680) -- and the
+// contract rule is pin-before-proof. The new shapes ride existing free-form
+// fact payloads and limitation strings, not schema members.
+export const SOURCE_COMMIT = "f32774cf6329fab4ab2d19d2e1341327040e6f20";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
