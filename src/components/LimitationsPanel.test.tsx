@@ -4,6 +4,22 @@ import { describe, expect, it } from "vitest";
 import { LimitationsPanel } from "@/components/LimitationsPanel";
 import { identityLimitations } from "@/lib/fact-dedup";
 
+describe("LimitationsPanel — acr f32774cf served disclosures (CHAOS-6577)", () => {
+    it("renders a team's 'investment mix unavailable' reason verbatim as a limitation, never as a healthy or empty state", () => {
+        const text =
+            "Investment mix unavailable for this team: no work_unit_investments mix in the window (watermark 2026-09-24).";
+        render(<LimitationsPanel limitations={identityLimitations([text])} warnings={[]} />);
+        expect(screen.getByText(text)).toBeInTheDocument();
+    });
+
+    it("renders a truncation disclosure sentence in full", () => {
+        const text =
+            "Fact rows were cut to fit the response byte budget; 40 of 120 rows are shown.";
+        render(<LimitationsPanel limitations={identityLimitations([text])} warnings={[]} />);
+        expect(screen.getByText(text)).toBeInTheDocument();
+    });
+});
+
 describe("LimitationsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("renders a non-duplicate limitation's text in full", () => {
         render(
