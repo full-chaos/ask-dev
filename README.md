@@ -207,12 +207,13 @@ place a rename has to be absorbed.
    and `src/lib/presentation.test.ts` reads those enums straight out of the
    pinned schema, so a new state fails the suite instead of rendering blank.
 
-Currently pinned: `f32774cf6329fab4ab2d19d2e1341327040e6f20` (acr main tip after
-#680). No vendored file changed against the prior content pin
-`a618ca15ff2681cdf7ba24cfd2ddfceb1c31f0da` (`git diff a618ca15 f32774cf --` over
+Currently pinned: `c4945bb87534b1e2533657b0306be819c1ec38ab` (acr main tip after
+#679). No vendored file changed against the prior content pin
+`a618ca15ff2681cdf7ba24cfd2ddfceb1c31f0da` (`git diff a618ca15 c4945bb8 --` over
 the ten vendored paths is empty); the pin moves because acr widened its served
 surface (evidence refs scoped by `result_id`, truncation/limitation sentences,
-a team's investment mix as its own fact, facts query version v16) and the
+a team's investment mix as its own fact, facts query version v16, a
+committed evidence window) and the
 contract rule is pin-before-proof. ask-dev makes no `source_evidence` call, so
 there is no `result_id` to send.
 
