@@ -2,6 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { FactRowsPanels } from "@/components/FactRowsPanel";
+import canonicalExample from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import { validateContract } from "@/lib/acr/validate";
 import renderShapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { ClaimedFact, InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
@@ -593,5 +595,82 @@ describe("chris's ruling: nothing disappears from the UI", () => {
         a.unmount();
         const b = render(<FactRowsPanels facts={[factWithRows]} result={withoutField} />);
         expect(b.container.querySelectorAll(".fact-chart").length).toBe(withCount);
+    });
+});
+
+/**
+ * CHAOS-6577 (acr #680, devhealthfacts.clickhouse.v16): a team's investment
+ * mix is ONE standalone fact -- the canonical `theme_*` scalars plus a
+ * `theme_breakdown` breakdown table -- and never the legacy per-day
+ * investment rows. Both halves ride the pinned ClaimedFact shape (scalar
+ * `value`, scalar-only `rows`, closed `table` declaration), so ask-dev needs
+ * no code for it; these tests execute that claim against the pinned schema and
+ * the real panel instead of asserting it by argument.
+ */
+describe("team investment mix fact (acr #680)", () => {
+    const team = { kind: "team", canonical_id: "team_platform", label: "Platform" } as const;
+    const themes = ["feature_delivery", "operational", "maintenance", "quality", "risk"] as const;
+    const teamMix: readonly ClaimedFact[] = [
+        {
+            claim_id: "claim_team_theme_feature_delivery",
+            kind: "investment",
+            subject: team,
+            field: "theme_feature_delivery",
+            value: { number: 0.4 },
+        },
+        {
+            claim_id: "claim_team_theme_breakdown",
+            kind: "investment",
+            subject: team,
+            field: "theme_breakdown",
+            value: { integer: themes.length },
+            rows: themes.map((theme, index) => ({
+                fields: {
+                    theme: { string: theme },
+                    share: { number: index === 0 ? 0.4 : 0.15 },
+                    weighted_effort: { number: index === 0 ? 40 : 15 },
+                    source: { string: "work_unit_investments" },
+                    attribution: { string: "team_repo_ownership" },
+                },
+            })),
+            table: {
+                field: "theme_breakdown",
+                shape: "breakdown",
+                key: ["theme"],
+                measures: ["share", "weighted_effort"],
+                observations: ["source", "attribution"],
+            },
+        },
+    ];
+
+    it("a result carrying the standalone team mix validates against the pinned result schema", () => {
+        const result = { ...canonicalExample, claimed_facts: teamMix };
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", result),
+        ).toEqual({
+            valid: true,
+            errors: [],
+        });
+    });
+
+    it("control: the same result with a row that nests a table is refused, so the acceptance above can fail", () => {
+        const [scalar, breakdown] = teamMix as [ClaimedFact, ClaimedFact];
+        const nested = {
+            ...breakdown,
+            rows: [{ fields: { theme: { string: "risk" }, share: { table: {} } } }],
+        };
+        const result = { ...canonicalExample, claimed_facts: [scalar, nested] };
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", result).valid,
+        ).toBe(false);
+    });
+
+    it("renders the breakdown as its own panel with every canonical theme row", () => {
+        render(<FactRowsPanels facts={teamMix} result={undefined} />);
+        const heading = screen.getByRole("heading", { name: /investment.*theme breakdown/i });
+        const panel = heading.closest("section")!;
+        for (const theme of themes) {
+            expect(panel.textContent).toContain(theme);
+        }
     });
 });
