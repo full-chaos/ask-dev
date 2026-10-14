@@ -34,8 +34,10 @@ overrides:
     # via malformed IPv6 normalization (GHSA-f65p-4m7j-42xc), SSRF via
     # repeated hostname percent-decoding (GHSA-fph4-wmhf-6fwf), and host
     # confusion via percent-encoded scheme normalization
-    # (GHSA-jqff-g426-hqxp). All four are patched at fast-uri>=3.1.6, a
+    # (GHSA-jqff-g426-hqxp). All four are patched at fast-uri>=3.1.6; the 4.x
+    # line later added GHSA-qw65-cvwx-89v3 and GHSA-58mr-gqgx-xq4g (patched
+    # at >=4.1.4, 4.1.3 itself unpatched), so the floor is now >=4.1.4, a
     # semver-patch bump within ajv's own pinned major, verified empirically
     # via the full unit suite (ajv/ajv-formats validate every ACR contract
     # schema in this repo) after regenerating the lockfile.
-    fast-uri: ">=3.1.6"
+    fast-uri: ">=4.1.4"
