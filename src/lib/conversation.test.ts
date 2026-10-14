@@ -157,6 +157,7 @@ describe("deriveParentReference", () => {
         expect(deriveParentReference([])).toEqual({
             parentResultId: undefined,
             subjectHints: [],
+            unsentSubjects: [],
         });
     });
 
@@ -168,6 +169,7 @@ describe("deriveParentReference", () => {
         expect(deriveParentReference(turns)).toEqual({
             parentResultId: undefined,
             subjectHints: [],
+            unsentSubjects: [],
         });
     });
 
@@ -179,6 +181,7 @@ describe("deriveParentReference", () => {
         expect(deriveParentReference(turns)).toEqual({
             parentResultId: undefined,
             subjectHints: [],
+            unsentSubjects: [],
         });
     });
 
@@ -208,6 +211,7 @@ describe("deriveParentReference", () => {
                     source: PARENT_SUBJECT_HINT_SOURCE,
                 },
             ],
+            unsentSubjects: [],
         });
     });
 
@@ -220,6 +224,7 @@ describe("deriveParentReference", () => {
         expect(deriveParentReference(turns)).toEqual({
             parentResultId: "result_no_commit",
             subjectHints: [],
+            unsentSubjects: [],
         });
     });
 
@@ -236,6 +241,7 @@ describe("deriveParentReference", () => {
         expect(deriveParentReference(turns)).toEqual({
             parentResultId: undefined,
             subjectHints: [],
+            unsentSubjects: [],
         });
     });
 

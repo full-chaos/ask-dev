@@ -12,7 +12,11 @@ import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
 import { subjectForReceipt } from "@/lib/clarification";
 import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarification-popup";
-import { buildConversationTurns, deriveParentReference } from "@/lib/conversation";
+import {
+    buildConversationTurns,
+    deriveParentReference,
+    unsentSubjectsNotice,
+} from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
@@ -827,7 +831,7 @@ export default function ChatPage() {
                     {turns.length === 0 ? (
                         <p className="chat__empty">Ask a question to start an investigation.</p>
                     ) : (
-                        turns.map((turn) => {
+                        turns.map((turn, turnIndex) => {
                             if (turn.role === "user") {
                                 // CHAOS-4670: a silent receipt-carrying
                                 // re-ask renders nothing here — see
@@ -844,6 +848,13 @@ export default function ChatPage() {
                             }
 
                             const isLatest = turn.id === latestAssistantTurn?.id;
+                            // The turns BEFORE this assistant turn's own user
+                            // turn are what this follow-up derived its carry
+                            // from; say so when a subject could not ride along.
+                            const carryNotice = unsentSubjectsNotice(
+                                deriveParentReference(turns.slice(0, Math.max(0, turnIndex - 1)))
+                                    .unsentSubjects,
+                            );
 
                             return (
                                 <div
@@ -857,6 +868,14 @@ export default function ChatPage() {
                                     <p className="chat__meta">
                                         Ask Dev · {formatTurnTime(turn.createdAt)}
                                     </p>
+                                    {carryNotice === undefined ? null : (
+                                        <p
+                                            className="record__meta"
+                                            data-testid="follow-up-scope-not-carried"
+                                        >
+                                            {carryNotice}
+                                        </p>
+                                    )}
                                     {turn.outcome.kind === "pending" ? (
                                         <p className="chat__pending" role="status">
                                             Investigating…

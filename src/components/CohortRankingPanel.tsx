@@ -9,7 +9,7 @@ import type {
     InterpretedShape,
     InvestigationResult,
 } from "@/lib/contracts";
-import { formatCohortScore, isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { cohortRanking, formatCohortScore } from "@/lib/cohort-ranking";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "@/lib/render-shapes";
 import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "@/lib/presentation";
 
@@ -97,10 +97,31 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     // panel's heading — the same multi-instance bug `DeterministicAnswerView`
     // and `StructureNeedsPanel` already use `useId()` to avoid.
     const idPrefix = useId();
-    if (!isCohortIntent(shape)) return null;
+    const ranking = cohortRanking(shape, cohort);
+    if (ranking.state === "not_requested" || ranking.state === "not_computed") return null;
+    if (ranking.state === "kind_not_ranked") {
+        // The cohort's kind (or a member's) is outside the closed allowlist --
+        // an open-vocabulary value, or `person`, which is never ranked
+        // (AGENTS.md: no person-to-person rankings). No score, rank or
+        // member name is rendered; the raw cohort stays in the inspector.
+        return (
+            <section
+                className="panel"
+                aria-labelledby={`${idPrefix}-cohort-ranking-title`}
+                data-testid="cohort-ranking-withheld"
+            >
+                <h2 className="panel__title" id={`${idPrefix}-cohort-ranking-title`}>
+                    Ranking not shown
+                </h2>
+                <p className="record__meta">
+                    This answer carries a cohort of a kind this view does not rank, so no ranking is
+                    shown.
+                </p>
+            </section>
+        );
+    }
     if (cohort === undefined) return null;
-    const rows = rankingTable(cohort.members);
-    if (rows === null) return null;
+    const rows = ranking.rows;
 
     const unranked = unrankedLabels(cohort.members);
 

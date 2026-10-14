@@ -21,7 +21,7 @@ import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
 import { WorkItemStatusPanel } from "@/components/WorkItemStatusPanel";
 import { choiceDisposition } from "@/lib/clarification";
-import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { cohortRanking } from "@/lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
@@ -414,7 +414,7 @@ export function DeterministicAnswerView({
                 // answer wants "RANKED TEAMS ... then principal driver
                 // cards" (Drivers immediately after Ranked Teams), while a
                 // single-subject answer wants fact rows ahead of Drivers.
-                // `isCohortIntent`/`rankingTable` use the SAME gate
+                // `cohortRanking` uses the SAME gate
                 // `CohortRankingPanel`/`DriversPanel` already use, so this
                 // never drifts from what those panels actually decide to
                 // render.
@@ -426,9 +426,7 @@ export function DeterministicAnswerView({
             />
             <CohortGroupsPanel cohort={result.cohort} />
             <WorkItemStatusPanel result={result} />
-            {isCohortIntent(result.interpretation.shape) &&
-            result.cohort !== undefined &&
-            rankingTable(result.cohort.members) !== null ? (
+            {cohortRanking(result.interpretation.shape, result.cohort).state === "rows" ? (
                 <>
                     <DriversPanel result={result} />
                     <FactRowsPanels facts={result.claimed_facts} result={result} />

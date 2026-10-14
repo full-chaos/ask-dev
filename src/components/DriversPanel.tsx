@@ -3,7 +3,7 @@ import { useId } from "react";
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
-import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { cohortRanking } from "@/lib/cohort-ranking";
 import type {
     DriverJudgment,
     EvidenceRefLabels,
@@ -160,10 +160,8 @@ export function DriversPanel({ result }: DriversPanelProps) {
     // (named only in "Not ranked by the service: ...") gets no footnote at
     // all, so a withheld driver about one has nothing to point at even
     // though the table itself is on screen.
-    const rows =
-        isCohortIntent(result.interpretation.shape) && result.cohort !== undefined
-            ? rankingTable(result.cohort.members)
-            : null;
+    const ranking = cohortRanking(result.interpretation.shape, result.cohort);
+    const rows = ranking.state === "rows" ? ranking.rows : null;
     const membersWithFootnote = new Set(
         (rows ?? [])
             .filter((row) => row.member.missing_signals !== undefined)

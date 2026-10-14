@@ -14,6 +14,7 @@
  * contract field on the member, so surfacing it invents nothing.
  */
 import type {
+    Cohort,
     CohortDriverWindow,
     CohortMember,
     CohortMemberDriver,
@@ -168,4 +169,66 @@ export function rankingTable(members: readonly CohortMember[]): readonly RankedC
                 scoreWithheld: score !== null && drivers.length === 0,
             };
         });
+}
+
+/**
+ * The subject kinds a cohort ranking may be built over: a CLOSED allowlist,
+ * and exactly the kinds the pre-open-vocabulary pin's closed `Cohort.kind` /
+ * `SubjectRef.kind` enum declared (a7310f9). `Cohort.kind` and
+ * `SubjectRef.kind` are open vocabularies now ("a client must tolerate values
+ * it does not know"), so a value outside this list -- including `person`,
+ * which no pin has ever documented -- is tolerated by rendering NO ranking at
+ * all. Never derived from the schema: a vocabulary the producer may extend
+ * must not widen what this repo ranks without a consumer decision. The guard
+ * test `src/test/open-vocabulary-guard.test.ts` fails when the schema documents
+ * a kind this list has not decided.
+ */
+export const RANKABLE_SUBJECT_KINDS: readonly string[] = [
+    "organization",
+    "team",
+    "project",
+    "repository",
+    "work_item",
+    "pull_request",
+    "deployment",
+    "incident",
+    "document",
+    "decision",
+    "episode",
+    "metric",
+    "pull_request_review",
+    "ci_pipeline_run",
+    "work_item_ref",
+];
+
+/** True only for a kind on the closed allowlist; `person` is never on it. */
+export function isRankableSubjectKind(kind: string): boolean {
+    return RANKABLE_SUBJECT_KINDS.includes(kind);
+}
+
+export type CohortRankingState =
+    /** The question did not ask for a ranking, or there is no cohort. */
+    | { readonly state: "not_requested" }
+    /** Asked for, but acr ranked no member: nothing to show. */
+    | { readonly state: "not_computed" }
+    /** Ranked, but over a kind this view does not rank: withheld, never shown. */
+    | { readonly state: "kind_not_ranked" }
+    | { readonly state: "rows"; readonly rows: readonly RankedCohortRow[] };
+
+/**
+ * The single gate every ranking consumer goes through: intent, then the kind
+ * allowlist (cohort AND every member subject), then acr's own `ranking_computed`.
+ */
+export function cohortRanking(
+    shape: InterpretedShape,
+    cohort: Cohort | undefined,
+): CohortRankingState {
+    if (!isCohortIntent(shape) || cohort === undefined) return { state: "not_requested" };
+    const rows = rankingTable(cohort.members);
+    if (rows === null) return { state: "not_computed" };
+    const kindsRankable =
+        isRankableSubjectKind(cohort.kind) &&
+        cohort.members.every((member) => isRankableSubjectKind(member.subject.kind));
+    if (!kindsRankable) return { state: "kind_not_ranked" };
+    return { state: "rows", rows };
 }
