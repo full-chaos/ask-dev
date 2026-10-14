@@ -1,5 +1,6 @@
 "use client";
 
+import { type RankingWithheld, withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -39,7 +40,11 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
 type Outcome =
     | { readonly kind: "idle" }
     | { readonly kind: "pending" }
-    | { readonly kind: "answered"; readonly result: InvestigationResult }
+    | {
+          readonly kind: "answered";
+          readonly result: InvestigationResult;
+          readonly rankingWithheld?: RankingWithheld;
+      }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 // `enriched` joins this list in M3, behind its fail-closed validator.
@@ -173,7 +178,18 @@ export default function WorkbenchPage() {
                 });
                 return;
             }
-            setOutcome({ kind: "answered", result: result as InvestigationResult });
+            const boundary = withholdUnrankableRankings(result as InvestigationResult);
+            const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
+            const rankingWithheld =
+                boundary.rankingWithheld ??
+                (typeof routeMarker === "object" && routeMarker !== null
+                    ? (routeMarker as RankingWithheld)
+                    : undefined);
+            setOutcome({
+                kind: "answered",
+                result: boundary.result,
+                ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
+            });
         } catch (error) {
             // Never swallow: a dead server hop is itself a reportable outcome.
             console.error("investigation request failed", error);
@@ -360,9 +376,18 @@ export default function WorkbenchPage() {
                 <>
                     <div className="result__head">
                         <h2 className="result__question">{outcome.result.question}</h2>
-                        <span className="badge" title={outcome.result.status}>
-                            {outcome.result.status.replaceAll("_", " ")}
-                        </span>
+                        {outcome.rankingWithheld === undefined ? (
+                            <span className="badge" title={outcome.result.status}>
+                                {outcome.result.status.replaceAll("_", " ")}
+                            </span>
+                        ) : (
+                            <span
+                                className="badge badge--warn"
+                                title={`withheld by the Workbench; service status: ${outcome.result.status}`}
+                            >
+                                withheld
+                            </span>
+                        )}
                     </div>
                     {/* The choice-not-applied notice is likewise view-independent:
                         a dishonoured choice must not become invisible because
@@ -425,7 +450,10 @@ export default function WorkbenchPage() {
                                     selectedReceiptIds={candidateSelections.batch}
                                 />
                             ) : null}
-                            <CanonicalResultInspector result={outcome.result} />
+                            <CanonicalResultInspector
+                                rankingWithheld={outcome.rankingWithheld}
+                                result={outcome.result}
+                            />
                         </>
                     ) : (
                         <DeterministicAnswerView
@@ -439,6 +467,7 @@ export default function WorkbenchPage() {
                             onToggleCandidate={candidateSelections.toggle}
                             onToggleStructure={structureSelections.toggle}
                             onToggleStructureCandidate={structureCandidateSelections.toggle}
+                            rankingWithheld={outcome.rankingWithheld}
                             result={outcome.result}
                             selectedCandidateReceiptIds={candidateSelections.batch}
                             selectedStructureCandidateReceiptIds={

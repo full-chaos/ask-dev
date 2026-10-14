@@ -1,9 +1,11 @@
+import type { RankingWithheld } from "@/lib/ranking-withheld";
+import { WithheldPart } from "@/components/WithheldPart";
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
-import { isCohortIntent, rankingTable } from "@/lib/cohort-ranking";
+import { cohortRanking } from "@/lib/cohort-ranking";
 import type {
     DriverJudgment,
     EvidenceRefLabels,
@@ -27,6 +29,8 @@ function subjectKey(subject: SubjectRef): string {
 
 export type DriversPanelProps = {
     readonly result: InvestigationResult;
+    /** Present when the Workbench withheld drivers and strongest pressures. */
+    readonly rankingWithheld?: RankingWithheld | undefined;
 };
 
 /**
@@ -152,7 +156,7 @@ function DriverCard({
  * it. Same honesty rule the old inline version held: an empty `drivers` list
  * still renders the heading and says so explicitly, it is never hidden.
  */
-export function DriversPanel({ result }: DriversPanelProps) {
+export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
     const idPrefix = useId();
     // Mirrors CohortRankingPanel's own gate exactly (rule 0 there), then
     // narrows further to just the members whose row actually carries a
@@ -160,10 +164,8 @@ export function DriversPanel({ result }: DriversPanelProps) {
     // (named only in "Not ranked by the service: ...") gets no footnote at
     // all, so a withheld driver about one has nothing to point at even
     // though the table itself is on screen.
-    const rows =
-        isCohortIntent(result.interpretation.shape) && result.cohort !== undefined
-            ? rankingTable(result.cohort.members)
-            : null;
+    const ranking = cohortRanking(result.interpretation.shape, result.cohort);
+    const rows = ranking.state === "rows" ? ranking.rows : null;
     const membersWithFootnote = new Set(
         (rows ?? [])
             .filter((row) => row.member.missing_signals !== undefined)
@@ -178,7 +180,10 @@ export function DriversPanel({ result }: DriversPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-drivers-title`}>
                 Drivers
             </h2>
-            {result.strongest_pressures.length > 0 ? (
+            {rankingWithheld !== undefined ? (
+                <WithheldPart label="Strongest pressures and drivers" />
+            ) : null}
+            {rankingWithheld !== undefined ? null : result.strongest_pressures.length > 0 ? (
                 <>
                     <h3 className="panel__title">Strongest pressures</h3>
                     <ul className="stack stack--tight" style={{ marginBottom: 14 }}>
@@ -190,7 +195,7 @@ export function DriversPanel({ result }: DriversPanelProps) {
                     </ul>
                 </>
             ) : null}
-            {result.drivers.length === 0 ? (
+            {rankingWithheld !== undefined ? null : result.drivers.length === 0 ? (
                 <p className="panel__empty">No drivers were reported.</p>
             ) : (
                 <ul className="stack">

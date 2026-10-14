@@ -1,3 +1,4 @@
+import { WithheldPart } from "@/components/WithheldPart";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { SafeAnswerText } from "@/components/SafeAnswerText";
 import type { EvidenceRefLabels } from "@/lib/contracts";
@@ -10,6 +11,8 @@ export type FindingsPanelProps = {
     readonly findings: readonly DedupedFinding[];
     readonly emptyMessage: string;
     readonly evidenceRefLabels: EvidenceRefLabels;
+    /** True when the Workbench withheld this part: renders "withheld", never the empty message. */
+    readonly withheld?: boolean;
 };
 
 /**
@@ -28,6 +31,7 @@ export function FindingsPanel({
     findings,
     emptyMessage,
     evidenceRefLabels,
+    withheld = false,
 }: FindingsPanelProps) {
     const titleId = `findings-${title.toLowerCase().replaceAll(" ", "-")}`;
     return (
@@ -35,7 +39,9 @@ export function FindingsPanel({
             <h2 className="panel__title" id={titleId}>
                 {title}
             </h2>
-            {findings.length === 0 ? (
+            {withheld && findings.length === 0 ? (
+                <WithheldPart label={title} />
+            ) : findings.length === 0 ? (
                 <p className="panel__empty">{emptyMessage}</p>
             ) : (
                 <ul className="stack">

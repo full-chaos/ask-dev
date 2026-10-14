@@ -17,10 +17,14 @@ export function SemanticReadingNotice({
     semanticReading: InvestigationResult["semantic_reading"];
 }) {
     if (semanticReading === undefined || semanticReading.status !== "unavailable") return null;
+    // Only the two DOCUMENTED reasons get a cause; the vocabulary is open, so
+    // any other value reads neutrally and claims nothing about why.
     const cause =
         semanticReading.reason === "semantic_state_absent"
             ? "no stored reading of the question is available for it"
-            : "its stored reading of the question could not be read";
+            : semanticReading.reason === "semantic_state_unreadable"
+              ? "its stored reading of the question could not be read"
+              : "its stored reading of the question could not be used";
     return (
         <p role="note" data-semantic-reading={semanticReading.reason}>
             This clarification was stored earlier, and {cause}, so the service could not check

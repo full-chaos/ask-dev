@@ -1,4 +1,5 @@
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
+import { declaredVocabulary } from "@/lib/acr/upstream-vocabulary";
 import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import { degradedReasonCount } from "@/lib/degraded-reasons";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
@@ -206,12 +207,68 @@ function outcomeFor(input: OutcomeInput): WorkbenchOutcome {
  * so a pin bump that adds a kind picks it up automatically.
  */
 const FACT_KINDS: ReadonlySet<string> = new Set(
-    (
-        commonSchema as {
-            $defs: { FactRequirement: { properties: { kind: { enum?: string[] } } } };
-        }
-    ).$defs.FactRequirement.properties.kind.enum ?? [],
+    declaredVocabulary(
+        (
+            commonSchema as {
+                $defs: { FactRequirement: { properties: { kind: { enum?: string[] } } } };
+            }
+        ).$defs.FactRequirement.properties.kind,
+        "FactRequirement.kind",
+    ),
 );
+
+/**
+ * The open vocabularies this event carries, each bounded to the pinned
+ * schema's DOCUMENTED members. The schema says "a client must tolerate values
+ * it does not know" -- tolerate, not forward: an unknown value is sent as
+ * `"other"` and the received string never leaves the process, so a producer
+ * that put free text (an email, a name) in one of these fields cannot reach
+ * telemetry through it. The count of such values stays visible as `"other"`.
+ */
+const vocabulary = (
+    node: { enum?: string[]; "x-documented-values"?: string[] } | undefined,
+    label: string,
+): ReadonlySet<string> => new Set(declaredVocabulary(node, label));
+
+type CommonDefs = {
+    $defs: {
+        InterpretedQuestion: { properties: { shape: object } };
+        SubjectRef: { properties: { kind: object } };
+        SubjectCandidate: { properties: { state: object } };
+        SourceObservation: { properties: { state: object } };
+    };
+};
+const commonDefs = (commonSchema as unknown as CommonDefs).$defs;
+
+export const TELEMETRY_VOCABULARIES = {
+    questionShape: vocabulary(
+        commonDefs.InterpretedQuestion.properties.shape,
+        "InterpretedQuestion.shape",
+    ),
+    candidateState: vocabulary(
+        commonDefs.SubjectCandidate.properties.state,
+        "SubjectCandidate.state",
+    ),
+    subjectKind: vocabulary(commonDefs.SubjectRef.properties.kind, "SubjectRef.kind"),
+    coverageState: vocabulary(
+        commonDefs.SourceObservation.properties.state,
+        "SourceObservation.state",
+    ),
+    resultStatus: new Set([
+        "complete",
+        "partial",
+        "degraded",
+        "clarification_required",
+        "no_match",
+    ]),
+} as const;
+
+export const UNRECOGNIZED_VALUE = "other";
+
+/** The value when documented, `"other"` otherwise. Never the received string. */
+export function boundedVocabularyValue(value: string, allowed: ReadonlySet<string>): string {
+    return allowed.has(value) ? value : UNRECOGNIZED_VALUE;
+}
 
 const KNOWN_SOURCES: ReadonlySet<string> = new Set(["context-fabric:graph"]);
 
@@ -240,20 +297,33 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
 
     return {
         event: "workbench_investigation",
-        questionShape: result?.interpretation.shape,
+        questionShape:
+            result === undefined
+                ? undefined
+                : boundedVocabularyValue(
+                      result.interpretation.shape,
+                      TELEMETRY_VOCABULARIES.questionShape,
+                  ),
         outcome: outcomeFor(input),
-        resultStatus: result?.status,
+        resultStatus:
+            result === undefined
+                ? undefined
+                : boundedVocabularyValue(result.status, TELEMETRY_VOCABULARIES.resultStatus),
         failureCode: input.failureCode,
         upstreamStatus: input.upstreamStatus,
         latencyMs: input.latencyMs,
 
         subjectCandidateCount: result?.subject_resolution.candidates.length ?? 0,
         subjectCandidateStates: distinct(
-            (result?.subject_resolution.candidates ?? []).map((candidate) => candidate.state),
+            (result?.subject_resolution.candidates ?? []).map((candidate) =>
+                boundedVocabularyValue(candidate.state, TELEMETRY_VOCABULARIES.candidateState),
+            ),
         ),
         committedSubjectCount: result?.subject_resolution.committed.length ?? 0,
         committedSubjectKinds: distinct(
-            (result?.subject_resolution.committed ?? []).map((subject) => subject.kind),
+            (result?.subject_resolution.committed ?? []).map((subject) =>
+                boundedVocabularyValue(subject.kind, TELEMETRY_VOCABULARIES.subjectKind),
+            ),
         ),
         cohortMemberCount: result?.cohort?.members.length ?? 0,
         cohortComplete: result?.cohort?.complete,
@@ -266,7 +336,7 @@ export function buildOutcomeEvent(input: OutcomeInput): OutcomeEvent {
         coverageSourceStates: (coverage?.sources ?? [])
             .map((source) => ({
                 source: boundedCoverageSource(source.source),
-                state: source.state,
+                state: boundedVocabularyValue(source.state, TELEMETRY_VOCABULARIES.coverageState),
             }))
             .sort(
                 (left, right) =>

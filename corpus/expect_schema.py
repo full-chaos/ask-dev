@@ -43,7 +43,9 @@ def _read_question_family_vocabulary():
     keeps current, so there is nothing here for a corpus.py-side edit to
     forget to update."""
     doc = json.loads((_SCHEMAS_DIR / "context_fabric_common.v1.schema.json").read_text())
-    return frozenset(doc["$defs"]["QuestionFamily"]["enum"])
+    node = doc["$defs"]["QuestionFamily"]
+    # Open vocabularies carry `x-documented-values` instead of `enum`.
+    return frozenset(node["enum"] if "enum" in node else node["x-documented-values"])
 
 
 FAMILIES = _read_question_family_vocabulary()
@@ -61,7 +63,8 @@ def _read_semantic_reading_reasons():
     silent guess) if the synced schema's vocabulary ever stops being exactly
     these two members."""
     doc = json.loads((_SCHEMAS_DIR / "context_fabric_investigation_result.v1.schema.json").read_text())
-    enum = frozenset(doc["properties"]["semantic_reading"]["properties"]["reason"]["enum"])
+    node = doc["properties"]["semantic_reading"]["properties"]["reason"]
+    enum = frozenset(node["enum"] if "enum" in node else node["x-documented-values"])
     absent, unreadable = "semantic_state_absent", "semantic_state_unreadable"
     if enum != {absent, unreadable}:
         raise RuntimeError(

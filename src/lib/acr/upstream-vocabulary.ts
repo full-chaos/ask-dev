@@ -12,6 +12,27 @@ import errorSchema from "@/contracts/schemas/error.v1.schema.json";
  */
 
 /**
+ * The values a pinned schema node declares: `enum` for a closed vocabulary,
+ * `x-documented-values` for an open one (the pin's "a client must tolerate
+ * values it does not know" vocabularies). These allowlists bound what is
+ * rendered or sent to telemetry, so an open vocabulary still bounds by its
+ * documented members; a value outside them is dropped, never echoed.
+ *
+ * Throws when the node declares neither: an allowlist that silently became
+ * empty would drop every value and still look healthy.
+ */
+export function declaredVocabulary(
+    node: { enum?: string[]; "x-documented-values"?: string[] } | undefined,
+    label: string,
+): string[] {
+    const values = node?.enum ?? node?.["x-documented-values"];
+    if (values === undefined || values.length === 0) {
+        throw new Error(`pinned schema declares no vocabulary for ${label}`);
+    }
+    return values;
+}
+
+/**
  * The allowlist is READ FROM THE PINNED SCHEMA, not hand-copied.
  *
  * `error.v1` declares `code` as a closed enum, so the contract already is the
@@ -20,8 +41,14 @@ import errorSchema from "@/contracts/schemas/error.v1.schema.json";
  * check that still looks green.
  */
 const ACR_ERROR_CODES: ReadonlySet<string> = new Set(
-    (errorSchema as { properties: { error: { properties: { code: { enum?: string[] } } } } })
-        .properties.error.properties.code.enum ?? [],
+    declaredVocabulary(
+        (
+            errorSchema as {
+                properties: { error: { properties: { code: { enum?: string[] } } } };
+            }
+        ).properties.error.properties.code,
+        "error.code",
+    ),
 );
 
 /** A code outside the contract's vocabulary. Never the received value. */
@@ -109,8 +136,10 @@ export function boundedNarrowingContinuationAxis(
  * see this section's header comment.
  */
 const QUESTION_FAMILIES: ReadonlySet<string> = new Set(
-    (commonSchema as { $defs: { QuestionFamily: { enum?: string[] } } }).$defs.QuestionFamily
-        .enum ?? [],
+    declaredVocabulary(
+        (commonSchema as { $defs: { QuestionFamily: { enum?: string[] } } }).$defs.QuestionFamily,
+        "QuestionFamily",
+    ),
 );
 
 /** Exposed for tests, so the allowlist's source can be asserted rather than assumed. */
@@ -135,8 +164,10 @@ export function boundedQuestionFamily(family: string | undefined): string | unde
  * bound accepts the schema's full enum rather than a hand-narrowed one.
  */
 const BUDGET_OVERRUNS: ReadonlySet<string> = new Set(
-    (commonSchema as { $defs: { BudgetOverrun: { enum?: string[] } } }).$defs.BudgetOverrun.enum ??
-        [],
+    declaredVocabulary(
+        (commonSchema as { $defs: { BudgetOverrun: { enum?: string[] } } }).$defs.BudgetOverrun,
+        "BudgetOverrun",
+    ),
 );
 
 /** Exposed for tests, so the allowlist's source can be asserted rather than assumed. */

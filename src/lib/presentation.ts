@@ -20,7 +20,13 @@ import type {
 
 export type Tone = "ok" | "warn" | "bad" | "neutral";
 
-/** Tone for one `coverage.sources[].state`. Exhaustive over the closed enum. */
+/**
+ * Tone for one `coverage.sources[].state`. The pinned schema declares this an
+ * open vocabulary (`x-documented-values`, "a client must tolerate values it
+ * does not know"): every documented member is mapped, and a value acr adds
+ * later reads `neutral` — the presentation layer does not guess a judgment
+ * (North Star check 12), and the raw term is still shown beside the tone.
+ */
 export function coverageStateTone(state: CoverageState): Tone {
     switch (state) {
         case "available":
@@ -36,6 +42,8 @@ export function coverageStateTone(state: CoverageState): Tone {
         case "unconfigured":
         case "no_data":
         case "not_applicable":
+            return "neutral";
+        default:
             return "neutral";
     }
 }
@@ -54,7 +62,11 @@ export function statusTone(status: InvestigationStatus): Tone {
     }
 }
 
-/** Tone for one subject candidate. Exhaustive over the closed enum. */
+/**
+ * Tone for one subject candidate. Open vocabulary in the pinned schema, same
+ * discipline as `coverageStateTone`: documented members are mapped, an unknown
+ * one reads `neutral` rather than as a state acr did not declare.
+ */
 export function candidateStateTone(state: SubjectCandidateState): Tone {
     switch (state) {
         case "committed":
@@ -65,6 +77,8 @@ export function candidateStateTone(state: SubjectCandidateState): Tone {
             return "warn";
         case "unresolved":
             return "bad";
+        default:
+            return "neutral";
     }
 }
 

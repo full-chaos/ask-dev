@@ -70,7 +70,8 @@ def test_family_vocabulary_matches_the_pinned_contract_schema():
     # a FAMILIES that silently lost (or gained) a member relative to the
     # pinned contract fails here, not only against its own membership.
     schema = json.loads(_SCHEMA_PATH.read_text())
-    pinned = set(schema["$defs"]["QuestionFamily"]["enum"])
+    node = schema["$defs"]["QuestionFamily"]
+    pinned = set(node["enum"] if "enum" in node else node["x-documented-values"])
     _require(pinned, f"no QuestionFamily enum found at {_SCHEMA_PATH}")
     _require(S.FAMILIES == pinned,
               f"expect_schema.FAMILIES {sorted(S.FAMILIES)} != pinned contract QuestionFamily {sorted(pinned)}")

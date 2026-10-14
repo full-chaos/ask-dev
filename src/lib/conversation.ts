@@ -1,4 +1,5 @@
 import type { ConversationTurn, SubjectHint, SubjectRef } from "@/lib/contracts";
+import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { nonBlank } from "@/lib/presentation";
 
 /**
@@ -146,10 +147,33 @@ export const MAX_SUBJECT_HINTS_ON_WIRE = 50;
  */
 export const PARENT_SUBJECT_HINT_SOURCE = "ask_dev_parent_result_subject";
 
+/**
+ * A committed subject of the prior result whose kind this pin's REQUEST
+ * contract cannot carry (`SubjectHint.kind` is a closed enum; the result's
+ * `SubjectRef.kind` is open). It is named here so the caller can SAY the
+ * follow-up does not carry it, instead of dropping it silently.
+ */
+export type UnsentSubject = {
+    readonly kind: string;
+    readonly label: string;
+};
+
 export type ParentReference = {
     readonly parentResultId: string | undefined;
     readonly subjectHints: readonly SubjectHint[];
+    /** Committed subjects that could not be sent as hints; empty when none. */
+    readonly unsentSubjects: readonly UnsentSubject[];
 };
+
+/**
+ * The visible sentence for subjects a follow-up cannot carry, or `undefined`
+ * when nothing was lost. Plain text, no raw kind echoed beyond the label.
+ */
+export function unsentSubjectsNotice(unsent: readonly UnsentSubject[]): string | undefined {
+    if (unsent.length === 0) return undefined;
+    const labels = unsent.map((subject) => subject.label).join(", ");
+    return `This follow-up does not carry ${labels} as its subject, because its kind is not one the service accepts as a scope hint. Name it in the question if the answer should stay about it.`;
+}
 
 /**
  * Derives the carry for a re-ask from the chat timeline's own prior turns —
@@ -175,16 +199,37 @@ export function deriveParentReference(
 ): ParentReference {
     const last = priorTurns[priorTurns.length - 1];
     if (last === undefined || last.role !== "assistant" || last.outcome.kind !== "answered") {
-        return { parentResultId: undefined, subjectHints: [] };
+        return { parentResultId: undefined, subjectHints: [], unsentSubjects: [] };
     }
     const { result } = last.outcome;
-    const subjectHints: readonly SubjectHint[] = result.subject_resolution.committed
-        .slice(0, MAX_SUBJECT_HINTS_ON_WIRE)
-        .map((subject) => ({
-            kind: subject.kind,
-            id: subject.canonical_id,
-            label: subject.label,
-            source: PARENT_SUBJECT_HINT_SOURCE,
-        }));
-    return { parentResultId: result.result_id, subjectHints };
+    const unsentSubjects: UnsentSubject[] = [];
+    const allHints: readonly SubjectHint[] = result.subject_resolution.committed.flatMap(
+        (subject) => {
+            // The result's `SubjectRef.kind` is an open vocabulary but the
+            // request's `SubjectHint.kind` is closed: a kind this pin does
+            // not know cannot be sent as a hint, so it is omitted, never
+            // coerced or reworded. It is RECORDED in `unsentSubjects`, so the
+            // loss of scope is disclosed by the caller, never silent.
+            const kind = SUBJECT_KIND_VOCABULARY.find((known) => known === subject.kind);
+            if (kind === undefined) {
+                unsentSubjects.push({ kind: subject.kind, label: subject.label });
+                return [];
+            }
+            return [
+                {
+                    kind,
+                    id: subject.canonical_id,
+                    label: subject.label,
+                    source: PARENT_SUBJECT_HINT_SOURCE,
+                },
+            ];
+        },
+    );
+    // The wire cap must never drop a subject silently either: whatever it
+    // cuts joins `unsentSubjects`, so the same notice discloses it.
+    const sentHints = allHints.slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
+    for (const cut of allHints.slice(MAX_SUBJECT_HINTS_ON_WIRE)) {
+        unsentSubjects.push({ kind: cut.kind, label: cut.label ?? cut.id ?? cut.kind });
+    }
+    return { parentResultId: result.result_id, subjectHints: sentHints, unsentSubjects };
 }

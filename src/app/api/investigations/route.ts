@@ -14,6 +14,8 @@ import {
     type StructureSubjectKind,
     type SubjectHint,
 } from "@/lib/contracts";
+import { unsentSubjectsNotice, type UnsentSubject } from "@/lib/conversation";
+import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import { emitTelemetryEvent } from "@/lib/telemetry/emit";
 import {
     buildOutcomeEvent,
@@ -97,6 +99,13 @@ type InvestigateBody = {
      * — a parent that committed nothing still names itself.
      */
     readonly subjectHints?: unknown;
+    /**
+     * Committed subjects of the parent result that could not ride as hints
+     * (kind outside the request vocabulary, or cut by the 50-hint cap).
+     * `deriveParentReference` is the producer. The route builds the one
+     * scope-loss notice from it and returns it; nothing else builds one.
+     */
+    readonly unsentSubjects?: unknown;
     /**
      * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
      * `useStructureSelections` builds this client-side (never hand-typed by
@@ -306,6 +315,33 @@ class MalformedParentResultIdError extends Error {
  * reasoning as every other field this route parses.
  */
 const MAX_SUBJECT_HINTS = 50;
+const MAX_UNSENT_SUBJECTS = 500;
+const MAX_UNSENT_KIND_LENGTH = 128;
+
+function parseUnsentSubjects(value: unknown): readonly UnsentSubject[] {
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.length > MAX_UNSENT_SUBJECTS) {
+        throw new MalformedSubjectHintError();
+    }
+    return value.map((entry) => {
+        if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+            throw new MalformedSubjectHintError();
+        }
+        const record = entry as Record<string, unknown>;
+        const { kind, label } = record;
+        if (
+            !Object.keys(record).every((key) => key === "kind" || key === "label") ||
+            typeof kind !== "string" ||
+            codePointLength(kind) > MAX_UNSENT_KIND_LENGTH ||
+            typeof label !== "string" ||
+            codePointLength(label) < 1 ||
+            codePointLength(label) > MAX_SUBJECT_HINT_LABEL_LENGTH
+        ) {
+            throw new MalformedSubjectHintError();
+        }
+        return { kind, label };
+    });
+}
 const MAX_SUBJECT_HINT_ID_LENGTH = 256;
 const MAX_SUBJECT_HINT_LABEL_LENGTH = 512;
 const MAX_SUBJECT_HINT_SOURCE_LENGTH = 64;
@@ -656,6 +692,22 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
     }
 
+    let unsentSubjects: readonly UnsentSubject[];
+    try {
+        unsentSubjects = parseUnsentSubjects(body.unsentSubjects);
+    } catch {
+        return failureResponse(
+            requestStartedAt,
+            {
+                code: "acr_rejected_request",
+                message:
+                    "The supplied list of unsent subjects was malformed. The request was rejected rather than run without it.",
+                retryable: false,
+            },
+            400,
+        );
+    }
+
     // CHAOS-4171 standing order: emitted here, not where the selection was
     // made — this route is the one place a browser click becomes a server
     // log line (see `emitTelemetryEvent`'s own header for why). Independent
@@ -727,7 +779,21 @@ export async function POST(request: Request): Promise<NextResponse> {
                 subjectHintCount: subjectHints.length,
             }),
         );
-        return NextResponse.json({ result }, { status: 200 });
+        // The boundary: unrankable cohorts leave this route already withheld
+        // (typed marker, no rank/score/drivers), and the scope-loss notice is
+        // built here, once.
+        const scopeLossNotice = unsentSubjectsNotice(unsentSubjects);
+        const withheld = withholdUnrankableRankings(result);
+        return NextResponse.json(
+            {
+                result: withheld.result,
+                ...(withheld.rankingWithheld !== undefined
+                    ? { rankingWithheld: withheld.rankingWithheld }
+                    : {}),
+                ...(scopeLossNotice !== undefined ? { scopeLossNotice } : {}),
+            },
+            { status: 200 },
+        );
     } catch (error) {
         // This request's own carry state, known here regardless
         // of how `investigate()` failed — the same fields the success exit

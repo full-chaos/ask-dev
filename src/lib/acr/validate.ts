@@ -42,6 +42,10 @@ const ajv = new Ajv2020({
     strictTypes: false,
 });
 addFormats(ajv);
+// Annotation-only keyword the pinned schemas use for open vocabularies
+// ("documented values; a client must tolerate values it does not know").
+// It carries no validation semantics, so unknown values stay valid.
+ajv.addKeyword({ keyword: "x-documented-values", schemaType: "array" });
 for (const [name, schema] of Object.entries(CONTRACT_SCHEMAS)) ajv.addSchema(schema, name);
 
 export function validateContract(schema: ContractSchemaName, value: unknown): ValidationResult {

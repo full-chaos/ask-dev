@@ -1,18 +1,18 @@
 {
-  "source_commit": "c4945bb87534b1e2533657b0306be819c1ec38ab",
+  "source_commit": "57ecaa18d553b5a2a1d770d07b051f6eec2e535c",
   "source_repository": "full-chaos/dev-health-acr",
   "files": [
     {
       "path": "examples/context_fabric_investigation_request.v1.json",
-      "sha256": "b69cc1ce58c42e4bea2b12d9c0bc25c358482e6173d133d27b83c259992f7ad9"
+      "sha256": "247aa56043088d66f59f53d02dd5600981cc1f888731526d350cec8456f92992"
     },
     {
       "path": "examples/context_fabric_investigation_result.v1.json",
-      "sha256": "a9d8e9347abe92315f9a3dcee5ded3be460ee04e42d90cf9cdaf2e89bbf81553"
+      "sha256": "cdbfc5b5a51b3f614f61377e8be791a62923240b5b72fccf2ae6993521fc0324"
     },
     {
       "path": "examples/context_fabric_investigation_result_origin_state.v1.json",
-      "sha256": "3be78951c4a9c86c6ffea4c0c7966b4aad5f10100b6d4e571b8beeb06ed2dec6"
+      "sha256": "19f0e1b7a8d5d5d51340d94025f6586529a661ec340e4542007c0188663eabc6"
     },
     {
       "path": "examples/context_fabric_investigation_result_render_shapes.v1.json",
@@ -28,19 +28,19 @@
     },
     {
       "path": "schemas/context_fabric_common.v1.schema.json",
-      "sha256": "355d78d55d45e360f0cb0c74a974d6f33cb23a5291825b76818131fd3a30a8bd"
+      "sha256": "b13f020a61ffac46529a52350f5539311de08a7b835b48fac583b3408f6813d2"
     },
     {
       "path": "schemas/context_fabric_investigation_request.v1.schema.json",
-      "sha256": "db34def69344d0293cbd5e6373735bada695bbfdcaf40af2222c6456e6bb6486"
+      "sha256": "6dc3afe9e370bfef5da6d58a421bebade195b0ab9cdfa9c9409b160d42d6b507"
     },
     {
       "path": "schemas/context_fabric_investigation_result.v1.schema.json",
-      "sha256": "56243a35687300b06d56c38c7a4cd12eac0a5bb8a3b2fa2446d293bc09f3715b"
+      "sha256": "e47b6abc0e6faf4122eb66c62104bf4f30ed57f6d1727f635cb395e3bcdff4ff"
     },
     {
       "path": "schemas/error.v1.schema.json",
-      "sha256": "e9b2b0b0de2eb66bff9f9f893e30fdf70a3ebab30a063c07141ed4d5ea4f3384"
+      "sha256": "47affe9aad36abd9e66b2c9e6832fad6cc2ffe09b200a97a104f244b5f1a7eb7"
     }
   ]
 }

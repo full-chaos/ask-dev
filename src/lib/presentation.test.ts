@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import investigationResultSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import type {
-    CoverageState,
-    PriorSubjectReceiptDisposition,
-    SubjectCandidateState,
-} from "@/lib/contracts";
+import type { PriorSubjectReceiptDisposition } from "@/lib/contracts";
 import {
     candidateStateTone,
     coverageStateTone,
@@ -22,23 +18,31 @@ import {
  */
 const schemaDefs = investigationResultSchema.$defs as unknown as Record<
     string,
-    { properties: Record<string, { enum?: string[] }>; enum?: string[] }
+    {
+        properties: Record<string, { enum?: string[]; "x-documented-values"?: string[] }>;
+        enum?: string[];
+    }
 >;
+
+/** Closed vocabularies carry `enum`; open ones carry `x-documented-values`. */
+function declaredValues(prop: { enum?: string[]; "x-documented-values"?: string[] } | undefined) {
+    return prop?.enum ?? prop?.["x-documented-values"];
+}
 
 describe("presentation tone maps", () => {
     it("covers every coverage state the contract declares", () => {
-        const states = schemaDefs["SourceObservation"]!.properties["state"]!.enum;
+        const states = declaredValues(schemaDefs["SourceObservation"]!.properties["state"]);
         expect(states).toBeDefined();
         for (const state of states!) {
-            expect(coverageStateTone(state as CoverageState)).toBeTypeOf("string");
+            expect(coverageStateTone(state)).toBeTypeOf("string");
         }
     });
 
     it("covers every subject-candidate state the contract declares", () => {
-        const states = schemaDefs["SubjectCandidate"]!.properties["state"]!.enum;
+        const states = declaredValues(schemaDefs["SubjectCandidate"]!.properties["state"]);
         expect(states).toBeDefined();
         for (const state of states!) {
-            expect(candidateStateTone(state as SubjectCandidateState)).toBeTypeOf("string");
+            expect(candidateStateTone(state)).toBeTypeOf("string");
         }
     });
 

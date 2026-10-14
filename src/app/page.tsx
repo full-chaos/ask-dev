@@ -12,7 +12,12 @@ import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
 import { subjectForReceipt } from "@/lib/clarification";
 import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarification-popup";
-import { buildConversationTurns, deriveParentReference } from "@/lib/conversation";
+import {
+    buildConversationTurns,
+    deriveParentReference,
+    type UnsentSubject,
+} from "@/lib/conversation";
+import { type RankingWithheld, withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
@@ -85,7 +90,14 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
 
 type AssistantOutcome =
     | { readonly kind: "pending" }
-    | { readonly kind: "answered"; readonly result: InvestigationResult }
+    | {
+          readonly kind: "answered";
+          readonly result: InvestigationResult;
+          /** Typed marker beside the result: parts were withheld by the boundary. */
+          readonly rankingWithheld?: RankingWithheld;
+          /** Built once, server side (the route); rendered here, never rebuilt. */
+          readonly scopeLossNotice?: string;
+      }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 type Turn =
@@ -208,6 +220,8 @@ async function fireInvestigation(params: {
     // producer of both.
     readonly parentResultId: string | undefined;
     readonly subjectHints: readonly SubjectHint[];
+    /** Committed subjects that could not ride as hints; the route words the notice. */
+    readonly unsentSubjects: readonly UnsentSubject[];
     readonly structureReceiptFields: Record<string, unknown>;
     readonly selectionEvents: readonly PendingSelectionEvent[];
 }): Promise<AssistantOutcome> {
@@ -228,6 +242,9 @@ async function fireInvestigation(params: {
                     ? { parentResultId: params.parentResultId }
                     : {}),
                 ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
+                ...(params.unsentSubjects.length > 0
+                    ? { unsentSubjects: params.unsentSubjects }
+                    : {}),
                 ...params.structureReceiptFields,
                 ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
                 ...(params.selectionEvents.length > 0
@@ -251,7 +268,24 @@ async function fireInvestigation(params: {
                 },
             };
         }
-        return { kind: "answered", result: result as InvestigationResult };
+        const scopeLossNotice = (payload as { scopeLossNotice?: unknown }).scopeLossNotice;
+        // The route already withholds; applying the same idempotent boundary
+        // where the result enters client state keeps a caller that bypasses
+        // the route from ever holding the unwithheld form. The route's own
+        // marker (beside the result) wins: a second pass returns none.
+        const boundary = withholdUnrankableRankings(result as InvestigationResult);
+        const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
+        const rankingWithheld =
+            boundary.rankingWithheld ??
+            (typeof routeMarker === "object" && routeMarker !== null
+                ? (routeMarker as RankingWithheld)
+                : undefined);
+        return {
+            kind: "answered",
+            result: boundary.result,
+            ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
+            ...(typeof scopeLossNotice === "string" ? { scopeLossNotice } : {}),
+        };
     } catch (error) {
         // Never swallow: a dead server hop is itself a reportable outcome.
         console.error("investigation request failed", error);
@@ -421,7 +455,7 @@ export default function ChatPage() {
         const conversation = buildConversationTurns(turns);
         // Same "before the pending pair" capture, same source —
         // the immediately preceding turn's own result_id/committed subjects.
-        const { parentResultId, subjectHints } = deriveParentReference(turns);
+        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
         structureSelections.reset();
         // A plain new ask (the common composer path) must clear any
         // unconfirmed candidate picks left over from the turn it supersedes
@@ -473,6 +507,7 @@ export default function ChatPage() {
             conversation,
             parentResultId,
             subjectHints,
+            unsentSubjects,
             structureReceiptFields,
             selectionEvents,
         });
@@ -549,7 +584,7 @@ export default function ChatPage() {
         // `conversation` above — the receipts fired below already name a
         // subject explicitly, but the carry still applies (this re-ask
         // follows `result` exactly as much as a plain typed follow-up would).
-        const { parentResultId, subjectHints } = deriveParentReference(turns);
+        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
         // Read BEFORE any reset() — a plain synchronous read at the top of
         // this ONE call, never re-read after a loop iteration's own
         // re-render (codex review: a stale closure re-reading a hook after
@@ -624,6 +659,7 @@ export default function ChatPage() {
                 conversation,
                 parentResultId,
                 subjectHints,
+                unsentSubjects,
                 structureReceiptFields,
                 selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             }).then((outcome) => {
@@ -844,6 +880,13 @@ export default function ChatPage() {
                             }
 
                             const isLatest = turn.id === latestAssistantTurn?.id;
+                            // The turns BEFORE this assistant turn's own user
+                            // turn are what this follow-up derived its carry
+                            // from; say so when a subject could not ride along.
+                            const carryNotice =
+                                turn.outcome.kind === "answered"
+                                    ? turn.outcome.scopeLossNotice
+                                    : undefined;
 
                             return (
                                 <div
@@ -857,6 +900,14 @@ export default function ChatPage() {
                                     <p className="chat__meta">
                                         Ask Dev · {formatTurnTime(turn.createdAt)}
                                     </p>
+                                    {carryNotice === undefined ? null : (
+                                        <p
+                                            className="record__meta"
+                                            data-testid="follow-up-scope-not-carried"
+                                        >
+                                            {carryNotice}
+                                        </p>
+                                    )}
                                     {turn.outcome.kind === "pending" ? (
                                         <p className="chat__pending" role="status">
                                             Investigating…
@@ -941,6 +992,7 @@ export default function ChatPage() {
                                                     ? structureCandidateSelections.toggle
                                                     : undefined
                                             }
+                                            rankingWithheld={turn.outcome.rankingWithheld}
                                             result={turn.outcome.result}
                                             selectedCandidateReceiptIds={
                                                 isLatest
