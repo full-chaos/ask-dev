@@ -14,11 +14,11 @@
  * rewritten here.
  */
 import { isRankableSubjectKind } from "@/lib/cohort-ranking";
-import type { CohortMember, InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult } from "@/lib/contracts";
 
 export type RankingWithheld = {
     readonly reason: "subject_kind_not_ranked";
-    /** How many members had rank, score or drivers removed. */
+    /** How many cohort members were withheld with the cohort. */
     readonly members_affected: number;
 };
 
@@ -31,29 +31,77 @@ export function rankingWithheldOf(result: InvestigationResult): RankingWithheld 
     return (result as WithheldAwareResult).ranking_withheld;
 }
 
-const RANKING_FIELDS = [
-    "attention_rank",
-    "score",
-    "drivers",
-    "ranking_basis",
-    "ranking_computed",
+/**
+ * FAIL CLOSED BY ALLOWLIST. A withheld result is BUILT from the keep list
+ * below; every other field (cohort, render_shapes, claimed facts, drivers,
+ * and any field a future producer adds) is dropped. A new schema property is
+ * withheld until someone decides it here; a test walks the pinned result
+ * schema and fails on an undecided property, so a pin bump forces the call.
+ *
+ * Kept fields cannot carry member rank, score, driver weight or
+ * member-keyed ranking points: envelope ids, status and completeness,
+ * interpretation, coverage/versions/limitations/warnings, subject
+ * resolution (candidate offers, no scores), temporal and window fields,
+ * refusal/correction/semantic-reading notices. The answer prose
+ * (`deterministic_answer`, `direct_judgment`, `current_state`) is
+ * producer-owned and is not rewritten here.
+ */
+export const RESULT_FIELDS_KEPT = [
+    "schema_version",
+    "result_id",
+    "request_id",
+    "generated_at",
+    "status",
+    "question",
+    "interpretation",
+    "subject_resolution",
+    "direct_judgment",
+    "current_state",
+    "limitations",
+    "limitations_displaced",
+    "coverage",
+    "versions",
+    "deterministic_answer",
+    "warnings",
+    "reused",
+    "temporal",
+    "effective_evidence_window",
+    "window_clarification",
+    "completeness",
+    "refusal_basis",
+    "status_correction",
+    "semantic_reading",
 ] as const;
 
-function hasRankingFields(member: CohortMember): boolean {
-    const record = member as Record<string, unknown>;
-    return RANKING_FIELDS.some((field) => record[field] !== undefined);
-}
+/** Required arrays the contract needs present; withheld to `[]`. */
+export const RESULT_FIELDS_DROPPED_TO_EMPTY = [
+    "strongest_pressures",
+    "drivers",
+    "remaining_work",
+    "readiness_gaps",
+    "paths",
+    "conflicts",
+    "evidence_ref_ids",
+    "claimed_facts",
+] as const;
 
-function stripped(member: CohortMember): CohortMember {
-    const copy: Record<string, unknown> = { ...member };
-    for (const field of RANKING_FIELDS) delete copy[field];
-    return copy as CohortMember;
-}
+/** Optional fields removed outright (they can name or order members). */
+export const RESULT_FIELDS_DROPPED = [
+    "answer_plan",
+    "cohort",
+    "structure_needs",
+    "confirmed_structure",
+    "structure_offer_snapshot",
+    "render_shapes",
+    "fact_scope_census",
+    "fact_scope_census_omitted",
+    "evidence_ref_labels",
+] as const;
 
 /**
  * Returns the result unchanged when its cohort (kind and every member subject
- * kind) is rankable; otherwise a copy whose members carry no rank, score,
- * ranking basis or drivers, plus the `ranking_withheld` marker. Idempotent.
+ * kind) is rankable; otherwise a result built from the keep list only, plus
+ * the `ranking_withheld` marker. Idempotent.
  */
 export function withholdUnrankableRankings(result: InvestigationResult): WithheldAwareResult {
     const cohort = result.cohort;
@@ -62,15 +110,16 @@ export function withholdUnrankableRankings(result: InvestigationResult): Withhel
         isRankableSubjectKind(cohort.kind) &&
         cohort.members.every((member) => isRankableSubjectKind(member.subject.kind));
     if (rankable) return result;
-    const existing = rankingWithheldOf(result);
-    const affected = cohort.members.filter(hasRankingFields).length;
-    if (affected === 0 && existing !== undefined) return result;
-    return {
-        ...result,
-        cohort: { ...cohort, members: cohort.members.map(stripped) },
-        ranking_withheld: {
-            reason: "subject_kind_not_ranked",
-            members_affected: affected + (existing?.members_affected ?? 0),
-        },
-    };
+    const source = result as unknown as Record<string, unknown>;
+    const built: Record<string, unknown> = {};
+    for (const field of RESULT_FIELDS_KEPT) {
+        if (source[field] !== undefined) built[field] = source[field];
+    }
+    for (const field of RESULT_FIELDS_DROPPED_TO_EMPTY) built[field] = [];
+    built.ranking_withheld = {
+        reason: "subject_kind_not_ranked",
+        members_affected:
+            cohort.members.length + (rankingWithheldOf(result)?.members_affected ?? 0),
+    } satisfies RankingWithheld;
+    return built as unknown as WithheldAwareResult;
 }

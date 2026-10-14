@@ -15,6 +15,7 @@ import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { candidateStateTone, coverageStateTone, type Tone } from "@/lib/presentation";
 import { TELEMETRY_VOCABULARIES } from "@/lib/telemetry/outcome";
 import { DECIDED_OPEN_VOCABULARIES } from "@/test/open-vocabulary-decisions";
+import { findRankReads } from "@/test/rank-read-scan";
 
 /**
  * The guard for the open-vocabulary class: the pinned acr schemas declare many
@@ -232,8 +233,6 @@ describe("ranking withheld boundary guard", () => {
             }
             return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) ? [full] : [];
         });
-    const MEMBER_RANK_READ =
-        /\.(attention_rank|ranking_computed|ranking_basis)\b|member\??\.(score|drivers)\b|members\[0\]!?\.(score|drivers)\b/;
     const ALLOWED_READERS = [
         "lib/cohort-ranking.ts",
         "lib/ranking-withheld.ts",
@@ -245,7 +244,7 @@ describe("ranking withheld boundary guard", () => {
     it("only the decided files read member rank, score or driver fields", () => {
         const offenders = walk(root)
             .map((file) => path.relative(root, file))
-            .filter((rel) => MEMBER_RANK_READ.test(readFileSync(path.join(root, rel), "utf8")))
+            .filter((rel) => findRankReads(readFileSync(path.join(root, rel), "utf8")).length > 0)
             .filter((rel) => !ALLOWED_READERS.includes(rel));
         expect(offenders).toEqual([]);
     });

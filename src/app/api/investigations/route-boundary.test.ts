@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/investigations/route";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
+import shapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { InvestigationResult } from "@/lib/contracts";
 
 /**
@@ -70,6 +71,26 @@ describe("route boundary", () => {
         expect(text).not.toContain('"score"');
         const payload = JSON.parse(text) as { result: { ranking_withheld?: { reason: string } } };
         expect(payload.result.ranking_withheld?.reason).toBe("subject_kind_not_ranked");
+    });
+
+    it("returns no render-shape value, label or subject id for a person cohort", async () => {
+        const shaped = JSON.parse(
+            JSON.stringify(shapesResult)
+                .replaceAll("team:CHAOS", "person:ada")
+                .replaceAll('"kind":"team"', '"kind":"person"'),
+        ) as unknown;
+        stubAcr(shaped);
+        const response = await POST(post({ question: "who needs attention?" }));
+        const text = await response.text();
+        for (const leak of [
+            "cohort_member_score",
+            "cohort_driver_weight_contributed",
+            "person:ada",
+            '"render_shapes":',
+        ]) {
+            expect(text).not.toContain(leak);
+        }
+        expect(text).toContain("ranking_withheld");
     });
 
     it("leaves a team cohort's ranking untouched", async () => {
