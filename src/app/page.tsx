@@ -17,7 +17,7 @@ import {
     deriveParentReference,
     type UnsentSubject,
 } from "@/lib/conversation";
-import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
+import { type RankingWithheld, withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
@@ -93,6 +93,8 @@ type AssistantOutcome =
     | {
           readonly kind: "answered";
           readonly result: InvestigationResult;
+          /** Typed marker beside the result: parts were withheld by the boundary. */
+          readonly rankingWithheld?: RankingWithheld;
           /** Built once, server side (the route); rendered here, never rebuilt. */
           readonly scopeLossNotice?: string;
       }
@@ -267,12 +269,21 @@ async function fireInvestigation(params: {
             };
         }
         const scopeLossNotice = (payload as { scopeLossNotice?: unknown }).scopeLossNotice;
+        // The route already withholds; applying the same idempotent boundary
+        // where the result enters client state keeps a caller that bypasses
+        // the route from ever holding the unwithheld form. The route's own
+        // marker (beside the result) wins: a second pass returns none.
+        const boundary = withholdUnrankableRankings(result as InvestigationResult);
+        const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
+        const rankingWithheld =
+            boundary.rankingWithheld ??
+            (typeof routeMarker === "object" && routeMarker !== null
+                ? (routeMarker as RankingWithheld)
+                : undefined);
         return {
             kind: "answered",
-            // The route already withholds; applying the same idempotent
-            // boundary where the result enters client state keeps a caller
-            // that bypasses the route from ever holding the unwithheld form.
-            result: withholdUnrankableRankings(result as InvestigationResult),
+            result: boundary.result,
+            ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
             ...(typeof scopeLossNotice === "string" ? { scopeLossNotice } : {}),
         };
     } catch (error) {
@@ -981,6 +992,7 @@ export default function ChatPage() {
                                                     ? structureCandidateSelections.toggle
                                                     : undefined
                                             }
+                                            rankingWithheld={turn.outcome.rankingWithheld}
                                             result={turn.outcome.result}
                                             selectedCandidateReceiptIds={
                                                 isLatest

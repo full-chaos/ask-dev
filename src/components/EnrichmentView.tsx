@@ -1,5 +1,6 @@
 "use client";
 
+import type { RankingWithheld } from "@/lib/ranking-withheld";
 import { Renderer } from "@openuidev/react-lang";
 import { useMemo, useState } from "react";
 
@@ -31,6 +32,8 @@ export function renderFailureFor(
 
 export type EnrichmentViewProps = {
     readonly result: InvestigationResult;
+    /** Present when the Workbench withheld parts of `result`. */
+    readonly rankingWithheld?: RankingWithheld | undefined;
     /** The presentation composition. Model-authored later; supplied by a caller today. */
     readonly composition: string;
     /** CHAOS-4343: forwarded verbatim to `DeterministicAnswerView`'s own props of the same names. */
@@ -68,6 +71,7 @@ export type EnrichmentViewProps = {
  */
 export function EnrichmentView({
     result,
+    rankingWithheld,
     composition,
     selectedCandidateReceiptIds,
     onToggleCandidate,
@@ -110,6 +114,22 @@ export function EnrichmentView({
     //
     // Without this, an enrichment render of a clarification showed an empty
     // answer with no way to re-ask — a choiceless dead end.
+    // A withheld result has emptied required lists. Composing an enriched
+    // answer from them would present withheld parts as absent, so a withheld
+    // result routes to the deterministic view, which renders them as withheld.
+    if (rankingWithheld !== undefined && !isClarification) {
+        return (
+            <DeterministicAnswerView
+                chosenSubject={chosenSubject}
+                onConfirmCandidates={onConfirmCandidates}
+                onToggleCandidate={onToggleCandidate}
+                pending={pending}
+                rankingWithheld={rankingWithheld}
+                result={result}
+                selectedCandidateReceiptIds={selectedCandidateReceiptIds}
+            />
+        );
+    }
     if (isClarification) {
         return (
             <div>
@@ -135,6 +155,7 @@ export function EnrichmentView({
                     onConfirmCandidates={onConfirmCandidates}
                     onToggleCandidate={onToggleCandidate}
                     pending={pending}
+                    rankingWithheld={rankingWithheld}
                     result={result}
                     selectedCandidateReceiptIds={selectedCandidateReceiptIds}
                 />
@@ -178,6 +199,7 @@ export function EnrichmentView({
                     onConfirmCandidates={onConfirmCandidates}
                     onToggleCandidate={onToggleCandidate}
                     pending={pending}
+                    rankingWithheld={rankingWithheld}
                     result={result}
                     selectedCandidateReceiptIds={selectedCandidateReceiptIds}
                 />

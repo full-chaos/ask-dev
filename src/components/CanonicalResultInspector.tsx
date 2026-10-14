@@ -1,3 +1,5 @@
+import type { RankingWithheld } from "@/lib/ranking-withheld";
+import { WithheldPart } from "@/components/WithheldPart";
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
 import { RankingWithheldNotice } from "@/components/RankingWithheldNotice";
@@ -12,6 +14,8 @@ import { formatConfidence, humanizeTerm } from "@/lib/presentation";
 
 export type CanonicalResultInspectorProps = {
     readonly result: InvestigationResult;
+    /** Present when `result` was transformed by the Workbench boundary. */
+    readonly rankingWithheld?: RankingWithheld | undefined;
 };
 
 function subjectLabel(subject: SubjectRef): string {
@@ -69,11 +73,14 @@ function PathRecord({
  * Nothing here is filtered for readability. If a field is in the result, it is
  * on this page.
  */
-export function CanonicalResultInspector({ result }: CanonicalResultInspectorProps) {
+export function CanonicalResultInspector({
+    result,
+    rankingWithheld,
+}: CanonicalResultInspectorProps) {
     const interpretation = result.interpretation;
     return (
         <article aria-label="Canonical result inspector">
-            <RankingWithheldNotice result={result} />
+            <RankingWithheldNotice rankingWithheld={rankingWithheld} />
             <section className="panel" aria-labelledby="goal-title">
                 <h2 className="panel__title" id="goal-title">
                     Analytical goal and scope
@@ -243,7 +250,9 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                 <h2 className="panel__title" id="paths-title">
                     Relationship and evidence paths
                 </h2>
-                {result.paths.length === 0 ? (
+                {rankingWithheld !== undefined ? (
+                    <WithheldPart label="Relationship and evidence paths" />
+                ) : result.paths.length === 0 ? (
                     <p className="panel__empty">No paths were returned.</p>
                 ) : (
                     <ul className="stack">
@@ -262,7 +271,9 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                 <h2 className="panel__title" id="facts-title">
                     Canonical facts
                 </h2>
-                {result.claimed_facts.length === 0 ? (
+                {rankingWithheld !== undefined ? (
+                    <WithheldPart label="Canonical facts" />
+                ) : result.claimed_facts.length === 0 ? (
                     <p className="panel__empty">No canonical facts were claimed.</p>
                 ) : (
                     <ul className="stack stack--tight">
@@ -322,7 +333,9 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
                     Raw contract payload
                 </h2>
                 <p className="record__meta">
-                    The immutable result exactly as ACR returned it, after schema validation.
+                    {rankingWithheld === undefined
+                        ? "The immutable result exactly as ACR returned it, after schema validation."
+                        : "The result as transformed by the Workbench: unrankable cohort parts were removed and required lists emptied before display. This is not the exact ACR response."}
                 </p>
                 <pre className="raw-payload">
                     <code>{JSON.stringify(result, null, 2)}</code>

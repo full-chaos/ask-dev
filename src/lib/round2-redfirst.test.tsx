@@ -28,7 +28,12 @@ function personResult(): InvestigationResult {
 describe("P1: CanonicalResultInspector on a person cohort", () => {
     it("shows the withheld marker and no rank or score numbers", () => {
         const withheld = withholdUnrankableRankings(personResult());
-        const { container } = render(<CanonicalResultInspector result={withheld} />);
+        const { container } = render(
+            <CanonicalResultInspector
+                rankingWithheld={withheld.rankingWithheld}
+                result={withheld.result}
+            />,
+        );
         expect(container.textContent).not.toContain("attention_rank");
         expect(container.textContent).not.toContain('"score"');
         expect(screen.getAllByText(/Ranking not shown/).length).toBeGreaterThan(0);
@@ -36,7 +41,7 @@ describe("P1: CanonicalResultInspector on a person cohort", () => {
 
     it("the boundary is idempotent", () => {
         const once = withholdUnrankableRankings(personResult());
-        expect(withholdUnrankableRankings(once)).toEqual(once);
+        expect(withholdUnrankableRankings(once.result)).toEqual({ result: once.result });
     });
 });
 

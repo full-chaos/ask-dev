@@ -1,3 +1,4 @@
+import type { RankingWithheld } from "@/lib/ranking-withheld";
 import { useId } from "react";
 
 import { Badge } from "@/components/Badge";
@@ -15,6 +16,12 @@ import {
 
 export type CompletenessPanelProps = {
     readonly completeness: AnswerCompleteness;
+    /**
+     * Present when the Workbench withheld parts of this answer. Status and
+     * completeness must then NOT read Complete: a withheld part is unknown
+     * here, not complete.
+     */
+    readonly rankingWithheld?: RankingWithheld | undefined;
 };
 
 /**
@@ -112,7 +119,8 @@ function RefinementStep({
  * same name: what must reach the reader is the service's own limitation
  * sentence, not the closed-vocabulary token.
  */
-export function CompletenessPanel({ completeness }: CompletenessPanelProps) {
+export function CompletenessPanel({ completeness, rankingWithheld }: CompletenessPanelProps) {
+    const withheld = rankingWithheld !== undefined;
     const idPrefix = useId();
     const outcomes = completeness.outcomes ?? [];
     return (
@@ -125,22 +133,39 @@ export function CompletenessPanel({ completeness }: CompletenessPanelProps) {
                 Completeness
             </h2>
             <div className="chip-row" data-testid="completeness-chip-row">
-                <Badge
-                    tone={statusTone(completeness.terminal_status)}
-                    title={`terminal_status: ${completeness.terminal_status}`}
-                >
-                    {humanizeTerm(completeness.terminal_status)}
-                </Badge>
-                <Badge
-                    tone={completenessStateTone(completeness.state)}
-                    title={`state: ${completeness.state}`}
-                >
-                    {humanizeTerm(completeness.state)}
-                </Badge>
+                {withheld ? (
+                    <Badge
+                        tone="warn"
+                        title={`withheld by the Workbench; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
+                    >
+                        Withheld
+                    </Badge>
+                ) : (
+                    <>
+                        <Badge
+                            tone={statusTone(completeness.terminal_status)}
+                            title={`terminal_status: ${completeness.terminal_status}`}
+                        >
+                            {humanizeTerm(completeness.terminal_status)}
+                        </Badge>
+                        <Badge
+                            tone={completenessStateTone(completeness.state)}
+                            title={`state: ${completeness.state}`}
+                        >
+                            {humanizeTerm(completeness.state)}
+                        </Badge>
+                    </>
+                )}
             </div>
             <p className="record__meta">
                 {`${String(completeness.claimed_facts_count)} claimed fact${completeness.claimed_facts_count === 1 ? "" : "s"} · ${String(completeness.rows_count)} row${completeness.rows_count === 1 ? "" : "s"}`}
             </p>
+            {withheld ? (
+                <p className="coverage__reason" data-testid="completeness-withheld">
+                    Parts of this answer were withheld by the Workbench, so completeness is not
+                    stated here.
+                </p>
+            ) : null}
             {completeness.terminal_reason !== undefined ? (
                 <p className="coverage__reason" data-testid="completeness-terminal-reason">
                     {humanizeTerm(completeness.terminal_reason)}

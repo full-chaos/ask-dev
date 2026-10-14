@@ -8,7 +8,7 @@
  * to leak, so the removal happens once, where a result enters client state
  * (route response, then `fireInvestigation`), and every later consumer reads
  * the withheld form by construction. The removal is recorded in a typed
- * marker (`ranking_withheld`) that panels read; it is never silent.
+ * marker (`rankingWithheld`, beside the result) that panels read; it is never silent.
  *
  * Service prose (`deterministic_answer`, ...) is producer-owned and is not
  * rewritten here.
@@ -22,14 +22,16 @@ export type RankingWithheld = {
     readonly members_affected: number;
 };
 
-export type WithheldAwareResult = InvestigationResult & {
-    readonly ranking_withheld?: RankingWithheld;
+/**
+ * What the boundary returns. The marker travels BESIDE the result, never
+ * inside it: the pinned result schema is `additionalProperties: false`, so a
+ * marker inside would make the withheld result fail its own contract.
+ */
+export type WithheldBoundary = {
+    readonly result: InvestigationResult;
+    /** Present exactly when the result was rebuilt from the keep list. */
+    readonly rankingWithheld?: RankingWithheld;
 };
-
-/** The marker a result carries, or `undefined` when nothing was withheld. */
-export function rankingWithheldOf(result: InvestigationResult): RankingWithheld | undefined {
-    return (result as WithheldAwareResult).ranking_withheld;
-}
 
 /**
  * FAIL CLOSED BY ALLOWLIST. A withheld result is BUILT from the keep list
@@ -101,25 +103,27 @@ export const RESULT_FIELDS_DROPPED = [
 /**
  * Returns the result unchanged when its cohort (kind and every member subject
  * kind) is rankable; otherwise a result built from the keep list only, plus
- * the `ranking_withheld` marker. Idempotent.
+ * a typed `rankingWithheld` marker BESIDE it. Idempotent on the result (a
+ * second pass changes nothing and returns no marker; keep the first one).
  */
-export function withholdUnrankableRankings(result: InvestigationResult): WithheldAwareResult {
+export function withholdUnrankableRankings(result: InvestigationResult): WithheldBoundary {
     const cohort = result.cohort;
-    if (cohort === undefined) return result;
+    if (cohort === undefined) return { result };
     const rankable =
         isRankableSubjectKind(cohort.kind) &&
         cohort.members.every((member) => isRankableSubjectKind(member.subject.kind));
-    if (rankable) return result;
+    if (rankable) return { result };
     const source = result as unknown as Record<string, unknown>;
     const built: Record<string, unknown> = {};
     for (const field of RESULT_FIELDS_KEPT) {
         if (source[field] !== undefined) built[field] = source[field];
     }
     for (const field of RESULT_FIELDS_DROPPED_TO_EMPTY) built[field] = [];
-    built.ranking_withheld = {
-        reason: "subject_kind_not_ranked",
-        members_affected:
-            cohort.members.length + (rankingWithheldOf(result)?.members_affected ?? 0),
-    } satisfies RankingWithheld;
-    return built as unknown as WithheldAwareResult;
+    return {
+        result: built as unknown as InvestigationResult,
+        rankingWithheld: {
+            reason: "subject_kind_not_ranked",
+            members_affected: cohort.members.length,
+        },
+    };
 }

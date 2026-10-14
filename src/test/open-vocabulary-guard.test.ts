@@ -253,6 +253,9 @@ describe("ranking withheld boundary guard", () => {
         const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");
         const page = readFileSync(path.join(root, "app/page.tsx"), "utf8");
         expect(route).toContain("withholdUnrankableRankings(result)");
+        expect(route).toContain("rankingWithheld: withheld.rankingWithheld");
+        const workbench = readFileSync(path.join(root, "app/workbench/page.tsx"), "utf8");
+        expect(workbench).toContain("withholdUnrankableRankings(result as InvestigationResult)");
         expect(route).not.toMatch(/NextResponse\.json\(\{\s*result\s*[,}]/);
         expect(page).toContain("withholdUnrankableRankings(result as InvestigationResult)");
         expect(page).not.toMatch(/result:\s*result as InvestigationResult/);

@@ -1,3 +1,5 @@
+import type { RankingWithheld } from "@/lib/ranking-withheld";
+import { WithheldPart } from "@/components/WithheldPart";
 import { useId } from "react";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
@@ -38,6 +40,8 @@ import { hasVetoedStructureConfirmation, structureMemberLabel } from "@/lib/stru
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;
+    /** Typed marker the result boundary returns beside the result. */
+    readonly rankingWithheld?: RankingWithheld | undefined;
     /**
      * CHAOS-4343 items 1/2: the candidate receipt ids selected so far on
      * THIS result, owned by the caller — same "shared across every
@@ -171,6 +175,7 @@ const EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS: ReadonlySet<string> = new Set();
 
 export function DeterministicAnswerView({
     result,
+    rankingWithheld,
     selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
     onToggleCandidate,
     onConfirmCandidates,
@@ -307,6 +312,7 @@ export function DeterministicAnswerView({
             // clarification-chip control.
             <article aria-label="Deterministic answer" data-state={result.status}>
                 {notice}
+                <RankingWithheldNotice rankingWithheld={rankingWithheld} />
                 {
                     // codex finding (CHAOS-4171 PR3): `prior_subject_receipt_dispositions`
                     // can be present on a `clarification_required` result too — a
@@ -351,7 +357,10 @@ export function DeterministicAnswerView({
                 })()}
                 <SemanticReadingNotice semanticReading={result.semantic_reading} />
                 <CoveragePanel coverage={result.coverage} />
-                <CompletenessPanel completeness={result.completeness} />
+                <CompletenessPanel
+                    completeness={result.completeness}
+                    rankingWithheld={rankingWithheld}
+                />
                 <AnswerPlanPanel answerPlan={result.answer_plan} />
                 {
                     // codex review round 2 (CHAOS-4581): extracting the old
@@ -408,7 +417,7 @@ export function DeterministicAnswerView({
                 // -> rich charts -> collapsed evidence.
             }
             <AnswerPanel result={result} />
-            <RankingWithheldNotice result={result} />
+            <RankingWithheldNotice rankingWithheld={rankingWithheld} />
             {
                 // codex review round 3 (CHAOS-4581, preserved here): the
                 // ticket specifies TWO distinct sequences for the CHARTS
@@ -430,13 +439,13 @@ export function DeterministicAnswerView({
             <WorkItemStatusPanel result={result} />
             {cohortRanking(result.interpretation.shape, result.cohort).state === "rows" ? (
                 <>
-                    <DriversPanel result={result} />
+                    <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                     <FactRowsPanels facts={result.claimed_facts} result={result} />
                 </>
             ) : (
                 <>
                     <FactRowsPanels facts={result.claimed_facts} result={result} />
-                    <DriversPanel result={result} />
+                    <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                 </>
             )}
             {
@@ -451,7 +460,10 @@ export function DeterministicAnswerView({
             }
             <div className="strip">
                 <CoveragePanel coverage={result.coverage} />
-                <CompletenessPanel completeness={result.completeness} />
+                <CompletenessPanel
+                    completeness={result.completeness}
+                    rankingWithheld={rankingWithheld}
+                />
                 <LimitationsPanel
                     limitations={dedupedFindings.limitations}
                     warnings={result.warnings}
@@ -466,18 +478,21 @@ export function DeterministicAnswerView({
             <FindingsPanel
                 evidenceRefLabels={result.evidence_ref_labels}
                 title="Remaining work"
+                withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.remaining_work}
                 emptyMessage="No remaining work was reported."
             />
             <FindingsPanel
                 evidenceRefLabels={result.evidence_ref_labels}
                 title="Readiness gaps"
+                withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.readiness_gaps}
                 emptyMessage="No readiness gaps were reported."
             />
             <FindingsPanel
                 evidenceRefLabels={result.evidence_ref_labels}
                 title="Conflicts"
+                withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.conflicts}
                 emptyMessage="No conflicting evidence was reported."
             />
@@ -486,7 +501,9 @@ export function DeterministicAnswerView({
                 <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>
                     Evidence references
                 </h2>
-                {result.evidence_ref_ids.length === 0 ? (
+                {rankingWithheld !== undefined ? (
+                    <WithheldPart label="Evidence references" />
+                ) : result.evidence_ref_ids.length === 0 ? (
                     <p className="panel__empty">No evidence was referenced.</p>
                 ) : (
                     <EvidenceReferences

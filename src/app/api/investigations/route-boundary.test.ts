@@ -69,8 +69,12 @@ describe("route boundary", () => {
         const text = await response.text();
         expect(text).not.toContain("attention_rank");
         expect(text).not.toContain('"score"');
-        const payload = JSON.parse(text) as { result: { ranking_withheld?: { reason: string } } };
-        expect(payload.result.ranking_withheld?.reason).toBe("subject_kind_not_ranked");
+        const payload = JSON.parse(text) as {
+            result: Record<string, unknown>;
+            rankingWithheld?: { reason: string };
+        };
+        expect(payload.rankingWithheld?.reason).toBe("subject_kind_not_ranked");
+        expect(payload.result).not.toHaveProperty("ranking_withheld");
     });
 
     it("returns no render-shape value, label or subject id for a person cohort", async () => {
@@ -90,7 +94,7 @@ describe("route boundary", () => {
         ]) {
             expect(text).not.toContain(leak);
         }
-        expect(text).toContain("ranking_withheld");
+        expect(text).toContain("rankingWithheld");
     });
 
     it("leaves a team cohort's ranking untouched", async () => {
@@ -98,7 +102,7 @@ describe("route boundary", () => {
         const response = await POST(post({ question: "status?" }));
         const text = await response.text();
         expect(text).toContain("attention_rank");
-        expect(JSON.parse(text)).not.toHaveProperty("result.ranking_withheld");
+        expect(JSON.parse(text)).not.toHaveProperty("rankingWithheld");
     });
 
     it("builds the scope-loss notice once, server side, from the unsent subjects", async () => {

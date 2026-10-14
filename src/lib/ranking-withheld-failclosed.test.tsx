@@ -49,16 +49,26 @@ describe("fail-closed withholding (allowlist)", () => {
         ]) {
             expect(text).not.toContain(leak);
         }
-        expect(text).toContain("ranking_withheld");
+        expect(text).toContain("rankingWithheld");
     });
 
     it("(a) the inspector and answer view render the kept-only result", () => {
         const withheld = withholdUnrankableRankings(personResult());
-        const inspector = render(<CanonicalResultInspector result={withheld} />);
+        const inspector = render(
+            <CanonicalResultInspector
+                rankingWithheld={withheld.rankingWithheld}
+                result={withheld.result}
+            />,
+        );
         expect(inspector.container.textContent).not.toContain("person:ada");
         expect(inspector.container.textContent).toMatch(/Ranking not shown/);
         inspector.unmount();
-        const view = render(<DeterministicAnswerView result={withheld} />);
+        const view = render(
+            <DeterministicAnswerView
+                rankingWithheld={withheld.rankingWithheld}
+                result={withheld.result}
+            />,
+        );
         expect(view.container.textContent).not.toContain("person:ada");
     });
 
@@ -84,8 +94,9 @@ describe("fail-closed withholding (allowlist)", () => {
     it("(d) a rankable cohort result is returned unchanged", () => {
         const before = structuredClone(teamResult);
         const after = withholdUnrankableRankings(teamResult);
-        expect(after).toEqual(before);
-        expect(after).toBe(teamResult);
+        expect(after.result).toEqual(before);
+        expect(after.result).toBe(teamResult);
+        expect(after.rankingWithheld).toBeUndefined();
     });
 
     it("is idempotent and drops a field a future producer adds", () => {
@@ -94,7 +105,7 @@ describe("fail-closed withholding (allowlist)", () => {
             member_scores_v9: [{ s: 1 }],
         });
         expect(JSON.stringify(once)).not.toContain("member_scores_v9");
-        expect(withholdUnrankableRankings(once)).toEqual(once);
+        expect(withholdUnrankableRankings(once.result)).toEqual({ result: once.result });
     });
 });
 

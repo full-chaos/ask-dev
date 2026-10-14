@@ -783,9 +783,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         // (typed marker, no rank/score/drivers), and the scope-loss notice is
         // built here, once.
         const scopeLossNotice = unsentSubjectsNotice(unsentSubjects);
+        const withheld = withholdUnrankableRankings(result);
         return NextResponse.json(
             {
-                result: withholdUnrankableRankings(result),
+                result: withheld.result,
+                ...(withheld.rankingWithheld !== undefined
+                    ? { rankingWithheld: withheld.rankingWithheld }
+                    : {}),
                 ...(scopeLossNotice !== undefined ? { scopeLossNotice } : {}),
             },
             { status: 200 },
