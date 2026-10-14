@@ -1,4 +1,5 @@
 import type { ConversationTurn, SubjectHint, SubjectRef } from "@/lib/contracts";
+import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { nonBlank } from "@/lib/presentation";
 
 /**
@@ -179,12 +180,22 @@ export function deriveParentReference(
     }
     const { result } = last.outcome;
     const subjectHints: readonly SubjectHint[] = result.subject_resolution.committed
-        .slice(0, MAX_SUBJECT_HINTS_ON_WIRE)
-        .map((subject) => ({
-            kind: subject.kind,
-            id: subject.canonical_id,
-            label: subject.label,
-            source: PARENT_SUBJECT_HINT_SOURCE,
-        }));
+        .flatMap((subject) => {
+            // The result's `SubjectRef.kind` is an open vocabulary but the
+            // request's `SubjectHint.kind` is closed: a kind this pin does
+            // not know cannot be sent as a hint, so it is omitted, never
+            // coerced or reworded.
+            const kind = SUBJECT_KIND_VOCABULARY.find((known) => known === subject.kind);
+            if (kind === undefined) return [];
+            return [
+                {
+                    kind,
+                    id: subject.canonical_id,
+                    label: subject.label,
+                    source: PARENT_SUBJECT_HINT_SOURCE,
+                },
+            ];
+        })
+        .slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
     return { parentResultId: result.result_id, subjectHints };
 }

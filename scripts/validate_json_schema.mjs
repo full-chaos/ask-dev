@@ -63,6 +63,18 @@ const ajv = new Ajv2020({
     strictTypes: false,
 });
 addFormats(ajv);
+// The pinned schemas declare open vocabularies with `x-documented-values`
+// (src/lib/acr/validate.ts registers it as a pure annotation, because the
+// wire must tolerate unknown values). This validator is the corpus AUTHORING
+// guard, not the wire: a corpus row that names a value outside the documented
+// set (e.g. `answer.family`) is a typo or a stale expectation, so here the
+// documented set is enforced as if closed. Stricter than the wire on purpose.
+ajv.addKeyword({
+    keyword: "x-documented-values",
+    schemaType: "array",
+    validate: (documented, data) => typeof data !== "string" || documented.includes(data),
+    errors: false,
+});
 
 // Register every schema file from both directories up front (by its own
 // bare filename), so a $ref from one directory into the other resolves --

@@ -77,18 +77,20 @@ describe("schema validation negative controls", () => {
     // The red half of red->green. If the validator ever stops rejecting these,
     // the round-trip test above proves nothing.
 
-    it("rejects a coverage state outside the contract's closed vocabulary", () => {
+    it("tolerates a coverage state outside the contract's documented (open) vocabulary", () => {
         // `retrieval_degraded` reads like a coverage state but appears nowhere
         // in the ACR contracts or service. The contract expresses that concept
         // as `coverage.partial` plus `degraded_reasons`, which the "degraded"
-        // scenario uses. This control keeps the invented term out.
+        // scenario uses. The pinned schema declares `state` open
+        // (`x-documented-values`: "a client must tolerate values it does not
+        // know"), so the term validates; presentation reads it as neutral.
         const tainted = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
         const coverage = tainted["coverage"] as { sources: { state: string }[] };
         coverage.sources[0]!.state = "retrieval_degraded";
 
         const validation = validateContract(RESULT_SCHEMA, tainted);
-        expect(validation.valid).toBe(false);
-        expect(validation.errors.join("; ")).toContain("/coverage/sources/0/state");
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 
     it("rejects a result that drops a required field", () => {
@@ -100,13 +102,13 @@ describe("schema validation negative controls", () => {
         expect(validation.errors.join("; ")).toContain("reused");
     });
 
-    it("rejects a subject-candidate state outside the contract's closed vocabulary", () => {
+    it("tolerates a subject-candidate state outside the contract's documented (open) vocabulary", () => {
         const tainted = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
         const resolution = tainted["subject_resolution"] as { candidates: { state: string }[] };
         resolution.candidates[0]!.state = "probably";
 
         const validation = validateContract(RESULT_SCHEMA, tainted);
-        expect(validation.valid).toBe(false);
-        expect(validation.errors.join("; ")).toContain("/subject_resolution/candidates/0/state");
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 });

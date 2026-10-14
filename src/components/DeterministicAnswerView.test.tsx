@@ -351,7 +351,7 @@ describe("DeterministicAnswerView: a refused continuation still shows the servic
             limitations: [
                 "The previous turn's context could not be verified, so this answer covers the requested window only.",
             ],
-        } as unknown as InvestigationResult;
+        };
     }
 
     it("renders the limitation as visible text", () => {

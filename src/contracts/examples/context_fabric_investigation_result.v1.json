@@ -80,6 +80,17 @@
         "canonical_id": "project_ask_dev",
         "label": "Ask Dev"
       }
+    ],
+    "commit_decision_digests": [
+      {
+        "subject": {
+          "kind": "project",
+          "canonical_id": "project_ask_dev",
+          "label": "Ask Dev"
+        },
+        "commit_gate": "exact_index",
+        "identity_lookup": "graph_lag"
+      }
     ]
   },
   "direct_judgment": "Ask Dev is not release-ready even though most tracked implementation work is closed.",
@@ -114,6 +125,10 @@
       "epistemic_status": "inferred",
       "confidence": 0.96,
       "qualification": "This judgment is limited to currently visible project and acceptance evidence.",
+      "rank": 1,
+      "source_state": "truncated",
+      "source_state_note": "The service marks this driver as partial: the source read was truncated.",
+      "summary_corrected": true,
       "current": true
     },
     {
@@ -645,6 +660,7 @@
       "value": {
         "boolean": false
       },
+      "fact_id": "fact_9b1deb4d3b7d9d5a1c0e2f4a",
       "rows": [
         {
           "fields": {

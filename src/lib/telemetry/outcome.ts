@@ -1,4 +1,5 @@
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
+import { declaredVocabulary } from "@/lib/acr/upstream-vocabulary";
 import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
 import { degradedReasonCount } from "@/lib/degraded-reasons";
 import type { WorkbenchFailureCode } from "@/lib/acr/errors";
@@ -206,11 +207,14 @@ function outcomeFor(input: OutcomeInput): WorkbenchOutcome {
  * so a pin bump that adds a kind picks it up automatically.
  */
 const FACT_KINDS: ReadonlySet<string> = new Set(
-    (
-        commonSchema as {
-            $defs: { FactRequirement: { properties: { kind: { enum?: string[] } } } };
-        }
-    ).$defs.FactRequirement.properties.kind.enum ?? [],
+    declaredVocabulary(
+        (
+            commonSchema as {
+                $defs: { FactRequirement: { properties: { kind: { enum?: string[] } } } };
+            }
+        ).$defs.FactRequirement.properties.kind,
+        "FactRequirement.kind",
+    ),
 );
 
 const KNOWN_SOURCES: ReadonlySet<string> = new Set(["context-fabric:graph"]);

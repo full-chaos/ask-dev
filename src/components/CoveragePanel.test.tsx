@@ -2,11 +2,14 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import originStateExample from "@/contracts/examples/context_fabric_investigation_result_origin_state.v1.json";
-import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
+import commonSchemaPinned from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import { CoveragePanel } from "@/components/CoveragePanel";
 import { validateContract } from "@/lib/acr/validate";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { isVisibleText, visibleText } from "@/test/visible-text";
+import { closedVocabularyView } from "@/test/closed-vocabulary";
+
+const commonSchema = closedVocabularyView(commonSchemaPinned);
 
 const degradedCoverage = mockScenarios().find((s) => s.id === "degraded")!.result.coverage;
 const legacyCoverage = mockScenarios().find((s) => s.id === "degraded-legacy")!.result.coverage;
@@ -1008,6 +1011,8 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "fact_narrowed",
             "graph_endpoint_lookup_failed",
             "graph_exact_name_candidates_truncated",
+            "graph_project_deployments_unlinked",
+            "work_item_repository_unlinked",
             "graph_cohort_denied_by_authorization",
             "graph_unknown_relationship_type",
             "graph_validity_unbounded",
@@ -1018,6 +1023,12 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "read_population_unverified",
             "fact_read_origin_state",
             "kind_census_truncated",
+            "graph_walk_cut_before_member",
+            "computed_population_absent",
+            "requirement_not_evaluable",
+            "graph_no_member_found",
+            "synthesis_input_bounded",
+            "synthesis_model_failed",
         ]);
     });
 

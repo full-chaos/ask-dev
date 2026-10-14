@@ -30,6 +30,7 @@
         "code": {
           "enum": [
             "invalid_request",
+            "budget_refusal",
             "device_authorization_conflict",
             "invalid_token",
             "insufficient_scope",
@@ -40,6 +41,7 @@
             "version_mismatch",
             "upstream_unavailable",
             "upstream_invalid_output",
+            "store_unavailable",
             "interpretation_rejected",
             "synthesis_rejected",
             "internal_error"
@@ -60,6 +62,26 @@
         },
         "details": {
           "type": "object",
+          "description": "Closed safe keys only. For a 400 invalid_request about the request body, details.reason is malformed_json, schema_violation, unknown_field, trailing_json or body_too_large, and details.field, when present, is the JSON path of the failing field. A budget_refusal is a 413 for a valid request whose answer did not fit the response budget; details carry the closed budget keys that route measured (overrun, measured_items, measured_bytes, max_items, max_serialized_bytes, retry_attempted, narrower_continuation); every key is optional and a route sends only the ones it measured.",
+          "properties": {
+            "reason": {
+              "type": "string",
+              "pattern": "^[a-z0-9_]+$",
+              "maxLength": 64
+            },
+            "field": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.]+$",
+              "maxLength": 64
+            },
+            "limit": {
+              "enum": [
+                "request_budget",
+                "capabilities_budget"
+              ],
+              "description": "On a 429 rate_limited: which limit refused the request. request_budget is the organization's request budget; capabilities_budget is the capabilities handshake's own budget, spent by the caller-resolution call every MCP request makes; the credential was already decided in both cases. A consumer treats a value outside this enum as absent."
+            }
+          },
           "additionalProperties": true
         }
       }

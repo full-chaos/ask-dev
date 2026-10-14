@@ -1,10 +1,14 @@
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
+import commonSchemaPinned from "@/contracts/schemas/context_fabric_common.v1.schema.json";
+import investigationResultSchemaPinned from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import { validateContract } from "@/lib/acr/validate";
+import { closedVocabularyView } from "@/test/closed-vocabulary";
+
+const commonSchema = closedVocabularyView(commonSchemaPinned);
+const investigationResultSchema = closedVocabularyView(investigationResultSchemaPinned);
 
 /**
  * CHAOS-5774 (two-step deploy, same class as the CHAOS-4413/CHAOS-4642
@@ -63,7 +67,7 @@ describe("investigation result contract — score meaning / judgment mismatch / 
         expect(validation.valid).toBe(true);
     });
 
-    it("REJECTS an out-of-vocabulary requested_judgment_kind", () => {
+    it("TOLERATES an out-of-vocabulary requested_judgment_kind (open vocabulary)", () => {
         const withBadKind = structuredClone(canonicalResult) as Record<string, unknown>;
         const interpretation = withBadKind.interpretation as Record<string, unknown>;
         interpretation.requested_judgment_kind = "productivity";
@@ -71,7 +75,8 @@ describe("investigation result contract — score meaning / judgment mismatch / 
             "context_fabric_investigation_result.v1.schema.json",
             withBadKind,
         );
-        expect(validation.valid).toBe(false);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 
     /**

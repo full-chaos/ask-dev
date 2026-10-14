@@ -1137,13 +1137,13 @@ describe("investigate — a result carrying the continuation-refusal basis", () 
         await expect(investigate(config, { question: "and last month?" })).resolves.toEqual(served);
     });
 
-    it("a value outside the vocabulary is still an upstream contract violation, named at that field", async () => {
-        const bogus = refusedContinuation();
-        bogus.refusal_basis = "not_a_real_refusal_basis";
-        respondWith(bogus);
+    it("a value outside the documented vocabulary is tolerated and served unchanged (open vocabulary)", async () => {
+        const unknown = refusedContinuation();
+        unknown.refusal_basis = "not_a_real_refusal_basis";
+        respondWith(unknown);
 
-        const failure = await failureOf(investigate(config, { question: "and last month?" }));
-        expect(failure.code).toBe("acr_contract_violation");
-        expect(failure.details?.join("; ")).toMatch(/refusal_basis/);
+        await expect(investigate(config, { question: "and last month?" })).resolves.toEqual(
+            unknown,
+        );
     });
 });

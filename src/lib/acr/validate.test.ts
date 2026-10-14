@@ -1,12 +1,16 @@
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 
-import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
+import commonSchemaPinned from "@/contracts/schemas/context_fabric_common.v1.schema.json";
+import investigationResultSchemaPinned from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import { isDateTimeFormatted, validateContract } from "@/lib/acr/validate";
+import { closedVocabularyView } from "@/test/closed-vocabulary";
+
+const commonSchema = closedVocabularyView(commonSchemaPinned);
+const investigationResultSchema = closedVocabularyView(investigationResultSchemaPinned);
 
 /**
  * codex review round 2: an earlier version of the conversation-turn
@@ -497,7 +501,7 @@ describe("coverage detail code — reuse_auxiliary_refs_stripped (acr 9e2bbede c
         expect(validation.valid).toBe(true);
     });
 
-    it("RED CONTROL: an unrecognized coverage detail code still rejects — the enum stays closed", () => {
+    it("an unrecognized coverage detail code is tolerated — the vocabulary is open", () => {
         const tampered = reuseDegradedResult() as {
             coverage: { details: Array<Record<string, unknown>> };
         };
@@ -507,7 +511,7 @@ describe("coverage detail code — reuse_auxiliary_refs_stripped (acr 9e2bbede c
             "context_fabric_investigation_result.v1.schema.json",
             tampered,
         );
-        expect(validation.valid).toBe(false);
+        expect(validation.valid).toBe(true);
     });
 
     /**
@@ -801,7 +805,7 @@ describe("coverage detail code — read_population_unverified (acr 084ab9c4 cons
         expect(validation.valid).toBe(true);
     });
 
-    it("RED CONTROL: an unrecognized coverage detail code still rejects — the enum stays closed", () => {
+    it("an unrecognized coverage detail code is tolerated — the vocabulary is open", () => {
         const tampered = unverifiedPopulationResult() as {
             coverage: { details: Array<Record<string, unknown>> };
         };
@@ -811,7 +815,7 @@ describe("coverage detail code — read_population_unverified (acr 084ab9c4 cons
             "context_fabric_investigation_result.v1.schema.json",
             tampered,
         );
-        expect(validation.valid).toBe(false);
+        expect(validation.valid).toBe(true);
     });
 
     /**
@@ -1307,9 +1311,9 @@ describe("investigation result contract — the continuation-refusal basis (cons
         expect(validation.valid).toBe(true);
     });
 
-    it("the vocabulary stays CLOSED: a value outside it is still rejected", () => {
+    it("the vocabulary is OPEN: a value outside it is tolerated, not rejected", () => {
         expect(validateContract(RESULT, withRefusalBasis("not_a_real_refusal_basis")).valid).toBe(
-            false,
+            true,
         );
     });
 
@@ -1363,15 +1367,15 @@ describe("investigation result contract — the continuation-refusal basis (cons
         expect(validation.errors).toEqual([]);
         expect(validation.valid).toBe(true);
 
-        // Same path, an unknown value: rejected, and named at that path.
+        // Same path, an unknown value: tolerated (open vocabulary).
         const bad = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
         bad.completeness = {
             ...(bad.completeness as Record<string, unknown>),
             refusal_basis: "not_a_real_refusal_basis",
         };
         const rejected = validateContract(RESULT, bad);
-        expect(rejected.valid).toBe(false);
-        expect(rejected.errors.join("; ")).toMatch(/completeness\/refusal_basis/);
+        expect(rejected.errors).toEqual([]);
+        expect(rejected.valid).toBe(true);
     });
 
     it("EXECUTED repro: the prior pin's own schema rejects the new value", () => {
@@ -1439,13 +1443,13 @@ describe("investigation result contract — the declared-kind terminal basis (co
         }
     });
 
-    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+    it("the vocabulary is OPEN around the new member: near-misses are tolerated", () => {
         for (const value of [
             "declared_kind_unmatched_",
             "DECLARED_KIND_UNMATCHED",
             "declared_kind",
         ]) {
-            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(false);
+            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(true);
         }
     });
 
@@ -1539,13 +1543,13 @@ describe("investigation result contract — the organization-scope refusal basis
         }
     });
 
-    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+    it("the vocabulary is OPEN around the new member: near-misses are tolerated", () => {
         for (const value of [
             "organization_scope_unsupported_",
             "ORGANIZATION_SCOPE_UNSUPPORTED",
             "organization_scope",
         ]) {
-            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(false);
+            expect(validateContract(RESULT, withRefusalBasis(value)).valid).toBe(true);
         }
     });
 
@@ -1626,10 +1630,9 @@ describe("investigation result contract — the semantic_reading disclosure (con
         expect(validateContract(RESULT, structuredClone(canonicalResult)).valid).toBe(true);
     });
 
-    it("the object stays CLOSED: bad members, missing members and extra keys are rejected", () => {
+    it("the object stays CLOSED in shape, while `reason` is an open vocabulary", () => {
         for (const value of [
             { status: "available", reason: "semantic_state_absent" },
-            { status: "unavailable", reason: "pre_semantic_state" },
             { status: "unavailable" },
             { reason: "semantic_state_absent" },
             { status: "unavailable", reason: "semantic_state_absent", note: "x" },
@@ -1637,6 +1640,13 @@ describe("investigation result contract — the semantic_reading disclosure (con
         ]) {
             expect(validateContract(RESULT, withSemanticReading(value)).valid).toBe(false);
         }
+        // `reason` documents values and a client must tolerate unknown ones.
+        expect(
+            validateContract(
+                RESULT,
+                withSemanticReading({ status: "unavailable", reason: "pre_semantic_state" }),
+            ).valid,
+        ).toBe(true);
     });
 
     it("EXECUTED repro: the prior pin's own schema rejects the field", () => {
@@ -1713,10 +1723,10 @@ describe("coverage detail contract — the read-origin-state code (consumer pin)
         }
     });
 
-    it("the vocabulary stays CLOSED: a code outside it is still rejected", () => {
+    it("the vocabulary is OPEN: a code outside it is tolerated, not rejected", () => {
         const validation = validateContract(RESULT, resultWithDetailCode("not_a_real_code"));
-        expect(validation.valid).toBe(false);
-        expect(validation.errors.join("; ")).toMatch(/code must be equal to one of the allowed/);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 
     it("EXECUTED repro: the prior pin's own schema rejects the new code", () => {
@@ -1843,10 +1853,10 @@ describe("coverage detail contract — the kind_census_truncated code (consumer 
         }
     });
 
-    it("the vocabulary stays CLOSED: a code outside it is still rejected", () => {
+    it("the vocabulary is OPEN: a code outside it is tolerated, not rejected", () => {
         const validation = validateContract(RESULT, resultWithDetail({ code: "not_a_real_code" }));
-        expect(validation.valid).toBe(false);
-        expect(validation.errors.join("; ")).toMatch(/code must be equal to one of the allowed/);
+        expect(validation.errors).toEqual([]);
+        expect(validation.valid).toBe(true);
     });
 
     it("EXECUTED repro: the prior pin's own schema rejects the new code", () => {
@@ -1970,7 +1980,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
         const kinds = (commonSchema as unknown as CommonDefs).$defs.ClaimedFact.properties.kind
             .enum;
         const earlier = kinds.filter((kind) => kind !== MEMBER);
-        expect(earlier).toHaveLength(22);
+        expect(earlier).toHaveLength(24);
         for (const kind of earlier) {
             const validation = validateContract(RESULT, withClaim(kind));
             expect(validation.errors).toEqual([]);
@@ -1978,9 +1988,9 @@ describe("investigation result contract — the cardinality claim kind (consumer
         }
     });
 
-    it("the vocabulary stays CLOSED around the new member: near-misses are rejected", () => {
+    it("the vocabulary is OPEN around the new member: near-misses are tolerated", () => {
         for (const kind of ["cardinality_", "CARDINALITY", "cardinalities", "count"]) {
-            expect(validateContract(RESULT, withClaim(kind)).valid).toBe(false);
+            expect(validateContract(RESULT, withClaim(kind)).valid).toBe(true);
         }
     });
 
@@ -1988,7 +1998,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
         const defs = (commonSchema as unknown as CommonDefs).$defs;
         const claimKinds = defs.ClaimedFact.properties.kind.enum;
         expect(claimKinds).toContain(MEMBER);
-        expect(claimKinds).toHaveLength(23);
+        expect(claimKinds).toHaveLength(25);
 
         const requestable = [
             defs.FactRequirement.properties.kind.enum,
@@ -1997,7 +2007,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
             defs.PlanRequirement.properties.input_fact_kinds.items.enum,
         ];
         for (const vocabulary of requestable) {
-            expect(vocabulary).toHaveLength(22);
+            expect(vocabulary).toHaveLength(24);
             expect(vocabulary).not.toContain(MEMBER);
             expect([...vocabulary, MEMBER].sort()).toEqual([...claimKinds].sort());
         }
@@ -2058,7 +2068,7 @@ describe("investigation result contract — structure provenance engine_committe
         expect(validation.valid).toBe(true);
     });
 
-    it("RED CONTROL: an unrecognized provenance still rejects — the enum stays closed", () => {
+    it("an unrecognized provenance is tolerated — the vocabulary is open", () => {
         const tampered = withEngineCommittedAnchor() as {
             confirmed_structure: Array<Record<string, unknown>>;
         };
@@ -2068,7 +2078,7 @@ describe("investigation result contract — structure provenance engine_committe
             "context_fabric_investigation_result.v1.schema.json",
             tampered,
         );
-        expect(validation.valid).toBe(false);
+        expect(validation.valid).toBe(true);
     });
 
     it("EXECUTED repro: this response would fail closed under the prior pin's own schema", () => {
@@ -2261,12 +2271,12 @@ describe("refusal basis — subject_identity_unconfirmed (acr a618ca15 consumer 
         expect(validation.valid).toBe(true);
     });
 
-    it("RED CONTROL: an unrecognized refusal basis still rejects — the enum stays closed", () => {
+    it("an unrecognized refusal basis is tolerated — the vocabulary is open", () => {
         const validation = validateContract(
             "context_fabric_investigation_result.v1.schema.json",
             refusedResult("subject_identity_unconfirmed_bogus"),
         );
-        expect(validation.valid).toBe(false);
+        expect(validation.valid).toBe(true);
     });
 
     /**
