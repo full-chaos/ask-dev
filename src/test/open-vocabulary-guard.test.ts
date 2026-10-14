@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+
 import { render } from "@testing-library/react";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -209,5 +212,50 @@ describe("open vocabulary guard: semantic_reading.reason notice", () => {
             expect(container.textContent).toMatch(REASON_TEXT[reason]!);
             unmount();
         }
+    });
+});
+
+/**
+ * Round 2 (P1): every consumer reads the WITHHELD form. Rank/score/driver
+ * fields of a cohort member may be read only by the files that implement the
+ * gated ranking (and the withholding boundary itself); a new reader fails here
+ * until it is decided. The result boundary must be applied on the route and at
+ * the client's entry point, and the route may never return a raw result.
+ */
+describe("ranking withheld boundary guard", () => {
+    const root = path.resolve(__dirname, "..");
+    const walk = (dir: string): string[] =>
+        readdirSync(dir).flatMap((name) => {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) {
+                return name === "contracts" || name === "test" ? [] : walk(full);
+            }
+            return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) ? [full] : [];
+        });
+    const MEMBER_RANK_READ =
+        /\.(attention_rank|ranking_computed|ranking_basis)\b|member\??\.(score|drivers)\b|members\[0\]!?\.(score|drivers)\b/;
+    const ALLOWED_READERS = [
+        "lib/cohort-ranking.ts",
+        "lib/ranking-withheld.ts",
+        "lib/render-shapes.ts",
+        "components/CohortRankingPanel.tsx",
+        "components/WorkItemStatusPanel.tsx",
+    ];
+
+    it("only the decided files read member rank, score or driver fields", () => {
+        const offenders = walk(root)
+            .map((file) => path.relative(root, file))
+            .filter((rel) => MEMBER_RANK_READ.test(readFileSync(path.join(root, rel), "utf8")))
+            .filter((rel) => !ALLOWED_READERS.includes(rel));
+        expect(offenders).toEqual([]);
+    });
+
+    it("applies the boundary on the route and at the client entry", () => {
+        const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");
+        const page = readFileSync(path.join(root, "app/page.tsx"), "utf8");
+        expect(route).toContain("withholdUnrankableRankings(result)");
+        expect(route).not.toMatch(/NextResponse\.json\(\{\s*result\s*[,}]/);
+        expect(page).toContain("withholdUnrankableRankings(result as InvestigationResult)");
+        expect(page).not.toMatch(/result:\s*result as InvestigationResult/);
     });
 });

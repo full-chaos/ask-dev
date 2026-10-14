@@ -218,17 +218,21 @@ export type CohortRankingState =
 /**
  * The single gate every ranking consumer goes through: intent, then the kind
  * allowlist (cohort AND every member subject), then acr's own `ranking_computed`.
+ * The kind check precedes `ranking_computed` so an unrankable cohort is always
+ * disclosed, never rendered as nothing.
  */
 export function cohortRanking(
     shape: InterpretedShape,
     cohort: Cohort | undefined,
 ): CohortRankingState {
     if (!isCohortIntent(shape) || cohort === undefined) return { state: "not_requested" };
-    const rows = rankingTable(cohort.members);
-    if (rows === null) return { state: "not_computed" };
+    // Kinds FIRST: a person cohort is "Ranking not shown" whether or not
+    // acr set `ranking_computed`, never silently nothing.
     const kindsRankable =
         isRankableSubjectKind(cohort.kind) &&
         cohort.members.every((member) => isRankableSubjectKind(member.subject.kind));
     if (!kindsRankable) return { state: "kind_not_ranked" };
+    const rows = rankingTable(cohort.members);
+    if (rows === null) return { state: "not_computed" };
     return { state: "rows", rows };
 }

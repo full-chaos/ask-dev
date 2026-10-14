@@ -203,8 +203,8 @@ export function deriveParentReference(
     }
     const { result } = last.outcome;
     const unsentSubjects: UnsentSubject[] = [];
-    const subjectHints: readonly SubjectHint[] = result.subject_resolution.committed
-        .flatMap((subject) => {
+    const allHints: readonly SubjectHint[] = result.subject_resolution.committed.flatMap(
+        (subject) => {
             // The result's `SubjectRef.kind` is an open vocabulary but the
             // request's `SubjectHint.kind` is closed: a kind this pin does
             // not know cannot be sent as a hint, so it is omitted, never
@@ -223,7 +223,13 @@ export function deriveParentReference(
                     source: PARENT_SUBJECT_HINT_SOURCE,
                 },
             ];
-        })
-        .slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
-    return { parentResultId: result.result_id, subjectHints, unsentSubjects };
+        },
+    );
+    // The wire cap must never drop a subject silently either: whatever it
+    // cuts joins `unsentSubjects`, so the same notice discloses it.
+    const sentHints = allHints.slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
+    for (const cut of allHints.slice(MAX_SUBJECT_HINTS_ON_WIRE)) {
+        unsentSubjects.push({ kind: cut.kind, label: cut.label ?? cut.id ?? cut.kind });
+    }
+    return { parentResultId: result.result_id, subjectHints: sentHints, unsentSubjects };
 }

@@ -15,8 +15,9 @@ import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarifica
 import {
     buildConversationTurns,
     deriveParentReference,
-    unsentSubjectsNotice,
+    type UnsentSubject,
 } from "@/lib/conversation";
+import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
@@ -89,7 +90,12 @@ import { useStructureSelections } from "@/lib/use-structure-selections";
 
 type AssistantOutcome =
     | { readonly kind: "pending" }
-    | { readonly kind: "answered"; readonly result: InvestigationResult }
+    | {
+          readonly kind: "answered";
+          readonly result: InvestigationResult;
+          /** Built once, server side (the route); rendered here, never rebuilt. */
+          readonly scopeLossNotice?: string;
+      }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 type Turn =
@@ -212,6 +218,8 @@ async function fireInvestigation(params: {
     // producer of both.
     readonly parentResultId: string | undefined;
     readonly subjectHints: readonly SubjectHint[];
+    /** Committed subjects that could not ride as hints; the route words the notice. */
+    readonly unsentSubjects: readonly UnsentSubject[];
     readonly structureReceiptFields: Record<string, unknown>;
     readonly selectionEvents: readonly PendingSelectionEvent[];
 }): Promise<AssistantOutcome> {
@@ -232,6 +240,9 @@ async function fireInvestigation(params: {
                     ? { parentResultId: params.parentResultId }
                     : {}),
                 ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
+                ...(params.unsentSubjects.length > 0
+                    ? { unsentSubjects: params.unsentSubjects }
+                    : {}),
                 ...params.structureReceiptFields,
                 ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
                 ...(params.selectionEvents.length > 0
@@ -255,7 +266,15 @@ async function fireInvestigation(params: {
                 },
             };
         }
-        return { kind: "answered", result: result as InvestigationResult };
+        const scopeLossNotice = (payload as { scopeLossNotice?: unknown }).scopeLossNotice;
+        return {
+            kind: "answered",
+            // The route already withholds; applying the same idempotent
+            // boundary where the result enters client state keeps a caller
+            // that bypasses the route from ever holding the unwithheld form.
+            result: withholdUnrankableRankings(result as InvestigationResult),
+            ...(typeof scopeLossNotice === "string" ? { scopeLossNotice } : {}),
+        };
     } catch (error) {
         // Never swallow: a dead server hop is itself a reportable outcome.
         console.error("investigation request failed", error);
@@ -425,7 +444,7 @@ export default function ChatPage() {
         const conversation = buildConversationTurns(turns);
         // Same "before the pending pair" capture, same source —
         // the immediately preceding turn's own result_id/committed subjects.
-        const { parentResultId, subjectHints } = deriveParentReference(turns);
+        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
         structureSelections.reset();
         // A plain new ask (the common composer path) must clear any
         // unconfirmed candidate picks left over from the turn it supersedes
@@ -477,6 +496,7 @@ export default function ChatPage() {
             conversation,
             parentResultId,
             subjectHints,
+            unsentSubjects,
             structureReceiptFields,
             selectionEvents,
         });
@@ -553,7 +573,7 @@ export default function ChatPage() {
         // `conversation` above — the receipts fired below already name a
         // subject explicitly, but the carry still applies (this re-ask
         // follows `result` exactly as much as a plain typed follow-up would).
-        const { parentResultId, subjectHints } = deriveParentReference(turns);
+        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
         // Read BEFORE any reset() — a plain synchronous read at the top of
         // this ONE call, never re-read after a loop iteration's own
         // re-render (codex review: a stale closure re-reading a hook after
@@ -628,6 +648,7 @@ export default function ChatPage() {
                 conversation,
                 parentResultId,
                 subjectHints,
+                unsentSubjects,
                 structureReceiptFields,
                 selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             }).then((outcome) => {
@@ -831,7 +852,7 @@ export default function ChatPage() {
                     {turns.length === 0 ? (
                         <p className="chat__empty">Ask a question to start an investigation.</p>
                     ) : (
-                        turns.map((turn, turnIndex) => {
+                        turns.map((turn) => {
                             if (turn.role === "user") {
                                 // CHAOS-4670: a silent receipt-carrying
                                 // re-ask renders nothing here — see
@@ -851,10 +872,10 @@ export default function ChatPage() {
                             // The turns BEFORE this assistant turn's own user
                             // turn are what this follow-up derived its carry
                             // from; say so when a subject could not ride along.
-                            const carryNotice = unsentSubjectsNotice(
-                                deriveParentReference(turns.slice(0, Math.max(0, turnIndex - 1)))
-                                    .unsentSubjects,
-                            );
+                            const carryNotice =
+                                turn.outcome.kind === "answered"
+                                    ? turn.outcome.scopeLossNotice
+                                    : undefined;
 
                             return (
                                 <div

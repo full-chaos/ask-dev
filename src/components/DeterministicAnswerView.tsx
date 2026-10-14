@@ -6,6 +6,7 @@ import { ChoiceNotice } from "@/components/ChoiceNotice";
 import { ChosenAnswersSummaryCard } from "@/components/ChosenAnswersSummaryCard";
 import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
 import { CohortGroupsPanel } from "@/components/CohortGroupsPanel";
+import { RankingWithheldNotice } from "@/components/RankingWithheldNotice";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import { CompletenessPanel } from "@/components/CompletenessPanel";
 import { CoveragePanel } from "@/components/CoveragePanel";
@@ -407,6 +408,7 @@ export function DeterministicAnswerView({
                 // -> rich charts -> collapsed evidence.
             }
             <AnswerPanel result={result} />
+            <RankingWithheldNotice result={result} />
             {
                 // codex review round 3 (CHAOS-4581, preserved here): the
                 // ticket specifies TWO distinct sequences for the CHARTS

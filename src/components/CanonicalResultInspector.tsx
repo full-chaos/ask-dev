@@ -1,5 +1,6 @@
 import { Badge } from "@/components/Badge";
 import { EvidenceReferences } from "@/components/EvidenceReferences";
+import { RankingWithheldNotice } from "@/components/RankingWithheldNotice";
 import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
 import type {
     EvidenceRefLabels,
@@ -72,6 +73,7 @@ export function CanonicalResultInspector({ result }: CanonicalResultInspectorPro
     const interpretation = result.interpretation;
     return (
         <article aria-label="Canonical result inspector">
+            <RankingWithheldNotice result={result} />
             <section className="panel" aria-labelledby="goal-title">
                 <h2 className="panel__title" id="goal-title">
                     Analytical goal and scope
