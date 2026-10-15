@@ -1980,7 +1980,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
         const kinds = (commonSchema as unknown as CommonDefs).$defs.ClaimedFact.properties.kind
             .enum;
         const earlier = kinds.filter((kind) => kind !== MEMBER);
-        expect(earlier).toHaveLength(24);
+        expect(earlier).toHaveLength(25);
         for (const kind of earlier) {
             const validation = validateContract(RESULT, withClaim(kind));
             expect(validation.errors).toEqual([]);
@@ -1998,7 +1998,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
         const defs = (commonSchema as unknown as CommonDefs).$defs;
         const claimKinds = defs.ClaimedFact.properties.kind.enum;
         expect(claimKinds).toContain(MEMBER);
-        expect(claimKinds).toHaveLength(25);
+        expect(claimKinds).toHaveLength(26);
 
         const requestable = [
             defs.FactRequirement.properties.kind.enum,
@@ -2007,7 +2007,7 @@ describe("investigation result contract — the cardinality claim kind (consumer
             defs.PlanRequirement.properties.input_fact_kinds.items.enum,
         ];
         for (const vocabulary of requestable) {
-            expect(vocabulary).toHaveLength(24);
+            expect(vocabulary).toHaveLength(25);
             expect(vocabulary).not.toContain(MEMBER);
             expect([...vocabulary, MEMBER].sort()).toEqual([...claimKinds].sort());
         }

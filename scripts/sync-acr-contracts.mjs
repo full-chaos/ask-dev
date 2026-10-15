@@ -403,7 +403,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // caller-supplied evidence window (#679) -- and the
 // contract rule is pin-before-proof. The new shapes ride existing free-form
 // fact payloads and limitation strings, not schema members.
-export const SOURCE_COMMIT = "57ecaa18d553b5a2a1d770d07b051f6eec2e535c";
+export const SOURCE_COMMIT = "994f165a5a064fb67b0b45df5ab88186213a834e";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
