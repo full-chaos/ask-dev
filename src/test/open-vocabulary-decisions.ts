@@ -223,6 +223,7 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "landscape",
         "security_alerts",
         "commitment",
+        "file_hotspots",
         "cardinality",
     ],
     "context_fabric_common.v1.schema.json#/$defs/SourceObservation/properties/state": [
@@ -291,6 +292,7 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "landscape",
         "security_alerts",
         "commitment",
+        "file_hotspots",
     ],
     "context_fabric_common.v1.schema.json#/$defs/InterpretedQuestion/properties/shape": [
         "single_subject",
@@ -376,6 +378,7 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "landscape",
         "security_alerts",
         "commitment",
+        "file_hotspots",
     ],
     "context_fabric_common.v1.schema.json#/$defs/PlanRequirement/properties/obligation": [
         "state",
@@ -428,6 +431,7 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "landscape",
         "security_alerts",
         "commitment",
+        "file_hotspots",
     ],
     "context_fabric_common.v1.schema.json#/$defs/PlanRequirement/properties/step": [
         "rank_cohort",
@@ -467,6 +471,7 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
             "landscape",
             "security_alerts",
             "commitment",
+            "file_hotspots",
         ],
     "context_fabric_common.v1.schema.json#/$defs/PlanRequirement/properties/scope": [
         "single_subject",
