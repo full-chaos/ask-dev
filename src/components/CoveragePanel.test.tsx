@@ -1029,6 +1029,8 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "graph_no_member_found",
             "synthesis_input_bounded",
             "synthesis_model_failed",
+            "synthesis_not_run",
+            "fact_score_withheld",
         ]);
     });
 

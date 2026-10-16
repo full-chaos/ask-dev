@@ -521,6 +521,8 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "graph_no_member_found",
         "synthesis_input_bounded",
         "synthesis_model_failed",
+        "synthesis_not_run",
+        "fact_score_withheld",
     ],
     "context_fabric_common.v1.schema.json#/$defs/CoverageDetail/properties/kind": [
         "organization",
@@ -544,6 +546,10 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "synthesis_rejected",
         "model_receipt_unrecorded",
         "model_call_not_completed",
+        "synthesis_deadline",
+        "synthesis_not_narrowable",
+        "synthesis_rows_over_budget",
+        "synthesis_retry_over_budget",
     ],
     "context_fabric_common.v1.schema.json#/$defs/CoverageDetail/properties/retry_hint": [
         "retry_may_succeed",
