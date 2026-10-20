@@ -7,6 +7,7 @@ import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import {
     acrErrorCodeVocabulary,
     budgetOverrunVocabulary,
+    modelRefusalReasonVocabulary,
     narrowingContinuationAxisVocabulary,
     questionFamilyVocabulary,
 } from "@/lib/acr/upstream-vocabulary";
@@ -886,6 +887,116 @@ describe("investigate", () => {
         const failure = await failureOf(investigate(config, { question: "q" }));
         expect(failure.code).toBe("acr_unauthorized");
         expect(failure.retryable).toBe(false);
+    });
+
+    describe("a 403 feature_not_enabled refusal names its BYO reason (CHAOS-10343)", () => {
+        const refusals = [
+            [
+                "own_model_gate_closed",
+                "This organization's own model is saved, but its plan does not include it right now. No model was used.",
+            ],
+            [
+                "ai_features_turned_off",
+                "AI features are turned off for this organization. No model was used.",
+            ],
+            [
+                "byo_no_investigate_config",
+                "This organization's saved model keys are not set for investigations. An organization admin must set one. No model was used.",
+            ],
+            [
+                "own_model_turned_off",
+                "An organization admin turned this organization's own model off. No model was used.",
+            ],
+        ] as const;
+
+        function refusal(reason: string, status = 403): void {
+            respondWith(
+                {
+                    schema_version: "error.v1",
+                    request_id: "req_refused",
+                    error: {
+                        code: "feature_not_enabled",
+                        message: "model-authored text that must never render",
+                        http_status: status,
+                        retryable: false,
+                        details: { reason },
+                    },
+                },
+                status,
+            );
+        }
+
+        it.each(refusals)(
+            "maps %s to its own message, not a credential fault",
+            async (reason, message) => {
+                refusal(reason);
+
+                const failure = await failureOf(investigate(config, { question: "q" }));
+                expect(failure.code).toBe("acr_model_refused");
+                expect(failure.refusalReason).toBe(reason);
+                expect(failure.message).toBe(message);
+                expect(failure.message).not.toMatch(/credential/i);
+                expect(failure.message).not.toMatch(/synthes|caller|supplied/i);
+                expect(failure.httpStatus).toBe(403);
+                expect(failure.upstreamCode).toBe("feature_not_enabled");
+                expect(failure.upstreamRequestId).toBe("req_refused");
+                expect(failure.retryable).toBe(false);
+            },
+        );
+
+        it("holds exactly acr's four documented reasons", () => {
+            expect([...modelRefusalReasonVocabulary].sort()).toEqual(
+                refusals.map(([reason]) => reason).sort(),
+            );
+        });
+
+        it("does not retry a refusal", async () => {
+            refusal("own_model_turned_off");
+            await failureOf(investigate(config, { question: "q" }));
+            expect(fetch).toHaveBeenCalledTimes(1);
+        });
+
+        it("keeps every other 403 a credential failure, including an unknown or absent reason", async () => {
+            for (const reason of [
+                "service_model_not_entitled",
+                "some_future_reason",
+                "A sentence.",
+            ]) {
+                refusal(reason);
+                const failure = await failureOf(investigate(config, { question: "q" }));
+                expect(failure.code).toBe("acr_unauthorized");
+                expect(failure.refusalReason).toBeUndefined();
+                vi.restoreAllMocks();
+            }
+            respondWith(
+                { schema_version: "error.v1", error: { code: "feature_not_enabled" } },
+                403,
+            );
+            const bare = await failureOf(investigate(config, { question: "q" }));
+            expect(bare.code).toBe("acr_unauthorized");
+        });
+
+        it("does not remap the same reason on another status or another code", async () => {
+            refusal("own_model_turned_off", 400);
+            expect((await failureOf(investigate(config, { question: "q" }))).code).toBe(
+                "acr_rejected_request",
+            );
+            vi.restoreAllMocks();
+            respondWith(
+                {
+                    schema_version: "error.v1",
+                    error: {
+                        code: "invalid_token",
+                        http_status: 403,
+                        details: { reason: "own_model_turned_off" },
+                    },
+                },
+                403,
+            );
+            expect((await failureOf(investigate(config, { question: "q" }))).code).toBe(
+                "acr_unauthorized",
+            );
+        });
     });
 
     /**

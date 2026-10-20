@@ -197,3 +197,35 @@ export function boundedNonNegativeInteger(value: unknown): number | undefined {
     if (Object.is(value, -0)) return undefined;
     return value >= 0 ? value : undefined;
 }
+
+/**
+ * CHAOS-10343: the `details.reason` members of a 403 `feature_not_enabled`
+ * that mean the organization's model setup refused an investigation. `error.v1`
+ * bounds `details.reason` only by a pattern (an open string), so the pin
+ * carries no member list: this copy is acr's documented set (acr-v1
+ * `error` description; internal/contracts/v1/context_fabric_service_model.go)
+ * and is asserted in client.test.ts. `service_model_not_entitled` is left out
+ * on purpose: it has no entry in the copy table, so it stays a credential-
+ * class failure rather than gaining a message nobody verified.
+ */
+export type ModelRefusalReason =
+    | "own_model_gate_closed"
+    | "ai_features_turned_off"
+    | "byo_no_investigate_config"
+    | "own_model_turned_off";
+
+const MODEL_REFUSAL_REASONS: ReadonlySet<string> = new Set<ModelRefusalReason>([
+    "own_model_gate_closed",
+    "ai_features_turned_off",
+    "byo_no_investigate_config",
+    "own_model_turned_off",
+]);
+
+/** Exposed for tests, so the hand-copied vocabulary can be asserted directly. */
+export const modelRefusalReasonVocabulary: ReadonlySet<string> = MODEL_REFUSAL_REASONS;
+
+/** The reason when it is a documented member, `undefined` otherwise; never the received value. */
+export function boundedModelRefusalReason(reason: unknown): ModelRefusalReason | undefined {
+    if (typeof reason !== "string") return undefined;
+    return MODEL_REFUSAL_REASONS.has(reason) ? (reason as ModelRefusalReason) : undefined;
+}

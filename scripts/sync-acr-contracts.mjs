@@ -403,7 +403,14 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // caller-supplied evidence window (#679) -- and the
 // contract rule is pin-before-proof. The new shapes ride existing free-form
 // fact payloads and limitation strings, not schema members.
-export const SOURCE_COMMIT = "1e983670f189363dd1b5270357e5a6dd2fc43ca2";
+// 1e983670 -> 09c9706a: acr widened its served refusals with four
+// `details.reason` members on a 403 `feature_not_enabled`: own_model_gate_closed,
+// ai_features_turned_off, byo_no_investigate_config, own_model_turned_off
+// (CHAOS-10269, CHAOS-10281). `error.v1` keeps `details.reason` an open
+// pattern-bounded string, so no schema changed; the only vendored file that
+// changed is `error_context_fabric_interpretation_rejected.v1.json` (one
+// line). The Workbench maps the four reasons itself (`failureFor`).
+export const SOURCE_COMMIT = "09c9706a5b54e836c10dc0377b5f2d1e72219f0d";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

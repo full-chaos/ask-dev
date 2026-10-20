@@ -499,6 +499,10 @@ function statusFor(failure: WorkbenchFailure): number {
             // SERVER's credential is not. A 401 here would invite a client-side
             // re-auth that cannot possibly help.
             return 502;
+        case "acr_model_refused":
+            // 403 passes through: the browser session and the server credential
+            // are fine; the organization's model setup refused the turn.
+            return 403;
         case "acr_rejected_request":
             return 400;
         case "acr_answer_rejected":

@@ -7,6 +7,8 @@ import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import {
     boundedBudgetOverrun,
+    boundedModelRefusalReason,
+    type ModelRefusalReason,
     boundedNarrowingContinuationAxis,
     boundedNonNegativeInteger,
     boundedQuestionFamily,
@@ -318,6 +320,8 @@ type UpstreamError = {
     readonly overrun?: string;
     readonly measuredItems?: number;
     readonly maxItems?: number;
+    /** CHAOS-10343: `details.reason`, kept only when it is a documented model-refusal member. */
+    readonly refusalReason?: ModelRefusalReason;
 };
 
 function parseUpstreamError(payload: unknown): UpstreamError {
@@ -352,7 +356,10 @@ function parseUpstreamError(payload: unknown): UpstreamError {
  */
 function parseUpstreamErrorDetails(
     details: unknown,
-): Pick<UpstreamError, "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun"> {
+): Pick<
+    UpstreamError,
+    "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun" | "refusalReason"
+> {
     if (typeof details !== "object" || details === null) return {};
     const record = details as Record<string, unknown>;
     const overrun = boundedBudgetOverrun(
@@ -361,7 +368,9 @@ function parseUpstreamErrorDetails(
     const measuredItems = boundedNonNegativeInteger(record.measured_items);
     const maxItems = boundedNonNegativeInteger(record.max_items);
     const narrowerContinuation = parseNarrowerContinuation(record.narrower_continuation);
+    const refusalReason = boundedModelRefusalReason(record.reason);
     return {
+        ...(refusalReason === undefined ? {} : { refusalReason }),
         ...(overrun === undefined ? {} : { overrun }),
         ...(measuredItems === undefined ? {} : { measuredItems }),
         ...(maxItems === undefined ? {} : { maxItems }),
@@ -405,6 +414,16 @@ function parseNarrowerContinuation(value: unknown): UpstreamError["narrowerConti
  * others, so the message below states only what's actually known and
  * points at the request id for the rest.
  */
+const modelRefusalMessages: Readonly<Record<ModelRefusalReason, string>> = {
+    own_model_gate_closed:
+        "This organization's own model is saved, but its plan does not include it right now. No model was used.",
+    ai_features_turned_off: "AI features are turned off for this organization. No model was used.",
+    byo_no_investigate_config:
+        "This organization's saved model keys are not set for investigations. An organization admin must set one. No model was used.",
+    own_model_turned_off:
+        "An organization admin turned this organization's own model off. No model was used.",
+};
+
 function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     // Both upstream fields are bounded before they can be carried anywhere.
     // "Usually an identifier" is not a guarantee, and an upstream that put a
@@ -436,6 +455,21 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         ...(upstreamRequestId === undefined ? {} : { upstreamRequestId }),
         ...budgetRefusalFields,
     };
+    // CHAOS-10343: a 403 feature_not_enabled with a documented reason is the
+    // organization's own model setup refusing the turn, not a bad credential.
+    // Both the code and the reason are bounded above, so anything else here
+    // (an unknown reason, service_model_not_entitled) stays a credential-class
+    // failure. All four refuse before the caller's own synthesis is considered
+    // (acr gate, executed per reason), so no message offers a way around them.
+    if (status === 403 && code === "feature_not_enabled" && upstream.refusalReason !== undefined) {
+        return {
+            ...upstreamFields,
+            code: "acr_model_refused",
+            refusalReason: upstream.refusalReason,
+            message: modelRefusalMessages[upstream.refusalReason],
+            retryable: false,
+        };
+    }
     if (status === 401 || status === 403) {
         return {
             ...upstreamFields,
