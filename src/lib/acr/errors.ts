@@ -1,4 +1,4 @@
-import type { NarrowingContinuationAxis } from "@/lib/acr/upstream-vocabulary";
+import type { ModelRefusalReason, NarrowingContinuationAxis } from "@/lib/acr/upstream-vocabulary";
 
 /**
  * The failure vocabulary the Workbench shows a tester.
@@ -24,6 +24,13 @@ export const workbenchFailureCodes = [
     "acr_runtime_unavailable",
     /** ACR rejected our credential. */
     "acr_unauthorized",
+    /**
+     * ACR refused the investigation because of how the organization's own model
+     * is set up (403 `feature_not_enabled` with a documented `details.reason`).
+     * Not a credential fault and not a thin answer: no model ran and nothing
+     * was stored. `refusalReason` says which setup state refused it.
+     */
+    "acr_model_refused",
     /**
      * ACR is rate limiting the Workbench.
      *
@@ -94,6 +101,8 @@ export type WorkbenchFailure = {
     readonly httpStatus?: number;
     /** ACR's own `error.v1` code, when it sent one. */
     readonly upstreamCode?: string;
+    /** The documented `details.reason`, on an `acr_model_refused` failure only. */
+    readonly refusalReason?: ModelRefusalReason;
     /**
      * ACR's own request id.
      *
