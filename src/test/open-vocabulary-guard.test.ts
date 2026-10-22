@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { render } from "@testing-library/react";
 import { createElement } from "react";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { SemanticReadingNotice } from "@/components/SemanticReadingNotice";
@@ -15,7 +16,7 @@ import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { candidateStateTone, coverageStateTone, type Tone } from "@/lib/presentation";
 import { TELEMETRY_VOCABULARIES } from "@/lib/telemetry/outcome";
 import { DECIDED_OPEN_VOCABULARIES } from "@/test/open-vocabulary-decisions";
-import { findRankReads } from "@/test/rank-read-scan";
+import { findRankReadsInFiles, findRankReadsTyped } from "@/test/rank-read-scan";
 
 /**
  * The guard for the open-vocabulary class: the pinned acr schemas declare many
@@ -242,12 +243,76 @@ describe("ranking withheld boundary guard", () => {
     ];
 
     it("only the decided files read member rank, score or driver fields", () => {
-        const offenders = walk(root)
+        const offenders = [...findRankReadsInFiles(walk(root)).keys()]
             .map((file) => path.relative(root, file))
-            .filter((rel) => findRankReads(readFileSync(path.join(root, rel), "utf8")).length > 0)
             .filter((rel) => !ALLOWED_READERS.includes(rel));
         expect(offenders).toEqual([]);
     });
+
+    it("scans the workbench and home page entries", () => {
+        const scanned = walk(root).map((file) => path.relative(root, file));
+        expect(scanned).toContain("app/workbench/page.tsx");
+        expect(scanned).toContain("app/page.tsx");
+    });
+
+    it("flags an aliased member read planted in the workbench page source", () => {
+        const source = readFileSync(path.join(root, "app/workbench/page.tsx"), "utf8");
+        expect(findRankReadsTyped(source)).toEqual([]);
+        const planted =
+            'import type { Cohort as PlantedCohort } from "@/contracts/generated/investigation-result";\n' +
+            "declare const plantedCohort: PlantedCohort;\n" +
+            "const plantedMember = plantedCohort.members[0]!;\n" +
+            "export const plantedRead = plantedMember.score;\n";
+        expect(findRankReadsTyped(source + planted).length).toBeGreaterThan(0);
+    });
+
+    it.each(["app/workbench/page.tsx", "app/page.tsx"])(
+        "%s answers with the withheld result, never the raw one",
+        (rel) => {
+            const text = readFileSync(path.join(root, rel), "utf8");
+            const file = ts.createSourceFile(
+                rel,
+                text,
+                ts.ScriptTarget.Latest,
+                true,
+                ts.ScriptKind.TSX,
+            );
+            let boundaryAt = -1;
+            const answered: string[] = [];
+            let answeredAt = -1;
+            const visit = (node: ts.Node): void => {
+                if (
+                    ts.isVariableDeclaration(node) &&
+                    ts.isIdentifier(node.name) &&
+                    node.name.text === "boundary" &&
+                    node.initializer?.getText().startsWith("withholdUnrankableRankings(")
+                ) {
+                    boundaryAt = node.getStart();
+                }
+                if (
+                    ts.isObjectLiteralExpression(node) &&
+                    node.properties.some(
+                        (prop) =>
+                            ts.isPropertyAssignment(prop) &&
+                            prop.name.getText() === "kind" &&
+                            prop.initializer.getText() === '"answered"',
+                    )
+                ) {
+                    answeredAt = answeredAt === -1 ? node.getStart() : answeredAt;
+                    for (const prop of node.properties) {
+                        if (ts.isPropertyAssignment(prop) && prop.name.getText() === "result") {
+                            answered.push(prop.initializer.getText());
+                        }
+                    }
+                }
+                ts.forEachChild(node, visit);
+            };
+            visit(file);
+            expect(boundaryAt).toBeGreaterThan(-1);
+            expect(answeredAt).toBeGreaterThan(boundaryAt);
+            expect(answered).toEqual(["boundary.result"]);
+        },
+    );
 
     it("applies the boundary on the route and at the client entry", () => {
         const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");

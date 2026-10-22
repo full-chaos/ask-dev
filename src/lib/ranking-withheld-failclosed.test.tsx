@@ -14,7 +14,7 @@ import {
     RESULT_FIELDS_KEPT,
     withholdUnrankableRankings,
 } from "@/lib/ranking-withheld";
-import { findRankReads } from "@/test/rank-read-scan";
+import { findRankReads, findRankReadsTyped } from "@/test/rank-read-scan";
 
 const teamResult = shapesExample as unknown as InvestigationResult;
 
@@ -125,5 +125,38 @@ describe("(c) rank-read scanner (AST)", () => {
 
     it("does not flag unrelated reads", () => {
         expect(findRankReads("const { drivers } = result; const s = result.score2;")).toEqual([]);
+    });
+});
+
+describe("(d) rank-read scanner (type-aware)", () => {
+    const HEAD =
+        'import type { Cohort, CohortMember } from "@/contracts/generated/investigation-result";\n' +
+        "declare const cohort: Cohort;\ndeclare function use(value: unknown): void;\n";
+
+    it.each([
+        ["alias of an indexed member", "const p = cohort.members[0]!; use(p.score);"],
+        ["alias read through optional chain", "const [m] = cohort.members; use(m?.drivers);"],
+        ["destructured alias", "const p = cohort.members[0]!; const { score } = p; use(score);"],
+        ["alias bracket read", 'const p = cohort.members[0]!; use(p["drivers"]);'],
+        ["alias inside for-of", "for (const m of cohort.members) { const x = m; use(x.score); }"],
+        ["alias inside a callback", "cohort.members.map((m) => { const x = m; return x.score; });"],
+        ["typed parameter", "function f(m: CohortMember) { return m.score; } use(f);"],
+        ["re-alias chain", "const a = cohort.members[0]!; const b = a; const c = b; use(c.score);"],
+    ])("flags %s", (_name, body) => {
+        expect(findRankReadsTyped(HEAD + body).length).toBeGreaterThan(0);
+    });
+
+    it.each([
+        [
+            "a result drivers array",
+            "declare const result: { drivers: string[] }; use(result.drivers);",
+        ],
+        ["a non-member score", "declare const row: { score: number }; use(row.score);"],
+        [
+            "a member field that is not a rank field",
+            "const p = cohort.members[0]!; use(p.subject);",
+        ],
+    ])("does not flag %s", (_name, body) => {
+        expect(findRankReadsTyped(HEAD + body)).toEqual([]);
     });
 });
