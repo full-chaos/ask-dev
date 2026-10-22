@@ -76,11 +76,41 @@ function compilerOptions(): { options: ts.CompilerOptions } {
     };
 }
 
-function isMemberType(checker: ts.TypeChecker, type: ts.Type): boolean {
+function declaredOnMember(symbol: ts.Symbol | undefined): boolean {
+    return (symbol?.declarations ?? []).some((declaration) => {
+        for (let node: ts.Node | undefined = declaration; node; node = node.parent) {
+            if (
+                (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
+                node.name.text === MEMBER_TYPE_NAME
+            ) {
+                return true;
+            }
+        }
+        return false;
+    });
+}
+
+/**
+ * True when reading `field` from a value of `type` reads a cohort member's
+ * rank field: the type is the contract's CohortMember, the property resolves
+ * to a declaration inside CohortMember (so Pick, Partial, spreads and
+ * intersections all count), or the value is `any` and carries no type at all.
+ */
+function readsMemberField(checker: ts.TypeChecker, type: ts.Type, field: string): boolean {
     const t = checker.getNonNullableType(type);
+    if ((t.flags & ts.TypeFlags.Any) !== 0) return true;
     if (t.aliasSymbol?.getName() === MEMBER_TYPE_NAME) return true;
-    if (t.isUnionOrIntersection()) return t.types.some((part) => isMemberType(checker, part));
-    return false;
+    if (t.isUnion()) return t.types.some((part) => readsMemberField(checker, part, field));
+    if (t.isIntersection() && t.types.some((part) => readsMemberField(checker, part, field))) {
+        return true;
+    }
+    return declaredOnMember(checker.getPropertyOfType(t, field));
+}
+
+function literalKeys(checker: ts.TypeChecker, expression: ts.Expression): string[] {
+    const type = checker.getTypeAtLocation(expression);
+    const parts = type.isUnion() ? type.types : [type];
+    return parts.filter((part) => part.isStringLiteral()).map((part) => part.value);
 }
 
 function scanFile(checker: ts.TypeChecker, file: ts.SourceFile): string[] {
@@ -90,26 +120,21 @@ function scanFile(checker: ts.TypeChecker, file: ts.SourceFile): string[] {
             `${name}@${String(file.getLineAndCharacterOfPosition(node.getStart()).line + 1)}`,
         );
     };
-    const typedMember = (expression: ts.Node): boolean =>
-        isMemberType(checker, checker.getTypeAtLocation(expression));
+    const reads = (expression: ts.Node, field: string): boolean =>
+        readsMemberField(checker, checker.getTypeAtLocation(expression), field);
     const visit = (node: ts.Node): void => {
         if (ts.isPropertyAccessExpression(node)) {
-            if (RANK_FIELDS.has(node.name.text) && typedMember(node.expression)) {
+            if (RANK_FIELDS.has(node.name.text) && reads(node.expression, node.name.text)) {
                 mark(node.name.text, node);
             }
         } else if (ts.isElementAccessExpression(node)) {
-            const arg = node.argumentExpression;
-            if (
-                ts.isStringLiteralLike(arg) &&
-                RANK_FIELDS.has(arg.text) &&
-                typedMember(node.expression)
-            ) {
-                mark(arg.text, node);
+            for (const key of literalKeys(checker, node.argumentExpression)) {
+                if (RANK_FIELDS.has(key) && reads(node.expression, key)) mark(key, node);
             }
         } else if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
             const key = node.propertyName ?? node.name;
             const name = ts.isIdentifier(key) || ts.isStringLiteralLike(key) ? key.text : "";
-            if (RANK_FIELDS.has(name) && typedMember(node.parent)) mark(name, node);
+            if (RANK_FIELDS.has(name) && reads(node.parent, name)) mark(name, node);
         }
         ts.forEachChild(node, visit);
     };
@@ -118,10 +143,12 @@ function scanFile(checker: ts.TypeChecker, file: ts.SourceFile): string[] {
 }
 
 /**
- * Type-aware scan: a read of a rank field is flagged when the receiver's
- * checked type is the contract's CohortMember (through any alias, destructure,
- * for-of or callback parameter), or when the name heuristic of
- * `findRankReads` flags it (the fallback for `any` and casts).
+ * Type-aware scan: a read of a rank field is flagged when it resolves, by
+ * checked type, to a CohortMember field (through any alias, destructure,
+ * for-of, callback parameter, Pick projection or literal-typed computed key),
+ * when the receiver is `any`, or when the name heuristic of `findRankReads`
+ * flags it. A value cast to an inline re-declared structural type is the
+ * remaining blind spot.
  */
 export function findRankReadsTyped(source: string): string[] {
     const { options } = compilerOptions();

@@ -225,6 +225,8 @@ describe("open vocabulary guard: semantic_reading.reason notice", () => {
  * the client's entry point, and the route may never return a raw result.
  */
 describe("ranking withheld boundary guard", () => {
+    const SOURCE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+    const TEST_FILE = /\.test\.(?:[cm]?[jt]s|[jt]sx)$/;
     const root = path.resolve(__dirname, "..");
     const walk = (dir: string): string[] =>
         readdirSync(dir).flatMap((name) => {
@@ -232,7 +234,7 @@ describe("ranking withheld boundary guard", () => {
             if (statSync(full).isDirectory()) {
                 return name === "contracts" || name === "test" ? [] : walk(full);
             }
-            return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) ? [full] : [];
+            return SOURCE_FILE.test(name) && !TEST_FILE.test(name) ? [full] : [];
         });
     const ALLOWED_READERS = [
         "lib/cohort-ranking.ts",
@@ -266,8 +268,17 @@ describe("ranking withheld boundary guard", () => {
         expect(findRankReadsTyped(source + planted).length).toBeGreaterThan(0);
     });
 
+    it.each(["a.ts", "a.tsx", "a.js", "a.jsx", "a.mjs", "a.cjs", "a.mts", "a.cts"])(
+        "walks %s as source and a .test version of it as a test",
+        (name) => {
+            expect(SOURCE_FILE.test(name)).toBe(true);
+            expect(TEST_FILE.test(name.replace(".", ".test."))).toBe(true);
+            expect(TEST_FILE.test(name)).toBe(false);
+        },
+    );
+
     it.each(["app/workbench/page.tsx", "app/page.tsx"])(
-        "%s answers with the withheld result, never the raw one",
+        "%s hands every result it stores from the withheld boundary, never a raw one",
         (rel) => {
             const text = readFileSync(path.join(root, rel), "utf8");
             const file = ts.createSourceFile(
@@ -278,8 +289,8 @@ describe("ranking withheld boundary guard", () => {
                 ts.ScriptKind.TSX,
             );
             let boundaryAt = -1;
-            const answered: string[] = [];
-            let answeredAt = -1;
+            let firstResultAt = -1;
+            const stored: string[] = [];
             const visit = (node: ts.Node): void => {
                 if (
                     ts.isVariableDeclaration(node) &&
@@ -290,27 +301,21 @@ describe("ranking withheld boundary guard", () => {
                     boundaryAt = node.getStart();
                 }
                 if (
-                    ts.isObjectLiteralExpression(node) &&
-                    node.properties.some(
-                        (prop) =>
-                            ts.isPropertyAssignment(prop) &&
-                            prop.name.getText() === "kind" &&
-                            prop.initializer.getText() === '"answered"',
-                    )
+                    (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+                    node.name.getText() === "result"
                 ) {
-                    answeredAt = answeredAt === -1 ? node.getStart() : answeredAt;
-                    for (const prop of node.properties) {
-                        if (ts.isPropertyAssignment(prop) && prop.name.getText() === "result") {
-                            answered.push(prop.initializer.getText());
-                        }
-                    }
+                    if (firstResultAt === -1) firstResultAt = node.getStart();
+                    stored.push(
+                        ts.isPropertyAssignment(node) ? node.initializer.getText() : "result",
+                    );
                 }
                 ts.forEachChild(node, visit);
             };
             visit(file);
             expect(boundaryAt).toBeGreaterThan(-1);
-            expect(answeredAt).toBeGreaterThan(boundaryAt);
-            expect(answered).toEqual(["boundary.result"]);
+            expect(firstResultAt).toBeGreaterThan(boundaryAt);
+            expect(stored.length).toBeGreaterThan(0);
+            expect(new Set(stored)).toEqual(new Set(["boundary.result"]));
         },
     );
 

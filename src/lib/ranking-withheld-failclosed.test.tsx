@@ -1,9 +1,12 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import ChatPage from "@/app/page";
+import WorkbenchPage from "@/app/workbench/page";
 import { CanonicalResultInspector } from "@/components/CanonicalResultInspector";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
@@ -141,6 +144,18 @@ describe("(d) rank-read scanner (type-aware)", () => {
         ["alias inside for-of", "for (const m of cohort.members) { const x = m; use(x.score); }"],
         ["alias inside a callback", "cohort.members.map((m) => { const x = m; return x.score; });"],
         ["typed parameter", "function f(m: CohortMember) { return m.score; } use(f);"],
+        ["Pick projection", 'declare const proj: Pick<CohortMember, "score">; use(proj.score);'],
+        ["Partial projection", "declare const part: Partial<CohortMember>; use(part.drivers);"],
+        ["spread copy", "const { score } = { ...cohort.members[0]! }; use(score);"],
+        ["untyped any receiver", "declare const blob: any; use(blob.score);"],
+        [
+            "computed key of literal type",
+            'const row = cohort.members[0]!; const rankKey: "score" = "score"; use(row[rankKey]);',
+        ],
+        [
+            "computed key from a const tuple",
+            'const row = cohort.members[0]!; for (const k of ["score", "drivers"] as const) use(row[k]);',
+        ],
         ["re-alias chain", "const a = cohort.members[0]!; const b = a; const c = b; use(c.score);"],
     ])("flags %s", (_name, body) => {
         expect(findRankReadsTyped(HEAD + body).length).toBeGreaterThan(0);
@@ -158,5 +173,37 @@ describe("(d) rank-read scanner (type-aware)", () => {
         ],
     ])("does not flag %s", (_name, body) => {
         expect(findRankReadsTyped(HEAD + body)).toEqual([]);
+    });
+});
+
+describe("(e) both page entries render the withheld form of a raw person-cohort result", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    const LEAKS = ["person:ada", "Ada", "43.5", "attention_rank", "Ranked Persons"];
+
+    async function answerWith(raw: InvestigationResult, label: string, button: string) {
+        vi.spyOn(globalThis, "fetch").mockResolvedValue(
+            new Response(JSON.stringify({ result: raw }), {
+                headers: { "Content-Type": "application/json" },
+            }),
+        );
+        const user = userEvent.setup();
+        await user.type(screen.getByLabelText(label), "Who needs attention?");
+        await user.click(screen.getByRole("button", { name: button }));
+    }
+
+    it.each([
+        ["workbench", WorkbenchPage, "Ask Context Fabric", "Investigate"],
+        ["chat", ChatPage, "Ask a question", "Send"],
+    ] as const)("%s page shows no person ranking", async (_name, Page, label, button) => {
+        const { container } = render(<Page />);
+        await answerWith(personResult(), label, button);
+        expect((await screen.findAllByText(/Ranking not shown/)).length).toBeGreaterThan(0);
+        expect(screen.queryByText(/Ranked/)).toBeNull();
+        const inspectorTab = screen.queryByRole("tab", { name: "Canonical result" });
+        if (inspectorTab !== null) await userEvent.setup().click(inspectorTab);
+        for (const leak of LEAKS) expect(container.textContent).not.toContain(leak);
     });
 });
