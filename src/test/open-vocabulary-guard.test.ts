@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { render } from "@testing-library/react";
 import { createElement } from "react";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { SemanticReadingNotice } from "@/components/SemanticReadingNotice";
@@ -15,7 +16,7 @@ import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { candidateStateTone, coverageStateTone, type Tone } from "@/lib/presentation";
 import { TELEMETRY_VOCABULARIES } from "@/lib/telemetry/outcome";
 import { DECIDED_OPEN_VOCABULARIES } from "@/test/open-vocabulary-decisions";
-import { findRankReads } from "@/test/rank-read-scan";
+import { findRankReadsInFiles, findRankReadsTyped } from "@/test/rank-read-scan";
 
 /**
  * The guard for the open-vocabulary class: the pinned acr schemas declare many
@@ -224,6 +225,8 @@ describe("open vocabulary guard: semantic_reading.reason notice", () => {
  * the client's entry point, and the route may never return a raw result.
  */
 describe("ranking withheld boundary guard", () => {
+    const SOURCE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+    const TEST_FILE = /\.test\.(?:[cm]?[jt]s|[jt]sx)$/;
     const root = path.resolve(__dirname, "..");
     const walk = (dir: string): string[] =>
         readdirSync(dir).flatMap((name) => {
@@ -231,7 +234,7 @@ describe("ranking withheld boundary guard", () => {
             if (statSync(full).isDirectory()) {
                 return name === "contracts" || name === "test" ? [] : walk(full);
             }
-            return /\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name) ? [full] : [];
+            return SOURCE_FILE.test(name) && !TEST_FILE.test(name) ? [full] : [];
         });
     const ALLOWED_READERS = [
         "lib/cohort-ranking.ts",
@@ -242,12 +245,79 @@ describe("ranking withheld boundary guard", () => {
     ];
 
     it("only the decided files read member rank, score or driver fields", () => {
-        const offenders = walk(root)
+        const offenders = [...findRankReadsInFiles(walk(root)).keys()]
             .map((file) => path.relative(root, file))
-            .filter((rel) => findRankReads(readFileSync(path.join(root, rel), "utf8")).length > 0)
             .filter((rel) => !ALLOWED_READERS.includes(rel));
         expect(offenders).toEqual([]);
     });
+
+    it("scans the workbench and home page entries", () => {
+        const scanned = walk(root).map((file) => path.relative(root, file));
+        expect(scanned).toContain("app/workbench/page.tsx");
+        expect(scanned).toContain("app/page.tsx");
+    });
+
+    it("flags an aliased member read planted in the workbench page source", () => {
+        const source = readFileSync(path.join(root, "app/workbench/page.tsx"), "utf8");
+        expect(findRankReadsTyped(source)).toEqual([]);
+        const planted =
+            'import type { Cohort as PlantedCohort } from "@/contracts/generated/investigation-result";\n' +
+            "declare const plantedCohort: PlantedCohort;\n" +
+            "const plantedMember = plantedCohort.members[0]!;\n" +
+            "export const plantedRead = plantedMember.score;\n";
+        expect(findRankReadsTyped(source + planted).length).toBeGreaterThan(0);
+    });
+
+    it.each(["a.ts", "a.tsx", "a.js", "a.jsx", "a.mjs", "a.cjs", "a.mts", "a.cts"])(
+        "walks %s as source and a .test version of it as a test",
+        (name) => {
+            expect(SOURCE_FILE.test(name)).toBe(true);
+            expect(TEST_FILE.test(name.replace(".", ".test."))).toBe(true);
+            expect(TEST_FILE.test(name)).toBe(false);
+        },
+    );
+
+    it.each(["app/workbench/page.tsx", "app/page.tsx"])(
+        "%s hands every result it stores from the withheld boundary, never a raw one",
+        (rel) => {
+            const text = readFileSync(path.join(root, rel), "utf8");
+            const file = ts.createSourceFile(
+                rel,
+                text,
+                ts.ScriptTarget.Latest,
+                true,
+                ts.ScriptKind.TSX,
+            );
+            let boundaryAt = -1;
+            let firstResultAt = -1;
+            const stored: string[] = [];
+            const visit = (node: ts.Node): void => {
+                if (
+                    ts.isVariableDeclaration(node) &&
+                    ts.isIdentifier(node.name) &&
+                    node.name.text === "boundary" &&
+                    node.initializer?.getText().startsWith("withholdUnrankableRankings(")
+                ) {
+                    boundaryAt = node.getStart();
+                }
+                if (
+                    (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+                    node.name.getText() === "result"
+                ) {
+                    if (firstResultAt === -1) firstResultAt = node.getStart();
+                    stored.push(
+                        ts.isPropertyAssignment(node) ? node.initializer.getText() : "result",
+                    );
+                }
+                ts.forEachChild(node, visit);
+            };
+            visit(file);
+            expect(boundaryAt).toBeGreaterThan(-1);
+            expect(firstResultAt).toBeGreaterThan(boundaryAt);
+            expect(stored.length).toBeGreaterThan(0);
+            expect(new Set(stored)).toEqual(new Set(["boundary.result"]));
+        },
+    );
 
     it("applies the boundary on the route and at the client entry", () => {
         const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");
