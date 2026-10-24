@@ -1056,13 +1056,17 @@ describe("investigate", () => {
         const requestBudgetMessage =
             "ACR accepted the investigation but did not finish it within its request budget.";
 
-        async function failureForDetails(details: unknown, status = 504) {
+        async function failureForDetails(
+            details: unknown,
+            status = 504,
+            code: string | null = "upstream_unavailable",
+        ) {
             respondWith(
                 {
                     schema_version: "error.v1",
                     request_id: "req_0123456789abcdef0123456789abcdef",
                     error: {
-                        code: "upstream_unavailable",
+                        ...(code === null ? {} : { code }),
                         message: "ACR free text that must never be shown",
                         http_status: status,
                         retryable: true,
@@ -1107,10 +1111,14 @@ describe("investigate", () => {
             },
         );
 
-        it("applies to a 408 as well", async () => {
-            const failure = await failureForDetails({ deadline: "model" }, 408);
+        it.each([
+            ["a 408", 408, "upstream_unavailable"],
+            ["a 504 with another code", 504, "internal_error"],
+            ["a 504 with no code", 504, null],
+        ])("does not read the key on %s", async (_label, status, code) => {
+            const failure = await failureForDetails({ deadline: "model" }, status, code);
             expect(failure.code).toBe("acr_timeout");
-            expect(failure.message).toContain("ACR_CONTEXT_FABRIC_MODEL_TIMEOUT");
+            expect(failure.message).toBe(requestBudgetMessage);
         });
     });
 

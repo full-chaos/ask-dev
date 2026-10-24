@@ -543,7 +543,13 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         // model-backed investigation times out at the HTTP layer while the
         // pipeline is still running. Naming this separately from "unreachable"
         // is what makes that diagnosable from the UI.
-        if (upstream.deadline === "model") {
+        // `details.deadline` is documented for a 504 `upstream_unavailable`
+        // only (error.v1); on any other status or code the key is not read.
+        if (
+            status === 504 &&
+            upstream.code === "upstream_unavailable" &&
+            upstream.deadline === "model"
+        ) {
             return {
                 ...upstreamFields,
                 code: "acr_timeout",
