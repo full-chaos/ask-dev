@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { boundedNonNegativeInteger } from "@/lib/acr/upstream-vocabulary";
+import { boundedNonNegativeInteger, boundedUpstreamDeadline } from "@/lib/acr/upstream-vocabulary";
 
 /**
  * codex review round 1 (CHAOS-5107 lane), P2: `Number.isInteger`/`>= 0`
@@ -34,4 +34,18 @@ describe("boundedNonNegativeInteger", () => {
         expect(boundedNonNegativeInteger(Number.POSITIVE_INFINITY)).toBeUndefined();
         expect(boundedNonNegativeInteger(undefined)).toBeUndefined();
     });
+});
+
+describe("boundedUpstreamDeadline", () => {
+    it("keeps the two documented members", () => {
+        expect(boundedUpstreamDeadline("model")).toBe("model");
+        expect(boundedUpstreamDeadline("request")).toBe("request");
+    });
+
+    it.each([["foo"], [""], ["MODEL"], ["model "], [7], [null], [undefined], [["model"]], [{}]])(
+        "drops anything else: %j",
+        (value) => {
+            expect(boundedUpstreamDeadline(value)).toBeUndefined();
+        },
+    );
 });
