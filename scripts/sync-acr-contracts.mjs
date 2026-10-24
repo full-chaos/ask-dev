@@ -410,7 +410,15 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "09c9706a5b54e836c10dc0377b5f2d1e72219f0d";
+// 09c9706a -> ec9c47ca: `error.v1` `details` gains one optional key,
+// `deadline` (closed enum `model` | `request`), on a 504 `upstream_unavailable`:
+// `model` is one model attempt reaching its own timeout, `request` is the
+// request deadline. `details.additionalProperties` stays `true`, so the key is
+// additive-optional. Verified per-file over the vendored surface: the only
+// vendored file that changed is `error.v1.schema.json` (the new acr example
+// `error_upstream_unavailable_model_deadline.v1.json` is not part of the
+// vendored example set).
+export const SOURCE_COMMIT = "ec9c47ca371668c44d086c8c4502625c9d30c3e0";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

@@ -1047,6 +1047,74 @@ describe("investigate", () => {
     });
 
     /**
+     * acr's `error.details.deadline` (`model` | `request`) says which deadline
+     * ended the investigation. Only the closed vocabulary is trusted: a model
+     * timeout names the setting to change, everything else keeps the
+     * request-budget message.
+     */
+    describe("a 504 that names its deadline", () => {
+        const requestBudgetMessage =
+            "ACR accepted the investigation but did not finish it within its request budget.";
+
+        async function failureForDetails(details: unknown, status = 504) {
+            respondWith(
+                {
+                    schema_version: "error.v1",
+                    request_id: "req_0123456789abcdef0123456789abcdef",
+                    error: {
+                        code: "upstream_unavailable",
+                        message: "ACR free text that must never be shown",
+                        http_status: status,
+                        retryable: true,
+                        ...(details === undefined ? {} : { details }),
+                    },
+                },
+                status,
+            );
+            return failureOf(investigate(config, { question: "q" }));
+        }
+
+        it("names ACR_CONTEXT_FABRIC_MODEL_TIMEOUT for a model timeout", async () => {
+            const failure = await failureForDetails({ deadline: "model" });
+            expect(failure.code).toBe("acr_timeout");
+            expect(failure.httpStatus).toBe(504);
+            expect(failure.retryable).toBe(true);
+            expect(failure.message).toContain("ACR_CONTEXT_FABRIC_MODEL_TIMEOUT");
+            expect(failure.message).not.toContain("request budget");
+            expect(failure.message).not.toContain("free text");
+        });
+
+        it("keeps the request-budget message for a request deadline", async () => {
+            const failure = await failureForDetails({ deadline: "request" });
+            expect(failure.code).toBe("acr_timeout");
+            expect(failure.message).toBe(requestBudgetMessage);
+        });
+
+        it("keeps the request-budget message when the key is missing", async () => {
+            const withDetails = await failureForDetails({});
+            const withoutDetails = await failureForDetails(undefined);
+            expect(withDetails.message).toBe(requestBudgetMessage);
+            expect(withoutDetails.message).toBe(requestBudgetMessage);
+            expect(withoutDetails.code).toBe("acr_timeout");
+        });
+
+        it.each([["foo"], [7], [null], [["model"]], ["MODEL"]])(
+            "ignores a deadline value outside the vocabulary: %j",
+            async (value) => {
+                const failure = await failureForDetails({ deadline: value });
+                expect(failure.code).toBe("acr_timeout");
+                expect(failure.message).toBe(requestBudgetMessage);
+            },
+        );
+
+        it("applies to a 408 as well", async () => {
+            const failure = await failureForDetails({ deadline: "model" }, 408);
+            expect(failure.code).toBe("acr_timeout");
+            expect(failure.message).toContain("ACR_CONTEXT_FABRIC_MODEL_TIMEOUT");
+        });
+    });
+
+    /**
      * ACR reserves 422 for its OWN derived artifact failing its OWN v1 bounds
      * (`synthesis_rejected` / `interpretation_rejected`). That is the engine
      * declining to assert a claim it cannot bind to canonical facts — a
