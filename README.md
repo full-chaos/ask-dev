@@ -1,3 +1,5 @@
+https://github.com/user-attachments/assets/a4c8cf35-3260-4c84-b805-2eb626817ddb
+
 # Context Fabric Workbench
 
 Standalone answer test platform for the ACR **Context Fabric**: ask a question,
