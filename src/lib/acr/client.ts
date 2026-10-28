@@ -8,6 +8,7 @@ import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
 import {
     boundedBudgetOverrun,
     boundedModelRefusalReason,
+    boundedUpstreamDeadline,
     type ModelRefusalReason,
     boundedNarrowingContinuationAxis,
     boundedNonNegativeInteger,
@@ -15,6 +16,7 @@ import {
     boundedUpstreamCode,
     boundedUpstreamRequestId,
     type NarrowingContinuationAxis,
+    type UpstreamDeadline,
 } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
@@ -322,6 +324,8 @@ type UpstreamError = {
     readonly maxItems?: number;
     /** CHAOS-10343: `details.reason`, kept only when it is a documented model-refusal member. */
     readonly refusalReason?: ModelRefusalReason;
+    /** `details.deadline` on a 504, kept only when it is a documented member. */
+    readonly deadline?: UpstreamDeadline;
 };
 
 function parseUpstreamError(payload: unknown): UpstreamError {
@@ -358,7 +362,7 @@ function parseUpstreamErrorDetails(
     details: unknown,
 ): Pick<
     UpstreamError,
-    "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun" | "refusalReason"
+    "deadline" | "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun" | "refusalReason"
 > {
     if (typeof details !== "object" || details === null) return {};
     const record = details as Record<string, unknown>;
@@ -369,7 +373,9 @@ function parseUpstreamErrorDetails(
     const maxItems = boundedNonNegativeInteger(record.max_items);
     const narrowerContinuation = parseNarrowerContinuation(record.narrower_continuation);
     const refusalReason = boundedModelRefusalReason(record.reason);
+    const deadline = boundedUpstreamDeadline(record.deadline);
     return {
+        ...(deadline === undefined ? {} : { deadline }),
         ...(refusalReason === undefined ? {} : { refusalReason }),
         ...(overrun === undefined ? {} : { overrun }),
         ...(measuredItems === undefined ? {} : { measuredItems }),
@@ -537,6 +543,21 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         // model-backed investigation times out at the HTTP layer while the
         // pipeline is still running. Naming this separately from "unreachable"
         // is what makes that diagnosable from the UI.
+        // `details.deadline` is documented for a 504 `upstream_unavailable`
+        // only (error.v1); on any other status or code the key is not read.
+        if (
+            status === 504 &&
+            upstream.code === "upstream_unavailable" &&
+            upstream.deadline === "model"
+        ) {
+            return {
+                ...upstreamFields,
+                code: "acr_timeout",
+                message:
+                    "ACR's model call took longer than its per-call limit. Raise ACR_CONTEXT_FABRIC_MODEL_TIMEOUT, or ask a narrower question.",
+                retryable: true,
+            };
+        }
         return {
             ...upstreamFields,
             code: "acr_timeout",

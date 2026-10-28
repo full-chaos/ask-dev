@@ -229,3 +229,19 @@ export function boundedModelRefusalReason(reason: unknown): ModelRefusalReason |
     if (typeof reason !== "string") return undefined;
     return MODEL_REFUSAL_REASONS.has(reason) ? (reason as ModelRefusalReason) : undefined;
 }
+
+/**
+ * Which deadline ended an investigation, from acr's `error.details.deadline` on
+ * a 504 `upstream_unavailable`: `model` is one model attempt reaching its own
+ * timeout (`ACR_CONTEXT_FABRIC_MODEL_TIMEOUT`), `request` is the request
+ * deadline. A closed two-member vocabulary copied from `error.v1`.
+ */
+export type UpstreamDeadline = "model" | "request";
+
+const UPSTREAM_DEADLINES: ReadonlySet<string> = new Set<UpstreamDeadline>(["model", "request"]);
+
+/** The deadline when it is a documented member, `undefined` otherwise; never the received value. */
+export function boundedUpstreamDeadline(deadline: unknown): UpstreamDeadline | undefined {
+    if (typeof deadline !== "string") return undefined;
+    return UPSTREAM_DEADLINES.has(deadline) ? (deadline as UpstreamDeadline) : undefined;
+}
