@@ -27,8 +27,13 @@ describe("comparePins", () => {
         expect(out.join("\n")).toContain("source_commit differs");
     });
     it("fails on a drifted schema digest", () => {
-        const drifted = { ...web, files: [{ path: "schemas/common.json", sha256: "XX" }, web.files[1]] };
-        expect(comparePins(ask, drifted).join("\n")).toContain("digest differs for schemas/common.json");
+        const drifted = {
+            ...web,
+            files: [{ path: "schemas/common.json", sha256: "XX" }, web.files[1]],
+        };
+        expect(comparePins(ask, drifted).join("\n")).toContain(
+            "digest differs for schemas/common.json",
+        );
     });
     it("fails when web lacks a schema ask-dev vendors", () => {
         expect(comparePins(ask, { ...web, files: [web.files[0]] }).join("\n")).toContain(

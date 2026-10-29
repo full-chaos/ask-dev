@@ -1,5 +1,5 @@
 {
-  "source_commit": "ae88ef719eaff8f689c9b621b7c453c40bbdc446",
+  "source_commit": "418f9bf477c95efab2064f526594636aa3a6887c",
   "source_repository": "full-chaos/dev-health-acr",
   "files": [
     {
@@ -48,7 +48,7 @@
     },
     {
       "path": "schemas/error.v1.schema.json",
-      "sha256": "47affe9aad36abd9e66b2c9e6832fad6cc2ffe09b200a97a104f244b5f1a7eb7"
+      "sha256": "2edbbe96959d0c710652d639247b1ca6405965f3088ec60efbc58d6624042b59"
     }
   ]
 }

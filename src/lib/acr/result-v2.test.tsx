@@ -54,18 +54,28 @@ afterEach(() => {
 
 describe("investigation result v2 dispatch", () => {
     it("the v2 golden validates against the v2 schema, and the v1 golden against v1", () => {
-        expect(validateContract("context_fabric_investigation_result.v2.schema.json", v2Result)).toEqual({ valid: true, errors: [] });
-        expect(validateContract("context_fabric_investigation_result.v1.schema.json", v1Result).valid).toBe(true);
+        expect(
+            validateContract("context_fabric_investigation_result.v2.schema.json", v2Result),
+        ).toEqual({ valid: true, errors: [] });
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", v1Result).valid,
+        ).toBe(true);
     });
 
     it("schemas are version-exclusive: each golden fails the other version's schema", () => {
-        expect(validateContract("context_fabric_investigation_result.v1.schema.json", v2Result).valid).toBe(false);
-        expect(validateContract("context_fabric_investigation_result.v2.schema.json", v1Result).valid).toBe(false);
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", v2Result).valid,
+        ).toBe(false);
+        expect(
+            validateContract("context_fabric_investigation_result.v2.schema.json", v1Result).valid,
+        ).toBe(false);
     });
 
     it("investigate serves a v2 result unchanged (was acr_contract_violation under the v1-only dispatch)", async () => {
         respondWith(v2Result);
-        await expect(investigate(config, { question: "Is widget-service healthy?" })).resolves.toEqual(v2Result);
+        await expect(
+            investigate(config, { question: "Is widget-service healthy?" }),
+        ).resolves.toEqual(v2Result);
     });
 
     it("investigate still serves v1 unchanged", async () => {
@@ -82,10 +92,14 @@ describe("investigation result v2 dispatch", () => {
     it("rejects an unknown schema_version and a missing one, loudly", async () => {
         const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
         respondWith({ ...v2Result, schema_version: "context_fabric_investigation_result.v3" });
-        expect((await violationOf(investigate(config, { question: "q" }))).code).toBe("acr_contract_violation");
+        expect((await violationOf(investigate(config, { question: "q" }))).code).toBe(
+            "acr_contract_violation",
+        );
         const { schema_version: _drop, ...noVersion } = v2Result;
         respondWith(noVersion);
-        expect((await violationOf(investigate(config, { question: "q" }))).code).toBe("acr_contract_violation");
+        expect((await violationOf(investigate(config, { question: "q" }))).code).toBe(
+            "acr_contract_violation",
+        );
         expect(logged).toHaveBeenCalledTimes(2);
     });
 
