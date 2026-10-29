@@ -8,6 +8,7 @@
  * is then a one-line change in this file, not a sweep through the UI.
  */
 import type {
+    ACRContextFabricInvestigationResultV1 as InvestigationResultV1,
     AcceptedGrammar,
     ConfirmedStructureEntry,
     EffectiveEvidenceWindow,
@@ -15,8 +16,29 @@ import type {
     PriorSubjectReceiptDispositionEntry,
 } from "@/contracts/generated/investigation-result";
 
+/**
+ * CHAOS-11906: an investigation result is v1 or v2. v2 is wire-identical to v1
+ * except the MEANING of `structure_needs.anchor_options` (membership-verify, not
+ * unique-claimant); the pinned v2 schema is v1 with `schema_version` and the
+ * anchor-options $ref swapped, so one structural type serves both. The
+ * discriminant is the only thing that differs at the type level.
+ */
+export type InvestigationResultSchemaVersion =
+    InvestigationResultV1["schema_version"] | "context_fabric_investigation_result.v2";
+// The generated type is `{ [k: string]: unknown } & { ...fields }`; `Omit` over
+// it collapses to `{}`, so the named fields are re-extracted by dropping the
+// index-signature keys first.
+type NamedFields<T> = {
+    [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
+};
+export type InvestigationResult = { [k: string]: unknown } & Omit<
+    NamedFields<InvestigationResultV1>,
+    "schema_version"
+> & {
+        schema_version: InvestigationResultSchemaVersion;
+    };
+
 export type {
-    ACRContextFabricInvestigationResultV1 as InvestigationResult,
     AcceptedGrammar,
     AnchorOption,
     // CHAOS-4413/CHAOS-4642: the promoted answer-rate/terminal-state fields.

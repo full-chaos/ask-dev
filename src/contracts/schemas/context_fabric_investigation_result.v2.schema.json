@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.fullchaos.dev/acr/v1/context_fabric_investigation_result.v2.schema.json",
+  "title": "ACR Context Fabric Investigation Result v2",
+  "description": "CHAOS-4042 (sol-max ruling): identical to Investigation Result v1 in every field except structure_needs, whose anchor_options carry AnchorOptionV2 (membership-verify) semantics instead of AnchorOption (unique-claimant). A result only ever carries this schema_version when it minted at least one membership-verify anchor option; v1 AnchorOption/results stay permanently unique-claimant and are never reinterpreted under this schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "context_fabric_investigation_result.v2"
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 256
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 256
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial",
+        "degraded",
+        "clarification_required",
+        "no_match"
+      ]
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 8000
+    },
+    "interpretation": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/InterpretedQuestion"
+    },
+    "subject_resolution": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/SubjectResolution"
+    },
+    "answer_plan": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/AnswerPlan"
+    },
+    "cohort": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/Cohort"
+    },
+    "direct_judgment": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "current_state": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "strongest_pressures": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "maxItems": 50
+    },
+    "drivers": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/DriverJudgment"
+      },
+      "maxItems": 50
+    },
+    "remaining_work": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/Finding"
+      },
+      "maxItems": 250
+    },
+    "readiness_gaps": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/Finding"
+      },
+      "maxItems": 250
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/RelationshipPath"
+      },
+      "maxItems": 250
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/Finding"
+      },
+      "maxItems": 250
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "maxItems": 100
+    },
+    "limitations_displaced": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Model-authored limitations the engine dropped to fit a service-authored disclosure inside the limitations cap (CHAOS-3746; the disclosure may be retrieval degradation, a historical-axis statement, a commit retraction, or a clarification override). Absent or zero when nothing was displaced. It cannot be inferred from limitations itself: a displaced list and a list that had room are the same length and both end with the disclosure."
+    },
+    "evidence_ref_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 256,
+        "pattern": "^[^|]*$"
+      },
+      "maxItems": 500,
+      "uniqueItems": true
+    },
+    "claimed_facts": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/ClaimedFact"
+      },
+      "maxItems": 250
+    },
+    "coverage": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/Coverage"
+    },
+    "versions": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/VersionSet"
+    },
+    "deterministic_answer": {
+      "type": "string",
+      "maxLength": 12000
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      },
+      "maxItems": 100
+    },
+    "reused": {
+      "type": "boolean",
+      "description": "CHAOS-3782: true when this result was served from the immutable result store rather than a fresh investigation. When true, result_id and generated_at name the reused result's own identifier and generation time, not this request's."
+    },
+    "temporal": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/TemporalLabel"
+    },
+    "effective_evidence_window": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/EffectiveEvidenceWindow"
+    },
+    "window_clarification": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/WindowClarification"
+    },
+    "structure_needs": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/StructureNeedsV2"
+    },
+    "confirmed_structure": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/ConfirmedStructureEntry"
+      },
+      "maxItems": 4
+    },
+    "structure_offer_snapshot": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/StructureOfferSnapshotEntry"
+      },
+      "maxItems": 80
+    },
+    "render_shapes": {
+      "description": "CHAOS-4415: the OPTIONAL renderable shapes this answer warrants, chosen by deterministic rules from the interpreted intent and this result's own cohort and claimed facts. Absent on every answer no rule fired for.",
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/RenderShape"
+      }
+    },
+    "completeness": {
+      "$ref": "context_fabric_common.v1.schema.json#/$defs/AnswerCompleteness"
+    },
+    "fact_scope_census": {
+      "type": "array",
+      "items": {
+        "$ref": "context_fabric_common.v1.schema.json#/$defs/FactScopeCensusRecord"
+      },
+      "maxItems": 27,
+      "description": "CHAOS-5405 D-d: one record per attempted requirement/origin scope decision. Optional-first: absent on every result written before this field existed, and on any path that resolved no scope at all -- absent and empty are different documents."
+    },
+    "fact_scope_census_omitted": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 27,
+      "description": "Count of scope decisions the census does not list because the request's serialized byte budget could not carry every row beside the smallest valid answer. Absent when every decision is listed. Additive: absent on every result written before this field existed."
+    },
+    "evidence_ref_labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "maxProperties": 8192,
+      "description": "CHAOS-4690: display label per evidence ref id reachable on this result; on a fresh write the key set equals the result's own evidence-ref closure exactly."
+    },
+    "refusal_basis": {
+      "type": "string",
+      "description": "CHAOS-5442: names WHY the server refused to act on this question's frame, over a vocabulary. ABSENT on every turn that was not refused -- absence means \"not refused\", never \"refused for a reason nobody recorded\" (that state is the `unspecified` member). Orthogonal to terminal_reason, which names the CHANNEL an explanation travelled through rather than the decision taken: a refused frame carries both. `continuation_context_unverifiable` refuses a window-only continuation whose prior semantic context the server could not verify; it is not a frame refusal, and the document carries its own fixed limitation sentence. Open vocabulary; documented values: member_kind_unservable, frame_invariant_violated, unspecified, continuation_context_unverifiable, declared_kind_unmatched, organization_scope_unsupported, subject_identity_unconfirmed. A client must tolerate values it does not know.",
+      "x-documented-values": [
+        "member_kind_unservable",
+        "frame_invariant_violated",
+        "unspecified",
+        "continuation_context_unverifiable",
+        "declared_kind_unmatched",
+        "organization_scope_unsupported",
+        "subject_identity_unconfirmed"
+      ]
+    },
+    "status_correction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replaced_status",
+        "direction"
+      ],
+      "description": "Present only when the server's outcome-derived completeness authority replaced the status the model authored: the status replaced (replaced_status), the pair served (direction), and the outcome row the derivation relied on (deciding_requirement, deciding_outcome; a requirement identity that also appears in completeness.outcomes). ABSENT means the served status is the model's own label, never 'unknown'. A status is never corrected up to complete.",
+      "properties": {
+        "replaced_status": {
+          "type": "string",
+          "description": "The status the server replaced: the model's authored status unless an earlier server step (claim-depth trim, served-status floors) had already lowered it, which that step discloses through its own limitation.",
+          "enum": [
+            "complete",
+            "partial",
+            "degraded"
+          ]
+        },
+        "direction": {
+          "type": "string",
+          "description": "model_status paired with the served status.",
+          "enum": [
+            "complete_to_partial",
+            "complete_to_degraded",
+            "partial_to_degraded",
+            "degraded_to_partial"
+          ]
+        },
+        "deciding_requirement": {
+          "type": "string",
+          "description": "Identity of the outcome row the derivation relied on; absent when no single row decided it."
+        },
+        "deciding_outcome": {
+          "type": "string",
+          "description": "That row's outcome.",
+          "enum": [
+            "satisfied",
+            "narrowed",
+            "unavailable",
+            "not_applicable",
+            "not_attempted"
+          ]
+        }
+      }
+    },
+    "semantic_reading": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Open vocabulary; documented values: semantic_state_absent, semantic_state_unreadable. A client must tolerate values it does not know.",
+          "x-documented-values": [
+            "semantic_state_absent",
+            "semantic_state_unreadable"
+          ]
+        }
+      },
+      "description": "CHAOS-5672: present only on a read of a stored clarification whose answerability needed the stored accepted reading and could not load it. Absent means the read did not need the reading or had it. semantic_state_absent: the row carries no reading; semantic_state_unreadable: the row carries a reading this build cannot read. Fresh composition never sets it."
+    }
+  },
+  "required": [
+    "schema_version",
+    "result_id",
+    "request_id",
+    "generated_at",
+    "status",
+    "question",
+    "interpretation",
+    "subject_resolution",
+    "direct_judgment",
+    "current_state",
+    "strongest_pressures",
+    "drivers",
+    "remaining_work",
+    "readiness_gaps",
+    "paths",
+    "conflicts",
+    "limitations",
+    "evidence_ref_ids",
+    "claimed_facts",
+    "coverage",
+    "versions",
+    "deterministic_answer",
+    "warnings",
+    "reused",
+    "completeness"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "complete",
+              "partial"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "direct_judgment": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "anyOf": [
+          {
+            "properties": {
+              "status": {
+                "enum": [
+                  "complete",
+                  "partial"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "properties": {
+              "claimed_facts": {
+                "minItems": 1
+              },
+              "evidence_ref_ids": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "claimed_facts",
+              "evidence_ref_ids"
+            ]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "deterministic_answer": {
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

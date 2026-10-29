@@ -16,7 +16,7 @@ import {
     boundedUpstreamRequestId,
     type NarrowingContinuationAxis,
 } from "@/lib/acr/upstream-vocabulary";
-import { validateContract } from "@/lib/acr/validate";
+import { validateContract, type ContractSchemaName } from "@/lib/acr/validate";
 import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
 import type {
     BoundStructureReceipt,
@@ -40,7 +40,22 @@ import type {
  */
 
 const INVESTIGATION_PATH = "/api/v1/context-fabric/investigations";
-const RESULT_SCHEMA = "context_fabric_investigation_result.v1.schema.json";
+/**
+ * Result schema by the payload's own `schema_version` (CHAOS-11906). acr serves
+ * v2 whenever it minted a membership-verify anchor option; v1 results are never
+ * reinterpreted. An unlisted version is a contract violation, never a guess.
+ */
+const RESULT_SCHEMAS = {
+    "context_fabric_investigation_result.v1": "context_fabric_investigation_result.v1.schema.json",
+    "context_fabric_investigation_result.v2": "context_fabric_investigation_result.v2.schema.json",
+} as const satisfies Record<string, ContractSchemaName>;
+
+function resultSchemaFor(payload: unknown): ContractSchemaName | undefined {
+    if (typeof payload !== "object" || payload === null) return undefined;
+    const version = (payload as { schema_version?: unknown }).schema_version;
+    if (typeof version !== "string" || !Object.hasOwn(RESULT_SCHEMAS, version)) return undefined;
+    return RESULT_SCHEMAS[version as keyof typeof RESULT_SCHEMAS];
+}
 
 /**
  * Upper bound on a result payload, in BYTES.
@@ -713,7 +728,21 @@ export async function investigate(
 
     // The result must satisfy its own contract before the UI sees it. Anything
     // else is an upstream failure, reported as one.
-    const validation = validateContract(RESULT_SCHEMA, payload);
+    const resultSchema = resultSchemaFor(payload);
+    if (resultSchema === undefined) {
+        const seen = (payload as { schema_version?: unknown } | null)?.schema_version;
+        console.error("acr result carries an unsupported schema_version", {
+            schema_version: typeof seen === "string" ? seen.slice(0, 80) : typeof seen,
+            httpStatus: response.status,
+        });
+        throw new AcrRequestError({
+            code: "acr_contract_violation",
+            message: "ACR returned a result with a schema version the Workbench does not accept.",
+            httpStatus: response.status,
+            retryable: false,
+        });
+    }
+    const validation = validateContract(resultSchema, payload);
     if (!validation.valid) {
         throw new AcrRequestError({
             code: "acr_contract_violation",

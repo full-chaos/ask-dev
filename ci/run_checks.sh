@@ -51,6 +51,10 @@ run_format() {
 # a pin bump all fail here.
 run_contracts() {
   pnpm acr:contracts:check
+  # CHAOS-11906 (INV-4): web is the pin of record; ask-dev must carry the same
+  # acr SHA and equal schema digests. Reads web's committed manifest on main.
+  node scripts/check-pin-equality.mjs --web-manifest \
+    "${WEB_ACR_MANIFEST_URL:-https://raw.githubusercontent.com/full-chaos/dev-health-web/main/src/lib/acr/contracts/manifest.json}"
 }
 
 # Validates the corpus of record's rows against acr's ingestion-boundary
