@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 
 import "@/app/tokens.css";
-import "@/app/globals.css";
+import "@/app/standalone.css";
+import "@/app/ask-dev.css";
 
 // Vendored from dev-health-web (src/fonts, OFL): the same static Inter and
 // JetBrains Mono instances web loads, under the same CSS variable names.
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { readonly children: React.ReactNode }) {
     return (
         <html className={`${bodyFont.variable} ${monoFont.variable}`} lang="en">
-            <body>{children}</body>
+            <body className="ask-dev">{children}</body>
         </html>
     );
 }

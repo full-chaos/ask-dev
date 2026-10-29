@@ -877,295 +877,299 @@ export function AskDevChat() {
     }
 
     return (
-        <div className="ask">
-            <aside aria-label="This conversation" className="ask__rail ask__rail--left">
-                <button
-                    className="rail__new"
-                    disabled={isPending || turns.length === 0}
-                    onClick={startOver}
-                    type="button"
-                >
-                    <svg
-                        aria-hidden="true"
-                        fill="none"
-                        height="16"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        viewBox="0 0 24 24"
-                        width="16"
+        <div className="ask-dev ask-frame">
+            <div className="ask">
+                <aside aria-label="This conversation" className="ask__rail ask__rail--left">
+                    <button
+                        className="rail__new"
+                        disabled={isPending || turns.length === 0}
+                        onClick={startOver}
+                        type="button"
                     >
-                        <path d="M12 5v14M5 12h14" />
-                    </svg>
-                    New question
-                </button>
-                <div className="rail__section">
-                    <h2 className="rail__label">This conversation</h2>
-                    {askedQuestions.length === 0 ? (
-                        <p className="rail__empty">The questions you ask appear here.</p>
-                    ) : (
-                        <ol className="rail__list">
-                            {askedQuestions.map((turn, index) => (
-                                <li key={turn.id}>
-                                    <button
-                                        aria-current={
-                                            index === askedQuestions.length - 1 ? "true" : undefined
-                                        }
-                                        className={
-                                            index === askedQuestions.length - 1
-                                                ? "rail__item rail__item--current"
-                                                : "rail__item"
-                                        }
-                                        onClick={() => showTurn(turn.id)}
-                                        type="button"
-                                    >
-                                        <span className="sr-only">Show the question </span>
-                                        {`“${turn.question}”`}
-                                        <span className="rail__item-meta">
-                                            {formatTurnTime(turn.createdAt)}
-                                        </span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ol>
-                    )}
-                </div>
-            </aside>
-
-            <section aria-label="Ask Dev conversation" className="chat">
-                <div className="chat__timeline-wrap">
-                    <div
-                        aria-label="Conversation"
-                        className="chat__timeline"
-                        role="log"
-                        aria-live="polite"
-                        onScroll={handleTimelineScroll}
-                        ref={timelineRef}
-                    >
-                        {turns.length === 0 ? (
-                            <div className="chat__intro">
-                                <h2 className="chat__intro-title">
-                                    Where is your engineering effort{" "}
-                                    <span className="chat__intro-accent">actually going?</span>
-                                </h2>
-                                <p className="chat__empty">
-                                    Ask a question to start an investigation.
-                                </p>
-                            </div>
+                        <svg
+                            aria-hidden="true"
+                            fill="none"
+                            height="16"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            viewBox="0 0 24 24"
+                            width="16"
+                        >
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        New question
+                    </button>
+                    <div className="rail__section">
+                        <h2 className="rail__label">This conversation</h2>
+                        {askedQuestions.length === 0 ? (
+                            <p className="rail__empty">The questions you ask appear here.</p>
                         ) : (
-                            turns.map((turn) => {
-                                if (turn.role === "user") {
-                                    // CHAOS-4670: a silent receipt-carrying
-                                    // re-ask renders nothing here — see
-                                    // `Turn`'s `showBubble` doc comment.
-                                    if (!turn.showBubble) return null;
-                                    return (
-                                        <div
-                                            className="chat__turn chat__turn--user"
-                                            id={turnDomId(turn.id)}
-                                            key={turn.id}
+                            <ol className="rail__list">
+                                {askedQuestions.map((turn, index) => (
+                                    <li key={turn.id}>
+                                        <button
+                                            aria-current={
+                                                index === askedQuestions.length - 1
+                                                    ? "true"
+                                                    : undefined
+                                            }
+                                            className={
+                                                index === askedQuestions.length - 1
+                                                    ? "rail__item rail__item--current"
+                                                    : "rail__item"
+                                            }
+                                            onClick={() => showTurn(turn.id)}
+                                            type="button"
                                         >
-                                            <p className="chat__meta chat__meta--user">
-                                                You · {formatTurnTime(turn.createdAt)}
-                                            </p>
-                                            <p className="chat__bubble">{turn.question}</p>
-                                        </div>
-                                    );
-                                }
-
-                                const isLatest = turn.id === latestAssistantTurn?.id;
-                                // The turns BEFORE this assistant turn's own user
-                                // turn are what this follow-up derived its carry
-                                // from; say so when a subject could not ride along.
-                                const carryNotice =
-                                    turn.outcome.kind === "answered"
-                                        ? turn.outcome.scopeLossNotice
-                                        : undefined;
-
-                                return (
-                                    <div
-                                        className={
-                                            isLatest
-                                                ? "chat__turn chat__turn--assistant"
-                                                : "chat__turn chat__turn--assistant chat__turn--frozen"
-                                        }
-                                        key={turn.id}
-                                    >
-                                        <p className="chat__meta">
-                                            Ask Dev · {formatTurnTime(turn.createdAt)}
-                                        </p>
-                                        {carryNotice === undefined ? null : (
-                                            <p
-                                                className="record__meta"
-                                                data-testid="follow-up-scope-not-carried"
-                                            >
-                                                {carryNotice}
-                                            </p>
-                                        )}
-                                        {turn.outcome.kind === "pending" ? (
-                                            <p className="chat__pending" role="status">
-                                                Investigating…
-                                            </p>
-                                        ) : null}
-                                        {turn.outcome.kind === "failed" ? (
-                                            <FailurePanel
-                                                failure={turn.outcome.failure}
-                                                pending={isPending}
-                                                originalQuestion={turn.rootQuestion}
-                                                onRetry={
-                                                    isLatest &&
-                                                    turn.retryQuestion !== undefined &&
-                                                    turn.outcome.failure.retryable
-                                                        ? () => {
-                                                              // Through the composer's OWN submit
-                                                              // path (draft-clear-on-success,
-                                                              // preserve-and-select-on-failure) —
-                                                              // never `ask()` directly, which would
-                                                              // leave the composer showing stale,
-                                                              // already-answered text after a
-                                                              // successful retry (codex review
-                                                              // round 2).
-                                                              composerRef.current?.retry(
-                                                                  turn.retryQuestion!,
-                                                              );
-                                                          }
-                                                        : undefined
-                                                }
-                                                onNarrowerReask={
-                                                    // CHAOS-5107: same availability rule as
-                                                    // `onRetry` (plain-ask-only, latest-turn-only),
-                                                    // but NOT gated on `retryable` — a 413 budget
-                                                    // refusal is never retryable, yet is exactly
-                                                    // when this fires. Through the same composer
-                                                    // submit path as retry, for the same reason.
-                                                    isLatest &&
-                                                    turn.rootQuestion !== undefined &&
-                                                    turn.outcome.failure.narrowerContinuation !==
-                                                        undefined
-                                                        ? (narrowedQuestion: string) => {
-                                                              // CHAOS-5107 (codex review round 3):
-                                                              // carries the CHAIN's root forward so a
-                                                              // second consecutive budget refusal
-                                                              // narrows the tester's real question
-                                                              // again, not the already-narrowed text
-                                                              // this turn itself sent. Set BEFORE
-                                                              // `retry`, consumed synchronously at
-                                                              // the start of the `ask()` call it
-                                                              // triggers — see the ref's own doc
-                                                              // comment.
-                                                              pendingNarrowingRootRef.current =
-                                                                  turn.rootQuestion;
-                                                              composerRef.current?.retry(
-                                                                  narrowedQuestion,
-                                                              );
-                                                          }
-                                                        : undefined
-                                                }
-                                            />
-                                        ) : null}
-                                        {turn.outcome.kind === "answered" ? (
-                                            <DeterministicAnswerView
-                                                chosenSubject={turn.chosenSubject}
-                                                onConfirmCandidates={
-                                                    isLatest ? chooseCandidates : undefined
-                                                }
-                                                onConfirmStructure={
-                                                    isLatest ? chooseStructure : undefined
-                                                }
-                                                onRejectStructure={
-                                                    isLatest
-                                                        ? structureSelections.reject
-                                                        : undefined
-                                                }
-                                                onToggleCandidate={
-                                                    isLatest
-                                                        ? candidateSelections.toggle
-                                                        : undefined
-                                                }
-                                                onToggleStructure={
-                                                    isLatest
-                                                        ? structureSelections.toggle
-                                                        : undefined
-                                                }
-                                                onToggleStructureCandidate={
-                                                    isLatest
-                                                        ? structureCandidateSelections.toggle
-                                                        : undefined
-                                                }
-                                                rankingWithheld={turn.outcome.rankingWithheld}
-                                                result={turn.outcome.result}
-                                                selectedCandidateReceiptIds={
-                                                    isLatest
-                                                        ? candidateSelections.batch
-                                                        : (turn.submittedCandidateReceiptIds ??
-                                                          EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                }
-                                                selectedStructureCandidateReceiptIds={
-                                                    isLatest
-                                                        ? structureCandidateSelections.batch
-                                                        : (turn.submittedStructureCandidateReceiptIds ??
-                                                          EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                }
-                                                offersPresentation="popup"
-                                                pending={isPending}
-                                                structureBatch={
-                                                    isLatest
-                                                        ? structureSelections.batch
-                                                        : turn.submittedStructureBatch
-                                                }
-                                            />
-                                        ) : null}
-                                    </div>
-                                );
-                            })
+                                            <span className="sr-only">Show the question </span>
+                                            {`“${turn.question}”`}
+                                            <span className="rail__item-meta">
+                                                {formatTurnTime(turn.createdAt)}
+                                            </span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ol>
                         )}
                     </div>
-                    {hasUnseenBelow ? (
-                        <button
-                            className="chat__jump-to-latest"
-                            onClick={jumpToLatest}
-                            type="button"
+                </aside>
+
+                <section aria-label="Ask Dev conversation" className="chat">
+                    <div className="chat__timeline-wrap">
+                        <div
+                            aria-label="Conversation"
+                            className="chat__timeline"
+                            role="log"
+                            aria-live="polite"
+                            onScroll={handleTimelineScroll}
+                            ref={timelineRef}
                         >
-                            Jump to latest ↓
-                        </button>
-                    ) : null}
-                </div>
+                            {turns.length === 0 ? (
+                                <div className="chat__intro">
+                                    <h2 className="chat__intro-title">
+                                        Where is your engineering effort{" "}
+                                        <span className="chat__intro-accent">actually going?</span>
+                                    </h2>
+                                    <p className="chat__empty">
+                                        Ask a question to start an investigation.
+                                    </p>
+                                </div>
+                            ) : (
+                                turns.map((turn) => {
+                                    if (turn.role === "user") {
+                                        // CHAOS-4670: a silent receipt-carrying
+                                        // re-ask renders nothing here — see
+                                        // `Turn`'s `showBubble` doc comment.
+                                        if (!turn.showBubble) return null;
+                                        return (
+                                            <div
+                                                className="chat__turn chat__turn--user"
+                                                id={turnDomId(turn.id)}
+                                                key={turn.id}
+                                            >
+                                                <p className="chat__meta chat__meta--user">
+                                                    You · {formatTurnTime(turn.createdAt)}
+                                                </p>
+                                                <p className="chat__bubble">{turn.question}</p>
+                                            </div>
+                                        );
+                                    }
 
-                <div className="chat__composer-bar">
-                    {popupPages.length === 0 ? null : (
-                        // Floats above the composer via CSS (`.clarification-popup`
-                        // is `position: absolute`, this wrapper `position:
-                        // relative`) — a DOM SIBLING of `ChatComposer`, never a
-                        // wrapper around it, so the composer stays fully
-                        // interactive underneath exactly as the ticket requires
-                        // ("typing a normal reply is always allowed").
-                        <ClarificationPopup
-                            key={latestAssistantTurn?.id}
-                            onComplete={() => {
-                                if (latestAssistantTurn !== undefined) {
-                                    popupAutoConfirmRef.current = latestAssistantTurn.id;
-                                    setPopupAutoConfirmTick((tick) => tick + 1);
-                                }
-                            }}
-                            onDismiss={() => {
-                                // codex round 3: move focus BEFORE the popup
-                                // unmounts (same synchronous handler that
-                                // removes it) — see `ChatComposerHandle.focus`'s
-                                // own doc comment for why a later effect is too
-                                // late.
-                                composerRef.current?.focus();
-                                setDismissedPopupTurnId(latestAssistantTurn?.id);
-                            }}
-                            onFreeText={(text) => void ask(text)}
-                            onSelect={applyPopupSelection}
-                            pages={popupPages}
-                            pending={isPending}
-                        />
-                    )}
-                    <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
-                </div>
-            </section>
+                                    const isLatest = turn.id === latestAssistantTurn?.id;
+                                    // The turns BEFORE this assistant turn's own user
+                                    // turn are what this follow-up derived its carry
+                                    // from; say so when a subject could not ride along.
+                                    const carryNotice =
+                                        turn.outcome.kind === "answered"
+                                            ? turn.outcome.scopeLossNotice
+                                            : undefined;
 
-            <InspectorRail result={latestAnswered} />
+                                    return (
+                                        <div
+                                            className={
+                                                isLatest
+                                                    ? "chat__turn chat__turn--assistant"
+                                                    : "chat__turn chat__turn--assistant chat__turn--frozen"
+                                            }
+                                            key={turn.id}
+                                        >
+                                            <p className="chat__meta">
+                                                Ask Dev · {formatTurnTime(turn.createdAt)}
+                                            </p>
+                                            {carryNotice === undefined ? null : (
+                                                <p
+                                                    className="record__meta"
+                                                    data-testid="follow-up-scope-not-carried"
+                                                >
+                                                    {carryNotice}
+                                                </p>
+                                            )}
+                                            {turn.outcome.kind === "pending" ? (
+                                                <p className="chat__pending" role="status">
+                                                    Investigating…
+                                                </p>
+                                            ) : null}
+                                            {turn.outcome.kind === "failed" ? (
+                                                <FailurePanel
+                                                    failure={turn.outcome.failure}
+                                                    pending={isPending}
+                                                    originalQuestion={turn.rootQuestion}
+                                                    onRetry={
+                                                        isLatest &&
+                                                        turn.retryQuestion !== undefined &&
+                                                        turn.outcome.failure.retryable
+                                                            ? () => {
+                                                                  // Through the composer's OWN submit
+                                                                  // path (draft-clear-on-success,
+                                                                  // preserve-and-select-on-failure) —
+                                                                  // never `ask()` directly, which would
+                                                                  // leave the composer showing stale,
+                                                                  // already-answered text after a
+                                                                  // successful retry (codex review
+                                                                  // round 2).
+                                                                  composerRef.current?.retry(
+                                                                      turn.retryQuestion!,
+                                                                  );
+                                                              }
+                                                            : undefined
+                                                    }
+                                                    onNarrowerReask={
+                                                        // CHAOS-5107: same availability rule as
+                                                        // `onRetry` (plain-ask-only, latest-turn-only),
+                                                        // but NOT gated on `retryable` — a 413 budget
+                                                        // refusal is never retryable, yet is exactly
+                                                        // when this fires. Through the same composer
+                                                        // submit path as retry, for the same reason.
+                                                        isLatest &&
+                                                        turn.rootQuestion !== undefined &&
+                                                        turn.outcome.failure
+                                                            .narrowerContinuation !== undefined
+                                                            ? (narrowedQuestion: string) => {
+                                                                  // CHAOS-5107 (codex review round 3):
+                                                                  // carries the CHAIN's root forward so a
+                                                                  // second consecutive budget refusal
+                                                                  // narrows the tester's real question
+                                                                  // again, not the already-narrowed text
+                                                                  // this turn itself sent. Set BEFORE
+                                                                  // `retry`, consumed synchronously at
+                                                                  // the start of the `ask()` call it
+                                                                  // triggers — see the ref's own doc
+                                                                  // comment.
+                                                                  pendingNarrowingRootRef.current =
+                                                                      turn.rootQuestion;
+                                                                  composerRef.current?.retry(
+                                                                      narrowedQuestion,
+                                                                  );
+                                                              }
+                                                            : undefined
+                                                    }
+                                                />
+                                            ) : null}
+                                            {turn.outcome.kind === "answered" ? (
+                                                <DeterministicAnswerView
+                                                    chosenSubject={turn.chosenSubject}
+                                                    onConfirmCandidates={
+                                                        isLatest ? chooseCandidates : undefined
+                                                    }
+                                                    onConfirmStructure={
+                                                        isLatest ? chooseStructure : undefined
+                                                    }
+                                                    onRejectStructure={
+                                                        isLatest
+                                                            ? structureSelections.reject
+                                                            : undefined
+                                                    }
+                                                    onToggleCandidate={
+                                                        isLatest
+                                                            ? candidateSelections.toggle
+                                                            : undefined
+                                                    }
+                                                    onToggleStructure={
+                                                        isLatest
+                                                            ? structureSelections.toggle
+                                                            : undefined
+                                                    }
+                                                    onToggleStructureCandidate={
+                                                        isLatest
+                                                            ? structureCandidateSelections.toggle
+                                                            : undefined
+                                                    }
+                                                    rankingWithheld={turn.outcome.rankingWithheld}
+                                                    result={turn.outcome.result}
+                                                    selectedCandidateReceiptIds={
+                                                        isLatest
+                                                            ? candidateSelections.batch
+                                                            : (turn.submittedCandidateReceiptIds ??
+                                                              EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                    }
+                                                    selectedStructureCandidateReceiptIds={
+                                                        isLatest
+                                                            ? structureCandidateSelections.batch
+                                                            : (turn.submittedStructureCandidateReceiptIds ??
+                                                              EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                    }
+                                                    offersPresentation="popup"
+                                                    pending={isPending}
+                                                    structureBatch={
+                                                        isLatest
+                                                            ? structureSelections.batch
+                                                            : turn.submittedStructureBatch
+                                                    }
+                                                />
+                                            ) : null}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                        {hasUnseenBelow ? (
+                            <button
+                                className="chat__jump-to-latest"
+                                onClick={jumpToLatest}
+                                type="button"
+                            >
+                                Jump to latest ↓
+                            </button>
+                        ) : null}
+                    </div>
+
+                    <div className="chat__composer-bar">
+                        {popupPages.length === 0 ? null : (
+                            // Floats above the composer via CSS (`.clarification-popup`
+                            // is `position: absolute`, this wrapper `position:
+                            // relative`) — a DOM SIBLING of `ChatComposer`, never a
+                            // wrapper around it, so the composer stays fully
+                            // interactive underneath exactly as the ticket requires
+                            // ("typing a normal reply is always allowed").
+                            <ClarificationPopup
+                                key={latestAssistantTurn?.id}
+                                onComplete={() => {
+                                    if (latestAssistantTurn !== undefined) {
+                                        popupAutoConfirmRef.current = latestAssistantTurn.id;
+                                        setPopupAutoConfirmTick((tick) => tick + 1);
+                                    }
+                                }}
+                                onDismiss={() => {
+                                    // codex round 3: move focus BEFORE the popup
+                                    // unmounts (same synchronous handler that
+                                    // removes it) — see `ChatComposerHandle.focus`'s
+                                    // own doc comment for why a later effect is too
+                                    // late.
+                                    composerRef.current?.focus();
+                                    setDismissedPopupTurnId(latestAssistantTurn?.id);
+                                }}
+                                onFreeText={(text) => void ask(text)}
+                                onSelect={applyPopupSelection}
+                                pages={popupPages}
+                                pending={isPending}
+                            />
+                        )}
+                        <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
+                    </div>
+                </section>
+
+                <InspectorRail result={latestAnswered} />
+            </div>
         </div>
     );
 }
