@@ -46,4 +46,20 @@ describe("comparePins", () => {
         );
         expect(comparePins({ files: [] }, web).join("\n")).toContain("no source_commit");
     });
+    it("fails on duplicate paths with conflicting digests in either manifest", () => {
+        const dupWeb = {
+            ...web,
+            files: [...web.files, { path: "schemas/common.json", sha256: "tampered" }],
+        };
+        expect(comparePins(ask, dupWeb).join("\n")).toContain(
+            "web manifest lists schemas/common.json twice",
+        );
+        const dupAsk = {
+            ...ask,
+            files: [...ask.files, { path: "schemas/common.json", sha256: "tampered" }],
+        };
+        expect(comparePins(dupAsk, web).join("\n")).toContain(
+            "ask-dev manifest lists schemas/common.json twice",
+        );
+    });
 });

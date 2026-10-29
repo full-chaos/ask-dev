@@ -24,6 +24,16 @@ export function comparePins(askDev, web) {
     if (typeof web?.source_commit !== "string" || web.source_commit === "") {
         problems.push("web manifest has no source_commit");
     }
+    for (const [label, manifest] of [
+        ["ask-dev", askDev],
+        ["web", web],
+    ]) {
+        const seen = new Set();
+        for (const file of manifest.files ?? []) {
+            if (seen.has(file.path)) problems.push(`${label} manifest lists ${file.path} twice`);
+            seen.add(file.path);
+        }
+    }
     if (problems.length > 0) return problems;
     if (askDev.source_commit !== web.source_commit) {
         problems.push(
