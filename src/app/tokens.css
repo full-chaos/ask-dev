@@ -1,0 +1,187 @@
+/*
+ * Ask Dev design tokens — dev-health-web's `infinity` palette, copied by name
+ * and value (web: src/app/fc-infinity-themes.css, src/app/globals.css).
+ *
+ * Standalone, this file is the theme. Embedded in dev-health-web, web's own
+ * `:root[data-palette="infinity"][data-theme=…]` rules carry higher
+ * specificity and win, so the surface inherits web's theme with no remap.
+ * Keep names identical to web's; add a token here only when web has no role
+ * for it.
+ *
+ * Theme: follows the OS by default; `data-theme="light|dark"` on <html>
+ * overrides it (the same attribute web sets).
+ */
+
+:root {
+    color-scheme: light;
+
+    --background: #f1f3f4;
+    --foreground: #15171a;
+    --ink-muted: #585e65;
+    --accent: #d6421f;
+    --accent-foreground: #ffffff;
+    --accent-text: #b1361a;
+    --accent-wash: #ffe9da;
+    --accent-ink: #b1361a;
+    --accent-2: #03627d;
+    --action: #037493;
+    --on-action: #ffffff;
+    --card: #fdfdfc;
+    --card-stroke: #dde1e4;
+    --surface: #fdfdfc;
+    --surface-raised: #fdfdfc;
+    --surface2: #e8ecee;
+    --sidebar: #f8f9f9;
+    --border: #dde1e4;
+    --text-primary: #15171a;
+    --text-secondary: #4b535b;
+    --text-muted: #585e65;
+    --positive: #18664d;
+    --caution: #7d4f00;
+    --negative: #a61708;
+    --info: #03627d;
+    --positive-wash: #e1f2eb;
+    --caution-wash: #fff0d0;
+    --negative-wash: #fbe6e1;
+    --info-wash: #dcf0f4;
+    --deemph: #9aa2a9;
+    --chart-grid: #e4e7e9;
+    --chart-text: #15171a;
+    --chart-muted: #656c73;
+    --chart-color-1: #0087a9;
+    --chart-color-2: #c88600;
+    --chart-color-3: #2525d0;
+    --chart-color-4: #00a2b8;
+    --chart-color-5: #f06a00;
+    --chart-color-6: #075a72;
+    --chart-color-7: #e052a7;
+    --chart-color-8: #771782;
+    --chart-color-9: #656c73;
+    --chart-color-10: #2f353b;
+    --theme-feature: var(--chart-color-5);
+    --theme-quality: var(--chart-color-4);
+    --theme-risk: var(--chart-color-2);
+    --theme-maintenance: var(--chart-color-3);
+    --theme-operational: var(--chart-color-1);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-pill: 999px;
+    --space-card: 24px;
+    --space-card-sm: 16px;
+    --elevation-card: 0 18px 48px -34px rgb(15 23 42 / 0.25);
+    --elevation-drawer: 0 28px 80px -36px rgb(15 23 42 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+
+        --background: #0e1316;
+        --foreground: #f1f3f4;
+        --ink-muted: #a7afb5;
+        --accent: #f47b20;
+        --accent-foreground: #15171a;
+        --accent-text: #ffab66;
+        --accent-wash: #3a2110;
+        --accent-ink: #ffab66;
+        --accent-2: #4fd3df;
+        --action: #0a7f9c;
+        --on-action: #ffffff;
+        --card: #161c20;
+        --card-stroke: #28323a;
+        --surface: #161c20;
+        --surface-raised: #1f272c;
+        --surface2: #1f272c;
+        --sidebar: #11171a;
+        --border: #28323a;
+        --text-primary: #f1f3f4;
+        --text-secondary: #a7afb5;
+        --text-muted: #8b959c;
+        --positive: #63cfa6;
+        --caution: #f2b84b;
+        --negative: #ff8266;
+        --info: #4fd3df;
+        --positive-wash: #13322a;
+        --caution-wash: #33290f;
+        --negative-wash: #3b1b15;
+        --info-wash: #11333c;
+        --deemph: #5f6a72;
+        --chart-grid: #232c32;
+        --chart-text: #f1f3f4;
+        --chart-muted: #a7afb5;
+        --chart-color-1: #0b8fb0;
+        --chart-color-2: #c98500;
+        --chart-color-3: #da2100;
+        --chart-color-4: #02a2bc;
+        --chart-color-5: #e8650a;
+        --chart-color-6: #4fd3df;
+        --chart-color-7: #7d49ca;
+        --chart-color-8: #e56ce5;
+        --chart-color-9: #808990;
+        --chart-color-10: #a7afb5;
+        --theme-feature: #a64807;
+        --theme-quality: #016e7f;
+        --theme-risk: #885a00;
+        --theme-maintenance: #cc1f00;
+        --theme-operational: #086d86;
+        --elevation-card: 0 18px 48px -30px rgb(0 0 0 / 0.6);
+        --elevation-drawer: 0 28px 80px -32px rgb(0 0 0 / 0.7);
+    }
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --background: #0e1316;
+    --foreground: #f1f3f4;
+    --ink-muted: #a7afb5;
+    --accent: #f47b20;
+    --accent-foreground: #15171a;
+    --accent-text: #ffab66;
+    --accent-wash: #3a2110;
+    --accent-ink: #ffab66;
+    --accent-2: #4fd3df;
+    --action: #0a7f9c;
+    --on-action: #ffffff;
+    --card: #161c20;
+    --card-stroke: #28323a;
+    --surface: #161c20;
+    --surface-raised: #1f272c;
+    --surface2: #1f272c;
+    --sidebar: #11171a;
+    --border: #28323a;
+    --text-primary: #f1f3f4;
+    --text-secondary: #a7afb5;
+    --text-muted: #8b959c;
+    --positive: #63cfa6;
+    --caution: #f2b84b;
+    --negative: #ff8266;
+    --info: #4fd3df;
+    --positive-wash: #13322a;
+    --caution-wash: #33290f;
+    --negative-wash: #3b1b15;
+    --info-wash: #11333c;
+    --deemph: #5f6a72;
+    --chart-grid: #232c32;
+    --chart-text: #f1f3f4;
+    --chart-muted: #a7afb5;
+    --chart-color-1: #0b8fb0;
+    --chart-color-2: #c98500;
+    --chart-color-3: #da2100;
+    --chart-color-4: #02a2bc;
+    --chart-color-5: #e8650a;
+    --chart-color-6: #4fd3df;
+    --chart-color-7: #7d49ca;
+    --chart-color-8: #e56ce5;
+    --chart-color-9: #808990;
+    --chart-color-10: #a7afb5;
+    --theme-feature: #a64807;
+    --theme-quality: #016e7f;
+    --theme-risk: #885a00;
+    --theme-maintenance: #cc1f00;
+    --theme-operational: #086d86;
+    --elevation-card: 0 18px 48px -30px rgb(0 0 0 / 0.6);
+    --elevation-drawer: 0 28px 80px -32px rgb(0 0 0 / 0.7);
+}

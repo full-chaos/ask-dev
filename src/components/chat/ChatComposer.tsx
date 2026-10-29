@@ -157,7 +157,19 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                     disabled={pending || question.trim() === ""}
                     aria-label="Send"
                 >
-                    {pending ? "Asking…" : "Ask"}
+                    <svg
+                        aria-hidden="true"
+                        fill="none"
+                        height="18"
+                        stroke="currentColor"
+                        strokeLinecap="round"
+                        strokeWidth="2.2"
+                        viewBox="0 0 24 24"
+                        width="18"
+                    >
+                        <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                    <span className="sr-only">{pending ? "Asking…" : "Ask"}</span>
                 </button>
             </div>
             <p className="chat-composer__hint">

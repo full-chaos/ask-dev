@@ -14,6 +14,7 @@ import type { ClarificationChoice } from "@/components/ClarificationPanel";
 import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
 import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
 import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
+import { AppHeader } from "@/components/shell/AppHeader";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
 import type { BoundStructureReceipt, InvestigationResult, SubjectRef } from "@/lib/contracts";
@@ -331,81 +332,87 @@ export default function WorkbenchPage() {
     }
 
     return (
-        <main className="workbench">
-            <header className="workbench__masthead">
-                <Link className="workbench__back-link" href="/">
-                    ← Ask Dev
-                </Link>
-                <h1>Context Fabric Workbench</h1>
-                <p>
-                    Standalone answer test platform (CHAOS-3738). Platform/test scoped, separate
-                    from the Ask Dev window and /dev. Read-only: it renders investigation results,
-                    it does not produce them.
-                </p>
-            </header>
+        <>
+            <AppHeader titleIsPageHeading={false} />
+            <main className="workbench">
+                <header className="workbench__masthead">
+                    <Link className="workbench__back-link" href="/">
+                        ← Ask Dev
+                    </Link>
+                    <h1>Context Fabric Workbench</h1>
+                    <p>
+                        Standalone answer test platform (CHAOS-3738). Platform/test scoped, separate
+                        from the Ask Dev window and /dev. Read-only: it renders investigation
+                        results, it does not produce them.
+                    </p>
+                </header>
 
-            <QuestionForm
-                initialQuestion=""
-                pending={outcome.kind === "pending"}
-                onAsk={(question) => {
-                    // Captured explicitly (codex review round 2): a plain new
-                    // question must not silently drop telemetry for a
-                    // candidate the tester toggled but never confirmed.
-                    const selectionEvents = [
-                        ...structureSelections.pendingSelectionEvents,
-                        ...candidateSelections.pendingSelectionEvents,
-                        ...structureCandidateSelections.pendingSelectionEvents,
-                    ];
-                    void ask(question, [], undefined, undefined, selectionEvents);
-                }}
-            />
+                <QuestionForm
+                    initialQuestion=""
+                    pending={outcome.kind === "pending"}
+                    onAsk={(question) => {
+                        // Captured explicitly (codex review round 2): a plain new
+                        // question must not silently drop telemetry for a
+                        // candidate the tester toggled but never confirmed.
+                        const selectionEvents = [
+                            ...structureSelections.pendingSelectionEvents,
+                            ...candidateSelections.pendingSelectionEvents,
+                            ...structureCandidateSelections.pendingSelectionEvents,
+                        ];
+                        void ask(question, [], undefined, undefined, selectionEvents);
+                    }}
+                />
 
-            {outcome.kind === "idle" ? (
-                <p className="panel__empty">Ask a question to run an investigation.</p>
-            ) : null}
+                {outcome.kind === "idle" ? (
+                    <p className="panel__empty">Ask a question to run an investigation.</p>
+                ) : null}
 
-            {outcome.kind === "pending" ? (
-                <p className="record__meta" role="status">
-                    Investigating “{askedQuestion}” …
-                </p>
-            ) : null}
+                {outcome.kind === "pending" ? (
+                    <p className="record__meta" role="status">
+                        Investigating “{askedQuestion}” …
+                    </p>
+                ) : null}
 
-            {outcome.kind === "failed" ? <FailurePanel failure={outcome.failure} /> : null}
+                {outcome.kind === "failed" ? <FailurePanel failure={outcome.failure} /> : null}
 
-            {outcome.kind === "answered" ? (
-                <>
-                    <div className="result__head">
-                        <h2 className="result__question">{outcome.result.question}</h2>
-                        {outcome.rankingWithheld === undefined ? (
-                            <span className="badge" title={outcome.result.status}>
-                                {outcome.result.status.replaceAll("_", " ")}
-                            </span>
-                        ) : (
-                            <span
-                                className="badge badge--warn"
-                                title={`withheld by the Workbench; service status: ${outcome.result.status}`}
-                            >
-                                withheld
-                            </span>
-                        )}
-                    </div>
-                    {/* The choice-not-applied notice is likewise view-independent:
+                {outcome.kind === "answered" ? (
+                    <>
+                        <div className="result__head">
+                            <h2 className="result__question">{outcome.result.question}</h2>
+                            {outcome.rankingWithheld === undefined ? (
+                                <span className="badge" title={outcome.result.status}>
+                                    {outcome.result.status.replaceAll("_", " ")}
+                                </span>
+                            ) : (
+                                <span
+                                    className="badge badge--warn"
+                                    title={`withheld by the Workbench; service status: ${outcome.result.status}`}
+                                >
+                                    withheld
+                                </span>
+                            )}
+                        </div>
+                        {/* The choice-not-applied notice is likewise view-independent:
                         a dishonoured choice must not become invisible because
                         the tester happened to be looking at the raw inspector.
                         Rendered here rather than inside the deterministic view,
                         which is why that view is given no chosenSubject below —
                         EnrichmentView still passes one through for its own
                         fallback. */}
-                    {chosenSubject === undefined ? null : (
-                        <ChoiceNotice
-                            chosen={chosenSubject}
-                            disposition={choiceDisposition(outcome.result, chosenSubject)}
+                        {chosenSubject === undefined ? null : (
+                            <ChoiceNotice
+                                chosen={chosenSubject}
+                                disposition={choiceDisposition(outcome.result, chosenSubject)}
+                            />
+                        )}
+                        <ViewSwitcher
+                            active={view}
+                            available={AVAILABLE_VIEWS}
+                            onSelect={setView}
                         />
-                    )}
-                    <ViewSwitcher active={view} available={AVAILABLE_VIEWS} onSelect={setView} />
-                    {view === "raw" ? (
-                        <>
-                            {/* The clarification interaction is reachable from
+                        {view === "raw" ? (
+                            <>
+                                {/* The clarification interaction is reachable from
                                 EVERY view. The raw inspector has no answer
                                 surface of its own, so the choice is rendered
                                 beside it; the deterministic view renders it
@@ -417,67 +424,70 @@ export default function WorkbenchPage() {
                                 DeterministicAnswerView renders its OWN copy
                                 from `result` directly, so nothing is passed
                                 down for it here either. */}
-                            <StructureConfirmationNotice
-                                entries={outcome.result.confirmed_structure}
-                            />
-                            {outcome.result.structure_needs === undefined ? null : (
-                                // Keyed by result_id — see DeterministicAnswerView's
-                                // own comment on the same fix. `batch`/`onToggle`
-                                // are the SAME shared state DeterministicAnswerView's
-                                // own instance uses, so a pick here survives a
-                                // switch to the deterministic view.
-                                <StructureNeedsPanel
-                                    key={outcome.result.result_id}
-                                    batch={structureSelections.batch}
-                                    onConfirm={(batch, candidateReceipts) => {
-                                        void chooseStructure(batch, candidateReceipts);
-                                    }}
-                                    onReject={structureSelections.reject}
-                                    onToggle={structureSelections.toggle}
-                                    onToggleCandidate={structureCandidateSelections.toggle}
-                                    resultId={outcome.result.result_id}
-                                    selectedCandidateReceiptIds={structureCandidateSelections.batch}
-                                    structureNeeds={outcome.result.structure_needs}
+                                <StructureConfirmationNotice
+                                    entries={outcome.result.confirmed_structure}
                                 />
-                            )}
-                            {outcome.result.status === "clarification_required" ? (
-                                <ClarificationPanel
-                                    onConfirm={(choices) => {
-                                        void chooseCandidates(choices);
-                                    }}
-                                    onToggle={candidateSelections.toggle}
+                                {outcome.result.structure_needs === undefined ? null : (
+                                    // Keyed by result_id — see DeterministicAnswerView's
+                                    // own comment on the same fix. `batch`/`onToggle`
+                                    // are the SAME shared state DeterministicAnswerView's
+                                    // own instance uses, so a pick here survives a
+                                    // switch to the deterministic view.
+                                    <StructureNeedsPanel
+                                        key={outcome.result.result_id}
+                                        batch={structureSelections.batch}
+                                        onConfirm={(batch, candidateReceipts) => {
+                                            void chooseStructure(batch, candidateReceipts);
+                                        }}
+                                        onReject={structureSelections.reject}
+                                        onToggle={structureSelections.toggle}
+                                        onToggleCandidate={structureCandidateSelections.toggle}
+                                        resultId={outcome.result.result_id}
+                                        selectedCandidateReceiptIds={
+                                            structureCandidateSelections.batch
+                                        }
+                                        structureNeeds={outcome.result.structure_needs}
+                                    />
+                                )}
+                                {outcome.result.status === "clarification_required" ? (
+                                    <ClarificationPanel
+                                        onConfirm={(choices) => {
+                                            void chooseCandidates(choices);
+                                        }}
+                                        onToggle={candidateSelections.toggle}
+                                        result={outcome.result}
+                                        selectedReceiptIds={candidateSelections.batch}
+                                    />
+                                ) : null}
+                                <CanonicalResultInspector
+                                    rankingWithheld={outcome.rankingWithheld}
                                     result={outcome.result}
-                                    selectedReceiptIds={candidateSelections.batch}
                                 />
-                            ) : null}
-                            <CanonicalResultInspector
+                            </>
+                        ) : (
+                            <DeterministicAnswerView
+                                onConfirmCandidates={(choices) => {
+                                    void chooseCandidates(choices);
+                                }}
+                                onConfirmStructure={(batch, candidateReceipts) => {
+                                    void chooseStructure(batch, candidateReceipts);
+                                }}
+                                onRejectStructure={structureSelections.reject}
+                                onToggleCandidate={candidateSelections.toggle}
+                                onToggleStructure={structureSelections.toggle}
+                                onToggleStructureCandidate={structureCandidateSelections.toggle}
                                 rankingWithheld={outcome.rankingWithheld}
                                 result={outcome.result}
+                                selectedCandidateReceiptIds={candidateSelections.batch}
+                                selectedStructureCandidateReceiptIds={
+                                    structureCandidateSelections.batch
+                                }
+                                structureBatch={structureSelections.batch}
                             />
-                        </>
-                    ) : (
-                        <DeterministicAnswerView
-                            onConfirmCandidates={(choices) => {
-                                void chooseCandidates(choices);
-                            }}
-                            onConfirmStructure={(batch, candidateReceipts) => {
-                                void chooseStructure(batch, candidateReceipts);
-                            }}
-                            onRejectStructure={structureSelections.reject}
-                            onToggleCandidate={candidateSelections.toggle}
-                            onToggleStructure={structureSelections.toggle}
-                            onToggleStructureCandidate={structureCandidateSelections.toggle}
-                            rankingWithheld={outcome.rankingWithheld}
-                            result={outcome.result}
-                            selectedCandidateReceiptIds={candidateSelections.batch}
-                            selectedStructureCandidateReceiptIds={
-                                structureCandidateSelections.batch
-                            }
-                            structureBatch={structureSelections.batch}
-                        />
-                    )}
-                </>
-            ) : null}
-        </main>
+                        )}
+                    </>
+                ) : null}
+            </main>
+        </>
     );
 }
