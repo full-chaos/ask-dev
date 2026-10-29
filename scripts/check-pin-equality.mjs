@@ -80,8 +80,10 @@ async function readManifest(source) {
     return JSON.parse(fs.readFileSync(source, "utf8"));
 }
 
-const entry = process.argv[1] && path.resolve(process.argv[1]);
-if (entry === fileURLToPath(import.meta.url)) {
+// realpath both sides: a symlinked or relative invocation must still run the
+// check, never skip it silently and exit 0.
+const entry = process.argv[1] && fs.realpathSync(process.argv[1]);
+if (entry === fs.realpathSync(fileURLToPath(import.meta.url))) {
     const flag = process.argv.indexOf("--web-manifest");
     const webSource = flag === -1 ? undefined : process.argv[flag + 1];
     if (webSource === undefined) {
