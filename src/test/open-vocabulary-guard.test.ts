@@ -255,6 +255,7 @@ describe("ranking withheld boundary guard", () => {
         const scanned = walk(root).map((file) => path.relative(root, file));
         expect(scanned).toContain("app/workbench/page.tsx");
         expect(scanned).toContain("app/page.tsx");
+        expect(scanned).toContain("components/chat/AskDevChat.tsx");
     });
 
     it("flags an aliased member read planted in the workbench page source", () => {
@@ -277,7 +278,8 @@ describe("ranking withheld boundary guard", () => {
         },
     );
 
-    it.each(["app/workbench/page.tsx", "app/page.tsx"])(
+    // The chat page renders `AskDevChat`, which owns the chat's result state.
+    it.each(["app/workbench/page.tsx", "components/chat/AskDevChat.tsx"])(
         "%s hands every result it stores from the withheld boundary, never a raw one",
         (rel) => {
             const text = readFileSync(path.join(root, rel), "utf8");
@@ -321,7 +323,7 @@ describe("ranking withheld boundary guard", () => {
 
     it("applies the boundary on the route and at the client entry", () => {
         const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");
-        const page = readFileSync(path.join(root, "app/page.tsx"), "utf8");
+        const page = readFileSync(path.join(root, "components/chat/AskDevChat.tsx"), "utf8");
         expect(route).toContain("withholdUnrankableRankings(result)");
         expect(route).toContain("rankingWithheld: withheld.rankingWithheld");
         const workbench = readFileSync(path.join(root, "app/workbench/page.tsx"), "utf8");

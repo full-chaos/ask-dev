@@ -1,0 +1,1836 @@
+/*
+ * Ask Dev — the embeddable surface stylesheet.
+ *
+ * Every rule is nested under `.ask-dev`, the class on the surface's root
+ * (`AskDevChat`, the Workbench, the standalone frame). Nothing here selects
+ * outside that root, so a host page (dev-health-web) keeps its own element
+ * and class rules, and the extra class in every selector keeps a host's
+ * single-class rules from restyling the surface.
+ *
+ * Colors, radii and elevation come ONLY from the web-named tokens
+ * (`tokens.css` standalone, web's own `infinity` palette when embedded). The
+ * short local names below are aliases onto those tokens.
+ *
+ * HARD RULE (house standard): no bright borders on the dark theme. Separation
+ * comes from surface elevation and low-contrast hairlines, never from a light
+ * outline on a dark ground.
+ */
+
+@keyframes ask-dev-pending-pulse {
+    0%,
+    100% {
+        opacity: 0.6;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+.ask-dev {
+    --surface-0: var(--background);
+    --surface-1: var(--card);
+    --surface-2: color-mix(in srgb, var(--foreground) 4%, var(--card));
+    --text-strong: var(--text-primary);
+    --text: color-mix(in srgb, var(--text-primary) 82%, var(--text-secondary));
+    --border-strong: color-mix(in srgb, var(--border) 86%, var(--foreground));
+    --accent-soft: var(--accent-wash);
+    --focus-ring: var(--accent-2);
+
+    --state-ok: var(--positive);
+    --state-warn: var(--caution);
+    --state-bad: var(--negative);
+    --state-neutral: var(--text-muted);
+
+    --ink-button: var(--foreground);
+    --on-ink-button: var(--background);
+
+    --radius: var(--radius-md);
+    --gap: 16px;
+
+    /* Chart categorical series: web's fixed series order, never cycled. A
+       chart with more series than slots folds extras into a table column. */
+    --series-1: var(--chart-color-1);
+    --series-2: var(--chart-color-2);
+    --series-3: var(--chart-color-3);
+    --series-4: var(--chart-color-4);
+    --series-5: var(--chart-color-5);
+    --series-6: var(--chart-color-6);
+    --series-7: var(--chart-color-7);
+    --series-8: var(--chart-color-8);
+
+    --font-sans-stack:
+        var(--font-body, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+    --font-mono-stack:
+        var(--font-mono, "JetBrains Mono"), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    box-sizing: border-box;
+    color: var(--text);
+    font-family: var(--font-sans-stack);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+
+    * {
+        box-sizing: border-box;
+    }
+
+    /* Keyboard-focus fallback: any class-specific `:focus-visible` rule below
+       still wins on specificity. Teal, as in web (`--accent-2`). */
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible,
+    [role="button"]:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
+
+    a {
+        color: var(--accent-text);
+    }
+
+    code,
+    pre,
+    kbd,
+    samp {
+        font-family: var(--font-mono-stack);
+    }
+
+    .workbench {
+        margin: 0 auto;
+        max-width: 900px;
+        padding: 32px 20px 64px;
+    }
+
+    .workbench__masthead h1 {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 28px;
+        font-weight: 650;
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+    }
+
+    .workbench__masthead p {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .question-form {
+        margin: 24px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .question-form__label {
+        color: var(--text-strong);
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .question-form__row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .question-form__input {
+        flex: 1 1 320px;
+        min-width: 0;
+        min-height: 44px;
+        padding: 10px 14px;
+        border: 1px solid var(--border-strong);
+        border-radius: 12px;
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 16px;
+    }
+
+    .question-form__input:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 1px;
+    }
+
+    .question-form__submit {
+        min-height: 44px;
+        padding: 0 20px;
+        border: none;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--accent-foreground);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .question-form__submit:hover {
+        background: color-mix(in srgb, var(--accent) 88%, var(--foreground));
+    }
+
+    .question-form__hint {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+    }
+
+    .suggestions__button {
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .suggestions__button:hover {
+        border-color: var(--border-strong);
+        background: var(--surface-2);
+    }
+
+    .panel {
+        margin-top: var(--gap);
+        padding: 20px 22px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-1);
+    }
+
+    /* Section tag (mock: "STATE", "EVIDENCE"): a small caps label on a quiet
+       wash, never a heading that competes with the answer itself. */
+    .panel__title {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 0 14px;
+        padding: 4px 8px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 16px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .panel__empty {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .answer__judgment {
+        margin: 0 0 10px;
+        color: var(--text-strong);
+        font-size: 22px;
+        font-weight: 650;
+        line-height: 1.3;
+        letter-spacing: -0.015em;
+    }
+
+    .answer__body {
+        margin: 0 0 12px;
+    }
+
+    .stack {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .stack--tight {
+        gap: 6px;
+    }
+
+    .record {
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-2);
+    }
+
+    .record__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .record__title {
+        color: var(--text-strong);
+        font-weight: 600;
+    }
+
+    .record__meta {
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .record__body {
+        margin: 6px 0 0;
+    }
+
+    /* Status pill: tone is carried by a wash + its AA ink, never by a border. */
+    .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border: none;
+        border-radius: var(--radius-pill);
+        background: var(--surface-2);
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.35;
+        white-space: nowrap;
+    }
+
+    .badge--ok {
+        background: var(--positive-wash);
+        color: var(--state-ok);
+    }
+
+    .badge--warn {
+        background: var(--caution-wash);
+        color: var(--state-warn);
+    }
+
+    .badge--bad {
+        background: var(--negative-wash);
+        color: var(--state-bad);
+    }
+
+    .coverage {
+        display: grid;
+        gap: 8px;
+    }
+
+    .coverage__source {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: baseline;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-2);
+    }
+
+    .coverage__name {
+        color: var(--text-strong);
+        font-family: var(--font-mono-stack);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+    }
+
+    .coverage__reason {
+        grid-column: 1 / -1;
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .evidence-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+    }
+
+    .evidence-ref {
+        padding: 5px 10px;
+        border: none;
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--text);
+        font-family: var(--font-mono-stack);
+        font-size: 12px;
+        overflow-wrap: anywhere;
+    }
+
+    .versions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 6px 16px;
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .versions div {
+        display: flex;
+        gap: 6px;
+    }
+
+    .versions dt {
+        font-weight: 600;
+    }
+
+    .versions dd {
+        margin: 0;
+        font-family: var(--font-mono-stack);
+        overflow-wrap: anywhere;
+    }
+
+    .result__head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-top: 24px;
+    }
+
+    .result__question {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .workbench__footer {
+        margin-top: 32px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    /* --- Workbench shell additions (CHAOS-3738) --- */
+
+    .panel--failure {
+        /* Failure is signalled by a tinted surface and the heading, never by a
+           bright outline — the dark-theme border rule holds here too. */
+        background: color-mix(in srgb, var(--negative-wash) 60%, var(--surface-1));
+    }
+
+    .panel--failure .panel__title {
+        background: var(--negative-wash);
+        color: var(--state-bad);
+    }
+
+    /* Segmented control: ember marks the current selection (web D1). */
+    .view-switcher {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 16px;
+        padding: 4px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-1);
+    }
+
+    .view-switcher__tab {
+        min-height: 36px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .view-switcher__tab:hover:not(:disabled) {
+        background: var(--surface-2);
+        color: var(--text-strong);
+    }
+
+    .view-switcher__tab--active,
+    .view-switcher__tab--active:hover:not(:disabled) {
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-weight: 600;
+    }
+
+    .view-switcher__tab:disabled {
+        color: var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .raw-payload {
+        margin: 10px 0 0;
+        padding: 12px;
+        max-height: 60vh;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface-2);
+        color: var(--text);
+        font-family: var(--font-mono-stack);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .comparison {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .comparison th,
+    .comparison td {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+    }
+
+    .comparison th {
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    /* --- Pop-up card chrome (CHAOS-4581) ---
+       "Elevated cards ... the reference feel is the orchestrator's artifact
+       pages" — card elevation, quiet borders, number tiles. Elevation comes from
+       a low-alpha shadow, never a bright border: the dark-theme "no bright
+       borders" rule at the top of this file holds here too, and the same shadow
+       value already used for `.chat__jump-to-latest` is reused for consistency. */
+
+    .panel--card {
+        box-shadow: var(--elevation-card);
+    }
+
+    /* A compact panel keeps its full detail reachable (never removed) but
+       collapsed by default behind a `<details>` — see CoveragePanel,
+       LimitationsPanel is plain-compact (no disclosure of its own, it is just
+       laid out side by side in `.strip`), StructureConfirmationNotice. */
+    .panel--compact {
+        padding: 14px 18px;
+    }
+
+    .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--gap);
+        margin-top: var(--gap);
+    }
+
+    .strip > .panel {
+        flex: 1 1 260px;
+        margin-top: 0;
+    }
+
+    /* Collapsed-by-default detail. Native `<details>`/`<summary>` — no JS, no
+       extra component, keyboard/screen-reader behavior for free. Only the
+       marker/summary line is themed; the revealed content reuses whatever
+       classes it already carries (`.stack`, `.record`, `.coverage`, ...). */
+    .disclosure {
+        margin-top: 8px;
+    }
+
+    .disclosure > summary {
+        color: var(--accent-2);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .disclosure > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .disclosure > summary::before {
+        content: "▸ ";
+    }
+
+    .disclosure[open] > summary::before {
+        content: "▾ ";
+    }
+
+    .disclosure > summary:hover,
+    .disclosure > summary:focus-visible {
+        color: var(--accent-ink);
+    }
+
+    .disclosure[open] > summary {
+        margin-bottom: 8px;
+    }
+
+    /* Applied-selections / coverage-source chip row: the compact, always-visible
+       summary line that replaces a full record list once there is nothing left
+       to act on (CHAOS-4581 — "receipts/applied selections collapse to a single
+       chip row once applied"). */
+    .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--text);
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .chip code {
+        font-family: var(--font-mono-stack);
+        font-size: 12px;
+    }
+
+    /* Key numbers as tiles (CHAOS-4581): the numeric columns of a single-row
+       rollup fact, pulled out of the table into a small grid of number tiles —
+       the values are unchanged, only the layout differs (`@/lib/fact-rows`'s
+       `factRowTiles` derives nothing new). */
+    .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin: 12px 0;
+    }
+
+    .tile {
+        display: flex;
+        flex-direction: column-reverse;
+        justify-content: flex-end;
+        gap: 6px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface-1);
+    }
+
+    .tile__value {
+        color: var(--text-strong);
+        font-size: 24px;
+        font-weight: 650;
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .tile__label {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    /* A driver card gets the same elevated treatment as its panel; a principal
+       driver is set apart by a tinted surface, never a bright border (same
+       pattern as `.panel--failure` above). */
+    .record--card {
+        padding: 12px 14px;
+    }
+
+    .record--principal {
+        background: var(--caution-wash);
+        border-color: color-mix(in srgb, var(--caution) 22%, var(--caution-wash));
+    }
+
+    /* --- App chrome (standalone only) ---
+       `.app` + `.app-header` are the standalone frame. An embedding host (web's
+       AppShell) mounts `AskDevChat` inside its own <main> and skips both: every
+       rule from `.ask` down sizes itself to its container, never the viewport. */
+
+    .app {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+    }
+
+    .app__main {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .app-header {
+        flex: 0 0 auto;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px 20px;
+        padding: 12px 24px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-1);
+    }
+
+    .app-header__brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border-radius: var(--radius-sm);
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .app-header__logo {
+        width: 30px;
+        height: auto;
+    }
+
+    .app-header__wordmark {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.1;
+    }
+
+    .app-header__product {
+        color: var(--text-strong);
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+    }
+
+    .app-header__title {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }
+
+    .app-header__nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: auto;
+    }
+
+    .app-header__link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        white-space: nowrap;
+    }
+
+    .app-header__link:hover {
+        background: var(--surface-2);
+    }
+
+    .workbench__back-link {
+        display: inline-block;
+        margin-bottom: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+    }
+
+    .workbench__back-link:hover,
+    .workbench__back-link:focus-visible {
+        color: var(--accent-text);
+    }
+
+    /* --- Ask Dev surface: left rail | conversation | right rail --- */
+
+    /* The surface root: a size container, so the rails respond to the space
+       the host gives the surface, not to the viewport. */
+    &.ask-frame {
+        flex: 1 1 auto;
+        min-height: 0;
+        height: 100%;
+        display: flex;
+        container: ask-dev / inline-size;
+    }
+
+    .ask {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 252px minmax(0, 1fr) 320px;
+    }
+
+    .ask__rail {
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        padding: 20px 16px;
+    }
+
+    .ask__rail--left {
+        border-right: 1px solid var(--border);
+        background: var(--sidebar);
+    }
+
+    .ask__rail--right {
+        padding: 24px 20px;
+        border-left: 1px solid var(--border);
+        background: var(--surface-1);
+    }
+
+    .rail__section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .rail__label {
+        margin: 0;
+        padding: 0 2px;
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+    }
+
+    .rail__empty {
+        margin: 0;
+        padding: 0 2px;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .rail__new {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 44px;
+        border: none;
+        border-radius: 12px;
+        background: var(--ink-button);
+        color: var(--on-ink-button);
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .rail__new:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .rail__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .rail__item {
+        display: block;
+        width: 100%;
+        padding: 9px 10px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 14px;
+        line-height: 1.4;
+        text-align: left;
+        overflow-wrap: anywhere;
+        cursor: pointer;
+    }
+
+    .rail__item:hover {
+        background: var(--surface2);
+    }
+
+    .rail__item--current {
+        background: var(--accent-soft);
+        font-weight: 600;
+    }
+
+    .rail__item-meta {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .rail__foot {
+        margin-top: auto;
+        padding: 0 2px;
+        font-size: 13px;
+    }
+
+    .rail__rows {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .rail__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 4px 10px;
+        font-size: 13px;
+    }
+
+    .rail__row-name {
+        color: var(--text-strong);
+        overflow-wrap: anywhere;
+    }
+
+    .rail__row-meta {
+        flex-basis: 100%;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .rail__value {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 14px;
+    }
+
+    .rail__note {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    @container ask-dev (max-width: 1180px) {
+        .ask {
+            grid-template-columns: 240px minmax(0, 1fr);
+        }
+
+        .ask__rail--right {
+            display: none;
+        }
+    }
+
+    @container ask-dev (max-width: 860px) {
+        .ask {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        .ask__rail--left {
+            display: none;
+        }
+    }
+
+    /* --- Conversation column ---
+       Content-first, quiet chrome: the timeline reads like a conversation, not a
+       panel stack. The timeline scrolls internally so the composer never
+       drifts; its gutter centers an 860px reading column without moving the
+       scrollbar off the edge. */
+
+    .chat {
+        --chat-column: 860px;
+        --chat-gutter: max(20px, calc((100% - var(--chat-column)) / 2));
+
+        min-width: 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Wrapper stays a fixed-size flex child; ONLY `.chat__timeline` inside it
+       scrolls. `.chat__jump-to-latest` anchors to this wrapper so it stays
+       pinned at the viewport's bottom edge instead of scrolling away with the
+       content it is offering to jump past. */
+    .chat__timeline-wrap {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+    }
+
+    .chat__timeline {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 28px var(--chat-gutter) 24px;
+    }
+
+    .chat__intro {
+        margin: auto 0;
+        padding: 40px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        text-align: center;
+    }
+
+    .chat__intro-title {
+        margin: 0;
+        max-width: 680px;
+        color: var(--text-strong);
+        font-size: 36px;
+        font-weight: 650;
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+    }
+
+    .chat__intro-accent {
+        color: var(--accent);
+    }
+
+    .chat__empty {
+        margin: 0;
+        max-width: 560px;
+        color: var(--text-secondary);
+        font-size: 16px;
+        line-height: 1.5;
+    }
+
+    .chat__turn--user {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .chat__meta {
+        margin: 0 0 6px;
+        padding: 0 2px;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .chat__meta--user {
+        text-align: right;
+    }
+
+    .chat__bubble {
+        margin: 0;
+        max-width: min(75%, 560px);
+        padding: 14px 20px;
+        border-radius: 18px 18px 4px 18px;
+        background: var(--surface2);
+        color: var(--text-strong);
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+
+    .chat__turn--assistant {
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
+    }
+
+    .chat__turn--assistant .panel:first-child {
+        margin-top: 0;
+    }
+
+    /* The answer prose leads the turn as the headline, not as one more card. */
+    .chat__turn--assistant [data-testid="answer-panel"] {
+        padding: 4px 0 0;
+        border: none;
+        background: transparent;
+    }
+
+    /* A frozen turn's OWN answer stays fully legible — only its now-inert
+       chip offers read as quieter, via the same "cannot re-ask here" markers
+       ClarificationPanel/StructureNeedsPanel already render for a non-latest
+       turn. Nothing here depends on those components' internals beyond the
+       test-id hooks they already expose. */
+    .chat__turn--frozen .panel:has([data-testid="cannot-choose-here"]) .record,
+    .chat__turn--frozen .panel:has([data-testid="cannot-confirm-structure-here"]) .record {
+        opacity: 0.72;
+    }
+
+    .chat__turn--frozen
+        .panel:has([data-testid="cannot-choose-here"])
+        [data-testid="cannot-choose-here"],
+    .chat__turn--frozen
+        .panel:has([data-testid="cannot-confirm-structure-here"])
+        [data-testid="cannot-confirm-structure-here"] {
+        opacity: 0.85;
+        font-style: italic;
+    }
+
+    .chat__pending {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .chat__pending::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--accent-2);
+    }
+
+    .chat__jump-to-latest {
+        position: absolute;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: var(--elevation-card);
+    }
+
+    .chat__jump-to-latest:hover {
+        background: var(--surface-2);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .chat__pending {
+            animation: ask-dev-pending-pulse 1.6s ease-in-out infinite;
+        }
+    }
+
+    .chat__composer-bar {
+        /* `position: relative` anchors `.clarification-popup` below (CHAOS-4671)
+           — the popup is a DOM sibling of `.chat-composer`, absolutely
+           positioned OVER this bar's own top edge, never wrapping or covering
+           the composer itself. Its horizontal padding is the popup's inset. */
+        position: relative;
+        flex: 0 0 auto;
+        width: 100%;
+        max-width: calc(var(--chat-column) + 40px);
+        margin: 0 auto;
+        padding: 8px 20px calc(18px + env(safe-area-inset-bottom));
+    }
+    /* --- Clarification popup (CHAOS-4671) ---
+       The Claude app/web pattern: a card floating directly above the chat
+       input, replacing the old full-width inline offer panels. Elevated via
+       the same low-alpha shadow token `.chat__jump-to-latest` already uses; no
+       bright border, dark-theme rule holds. */
+
+    .clarification-popup {
+        /* No `max-width`/`margin: auto` (CHAOS-4695): `left`/`right: 20px` here
+           match `.chat__composer-bar`'s own horizontal padding exactly, so the
+           popup spans the SAME content width as its DOM sibling `.chat-composer`
+           — the chat column's width, not a fixed intrinsic one that floats
+           narrower and off-center. */
+        position: absolute;
+        left: 20px;
+        right: 20px;
+        bottom: calc(100% + 10px);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: var(--surface-1);
+        box-shadow: var(--elevation-drawer);
+    }
+
+    .clarification-popup:focus-visible {
+        outline: none;
+    }
+
+    .clarification-popup__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .clarification-popup__stepper {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .clarification-popup__stepper-nav {
+        padding: 2px 8px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        color: var(--text);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .clarification-popup__stepper-nav:disabled {
+        color: var(--text-muted);
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .clarification-popup__stepper-count {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .clarification-popup__dismiss {
+        padding: 2px 8px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 16px;
+        line-height: 1;
+        cursor: pointer;
+    }
+
+    .clarification-popup__dismiss:hover {
+        color: var(--text-strong);
+    }
+
+    .clarification-popup__title {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .clarification-popup__options {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 40vh;
+        overflow-y: auto;
+    }
+
+    .clarification-popup__option-button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 44px;
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 14px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .clarification-popup__option-button:hover,
+    .clarification-popup__option-button--focused {
+        background: var(--surface-2);
+    }
+
+    .clarification-popup__option-button[aria-pressed="true"] {
+        border-color: color-mix(in srgb, var(--accent) 30%, var(--accent-soft));
+        background: var(--accent-soft);
+        color: var(--accent-ink);
+        font-weight: 600;
+    }
+
+    .clarification-popup__option-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .clarification-popup__option-button--other {
+        color: var(--text-muted);
+    }
+
+    .clarification-popup__option-number {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: var(--radius-sm);
+        background: var(--surface-2);
+        color: var(--text-muted);
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .clarification-popup__option-text {
+        flex: 1 1 auto;
+        overflow-wrap: anywhere;
+    }
+
+    /* codex round 1 finding 3: the structural value bound to the receipt,
+       shown alongside a model `phrasing` — never hidden behind it. */
+    .clarification-popup__option-structural {
+        display: block;
+        margin-top: 2px;
+        color: var(--text-muted);
+        font-size: 11px;
+    }
+
+    .clarification-popup__option-check {
+        flex: 0 0 auto;
+        color: var(--state-ok);
+    }
+
+    .clarification-popup__continue {
+        min-height: 40px;
+        padding: 0 16px;
+        border: none;
+        border-radius: var(--radius-md);
+        background: var(--ink-button);
+        color: var(--on-ink-button);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .clarification-popup__continue:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--ink-button) 86%, var(--background));
+    }
+
+    .clarification-popup__continue:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .clarification-popup__free-text {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        background: var(--surface-2);
+    }
+
+    .clarification-popup__free-text-icon {
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .clarification-popup__free-text-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        border: none;
+        background: transparent;
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 13px;
+    }
+
+    .clarification-popup__free-text-input:focus-visible {
+        outline: none;
+    }
+
+    .clarification-popup__skip {
+        flex: 0 0 auto;
+        padding: 3px 10px;
+        border: none;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--text-muted);
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .clarification-popup__skip:hover {
+        color: var(--text-strong);
+    }
+
+    .clarification-popup__hint {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 11px;
+        text-align: center;
+    }
+
+    @media (max-width: 480px) {
+        .clarification-popup {
+            left: 16px;
+            right: 16px;
+        }
+    }
+
+    /* --- Chosen-answers summary card (CHAOS-4671) ---
+       Replaces the "Your selections were applied" chip panel on the chat
+       surface: question muted, answer emphasized, one compact card. */
+
+    .chosen-answers__list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .chosen-answers__row {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 13px;
+    }
+
+    .chosen-answers__question {
+        color: var(--text-muted);
+    }
+
+    .chosen-answers__question::after {
+        content: ":";
+    }
+
+    .chosen-answers__answer {
+        color: var(--text-strong);
+        font-weight: 600;
+    }
+
+    .chat-composer {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 12px 10px 16px;
+        border: 1px solid var(--border-strong);
+        border-radius: 18px;
+        background: var(--surface-1);
+        box-shadow: var(--elevation-card);
+    }
+
+    .chat-composer:focus-within {
+        border-color: var(--focus-ring);
+        outline: 1px solid var(--focus-ring);
+        outline-offset: 0;
+    }
+
+    .chat-composer__label {
+        /* Visually hidden, not display:none — a screen reader still needs it. */
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .chat-composer__row {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+    }
+
+    .chat-composer__input {
+        flex: 1 1 auto;
+        min-width: 0;
+        /* Autosizes in JS up to this height (chat/ChatComposer.tsx), then
+           scrolls internally rather than growing the composer bar without
+           bound. */
+        max-height: 200px;
+        overflow-y: auto;
+        padding: 8px 2px;
+        border: none;
+        resize: none;
+        background: transparent;
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 16px;
+        line-height: 1.5;
+    }
+
+    .chat-composer__input:focus-visible {
+        outline: none;
+    }
+
+    .chat-composer__input::placeholder {
+        color: var(--text-muted);
+    }
+
+    .chat-composer__submit {
+        flex: 0 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: none;
+        border-radius: 12px;
+        background: var(--accent);
+        color: var(--accent-foreground);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .chat-composer__submit:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--accent) 88%, var(--foreground));
+    }
+
+    .chat-composer__submit:disabled {
+        background: var(--surface2);
+        color: var(--text-muted);
+        cursor: not-allowed;
+    }
+
+    .chat-composer__hint {
+        margin: 0;
+        padding: 0 4px;
+        color: var(--text-muted);
+        font-size: 11px;
+    }
+
+    /* --- Mobile (UX-equivalence pass) ---
+       Tighter side padding and a slightly smaller masthead so the header's link
+       row and the composer keep their full content on-screen at 375px with no
+       horizontal scroll; the timeline's own `.record`/`.badge` wrapping already
+       holds at this width without a rule of its own. */
+    /* --- Fact rows panel (CHAOS-4355) ---
+       One panel per claimed fact carrying a renderable `rows` table, stacked
+       under the answer text. Table by default; a chart only when the rows have
+       a time/ordinal axis plus a numeric column (see src/lib/fact-rows.ts). */
+
+    .fact-panel__caption {
+        margin: 0 0 12px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .fact-table-wrap {
+        overflow-x: auto;
+    }
+
+    .fact-table {
+        width: 100%;
+        min-width: max-content;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .fact-table th,
+    .fact-table td {
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    .fact-table th {
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .fact-table td {
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .work-item-status__observations {
+        display: grid;
+        gap: 2px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    /* Keep this table within its answer panel while letting its intrinsic columns
+       accommodate short headers and wrap long member labels without truncation. */
+    .work-item-status__table {
+        width: 100%;
+        min-width: 0;
+        table-layout: auto;
+    }
+
+    .work-item-status__table th,
+    .work-item-status__table td {
+        vertical-align: top;
+        white-space: normal;
+    }
+
+    .work-item-status__table thead th {
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .work-item-status__table tbody th,
+    .work-item-status__table tbody td {
+        overflow-wrap: anywhere;
+    }
+
+    .fact-chart {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* Small multiples: two or more numeric columns never share one y-scale
+       (dataviz skill — never dual-axis), so each gets its own mini chart in a
+       responsive grid instead. */
+    .fact-chart--grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .fact-chart__cell {
+        min-width: 0;
+    }
+
+    .fact-chart__cell-title {
+        display: flex;
+        align-items: center;
+        margin: 0 0 4px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .fact-chart__legend-swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        flex: 0 0 auto;
+    }
+
+    .fact-chart__svg {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+    }
+
+    .fact-chart__gridline {
+        stroke: var(--border);
+        stroke-width: 1;
+    }
+
+    .fact-chart__axis-label {
+        fill: var(--text-muted);
+        font-size: 10px;
+    }
+
+    .fact-chart__value-label {
+        fill: var(--text-strong);
+        font-size: 10px;
+        font-weight: 600;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.1s ease;
+    }
+
+    .fact-chart__mark-group:hover .fact-chart__value-label,
+    .fact-chart__mark-group:focus-within .fact-chart__value-label {
+        opacity: 1;
+    }
+
+    /* Every mark (bar/point) is a focusable, keyboard-reachable `<g>` — give it
+       a real visible focus ring, the same accent used everywhere else in this
+       stylesheet, not just a hover-only affordance (codex round 1, CHAOS-4355). */
+    .fact-chart__mark-group:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 1px;
+    }
+
+    /* Visually hidden but present for assistive tech — the accessible-data
+       fallback FactRowsPanel renders alongside a chart (codex round 1,
+       CHAOS-4355), same pattern as `.chat-composer__label` above. */
+    .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    /* --- Details disclosure (CHAOS-4669/CHAOS-4673) ---
+       Shared collapse for computation arithmetic, per-driver breakdowns, raw
+       evidence ids and internal vocabulary — everything 4581/4669 push behind a
+       fold instead of inline. Always starts collapsed; native <details> gives
+       keyboard/screen-reader operability and a JS-off fallback for free. */
+
+    .details {
+        margin-top: 8px;
+    }
+
+    .details__summary {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .details__summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .details__summary::before {
+        content: "▸ ";
+    }
+
+    .details[open] > .details__summary::before {
+        content: "▾ ";
+    }
+
+    .details__summary:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
+
+    .details__body {
+        margin-top: 8px;
+    }
+
+    /* CHAOS-4669: a compact driver record before its own Details is expanded —
+       title/standing/one-line summary only, the weight/value/confidence/
+       evidence apparatus stays folded. */
+    .driver-compact {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px;
+    }
+
+    .driver-compact__summary {
+        flex: 1 1 260px;
+        min-width: 0;
+        color: var(--text);
+        font-size: 13px;
+    }
+
+    /* CHAOS-4669: a cross-referenced fact (already rendered in full on its
+       primary surface) — a one-line pointer, not a re-rendered record. */
+    .record--reference {
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    @media (max-width: 480px) {
+        .app-header {
+            padding: 10px 16px;
+        }
+
+        .app-header__link {
+            padding: 0 10px;
+            font-size: 12px;
+        }
+
+        .chat__timeline {
+            padding: 16px 16px 20px;
+            gap: 20px;
+        }
+
+        .chat__intro-title {
+            font-size: 28px;
+        }
+
+        .chat__composer-bar {
+            padding: 6px 16px calc(14px + env(safe-area-inset-bottom));
+        }
+
+        .chat__bubble {
+            max-width: 85%;
+            font-size: 15px;
+        }
+
+        .answer__judgment {
+            font-size: 20px;
+        }
+
+        .panel {
+            padding: 16px;
+        }
+    }
+
+    /* --- Cohort ranking table (CHAOS-4449) ---
+       Reuses `.fact-table` wholesale; only the per-row driver list needs rules of
+       its own. Separation stays surface/hairline-based — no bright borders. */
+
+    .ranking__drivers {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 2px;
+    }
+
+    .ranking__driver-signal {
+        color: var(--text);
+        font-weight: 600;
+    }
+
+    /* CHAOS-4415: a render shape acr selected, drawn. Sits inside an existing
+       panel (the ranked-cohort panel, or a fact's own rows panel), so it carries
+       no border or surface of its own — nesting a second bordered box inside a
+       panel is the visual noise the dark theme exists to avoid. */
+    .render-shape {
+        margin: 0 0 12px;
+    }
+
+    .render-shape__title {
+        margin: 0 0 2px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .render-shape__legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 0 0 6px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .render-shape__legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+}

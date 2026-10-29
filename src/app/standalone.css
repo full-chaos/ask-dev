@@ -1,0 +1,5 @@
+/* Standalone page only: an embedding host owns its own <body>. */
+body {
+    margin: 0;
+    background: var(--background);
+}
