@@ -18,11 +18,27 @@ import path from "node:path";
 
 export function comparePins(askDev, web) {
     const problems = [];
-    if (typeof askDev?.source_commit !== "string" || askDev.source_commit === "") {
-        problems.push("ask-dev manifest has no source_commit");
-    }
-    if (typeof web?.source_commit !== "string" || web.source_commit === "") {
-        problems.push("web manifest has no source_commit");
+    for (const [label, manifest] of [
+        ["ask-dev", askDev],
+        ["web", web],
+    ]) {
+        if (
+            typeof manifest?.source_commit !== "string" ||
+            !/^[0-9a-f]{40}$/u.test(manifest.source_commit)
+        ) {
+            problems.push(`${label} manifest source_commit is not a 40-hex commit`);
+        }
+        if (!Array.isArray(manifest?.files)) {
+            problems.push(`${label} manifest has no files array`);
+            continue;
+        }
+        for (const file of manifest.files) {
+            if (typeof file?.path !== "string" || file.path === "") {
+                problems.push(`${label} manifest has an entry without a path`);
+            } else if (typeof file.sha256 !== "string" || !/^[0-9a-f]{64}$/u.test(file.sha256)) {
+                problems.push(`${label} manifest entry ${file.path} has no valid sha256`);
+            }
+        }
     }
     for (const [label, manifest] of [
         ["ask-dev", askDev],
