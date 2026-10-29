@@ -19,12 +19,14 @@ import addFormats from "ajv-formats";
 import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import investigationRequestSchema from "@/contracts/schemas/context_fabric_investigation_request.v1.schema.json";
 import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
+import investigationResultV2Schema from "@/contracts/schemas/context_fabric_investigation_result.v2.schema.json";
 import errorSchema from "@/contracts/schemas/error.v1.schema.json";
 
 export const CONTRACT_SCHEMAS = {
     "context_fabric_common.v1.schema.json": commonSchema,
     "context_fabric_investigation_request.v1.schema.json": investigationRequestSchema,
     "context_fabric_investigation_result.v1.schema.json": investigationResultSchema,
+    "context_fabric_investigation_result.v2.schema.json": investigationResultV2Schema,
     "error.v1.schema.json": errorSchema,
 } as const;
 

@@ -410,7 +410,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "09c9706a5b54e836c10dc0377b5f2d1e72219f0d";
+export const SOURCE_COMMIT = "418f9bf477c95efab2064f526594636aa3a6887c";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
@@ -429,11 +429,18 @@ const SCHEMA_PATHS = [
     "contracts/jsonschema/v1/context_fabric_common.v1.schema.json",
     "contracts/jsonschema/v1/context_fabric_investigation_request.v1.schema.json",
     "contracts/jsonschema/v1/context_fabric_investigation_result.v1.schema.json",
+    // CHAOS-11906: the v2 result (anchor_options carry membership-verify
+    // semantics; wire shape otherwise identical to v1). acr serves it whenever
+    // it minted a membership-verify anchor option, so validate.ts must accept it.
+    "contracts/jsonschema/v1/context_fabric_investigation_result.v2.schema.json",
     "contracts/jsonschema/v1/error.v1.schema.json",
 ];
 const EXAMPLE_PATHS = [
     "contracts/examples/v1/context_fabric_investigation_request.v1.json",
     "contracts/examples/v1/context_fabric_investigation_result.v1.json",
+    // CHAOS-11906: the v2 golden acr's own contract suite validates. Never
+    // hand-authored: the v2 tests run against this document.
+    "contracts/examples/v1/context_fabric_investigation_result.v2.json",
     // CHAOS-4415: the render-shape example. Added because the workbench's
     // chart tests must run against a document acr's OWN producer emitted --
     // a hand-authored fixture would pass a renderer test while the live
