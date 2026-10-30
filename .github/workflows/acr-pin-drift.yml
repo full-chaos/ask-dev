@@ -1,0 +1,31 @@
+# ALARM, not a gate (CHAOS-5553): fails when the vendored ACR contract pin has
+# drifted from acr main. Deliberately NOT a required check and NOT part of the
+# `test` aggregate in tests.yml, so ask-dev PRs stay green between pin bumps
+# while drift stays visible. Mirrors dev-health-web's "ACR pin drift" workflow.
+# The required pin-integrity check (`ci/run_checks.sh contracts`) is unchanged.
+# Exit 1 = drift, exit 2 = the check could not fetch (also red; never read as current).
+name: ACR pin drift
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+    schedule:
+        - cron: "17 6 * * *"
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    drift:
+        name: ACR pin drift
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+              with:
+                  node-version-file: .nvmrc
+            - name: Compare the vendored pin with acr main
+              run: node scripts/check-acr-pin-drift.mjs
