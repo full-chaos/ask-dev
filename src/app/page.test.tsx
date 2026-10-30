@@ -1134,18 +1134,13 @@ describe("fan-out correctness (codex review)", () => {
      * candidate on EACH, confirm only the LAST page — the earlier page's
      * pick must still fire its own request.
      */
-    it("confirming the last page still fires the other page's earlier pending pick", async () => {
+    it("confirming the last page carries the other page's earlier pending pick in the SAME single request (CHAOS-12003)", async () => {
         const subjectCandidate = mixedCandidates.subject_resolution.candidates[0]!;
         const structureCandidateOption = mixedCandidates.structure_needs!.candidate_options![0]!;
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
                 new Response(JSON.stringify({ result: mixedCandidates }), {
-                    headers: { "Content-Type": "application/json" },
-                }),
-            )
-            .mockResolvedValueOnce(
-                new Response(JSON.stringify({ result: answered }), {
                     headers: { "Content-Type": "application/json" },
                 }),
             )
@@ -1170,21 +1165,16 @@ describe("fan-out correctness (codex review)", () => {
 
         expect(
             await screen.findAllByRole("article", { name: "Deterministic answer" }),
-        ).toHaveLength(3);
-        expect(fetchSpy).toHaveBeenCalledTimes(3);
+        ).toHaveLength(2);
+        // One confirm click = one request: a second one would be sequential
+        // against the same result and always return a stale-receipt no_match.
+        expect(fetchSpy).toHaveBeenCalledTimes(2);
 
         const bodies = fetchSpy.mock.calls
             .slice(1)
             .map((call) => JSON.parse(call[1]!.body as string) as Record<string, unknown>);
-        const subjectRequest = bodies.find(
-            (body) =>
-                Array.isArray(body.priorSubjectReceipts) && body.priorSubjectReceipts.length > 0,
-        );
-        const structureRequest = bodies.find(
-            (body) =>
-                Array.isArray(body.priorCandidateReceipts) &&
-                body.priorCandidateReceipts.length > 0,
-        );
+        const subjectRequest = bodies[0];
+        const structureRequest = bodies[0];
         expect(subjectRequest?.priorSubjectReceipts).toEqual([
             { result_id: mixedCandidates.result_id, receipt_id: subjectCandidate.receipt_id },
         ]);
