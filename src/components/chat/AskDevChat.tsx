@@ -622,7 +622,8 @@ export function AskDevChat() {
         // always carries a receipt the first's newer result has superseded
         // (`no_match`, "kind vetoed stale"). The first structure-candidate
         // receipt therefore rides the first subject request; any further
-        // ones keep the one-request-per-entry fan-out.
+        // ones keep the one-request-per-entry fan-out (CHAOS-4343 design;
+        // same-axis multi-pick is tracked in CHAOS-12146).
         const foldedStructureReceipt: BoundStructureReceipt | undefined =
             subjectChoices.length > 0 ? structureCandidateReceipts[0] : undefined;
         const fanOutStructureReceipts =
