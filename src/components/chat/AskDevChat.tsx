@@ -610,11 +610,33 @@ export function AskDevChat() {
         const structureReceiptFieldsBase = buildStructureReceiptFields(otherStructureBatch);
 
         type PendingItem =
-            | { readonly kind: "subject"; readonly choice: ClarificationChoice }
+            | {
+                  readonly kind: "subject";
+                  readonly choice: ClarificationChoice;
+                  readonly structureReceipt?: BoundStructureReceipt;
+              }
             | { readonly kind: "structure"; readonly receipt: BoundStructureReceipt };
+        // CHAOS-12003: both axes picked against the SAME `result` (the popup
+        // walks them as consecutive pages) must travel in ONE request. Two
+        // requests would be sequential against one result, and the second
+        // always carries a receipt the first's newer result has superseded
+        // (`no_match`, "kind vetoed stale"). The first structure-candidate
+        // receipt therefore rides the first subject request; any further
+        // ones keep the one-request-per-entry fan-out (CHAOS-4343 design;
+        // same-axis multi-pick is tracked in CHAOS-12146).
+        const foldedStructureReceipt: BoundStructureReceipt | undefined =
+            subjectChoices.length > 0 ? structureCandidateReceipts[0] : undefined;
+        const fanOutStructureReceipts =
+            foldedStructureReceipt === undefined
+                ? structureCandidateReceipts
+                : structureCandidateReceipts.slice(1);
         const items: readonly PendingItem[] = [
-            ...subjectChoices.map((choice): PendingItem => ({ kind: "subject", choice })),
-            ...structureCandidateReceipts.map((receipt): PendingItem => ({
+            ...subjectChoices.map((choice, index): PendingItem =>
+                index === 0 && foldedStructureReceipt !== undefined
+                    ? { kind: "subject", choice, structureReceipt: foldedStructureReceipt }
+                    : { kind: "subject", choice },
+            ),
+            ...fanOutStructureReceipts.map((receipt): PendingItem => ({
                 kind: "structure",
                 receipt,
             })),
@@ -657,7 +679,12 @@ export function AskDevChat() {
                           ...otherStructureBatch,
                           subject_candidate: item.receipt,
                       })
-                    : structureReceiptFieldsBase;
+                    : item.structureReceipt !== undefined
+                      ? buildStructureReceiptFields({
+                            ...otherStructureBatch,
+                            subject_candidate: item.structureReceipt,
+                        })
+                      : structureReceiptFieldsBase;
             void fireInvestigation({
                 question,
                 priorSubjectReceipts,
