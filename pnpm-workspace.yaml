@@ -1,3 +1,16 @@
+# CHAOS-5269: resolve optional platform deps (e.g. @next/swc-*) for both the
+# linux build host (bigboy) and the darwin-arm64 Mac that runs the build
+# output, so one install carries both variants. "current" keeps the install
+# host's own platform.
+supportedArchitectures:
+    os:
+        - current
+        - darwin
+        - linux
+    cpu:
+        - current
+        - arm64
+
 allowBuilds:
     esbuild: true
     sharp: true
