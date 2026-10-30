@@ -46,16 +46,16 @@ describe("FactRowsPanels", () => {
 
     it("renders one panel per claimed fact carrying rows", () => {
         render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
-        // Three facts in the fixture carry rows: the CI daily rollup, the
-        // project's team_count claim (team_breakdown rows attached), and
-        // the latency-percentiles table.
+        // Two facts the fixture adds carry rows: the CI daily rollup and the
+        // project's team_count claim (team_breakdown rows attached).
         expect(
             screen.getByRole("heading", { name: /continuous integration.*pipelines count/i }),
         ).toBeInTheDocument();
         expect(screen.getByRole("heading", { name: /metrics.*team count/i })).toBeInTheDocument();
+        // No claim names a field no acr producer emits (CHAOS-4385).
         expect(
-            screen.getByRole("heading", { name: /metrics.*latency percentiles/i }),
-        ).toBeInTheDocument();
+            screen.queryByRole("heading", { name: /latency percentiles/i }),
+        ).not.toBeInTheDocument();
     });
 
     it("renders a LINE chart for the time-axis CI rollup, plus a screen-reader-only data table", () => {
@@ -108,7 +108,26 @@ describe("FactRowsPanels", () => {
     });
 
     it("falls back to a TABLE when every row column is numeric", () => {
-        render(<FactRowsPanels facts={rowsResult.claimed_facts} result={undefined} />);
+        // SYNTHETIC claim: exercises the renderer rule only. No acr producer
+        // emits an all-numeric rows value (CHAOS-4385), so this is
+        // deliberately not a shared fixture.
+        const allNumeric: ClaimedFact = {
+            claim_id: "claim_synthetic_all_numeric",
+            kind: "metrics",
+            subject: { kind: "repository", canonical_id: "repo_synthetic", label: "synthetic" },
+            field: "latency_percentiles",
+            value: { number: 340 },
+            rows: [
+                {
+                    fields: {
+                        p50_duration_minutes: { number: 12.4 },
+                        p90_duration_minutes: { number: 28.1 },
+                        p99_duration_minutes: { number: 55.6 },
+                    },
+                },
+            ],
+        };
+        render(<FactRowsPanels facts={[allNumeric]} result={undefined} />);
         const heading = screen.getByRole("heading", { name: /metrics.*latency percentiles/i });
         const panel = heading.closest("section")!;
         expect(panel.querySelector("table")).not.toBeNull();
