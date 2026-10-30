@@ -95,8 +95,12 @@ function completeScenario(): InvestigationResult {
  *     two numeric columns -> multi-series LINE chart with a legend.
  *   - `metrics`/`team_breakdown` — ordinal axis (`team_name`) + numeric
  *     columns -> BAR chart, caption shows the sibling `rollup_basis`.
- *   - `metrics`/`latency_percentiles` — every column numeric, no axis
- *     candidate at all -> falls back to the TABLE renderer.
+ *
+ * The renderer's "every column numeric, no axis candidate -> TABLE" rule is
+ * NOT backed by a fixture claim here: no acr producer emits a rows value
+ * with only numeric columns (CHAOS-4385; every producer's rows carry a
+ * string key such as `day`). That rule is exercised by a synthetic claim
+ * local to `FactRowsPanel.test.tsx`, labelled as synthetic.
  */
 function rowsScenario(): InvestigationResult {
     const result = canonical();
@@ -182,22 +186,6 @@ function rowsScenario(): InvestigationResult {
             },
         ],
     };
-    const latencyTable: ClaimedFact = {
-        claim_id: "claim_rows_latency_percentiles",
-        kind: "metrics",
-        subject: ASK_DEV_REPOSITORY_SUBJECT,
-        field: "latency_percentiles",
-        value: { number: 340 },
-        rows: [
-            {
-                fields: {
-                    p50_duration_minutes: { number: 12.4 },
-                    p90_duration_minutes: { number: 28.1 },
-                    p99_duration_minutes: { number: 55.6 },
-                },
-            },
-        ],
-    };
     return {
         ...result,
         result_id: "result_rows_0001",
@@ -209,13 +197,7 @@ function rowsScenario(): InvestigationResult {
             "CI and delivery metrics are stable, with no single team dominating investment.",
         current_state:
             "Pipeline success rate has stayed in the high 80s over the last three days; the Platform and Growth teams both contributed commits this week.",
-        claimed_facts: [
-            ...result.claimed_facts,
-            ciRollup,
-            teamRollupBasis,
-            teamBreakdown,
-            latencyTable,
-        ],
+        claimed_facts: [...result.claimed_facts, ciRollup, teamRollupBasis, teamBreakdown],
     };
 }
 
