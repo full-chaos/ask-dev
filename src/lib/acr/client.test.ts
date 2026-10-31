@@ -844,6 +844,48 @@ describe("investigate", () => {
      * id for the rest -- the same discipline `acr_investigation_failed`'s
      * own message already uses one branch below this one.
      */
+    // CHAOS-12202: the R1 refusals (acr #1793 canceled, acr #1798 T7) each get their own
+    // Workbench failure. None of them is an outage, a credential fault or an unknown status.
+    describe.each([
+        { upstream: "access_denied", status: 403, failure: "acr_access_denied", retryable: false },
+        { upstream: "no_repository", status: 409, failure: "acr_no_repository", retryable: false },
+        {
+            upstream: "budget_exhausted",
+            status: 503,
+            failure: "acr_budget_exhausted",
+            retryable: true,
+        },
+        { upstream: "canceled", status: 409, failure: "acr_canceled", retryable: false },
+    ])(
+        "the R1 refusal $upstream ($status)",
+        ({ upstream, status, failure: expected, retryable }) => {
+            it(`maps to ${expected}`, async () => {
+                const body = {
+                    schema_version: "error.v1",
+                    request_id: "req_0123456789abcdef0123456789abcdef",
+                    error: {
+                        code: upstream,
+                        message: "upstream free text that must not be shown",
+                        http_status: status,
+                        retryable,
+                    },
+                };
+                expect(validateContract("error.v1.schema.json", body).valid).toBe(true);
+                respondWith(body, status);
+
+                const failure = await failureOf(investigate(config, { question: "status?" }));
+                expect(failure.code).toBe(expected);
+                expect(failure.upstreamCode).toBe(upstream);
+                expect(failure.httpStatus).toBe(status);
+                expect(failure.retryable).toBe(retryable);
+                expect(failure.message).not.toMatch(
+                    /temporarily unavailable|dependency it needs|unexpected status|Workbench credential/i,
+                );
+                expect(failure.message).not.toContain("upstream free text");
+            });
+        },
+    );
+
     it("maps ACR's static 503 to acr_runtime_unavailable without asserting a specific cause", async () => {
         respondWith(
             {

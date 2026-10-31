@@ -503,6 +503,15 @@ function statusFor(failure: WorkbenchFailure): number {
             // 403 passes through: the browser session and the server credential
             // are fine; the organization's model setup refused the turn.
             return 403;
+        case "acr_access_denied":
+            // 403 passes through: the browser session is fine; ACR's live access
+            // read refused this user's call.
+            return 403;
+        case "acr_no_repository":
+        case "acr_canceled":
+            return 409;
+        case "acr_budget_exhausted":
+            return 503;
         case "acr_rejected_request":
             return 400;
         case "acr_answer_rejected":

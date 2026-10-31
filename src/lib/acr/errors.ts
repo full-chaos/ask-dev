@@ -25,6 +25,33 @@ export const workbenchFailureCodes = [
     /** ACR rejected our credential. */
     "acr_unauthorized",
     /**
+     * ACR's per-call access read refused the call (403 `access_denied`, acr
+     * #1798): the user is not a member of the organization, is impersonating,
+     * the browser session is not live, or the organization or user is unknown.
+     * ACR uses one code for every reason, so the Workbench names none of them.
+     * Not a credential fault and not retryable as sent.
+     */
+    "acr_access_denied",
+    /**
+     * The credential's repository grant within the organization's live
+     * repository inventory is empty (409 `no_repository`, acr #1798). An
+     * unsynced repository is outside the inventory until it is synced. Not
+     * retryable as sent.
+     */
+    "acr_no_repository",
+    /**
+     * ACR refused the investigation before admission because the wait budget
+     * left after its access read was below the minimum (503
+     * `budget_exhausted`, acr #1798). Nothing ran; it is retryable. Not an
+     * outage, so not `acr_runtime_unavailable`.
+     */
+    "acr_budget_exhausted",
+    /**
+     * The run's owner canceled it before it finished (409 `canceled`, acr
+     * #1793). No answer was stored; not retryable under the same submission.
+     */
+    "acr_canceled",
+    /**
      * ACR refused the investigation because of how the organization's own model
      * is set up (403 `feature_not_enabled` with a documented `details.reason`).
      * Not a credential fault and not a thin answer: no model ran and nothing
