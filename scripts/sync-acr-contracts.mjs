@@ -411,6 +411,9 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // as_of and provenance server_default; the v2 result refuses v1-shaped
 // results. The answer feedback schemas (acr #1792) stay web-only: ask-dev
 // vendors only what it consumes.
+// 33ada20a -> a5c1ab43 (CHAOS-11955): the Phase 4 train (M4, CHAOS-11953), the
+// same SHA as web (CHAOS-11954). No vendored file changed: acr's contracts/ is
+// identical at both commits (the only change between them is #1807, #1808).
 // 1e983670 -> 09c9706a: acr widened its served refusals with four
 // `details.reason` members on a 403 `feature_not_enabled`: own_model_gate_closed,
 // ai_features_turned_off, byo_no_investigate_config, own_model_turned_off
@@ -418,7 +421,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "33ada20a830d474161113f3f516ea675b16efbc1";
+export const SOURCE_COMMIT = "a5c1ab432cfedac801240e4310199745ff5378fe";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
