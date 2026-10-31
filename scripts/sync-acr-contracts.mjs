@@ -414,6 +414,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // 33ada20a -> a5c1ab43 (CHAOS-11955): the Phase 4 train (M4, CHAOS-11953), the
 // same SHA as web (CHAOS-11954). No vendored file changed: acr's contracts/ is
 // identical at both commits (the only change between them is #1807, #1808).
+// a5c1ab43 -> bd92be5a (CHAOS-12237): the thread first-question train (acr #1823,
+// CHAOS-12235), the same SHA as web (CHAOS-12236). context_fabric_common gains
+// the optional work-item `project_identities` (acr #1821); the thread list
+// schema (and its optional `first_question`) stays web-only.
 // 1e983670 -> 09c9706a: acr widened its served refusals with four
 // `details.reason` members on a 403 `feature_not_enabled`: own_model_gate_closed,
 // ai_features_turned_off, byo_no_investigate_config, own_model_turned_off
@@ -421,7 +425,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "a5c1ab432cfedac801240e4310199745ff5378fe";
+export const SOURCE_COMMIT = "bd92be5ab81b34ec732eda44ca6ae93309c8f264";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
