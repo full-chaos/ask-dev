@@ -12,10 +12,13 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "state_snapshot",
         "explicit_window",
     ],
+    // server_default (acr #1791, CHAOS-11601): InspectorRail shows the window's
+    // provenance through humanizeTerm ("Server default"), with no tone map.
     "context_fabric_common.v1.schema.json#/$defs/EffectiveEvidenceWindow/properties/provenance": [
         "inferred_default",
         "question_stated",
         "clarification_confirmed",
+        "server_default",
     ],
     "context_fabric_common.v1.schema.json#/$defs/EffectiveEvidenceWindow/properties/confidence": [
         "high",
@@ -226,6 +229,11 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "file_hotspots",
         "cardinality",
     ],
+    // New in acr #1800 (CHAOS-12160). Tolerated, not read: no product code
+    // reads the typed ClaimedFact.investment_mix member. The Workbench renders
+    // the claim's rows and captions a sibling rollup_basis claim (FactRowsPanel).
+    "context_fabric_common.v1.schema.json#/$defs/ClaimedInvestmentMix/properties/investment_mix_source":
+        ["project_native", "owning_team_rollup"],
     "context_fabric_common.v1.schema.json#/$defs/SourceObservation/properties/state": [
         "available",
         "stale",
