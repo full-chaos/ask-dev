@@ -485,6 +485,44 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             retryable: false,
         };
     }
+    // CHAOS-12202: the R1 refusals each have their own failure. Each is matched
+    // on its documented status AND code, so the same code under another status
+    // keeps the status's own mapping.
+    if (status === 403 && code === "access_denied") {
+        return {
+            ...upstreamFields,
+            code: "acr_access_denied",
+            message:
+                "ACR refused this call for the user: not a member of the organization, impersonating, a session that is no longer live, or an unknown organization or user. ACR does not say which.",
+            retryable: false,
+        };
+    }
+    if (status === 409 && code === "no_repository") {
+        return {
+            ...upstreamFields,
+            code: "acr_no_repository",
+            message:
+                "ACR found no repository this credential may read in the organization's synced repositories. A repository that is not synced yet is not readable until it is.",
+            retryable: false,
+        };
+    }
+    if (status === 409 && code === "canceled") {
+        return {
+            ...upstreamFields,
+            code: "acr_canceled",
+            message: "The investigation was canceled before it finished. No answer was stored.",
+            retryable: false,
+        };
+    }
+    if (status === 503 && code === "budget_exhausted") {
+        return {
+            ...upstreamFields,
+            code: "acr_budget_exhausted",
+            message:
+                "ACR refused the investigation before it started: too little of the request's wait budget was left. Nothing ran. Retry.",
+            retryable: true,
+        };
+    }
     if (status === 401 || status === 403) {
         return {
             ...upstreamFields,

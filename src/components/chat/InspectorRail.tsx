@@ -43,7 +43,10 @@ export function InspectorRail({ result }: InspectorRailProps) {
             ? `${formatDay(window.start)} – ${formatDay(window.end)}`
             : window?.relative_id !== undefined
               ? humanizeTerm(window.relative_id)
-              : undefined;
+              : // A current-state snapshot window (acr #1791) carries only `as_of`.
+                window?.as_of !== undefined
+                ? `As of ${formatDay(window.as_of)}`
+                : undefined;
     return (
         <aside aria-label="Latest answer sources" className="ask__rail ask__rail--right">
             <section className="rail__section">
