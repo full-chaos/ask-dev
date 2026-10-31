@@ -205,7 +205,7 @@
       }
     },
     "EffectiveEvidenceWindow": {
-      "description": "CHAOS-3900 W1: the window an answer actually speaks for once canonicalization has run. Server-computed; never accepted from the wire.",
+      "description": "CHAOS-3900 W1: the window an answer actually speaks for once canonicalization has run. Server-computed; never accepted from the wire. CHAOS-11601: as_of (date-time) is the third form, a current-state snapshot read at that instant with no read window; it is legal only with no start, end or relative_id.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -214,6 +214,10 @@
           "format": "date-time"
         },
         "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "as_of": {
           "type": "string",
           "format": "date-time"
         },
@@ -232,11 +236,12 @@
         },
         "provenance": {
           "type": "string",
-          "description": "Open vocabulary; documented values: inferred_default, question_stated, clarification_confirmed. A client must tolerate values it does not know.",
+          "description": "Open vocabulary; documented values: inferred_default, question_stated, clarification_confirmed, server_default. A client must tolerate values it does not know.",
           "x-documented-values": [
             "inferred_default",
             "question_stated",
-            "clarification_confirmed"
+            "clarification_confirmed",
+            "server_default"
           ]
         },
         "confidence": {
@@ -288,10 +293,15 @@
             "start",
             "end"
           ]
+        },
+        {
+          "required": [
+            "as_of"
+          ]
         }
       ],
       "not": {
-        "description": "CHAOS-3900 W1 (codex round 7): mirrors RequestedEvidenceWindow's own completeness guard -- the anyOf above proves at least one of relative_id/start+end is present but does not forbid a partial bound alongside a relative_id. See RequestedEvidenceWindow's identical clause for the full explanation.",
+        "description": "CHAOS-3900 W1 (codex round 7): mirrors RequestedEvidenceWindow's own completeness guard -- the anyOf above proves at least one of relative_id/start+end is present but does not forbid a partial bound alongside a relative_id. See RequestedEvidenceWindow's identical clause for the full explanation. CHAOS-11601: it also forbids as_of beside start, end or relative_id.",
         "anyOf": [
           {
             "required": [
@@ -312,6 +322,24 @@
                 "start"
               ]
             }
+          },
+          {
+            "required": [
+              "as_of",
+              "start"
+            ]
+          },
+          {
+            "required": [
+              "as_of",
+              "end"
+            ]
+          },
+          {
+            "required": [
+              "as_of",
+              "relative_id"
+            ]
           }
         ]
       }
@@ -1280,7 +1308,7 @@
       ]
     },
     "StructureNeedsV2": {
-      "description": "CHAOS-4042: the disclosure block carried on a context_fabric_investigation_result.v2 result -- identical to StructureNeeds except anchor_options items are AnchorOptionV2 (membership-verify semantics) rather than AnchorOption (unique-claimant). kind_options/handle_options/window_options/accepted_grammars are unchanged from v1.",
+      "description": "CHAOS-4042: the disclosure block carried on a context_fabric_investigation_result.v2 result -- identical to StructureNeeds except anchor_options items are AnchorOptionV2 (membership-verify semantics) rather than AnchorOption (unique-claimant). kind_options/handle_options/window_options/accepted_grammars are unchanged from v1. CHAOS-11975: anchor_options, when present, is non-empty. A v2 result carries at least one membership-verify anchor option (ACR's validator refuses one without); the schema states only the non-empty rule in this release, and requires structure_needs and anchor_options from the next one (a field is optional for one release before it becomes required).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -1305,7 +1333,8 @@
           "items": {
             "$ref": "#/$defs/AnchorOptionV2"
           },
-          "maxItems": 20
+          "maxItems": 20,
+          "minItems": 1
         },
         "handle_options": {
           "type": "array",
@@ -3397,6 +3426,9 @@
         "time_series_table": {
           "description": "CHAOS-4682 (§5.1 P2), additive and OPTIONAL: declares what `time_series_rows` IS, the same way `table` declares `rows`. Its shape is ALWAYS time_series when present -- that is the entire reason this pair exists, distinct from `table`, whose shape is never time_series whenever this pair is populated.",
           "$ref": "#/$defs/ClaimedFactTable"
+        },
+        "investment_mix": {
+          "$ref": "#/$defs/ClaimedInvestmentMix"
         }
       },
       "required": [
@@ -5666,6 +5698,40 @@
         "served",
         "declared"
       ]
+    },
+    "ClaimedInvestmentMix": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Additive (CHAOS-12160): which attribution produced an investment claim's value about a project, and over how many work units in the read window. owning_team_rollup is the owning teams' roll-up, served because the project has no measurable work of its own in the window (project_own_work_unit_count says how many own units it has); project_native is the project's own work. Set by the server from the claim's grounding fact, never model-authored, and only on an investment claim.",
+      "required": [
+        "investment_mix_source",
+        "rollup_basis",
+        "work_unit_count",
+        "project_own_work_unit_count"
+      ],
+      "properties": {
+        "investment_mix_source": {
+          "type": "string",
+          "description": "Open vocabulary; documented values: project_native, owning_team_rollup. A client must tolerate values it does not know.",
+          "x-documented-values": [
+            "project_native",
+            "owning_team_rollup"
+          ]
+        },
+        "rollup_basis": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "work_unit_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "project_own_work_unit_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }
