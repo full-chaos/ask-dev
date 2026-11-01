@@ -233,7 +233,12 @@ export type ChatHistoryRow = {
 /** The saved conversations of the signed-in viewer. The host owns all of it. */
 export type ChatHistorySnapshot = {
     /** `connect`: the host holds no access for the list. The render shows the Connect slot. */
-    readonly status: "idle" | "loading" | "ready" | "read_failed" | "connect";
+    /**
+     * `no_repository`: ACR's 409, the viewer has no repository in scope. It is not a failed read,
+     * so it offers no Try again, and not an empty list: conversations may exist that this viewer
+     * cannot reach now. The render shows no row while it holds.
+     */
+    readonly status: "idle" | "loading" | "ready" | "read_failed" | "connect" | "no_repository";
     readonly rows: readonly ChatHistoryRow[];
     /** The conversation shown now, or `null`. A change reads the list again. */
     readonly currentId: string | null;

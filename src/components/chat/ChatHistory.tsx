@@ -8,6 +8,7 @@ import {
     historyRowLabel,
     historyRowMeta,
     historyRowTitle,
+    NOT_RUN_COPY,
 } from "../../render/chat-copy";
 import type { ChatHistoryRow, ChatHistorySnapshot, ChatHistorySource } from "../../render/source";
 
@@ -214,7 +215,11 @@ export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: C
                     </button>
                 </div>
             ) : null}
-            {history.rows.length === 0 ? (
+            {history.status === "no_repository" ? (
+                <p className="rail__note" data-testid="ask-dev-history-no-repository">
+                    {NOT_RUN_COPY.no_repository}
+                </p>
+            ) : history.rows.length === 0 ? (
                 history.status === "loading" || history.status === "idle" ? (
                     <p className="rail__empty" data-testid="ask-dev-history-loading">
                         {HISTORY_COPY.loading}
@@ -238,8 +243,10 @@ export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: C
                     ))}
                 </ul>
             )}
-            {history.moreFailed ? <p className="rail__note">{HISTORY_COPY.moreFailed}</p> : null}
-            {history.hasMore ? (
+            {history.moreFailed && history.status !== "no_repository" ? (
+                <p className="rail__note">{HISTORY_COPY.moreFailed}</p>
+            ) : null}
+            {history.hasMore && history.status !== "no_repository" ? (
                 <button
                     className="rail__button"
                     data-testid="ask-dev-history-more"

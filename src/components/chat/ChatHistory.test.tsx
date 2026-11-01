@@ -7,6 +7,7 @@ import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskDevChat } from "@/components/chat/AskDevChat";
+import { HISTORY_COPY, NOT_RUN_COPY } from "@/render/chat-copy";
 import type { ChatHistoryRow, ChatHistorySnapshot, ChatSnapshot } from "@/render/source";
 import {
     fakeHistory,
@@ -374,6 +375,33 @@ describe("History: when it is read", () => {
 
         host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: "thread_a" }) });
         expect(api.load).toHaveBeenCalledTimes(3);
+    });
+
+    describe("no repository in scope", () => {
+        it("says so, in the words a refused question reads, with no way to try again", () => {
+            setup({ status: "no_repository" });
+
+            expect(screen.getByTestId("ask-dev-history-no-repository")).toHaveTextContent(
+                NOT_RUN_COPY.no_repository,
+            );
+            expect(screen.queryByTestId("ask-dev-history-retry")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-empty")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-loading")).toBeNull();
+        });
+
+        it("shows no row and no way to more: the scope that held them is gone", () => {
+            setup({ status: "no_repository", rows: [rowA, rowB], hasMore: true, moreFailed: true });
+
+            expect(screen.queryByTestId("ask-dev-history-list")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-more")).toBeNull();
+            expect(screen.queryByText(HISTORY_COPY.moreFailed)).toBeNull();
+        });
+
+        it("does not offer Connect", () => {
+            const { connect } = setup({ status: "no_repository" });
+
+            expect(connect).not.toHaveBeenCalled();
+        });
     });
 
     it("reads nothing until the host publishes a history, then reads once", () => {
