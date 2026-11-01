@@ -50,7 +50,7 @@ describe("a rich shape reaches the host's chart through one seam (CHAOS-12496)",
 
     it("names the shape with its served title", () => {
         draw(() => <div>chart</div>);
-        expect(screen.getByRole("figure")).toHaveTextContent(shape.title);
+        expect(screen.getByText(shape.title, { selector: "figcaption" })).toBeVisible();
     });
 });
 
