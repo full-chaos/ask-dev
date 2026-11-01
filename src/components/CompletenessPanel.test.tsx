@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { CompletenessPanel } from "@/components/CompletenessPanel";
 import type { AnswerCompleteness, PlanRequirementOutcomeRow } from "@/lib/contracts";
+import { visibleText } from "@/test/visible-text";
 
 /** A raw term is carried in `data-value`: a user reads the served or generic word instead. */
 const byValue = (root: ParentNode, value: string): Element | null =>
@@ -110,6 +111,23 @@ describe("CompletenessPanel", () => {
         expect(screen.getByTestId("completeness-terminal-reason")).toHaveTextContent(
             "limitation disclosed",
         );
+    });
+
+    // A reason's value can hold a state word ("degraded_reason_disclosed"), so it sits in the
+    // closed fold CHAOS-12417 rules for it: CHAOS-12245 keeps the word out of view.
+    it("keeps the terminal reason in a closed fold, out of view", () => {
+        const completeness: AnswerCompleteness = {
+            terminal_status: "degraded",
+            terminal_reason: "degraded_reason_disclosed",
+            claimed_facts_count: 2,
+            rows_count: 0,
+            state: "degraded",
+        };
+        render(<CompletenessPanel completeness={completeness} />);
+        const fold = screen.getByTestId("completeness-terminal-reason").closest("details");
+        expect(fold).not.toBeNull();
+        expect(fold).not.toHaveAttribute("open");
+        expect(visibleText(screen.getByTestId("completeness-panel"))).not.toMatch(/degraded/iu);
     });
 });
 

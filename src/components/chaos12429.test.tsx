@@ -7,6 +7,7 @@ import { DriversPanel } from "@/components/DriversPanel";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { ClaimedFact, Cohort, CohortMember, InvestigationResult } from "@/lib/contracts";
+import { investmentRollupOf } from "@/lib/investment-rollup";
 import { visibleText } from "@/test/visible-text";
 
 /**
@@ -132,6 +133,53 @@ describe("D: G1 — ranking shows for team, project and repository only", () => 
         });
     }
 
+    // Codex r1: the ranking panel was not the only door. A cohort the render does not rank keeps its
+    // subjects out of the drivers too, the same way the result boundary withholds a person cohort.
+    for (const kind of ["pull_request", "organization"]) {
+        it(`keeps a ${kind} cohort's drivers and pressures off screen`, () => {
+            const cohort = recolour(kind);
+            const result: InvestigationResult = {
+                ...withCohort(cohort),
+                strongest_pressures: ["SECRET_PRESSURE leads the pressures."],
+                drivers: example.drivers.map((driver) => ({
+                    ...driver,
+                    summary: "SECRET_DRIVER has a persistent pressure.",
+                })),
+                interpretation: { ...example.interpretation, shape: "discovered_cohort" },
+            };
+            expect(result.drivers.length).toBeGreaterThan(0);
+            const { container } = render(<DriversPanel result={result} />);
+            expect(container.textContent).not.toContain("SECRET_DRIVER");
+            expect(container.textContent).not.toContain("SECRET_PRESSURE");
+            expect(screen.getByTestId("withheld-part")).toHaveTextContent(
+                "Strongest pressures and drivers withheld",
+            );
+        });
+    }
+
+    it("still shows the drivers of a cohort the render ranks", () => {
+        const result: InvestigationResult = {
+            ...withCohort(recolour("team")),
+            drivers: example.drivers.map((driver) => ({ ...driver, summary: "SHOWN_DRIVER." })),
+            interpretation: { ...example.interpretation, shape: "discovered_cohort" },
+        };
+        expect(result.drivers.length).toBeGreaterThan(0);
+        const { container } = render(<DriversPanel result={result} />);
+        expect(container.textContent).toContain("SHOWN_DRIVER");
+        expect(screen.queryByTestId("withheld-part")).toBeNull();
+    });
+
+    it("still shows the drivers of an answer that asked for no ranking", () => {
+        const result: InvestigationResult = {
+            ...withCohort(recolour("pull_request")),
+            drivers: example.drivers.map((driver) => ({ ...driver, summary: "SHOWN_DRIVER." })),
+            interpretation: { ...example.interpretation, shape: "status" },
+        };
+        expect(result.drivers.length).toBeGreaterThan(0);
+        const { container } = render(<DriversPanel result={result} />);
+        expect(container.textContent).toContain("SHOWN_DRIVER");
+    });
+
     it("fails the whole cohort closed when ONE member is a person", () => {
         const cohort: Cohort = {
             ...teamCohort,
@@ -226,6 +274,14 @@ describe("F: the owning-team roll-up label (CHAOS-12178)", () => {
                   }),
             ...extra,
         }) as unknown as ClaimedFact;
+
+    it("labels a project only: the same mark on another subject is not this roll-up (codex r1)", () => {
+        const claim = rollupClaim("owning_team_rollup", {
+            subject: { kind: "organization", canonical_id: "org:acme", label: "Acme" },
+        } as Partial<ClaimedFact>);
+        expect(investmentRollupOf(claim)).toBeNull();
+        expect(investmentRollupOf(rollupClaim("owning_team_rollup"))).not.toBeNull();
+    });
 
     const withClaims = (claims: ClaimedFact[]): InvestigationResult => ({
         ...example,

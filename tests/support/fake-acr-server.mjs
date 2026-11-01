@@ -167,6 +167,25 @@ function shapesResult(question) {
         label: `Canonical facts \u2014 ${source.source.split(":").pop()} for every repository a team owns, over the whole evidence window`,
         state_label: "available",
     }));
+    // A one-row numeric claim draws as tiles. A long float is the unbroken text that widened the
+    // answer on a phone sheet (CHAOS-12429).
+    const [first] = result.claimed_facts;
+    result.claimed_facts = [
+        ...result.claimed_facts,
+        {
+            ...first,
+            claim_id: "claim_e2e_long_tile",
+            rows: [
+                {
+                    ...first.rows[0],
+                    fields: {
+                        completion_share: { number: 0.8333333333333334 },
+                        remaining_share: { number: 0.16666666666666666 },
+                    },
+                },
+            ],
+        },
+    ];
     return {
         ...result,
         result_id: "result_e2e_shapes_0001",

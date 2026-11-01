@@ -3,6 +3,7 @@ import type { RankingWithheld } from "../lib/ranking-withheld";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
+import { Details } from "./Details";
 import type {
     AnswerCompleteness,
     PlanRequirementOutcomeRow,
@@ -89,8 +90,8 @@ function RefinementStep({
  * they can legitimately exceed what any single panel actually renders; that is the point, not a bug
  * (AGENTS.md check 11: completeness is a public contract field, richer than the prose).
  * `terminal_reason` is a closed vocabulary naming WHY, never the engine's or a model's own raw
- * text (CHAOS-4413's own schema doc comment) -- shown verbatim, exactly like `CoveragePanel`'s
- * degraded reasons. (CHAOS-12417 moves the counts, the reason and the outcomes table.)
+ * text (CHAOS-4413's own schema doc comment). It sits in a closed fold: a value can hold a state
+ * word ("degraded_reason_disclosed"). (CHAOS-12417 moves the outcomes table.)
  *
  * `outcomes` (CHAOS-5109) is the one authority for what this answer was
  * supposed to contain and what became of it — rendered one row per entry,
@@ -158,9 +159,13 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                 </p>
             )}
             {completeness.terminal_reason !== undefined ? (
-                <p className="coverage__reason" data-testid="completeness-terminal-reason">
-                    {humanizeTerm(completeness.terminal_reason)}
-                </p>
+                // CHAOS-12245: a reason's value can hold a state word, so it stays in the closed
+                // fold CHAOS-12417 rules for it.
+                <Details summary="Why it stopped">
+                    <p className="coverage__reason" data-testid="completeness-terminal-reason">
+                        {humanizeTerm(completeness.terminal_reason)}
+                    </p>
+                </Details>
             ) : null}
             <h3 className="panel__title" style={{ marginTop: 14 }}>
                 Requirement outcomes

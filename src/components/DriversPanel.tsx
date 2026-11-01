@@ -184,6 +184,10 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
     // though the table itself is on screen.
     const ranking = cohortRanking(result.interpretation.shape, result.cohort);
     const rows = ranking.state === "rows" ? ranking.rows : null;
+    // G1 (CHAOS-12429): a cohort of a kind the render does not rank keeps its subjects out of the
+    // drivers as well, the same way the result boundary withholds a person cohort. The answer
+    // says "Ranking not shown"; the drivers would name what it just declined to show.
+    const withheld = rankingWithheld !== undefined || ranking.state === "kind_not_ranked";
     const membersWithFootnote = new Set(
         (rows ?? [])
             .filter((row) => row.member.missing_signals !== undefined)
@@ -199,10 +203,8 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-drivers-title`}>
                 Drivers
             </h2>
-            {rankingWithheld !== undefined ? (
-                <WithheldPart label="Strongest pressures and drivers" />
-            ) : null}
-            {rankingWithheld !== undefined ? null : result.strongest_pressures.length > 0 ? (
+            {withheld ? <WithheldPart label="Strongest pressures and drivers" /> : null}
+            {withheld ? null : result.strongest_pressures.length > 0 ? (
                 <>
                     <h3 className="panel__title">Strongest pressures</h3>
                     <ul className="stack stack--tight" style={{ marginBottom: 14 }}>
@@ -214,7 +216,7 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
                     </ul>
                 </>
             ) : null}
-            {rankingWithheld !== undefined ? null : result.drivers.length === 0 ? (
+            {withheld ? null : result.drivers.length === 0 ? (
                 <p className="panel__empty">No drivers were reported.</p>
             ) : (
                 <ul className="stack">

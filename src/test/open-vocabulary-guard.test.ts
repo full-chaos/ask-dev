@@ -257,12 +257,18 @@ describe("ranking withheld boundary guard", () => {
         "components/WorkItemStatusPanel.tsx",
     ];
 
-    it("only the decided files read member rank, score or driver fields", () => {
-        const offenders = [...findRankReadsInFiles(walk(root)).keys()]
-            .map((file) => path.relative(root, file))
-            .filter((rel) => !ALLOWED_READERS.includes(rel));
-        expect(offenders).toEqual([]);
-    });
+    // A type check of the whole program, not a wait: 0.9 s on a laptop, 4.6 s on hosted CI at main,
+    // and 5.08 s after CHAOS-12429 added four files, past the 5 s default.
+    it(
+        "only the decided files read member rank, score or driver fields",
+        { timeout: 30_000 },
+        () => {
+            const offenders = [...findRankReadsInFiles(walk(root)).keys()]
+                .map((file) => path.relative(root, file))
+                .filter((rel) => !ALLOWED_READERS.includes(rel));
+            expect(offenders).toEqual([]);
+        },
+    );
 
     it("scans the workbench and home page entries", () => {
         const scanned = walk(root).map((file) => path.relative(root, file));

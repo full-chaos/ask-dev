@@ -954,6 +954,16 @@ async function axeViolations(page: Page) {
 test.describe("narrow windows and the host rules", () => {
     test.use({ baseURL: configuredBaseURL });
 
+    test("fact tiles with long values fit a phone sheet", async ({ page }) => {
+        await page.setViewportSize({ width: 334, height: 800 });
+        await page.goto("/");
+        await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
+        await expect(
+            page.getByTestId("fact-tiles").filter({ hasText: "0.8333333333333334" }),
+        ).toHaveCount(1);
+        expect(await sidewaysOverflow(page)).toEqual([]);
+    });
+
     for (const width of PHONE_WIDTHS) {
         for (const layout of LAYOUT_CASES) {
             test(`${width} px: ${layout.name} does not scroll sideways`, async ({ page }) => {

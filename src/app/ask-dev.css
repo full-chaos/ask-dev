@@ -674,12 +674,13 @@
        `factRowTiles` derives nothing new). */
     .tiles {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
         gap: 12px;
         margin: 12px 0;
     }
 
     .tile {
+        min-width: 0;
         display: flex;
         flex-direction: column-reverse;
         justify-content: flex-end;
@@ -697,12 +698,15 @@
         line-height: 1.15;
         letter-spacing: -0.02em;
         font-variant-numeric: tabular-nums;
+        /* A tile can hold a phrase or a date: its text must not set the answer's width. */
+        overflow-wrap: anywhere;
     }
 
     .tile__label {
         color: var(--text-muted);
         font-size: 12px;
         font-weight: 500;
+        overflow-wrap: anywhere;
     }
 
     /* A driver card gets the same elevated treatment as its panel; a principal

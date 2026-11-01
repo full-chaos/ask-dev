@@ -53,7 +53,11 @@ export const INVESTMENT_ROLLUP_COPY = {
 /** The roll-up of one claim, or `null` when the service did not mark it a roll-up. */
 export function investmentRollupOf(claim: ClaimedFact): InvestmentRollup | null {
     const mix = claim.investment_mix;
-    if (claim.kind !== "investment" || mix?.investment_mix_source !== OWNING_TEAM_ROLLUP) {
+    if (
+        claim.kind !== "investment" ||
+        claim.subject.kind !== "project" ||
+        mix?.investment_mix_source !== OWNING_TEAM_ROLLUP
+    ) {
         return null;
     }
     return {
