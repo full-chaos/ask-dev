@@ -211,7 +211,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                 const caption = coverageCaption(cohortShape, cohort);
                 return (
                     <div key={cohortShape.shape_id}>
-                        <RenderShapeChart shape={cohortShape} />
+                        <RenderShapeChart cohort={cohort} shape={cohortShape} />
                         {caption.sentences.length === 0 ? null : (
                             <p className="record__meta" data-testid="cohort-chart-caption">
                                 {caption.sentences.join(" ")}

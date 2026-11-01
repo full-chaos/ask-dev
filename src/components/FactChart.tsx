@@ -1,5 +1,5 @@
 import type { ClaimedFactRow } from "../lib/contracts";
-import { cellValue, type ChartAxis } from "../lib/fact-rows";
+import { cellValue, parseIsoDate, type ChartAxis } from "../lib/fact-rows";
 import { humanizeTerm } from "../lib/presentation";
 
 export type FactChartProps = {
@@ -165,7 +165,8 @@ function SeriesChart({
     // component never assumes the caller upheld that contract) and falls
     // back to plain index spacing rather than crashing if it somehow did
     // not.
-    const rawTimes = axis.kind === "time" ? rows.map((r) => Date.parse(axisLabel(r, axis))) : [];
+    const rawTimes =
+        axis.kind === "time" ? rows.map((r) => parseIsoDate(axisLabel(r, axis)) ?? Number.NaN) : [];
     const timeIsUsable = axis.kind === "time" && rawTimes.every((t) => !Number.isNaN(t));
 
     // Sort by parsed time only once every value is a usable date (a row
@@ -192,7 +193,7 @@ function SeriesChart({
 
     let xForIndex: (index: number) => number;
     if (timeIsUsable) {
-        const times = orderedRows.map((r) => Date.parse(axisLabel(r, axis)));
+        const times = orderedRows.map((r) => parseIsoDate(axisLabel(r, axis)) ?? Number.NaN);
         const minTime = Math.min(...times);
         const maxTime = Math.max(...times);
         const timeRange = maxTime - minTime || 1;

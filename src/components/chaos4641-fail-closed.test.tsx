@@ -26,7 +26,8 @@ function member(id: string, score: number) {
         attention_rank: 1,
         score,
         outcome: "qualified",
-        drivers: [],
+        // A driver: a score with none draws no bar (CHAOS-11986 problem 2).
+        drivers: [{ signal: "investment_mix", weight_contributed: score }],
     };
 }
 
