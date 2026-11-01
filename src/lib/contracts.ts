@@ -8,35 +8,45 @@
  * is then a one-line change in this file, not a sweep through the UI.
  */
 import type {
-    ACRContextFabricInvestigationResultV1 as InvestigationResultV1,
+    ACRContextFabricInvestigationResultV1 as GeneratedInvestigationResultV1,
     AcceptedGrammar,
     ConfirmedStructureEntry,
     EffectiveEvidenceWindow,
     KindOption,
     PriorSubjectReceiptDispositionEntry,
+    StructureNeeds,
 } from "../contracts/generated/investigation-result";
 
 /**
- * CHAOS-11906: an investigation result is v1 or v2. v2 is wire-identical to v1
- * except the MEANING of `structure_needs.anchor_options` (membership-verify, not
- * unique-claimant); the pinned v2 schema is v1 with `schema_version` and the
- * anchor-options $ref swapped, so one structural type serves both. The
- * discriminant is the only thing that differs at the type level.
+ * CHAOS-11906: an investigation result is v1 or v2. An anchor option has one
+ * wire shape; v2 changes only its MEANING (membership-verify, not
+ * unique-claimant), so the generated v1 types serve both. What v2 adds is
+ * CHAOS-12073 (acr #1836): `structure_needs` is required, and so is a non-empty
+ * `anchor_options` inside it. `schema_version` tells the two apart.
  */
 export type InvestigationResultSchemaVersion =
-    InvestigationResultV1["schema_version"] | "context_fabric_investigation_result.v2";
+    GeneratedInvestigationResultV1["schema_version"] | "context_fabric_investigation_result.v2";
 // The generated type is `{ [k: string]: unknown } & { ...fields }`; `Omit` over
 // it collapses to `{}`, so the named fields are re-extracted by dropping the
 // index-signature keys first.
 type NamedFields<T> = {
     [K in keyof T as string extends K ? never : number extends K ? never : K]: T[K];
 };
-export type InvestigationResult = { [k: string]: unknown } & Omit<
-    NamedFields<InvestigationResultV1>,
+type InvestigationResultFields = { [k: string]: unknown } & Omit<
+    NamedFields<GeneratedInvestigationResultV1>,
     "schema_version"
-> & {
-        schema_version: InvestigationResultSchemaVersion;
-    };
+>;
+export type InvestigationResultV1 = InvestigationResultFields & {
+    schema_version: GeneratedInvestigationResultV1["schema_version"];
+};
+type StructureNeedsV2 = StructureNeeds & {
+    anchor_options: Exclude<NonNullable<StructureNeeds["anchor_options"]>, []>;
+};
+export type InvestigationResultV2 = InvestigationResultFields & {
+    schema_version: "context_fabric_investigation_result.v2";
+    structure_needs: StructureNeedsV2;
+};
+export type InvestigationResult = InvestigationResultV1 | InvestigationResultV2;
 
 export type {
     AcceptedGrammar,

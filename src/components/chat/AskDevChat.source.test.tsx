@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskDevChat, withheldTurn } from "@/components/chat/AskDevChat";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult, InvestigationResultV1 } from "@/lib/contracts";
 import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import type {
     AssistantOutcome,
@@ -972,7 +972,7 @@ describe("AskDevChat with a host source: what the render sends", () => {
 
 describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
     // The same person cohort `src/lib/withheld-render.test.tsx` builds, over a real capture.
-    function personify(source: InvestigationResult): InvestigationResult {
+    function personify(source: InvestigationResultV1): InvestigationResultV1 {
         return {
             ...source,
             cohort: {
@@ -991,7 +991,7 @@ describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
         };
     }
 
-    const rankable = shapesExample as unknown as InvestigationResult;
+    const rankable = shapesExample as unknown as InvestigationResultV1;
     const personResult = personify(rankable);
 
     function answeredBy(outcome: AssistantOutcome): ChatSnapshot {
@@ -1019,7 +1019,7 @@ describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
     });
 
     it("the popup reads the withheld result: a dropped offer opens no popup", () => {
-        const offers: Pick<InvestigationResult, "structure_needs"> = {
+        const offers: Pick<InvestigationResultV1, "structure_needs"> = {
             structure_needs: {
                 missing: ["subject_candidate"],
                 candidate_options: [

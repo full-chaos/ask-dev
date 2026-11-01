@@ -25,13 +25,13 @@ import type {
     CandidateOption,
     ConfirmedStructureEntry,
     HandleOption,
-    InvestigationResult,
+    InvestigationResultV1,
     KindOption,
     StructureNeeds,
     WindowOption,
 } from "@/lib/contracts";
 
-function baseScenario(id: string): InvestigationResult {
+function baseScenario(id: string): InvestigationResultV1 {
     const scenario = mockScenarios().find((entry) => entry.id === id);
     if (scenario === undefined) throw new Error(`unknown base scenario: ${id}`);
     return structuredClone(scenario.result);
@@ -203,7 +203,7 @@ const PHRASED_CANDIDATE_OPTIONS: readonly CandidateOption[] = [
  * `no_discriminators` refusal, no subject candidates: interpretation could
  * not even settle which census to run.
  */
-function kindDisambiguationScenario(): InvestigationResult {
+function kindDisambiguationScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     // The cast is the same "unavoidable" class `@/lib/acr/client.ts`
     // documents on its own `receipts` cast: `maxItems: 20` renders as a
@@ -232,7 +232,7 @@ function kindDisambiguationScenario(): InvestigationResult {
  * structural `label` when it did not (timeout, guard rejection, or a pin
  * that predates the field) — same list, same member, both branches.
  */
-function kindPhrasingScenario(): InvestigationResult {
+function kindPhrasingScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const structureNeeds: StructureNeeds = {
         missing: ["expected_kind"],
@@ -254,7 +254,7 @@ function kindPhrasingScenario(): InvestigationResult {
  * `kindPhrasingScenario` above already covers. Not `WindowOption` — out of
  * that PR's scope.
  */
-function anchorHandleCandidatePhrasingScenario(): InvestigationResult {
+function anchorHandleCandidatePhrasingScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const structureNeeds: StructureNeeds = {
         missing: ["subject_anchor", "subject_handle", "subject_candidate"],
@@ -275,7 +275,7 @@ function anchorHandleCandidatePhrasingScenario(): InvestigationResult {
 }
 
 /** Anchor + window: "the universal manageability pair" (§1.2 reading 2). */
-function anchorAndWindowScenario(): InvestigationResult {
+function anchorAndWindowScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const structureNeeds: StructureNeeds = {
         missing: ["subject_anchor", "window"],
@@ -293,7 +293,7 @@ function anchorAndWindowScenario(): InvestigationResult {
 }
 
 /** Handle offer: a grammar-valid value arrived explicit_unattributed and the engine offers it back. */
-function handleOfferScenario(): InvestigationResult {
+function handleOfferScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const structureNeeds: StructureNeeds = {
         missing: ["subject_handle"],
@@ -319,7 +319,7 @@ function handleOfferScenario(): InvestigationResult {
  * elicitation priority in `missing`'s own ordering when both apply; this
  * scenario isolates the candidate axis alone).
  */
-function candidateOfferScenario(): InvestigationResult {
+function candidateOfferScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const structureNeeds: StructureNeeds = {
         missing: ["subject_candidate"],
@@ -339,7 +339,7 @@ function candidateOfferScenario(): InvestigationResult {
  * The confirmed_structure echo, all applied — a decisive result reached via
  * confirmation (§2.1's B5: decisive results carry the offer context too).
  */
-function appliedConfirmationScenario(): InvestigationResult {
+function appliedConfirmationScenario(): InvestigationResultV1 {
     const result = baseScenario("complete");
     const confirmedStructure: readonly ConfirmedStructureEntry[] = [
         {
@@ -368,7 +368,7 @@ function appliedConfirmationScenario(): InvestigationResult {
         result_id: "result_structure_applied_0001",
         request_id: "request_structure_applied_0001",
         confirmed_structure: confirmedStructure as NonNullable<
-            InvestigationResult["confirmed_structure"]
+            InvestigationResultV1["confirmed_structure"]
         >,
     };
 }
@@ -379,7 +379,7 @@ function appliedConfirmationScenario(): InvestigationResult {
  * `structure_confirmation_conflict` (§2.5), so the round returns fresh
  * offers rather than a decisive result.
  */
-function vetoedConfirmationScenario(): InvestigationResult {
+function vetoedConfirmationScenario(): InvestigationResultV1 {
     const result = baseScenario("no-match");
     const confirmedStructure: readonly ConfirmedStructureEntry[] = [
         {
@@ -415,7 +415,7 @@ function vetoedConfirmationScenario(): InvestigationResult {
         status: "clarification_required",
         structure_needs: structureNeeds,
         confirmed_structure: confirmedStructure as NonNullable<
-            InvestigationResult["confirmed_structure"]
+            InvestigationResultV1["confirmed_structure"]
         >,
     };
 }
@@ -426,7 +426,7 @@ function vetoedConfirmationScenario(): InvestigationResult {
  * special case. Kept as a fixture so a regression that started offering
  * anchor/handle for an aggregate question would show up here first.
  */
-function aggregateClassNeverElicitScenario(): InvestigationResult {
+function aggregateClassNeverElicitScenario(): InvestigationResultV1 {
     const result = baseScenario("degraded");
     const structureNeeds: StructureNeeds = {
         missing: ["window"],
@@ -443,7 +443,7 @@ function aggregateClassNeverElicitScenario(): InvestigationResult {
 export type StructureMockScenario = {
     readonly id: string;
     readonly demonstrates: string;
-    readonly result: InvestigationResult;
+    readonly result: InvestigationResultV1;
 };
 
 export function structureMockScenarios(): readonly StructureMockScenario[] {

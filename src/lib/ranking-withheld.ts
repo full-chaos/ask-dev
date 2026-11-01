@@ -51,7 +51,6 @@ export type WithheldBoundary = {
  * refusal/correction/semantic-reading notices.
  */
 export const RESULT_FIELDS_KEPT = [
-    "schema_version",
     "result_id",
     "request_id",
     "generated_at",
@@ -79,11 +78,13 @@ export const WITHHELD_ANSWER =
     "This answer is not shown, because it ranks subjects of a kind this view does not rank.";
 
 /**
- * The service's prose fields: required strings, so each is replaced, never dropped. The contract
- * requires a decisive result's answer and judgment to be non-empty; `AnswerPanel` shows one line
- * when they are equal.
+ * Required strings, so each is replaced, never dropped. The service's prose: the contract requires
+ * a decisive result's answer and judgment to be non-empty; `AnswerPanel` shows one line when they
+ * are equal. `schema_version`: v2 differs from v1 only in requiring `structure_needs`, which this
+ * boundary drops, so a withheld result is always v1 (CHAOS-12375).
  */
 export const RESULT_FIELDS_REPLACED = {
+    schema_version: "context_fabric_investigation_result.v1",
     deterministic_answer: WITHHELD_ANSWER,
     direct_judgment: WITHHELD_ANSWER,
     current_state: "",
