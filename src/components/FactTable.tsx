@@ -1,3 +1,4 @@
+import { ScrollRegion } from "./ScrollRegion";
 import type { ClaimedFactRow } from "../lib/contracts";
 import { cellText, columnOrder } from "../lib/fact-rows";
 import { humanizeTerm } from "../lib/presentation";
@@ -15,7 +16,7 @@ export type FactTableProps = {
 export function FactTable({ rows }: FactTableProps) {
     const columns = columnOrder(rows);
     return (
-        <div className="fact-table-wrap">
+        <ScrollRegion label="Facts">
             <table className="fact-table">
                 <thead>
                     <tr>
@@ -39,6 +40,6 @@ export function FactTable({ rows }: FactTableProps) {
                     ))}
                 </tbody>
             </table>
-        </div>
+        </ScrollRegion>
     );
 }

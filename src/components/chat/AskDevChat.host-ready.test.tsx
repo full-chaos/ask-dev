@@ -363,3 +363,38 @@ describe("a host's turn stays usable", () => {
         await waitFor(() => expect(source.ask).toHaveBeenCalledTimes(1));
     });
 });
+
+describe("AskDevChat: composerHidden", () => {
+    it("draws no composer, no chips and no popup for a host with no way to send", () => {
+        const source = hostSource(
+            {
+                ...snapshotOf(
+                    userTurn(0, "Who owns this?"),
+                    assistantTurn(1, { kind: "status", status: { kind: "stalled" }, retry: false }),
+                ),
+                composerHidden: true,
+                composerLocked: true,
+            },
+            { pageContext: { remove: vi.fn() } },
+        );
+        render(<AskDevChat source={source} />);
+
+        expect(screen.queryByRole("textbox")).toBeNull();
+        expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+        expect(screen.queryByText(/Sign in again/u)).toBeNull();
+        expect(screen.getByText("Who owns this?")).toBeInTheDocument();
+    });
+
+    it.each([false, undefined])("keeps the composer when it is %s", (composerHidden) => {
+        const snapshot = snapshotOf();
+        render(
+            <AskDevChat
+                source={hostSource(
+                    composerHidden === undefined ? snapshot : { ...snapshot, composerHidden },
+                )}
+            />,
+        );
+
+        expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+});

@@ -373,6 +373,12 @@ export type ChatSnapshot = {
      */
     readonly composerLocked?: boolean;
     /**
+     * The host has no way to send at all, so the render draws no composer bar: no composer, no
+     * chips, no popup, no Stop. Not the same as `composerLocked`, which says why a composer that
+     * exists is waiting, and would tell a viewer with no transport to sign in again.
+     */
+    readonly composerHidden?: boolean;
+    /**
      * A conversation of this tab was lost to a reload. The host owns the marker; the render says so
      * while nothing else is shown. The standalone source never sends it.
      */

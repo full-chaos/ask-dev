@@ -82,6 +82,7 @@
     button:focus-visible,
     input:focus-visible,
     textarea:focus-visible,
+    .fact-table-wrap:focus-visible,
     [role="button"]:focus-visible {
         outline: 2px solid var(--focus-ring);
         outline-offset: 2px;
@@ -1558,8 +1559,9 @@
         background: var(--surface-2);
     }
 
+    /* The dot pulses and the words do not: text at 0.6 opacity fails contrast. */
     @media (prefers-reduced-motion: no-preference) {
-        .chat__pending {
+        .chat__pending::before {
             animation: ask-dev-pending-pulse 1.6s ease-in-out infinite;
         }
     }

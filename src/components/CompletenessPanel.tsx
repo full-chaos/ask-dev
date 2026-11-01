@@ -1,3 +1,4 @@
+import { ScrollRegion } from "./ScrollRegion";
 import type { RankingWithheld } from "../lib/ranking-withheld";
 import { useId } from "react";
 
@@ -192,7 +193,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                     No requirement outcomes were derived for this answer.
                 </p>
             ) : (
-                <div className="fact-table-wrap">
+                <ScrollRegion label="Requirement outcomes">
                     <table className="fact-table" data-testid="completeness-outcomes-table">
                         <thead>
                             <tr>
@@ -270,7 +271,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                             })}
                         </tbody>
                     </table>
-                </div>
+                </ScrollRegion>
             )}
         </section>
     );
