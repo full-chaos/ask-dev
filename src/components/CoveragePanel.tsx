@@ -7,6 +7,7 @@ import {
     GENERIC_DEGRADED_REASON_SENTENCE,
     degradedReasonDisplay,
     degradingDetails as degradingDetailsOf,
+    disclosedDetails as disclosedDetailsOf,
     uncoveredLegacyReasons,
 } from "../lib/degraded-reasons";
 import { type EvidenceWindow, evidenceWindowRange, formatDay } from "../lib/evidence-window";
@@ -101,6 +102,11 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
     // the same read, so both are shown, fold first.
     const readOriginStates = (coverage.details ?? []).filter(
         (detail) => detail.code === "fact_read_origin_state",
+    );
+    // CHAOS-12442: never a limit, so never under "What limits this answer", and it changes no
+    // headline or status. A read row has its own section above.
+    const disclosed = disclosedDetailsOf(coverage).filter(
+        (detail) => detail.code !== "fact_read_origin_state",
     );
     // CHAOS-4524 / CHAOS-4568: an empty source list is absence of evidence,
     // not completeness. `coverage.partial === false` only means "nothing
@@ -253,6 +259,34 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
                             })}
                         </div>
                     </details>
+                </>
+            )}
+            {disclosed.length === 0 ? null : (
+                <>
+                    <h3 className="panel__title" style={{ marginTop: 14 }}>
+                        About this answer
+                    </h3>
+                    <ul className="stack stack--tight" data-testid="coverage-disclosures">
+                        {disclosed.map((detail) => {
+                            const raw = nonBlank(detail.raw);
+                            return (
+                                <li
+                                    className="record"
+                                    data-value={detail.code}
+                                    key={detail.detail_id}
+                                >
+                                    <p className="record__body">
+                                        {nonBlank(detail.phrasing) ?? nonBlank(detail.label)}
+                                    </p>
+                                    {raw === undefined ? null : (
+                                        <Details summary="Details">
+                                            <code>{raw}</code>
+                                        </Details>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
                 </>
             )}
             {readOriginStates.length === 0 ? null : (

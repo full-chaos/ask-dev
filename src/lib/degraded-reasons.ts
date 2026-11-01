@@ -54,6 +54,23 @@ export function degradingDetails(coverage: Coverage | undefined): readonly Cover
 }
 
 /**
+ * What the answer rests on, though it costs nothing: a non-degrading detail that counts something
+ * in it, such as the pull requests that stand on a lower-tier project link. AGENTS.md's entity tree
+ * requires a consumer to name that tier, and these details are its only carrier.
+ *
+ * Chosen by the contract's own fields, never by a list of codes (chris, CHAOS-4690): a counted
+ * disclosure ACR adds later shows with no change here. An uncounted one, such as facts that do not
+ * apply to what was asked, says nothing of this answer.
+ */
+export function disclosedDetails(coverage: Coverage | undefined): readonly CoverageDetail[] {
+    return (
+        coverage?.details?.filter(
+            (detail) => !detail.degrading && detail.count !== undefined && detail.count > 0,
+        ) ?? []
+    );
+}
+
+/**
  * INVARIANT: reasons are the UNION of the two shapes acr can report them in. A
  * legacy `coverage.degraded_reasons[]` string is withheld only when it is
  * BYTE-IDENTICAL to a degrading detail's rendered line, or to that detail's own
