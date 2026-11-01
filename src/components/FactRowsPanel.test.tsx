@@ -72,6 +72,8 @@ describe("FactRowsPanels", () => {
         const table = panel.querySelector("table");
         expect(table).not.toBeNull();
         expect(table!.closest(".sr-only")).not.toBeNull();
+        // Hidden from sight, so it takes no focus (a keyboard would land on nothing).
+        expect(table!.closest(".fact-table-wrap")).not.toHaveAttribute("tabindex");
     });
 
     it("renders a BAR chart for the ordinal team_name breakdown (never the opaque team_id), with the rollup_basis caption", () => {
@@ -192,6 +194,7 @@ describe("FactRowsPanels", () => {
         // Unlike the untruncated case above, this table is genuinely
         // visible — it is the only place the 9th column ("c9") appears.
         expect(table!.closest(".sr-only")).toBeNull();
+        expect(table!.closest(".fact-table-wrap")).toHaveAttribute("tabindex", "0");
     });
 
     it("renders a panel for the flow FactKind's team_count claim (team_id axis, since flow.go emits no team_name)", () => {

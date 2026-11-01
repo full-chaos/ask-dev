@@ -1,3 +1,4 @@
+import { ScrollRegion } from "./ScrollRegion";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
@@ -169,7 +170,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     withheld: it could not be checked against the facts it cites in this answer.
                 </p>
             ) : null}
-            <div className="fact-table-wrap">
+            <ScrollRegion label="Ranking">
                 <table className="fact-table">
                     <thead>
                         <tr>
@@ -258,7 +259,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                         ))}
                     </tbody>
                 </table>
-            </div>
+            </ScrollRegion>
             {rows.map((row) =>
                 row.member.missing_signals === undefined ? null : (
                     <p className="record__meta" key={`${row.member.subject.canonical_id}-missing`}>

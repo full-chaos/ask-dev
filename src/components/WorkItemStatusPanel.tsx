@@ -1,3 +1,4 @@
+import { ScrollRegion } from "./ScrollRegion";
 import { useId } from "react";
 
 import { EvidenceReferences } from "./EvidenceReferences";
@@ -98,7 +99,7 @@ export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
             <h2 className="panel__title" id={titleId}>
                 Work item status
             </h2>
-            <div className="fact-table-wrap">
+            <ScrollRegion label="Work item status">
                 <table
                     className="fact-table work-item-status__table"
                     data-testid="work-item-status-table"
@@ -143,7 +144,7 @@ export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
                         })}
                     </tbody>
                 </table>
-            </div>
+            </ScrollRegion>
         </section>
     );
 }

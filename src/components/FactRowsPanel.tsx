@@ -206,7 +206,10 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                             presentation.truncatedSeriesColumns.length > 0 ? undefined : "sr-only"
                         }
                     >
-                        <FactTable rows={rows} />
+                        <FactTable
+                            focusable={presentation.truncatedSeriesColumns.length > 0}
+                            rows={rows}
+                        />
                     </div>
                 </>
             ) : (

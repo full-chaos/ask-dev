@@ -251,6 +251,9 @@ function ChatSurface({
     const turns = useMemo(() => turnsToShow.map(withheldTurn), [turnsToShow]);
     const unrecorded = useMemo(() => turnsOfUnrecordedQuestions(turns), [turns]);
     const composerLock = composerLockOf(snapshot);
+    const composerHidden = snapshot.composerHidden === true;
+    const offersStop =
+        snapshot.stoppable && chat.stop !== undefined && threadNotShown === undefined;
     // The first read of the list waits for the host's first history (see
     // `ChatHistorySource.load`). Here and not in `ChatHistory`: that component
     // is drawn in two places, and neither may read on its own.
@@ -712,6 +715,7 @@ function ChatSurface({
 
     const popupPages =
         composerLock === undefined &&
+        !composerHidden &&
         latestAssistantTurn?.role === "assistant" &&
         latestAssistantTurn.outcome.kind === "answered" &&
         latestAssistantTurn.id !== dismissedPopupTurnId &&
@@ -964,7 +968,8 @@ function ChatSurface({
                                     // Web's rule: a question that was not recorded
                                     // cannot be sent again, so its turn reads like an
                                     // earlier one: no choice and no re-ask.
-                                    const offersChoice = isLatest && !unrecorded.has(turn.id);
+                                    const offersChoice =
+                                        isLatest && !unrecorded.has(turn.id) && !composerHidden;
                                     // The turns BEFORE this assistant turn's own user
                                     // turn are what this follow-up derived its carry
                                     // from; say so when a subject could not ride along.
@@ -1168,7 +1173,10 @@ function ChatSurface({
                         ) : null}
                     </div>
 
-                    <div className="chat__composer-bar" hidden={view === "history"}>
+                    <div
+                        className="chat__composer-bar"
+                        hidden={view === "history" || (composerHidden && !offersStop)}
+                    >
                         {popupPages.length === 0 ? null : (
                             // Floats above the composer via CSS (`.clarification-popup`
                             // is `position: absolute`, this wrapper `position:
@@ -1199,9 +1207,7 @@ function ChatSurface({
                                 pending={isPending}
                             />
                         )}
-                        {snapshot.stoppable &&
-                        chat.stop !== undefined &&
-                        threadNotShown === undefined ? (
+                        {offersStop ? (
                             <div className="chat__stop-row">
                                 <button
                                     className="chat__stop"
@@ -1221,7 +1227,7 @@ function ChatSurface({
                                 </button>
                             </div>
                         ) : null}
-                        {chat.pageContext === undefined ? null : (
+                        {chat.pageContext === undefined || composerHidden ? null : (
                             <ChatContextChips
                                 onRemove={(ref) => {
                                     chat.pageContext?.remove(ref);
@@ -1230,7 +1236,8 @@ function ChatSurface({
                             />
                         )}
                         <ChatComposer
-                            lock={composerLock}
+                            hidden={composerHidden}
+                            lock={composerHidden ? undefined : composerLock}
                             onAsk={ask}
                             onDraftCleared={() => {
                                 setDraftClears((count) => count + 1);
