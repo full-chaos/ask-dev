@@ -20,11 +20,12 @@ function tree(files) {
 }
 
 const ENTRY = "src/render/index.ts";
-const rules = (root) => checkRenderGraph({ root }).breaks.map((item) => item.rule);
+const rules = (root) => checkRenderGraph({ root, minFiles: 1 }).breaks.map((item) => item.rule);
 
 describe("the render entry (CHAOS-12381)", () => {
     it("reaches the shell and the answer view, and breaks no rule", () => {
-        const { files, breaks } = checkRenderGraph({ root: repositoryRoot, minFiles: 50 });
+        // The default threshold is the contract: a walk that reaches fewer than 50 files fails.
+        const { files, breaks } = checkRenderGraph({ root: repositoryRoot });
         expect(breaks).toEqual([]);
         expect(files).toContain("src/components/chat/AskDevChat.tsx");
         expect(files).toContain("src/components/DeterministicAnswerView.tsx");
@@ -214,6 +215,52 @@ describe("the guard names each break (a plant per rule)", () => {
                 tree({
                     ...clean,
                     "src/a.tsx": '/// <reference types="node" />\nexport const A = 1;\n',
+                }),
+            ),
+        ).toEqual(["server"]);
+    });
+
+    // codex r1 on #116: three false passes, reproduced.
+    it("the default threshold is 50 files: a two-file graph fails with the defaults", () => {
+        const root = tree(clean);
+        expect(checkRenderGraph({ root }).breaks.map((item) => item.rule)).toEqual([
+            "too_few_files",
+        ]);
+    });
+
+    it("require() and import() count however many arguments follow the specifier", () => {
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": 'const fs = require("node:fs", {});\nexport const A = fs;\n',
+                }),
+            ),
+        ).toEqual(["server"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": 'export const A = () => import("next/link", { with: {} });\n',
+                }),
+            ),
+        ).toEqual(["framework"]);
+    });
+
+    it("a triple-slash types reference meets every package rule (next is framework)", () => {
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": '/// <reference types="next" />\nexport const A = 1;\n',
+                }),
+            ),
+        ).toEqual(["framework"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": '/// <reference types="server-only" />\nexport const A = 1;\n',
                 }),
             ),
         ).toEqual(["server"]);

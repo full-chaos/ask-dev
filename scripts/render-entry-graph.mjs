@@ -22,7 +22,7 @@
  * to a package; `types="node"` is a server break).
  *
  * A walk that cannot measure fails: a missing entry, or one that reaches fewer files than
- * `minFiles`, is a break too.
+ * `minFiles` (50 by default: the render reaches 67 today), is a break too.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { builtinModules } from "node:module";
@@ -79,14 +79,14 @@ export function importsOf(fileName, text) {
             ts.isCallExpression(node) &&
             ts.isIdentifier(node.expression) &&
             node.expression.text === "require" &&
-            node.arguments.length === 1 &&
+            node.arguments.length >= 1 &&
             ts.isStringLiteralLike(node.arguments[0])
         ) {
             found.push({ specifier: node.arguments[0].text, typeOnly: false });
         } else if (
             ts.isCallExpression(node) &&
             node.expression.kind === ts.SyntaxKind.ImportKeyword &&
-            node.arguments.length === 1 &&
+            node.arguments.length >= 1 &&
             ts.isStringLiteralLike(node.arguments[0])
         ) {
             found.push({ specifier: node.arguments[0].text, typeOnly: false });
@@ -122,7 +122,7 @@ const packageOf = (specifier) =>
  * Walks the graph from `entry` (relative to `root`). Returns the reached files and every break.
  * @returns {{ files: string[], breaks: { rule: string, file: string, specifier?: string }[] }}
  */
-export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles = 1 }) {
+export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles = 50 }) {
     const breaks = [];
     const entryPath = resolve(root, entry);
     if (!existsSync(entryPath)) {
@@ -147,10 +147,8 @@ export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles
             readFileSync(file, "utf8"),
         )) {
             const reachesAtRuntime = live && !typeOnly;
-            if (typesReference) {
-                if (specifier === "node" || NODE_BUILTINS.has(specifier)) {
-                    breaks.push({ rule: "server", file: name, specifier: `types:${specifier}` });
-                }
+            if (typesReference && specifier === "node") {
+                breaks.push({ rule: "server", file: name, specifier: "types:node" });
                 continue;
             }
             if (/\.(css|scss|sass|less)$/u.test(specifier)) {
@@ -170,6 +168,7 @@ export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles
                 else queue.push([target, reachesAtRuntime]);
                 continue;
             }
+            // A types reference names a package: the package rules below hold for it too.
             const pkg = packageOf(specifier);
             if (pkg === "next") breaks.push({ rule: "framework", file: name, specifier });
             else if (
