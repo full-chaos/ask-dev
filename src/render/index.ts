@@ -25,6 +25,7 @@ export {
     narrowerContinuationCopy,
     REFUSAL_COPY,
 } from "../lib/acr/narrower-continuation-copy";
+export { ChatEvidenceBody, type ChatEvidenceBodyProps } from "../components/chat/ChatEvidenceBody";
 export { createStandaloneSource } from "./standalone-source";
 export {
     composerLockOf,
@@ -37,6 +38,10 @@ export {
     type BatchItem,
     type ChatAssistantTurn,
     type ChatContextRef,
+    type ChatEvidenceDetail,
+    type ChatEvidenceRef,
+    type ChatEvidenceSource,
+    type ChatEvidenceState,
     type ChatFeedbackEntry,
     type ChatFeedbackSource,
     type ChatHistoryRow,
@@ -70,6 +75,7 @@ export {
     COMPOSER_LOCK_WORDS,
     CONTEXT_CHIPS_COPY,
     CTA_LABELS,
+    EVIDENCE_COPY,
     FEEDBACK_COPY,
     formatElapsed,
     HISTORY_COPY,

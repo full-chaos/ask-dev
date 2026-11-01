@@ -54,6 +54,7 @@ type Capabilities = Partial<
         | "pageContext"
         | "reloadThread"
         | "loadEarlier"
+        | "evidence"
     >
 >;
 
