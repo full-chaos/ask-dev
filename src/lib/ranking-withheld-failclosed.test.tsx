@@ -10,6 +10,7 @@ import WorkbenchPage from "@/app/workbench/page";
 import { CanonicalResultInspector } from "@/components/CanonicalResultInspector";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
+import v2Example from "@/contracts/examples/context_fabric_investigation_result.v2.json";
 import type { InvestigationResult } from "@/lib/contracts";
 import {
     RESULT_FIELDS_DROPPED,
@@ -257,6 +258,25 @@ describe("fail-closed withholding (allowlist)", () => {
         );
         expect(out.rankingWithheld).toBeUndefined();
     });
+
+    // CHAOS-12375: v2 requires `structure_needs`, and this boundary drops it.
+    for (const [name, source] of [
+        ["v1", teamResult],
+        ["v2", v2Example as unknown as InvestigationResult],
+    ] as const) {
+        it(`a withheld ${name} result passes the schema its own schema_version names`, () => {
+            const input = { ...source, cohort: personResult().cohort! } as InvestigationResult;
+            expect(validateContract(`${input.schema_version}.schema.json`, input).valid).toBe(true);
+
+            const { result, rankingWithheld } = withholdUnrankableRankings(input);
+
+            expect(rankingWithheld).toBeDefined();
+            expect(result.structure_needs).toBeUndefined();
+            expect(validateContract(`${result.schema_version}.schema.json`, result).errors).toEqual(
+                [],
+            );
+        });
+    }
 
     it("is idempotent and drops a field a future producer adds", () => {
         const once = withholdUnrankableRankings({
