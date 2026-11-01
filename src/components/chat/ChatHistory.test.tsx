@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { AskDevChat } from "@/components/chat/AskDevChat";
@@ -320,6 +321,24 @@ describe("History: when it is read", () => {
         host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: THREAD_A }) });
         expect(api.load).toHaveBeenCalledTimes(2);
         host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: THREAD_A }) });
+        expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads once under Strict Mode, and once more for a new conversation", () => {
+        const api = fakeHistory();
+        const host = hostSource(
+            { ...snapshotOf(), history: historySnapshot({ currentId: null }) },
+            { history: api },
+        );
+        render(
+            <StrictMode>
+                <AskDevChat source={host} />
+            </StrictMode>,
+        );
+        expect(api.load).toHaveBeenCalledOnce();
+
+        host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: "thread_a" }) });
+
         expect(api.load).toHaveBeenCalledTimes(2);
     });
 

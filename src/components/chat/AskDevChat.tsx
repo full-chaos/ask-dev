@@ -206,7 +206,7 @@ export function AskDevChat({ source }: AskDevChatProps = {}) {
     return (
         <ChatSurface
             chat={chat}
-            key={`${String(mounted.generation)}:${String(conversationKey)}`}
+            key={JSON.stringify([mounted.generation, conversationKey ?? null])}
             onViewChange={setView}
             view={view}
         />
@@ -240,8 +240,13 @@ function ChatSurface({
     // is drawn in two places, and neither may read on its own.
     const historyPublished = snapshot.history !== undefined;
     const currentHistoryId = snapshot.history?.currentId ?? null;
+    // Held in a ref, because Strict Mode runs a mount's effect twice and one
+    // surface reads a conversation's list once.
+    const historyReadFor = useRef<string | null | undefined>(undefined);
     useEffect(() => {
-        if (historyPublished) chat.history?.load();
+        if (!historyPublished || historyReadFor.current === currentHistoryId) return;
+        historyReadFor.current = currentHistoryId;
+        chat.history?.load();
     }, [chat, historyPublished, currentHistoryId]);
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().

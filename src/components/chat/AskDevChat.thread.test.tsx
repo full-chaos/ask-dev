@@ -418,6 +418,22 @@ describe("the conversation key", () => {
         expect(composerBox()).toHaveValue("");
     });
 
+    it.each([
+        ["a number and the string of it", 1, "1"],
+        ["no key and the string undefined", undefined, "undefined"],
+    ])("tells %s apart", async (_name, first, second) => {
+        const user = userEvent.setup();
+        const host = hostSource(
+            first === undefined ? snapshotOf() : { ...snapshotOf(), conversationKey: first },
+        );
+        render(<AskDevChat source={host} />);
+        await user.type(composerBox(), "A draft for conversation A");
+
+        host.publish({ ...snapshotOf(), conversationKey: second });
+
+        expect(composerBox()).toHaveValue("");
+    });
+
     it("keeps the draft when the same key publishes a new turn", async () => {
         const user = userEvent.setup();
         const host = hostSource({ ...snapshotOf(), conversationKey: 1 });

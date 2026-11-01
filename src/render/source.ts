@@ -294,7 +294,10 @@ export type ChatFeedbackSource = {
     isReady(): boolean;
     /** `undefined` before `ensure`. The same object until it changes. */
     entryFor(resultId: string): ChatFeedbackEntry | undefined;
-    /** Reads a result's feedback once. The render calls this when ready and the entry is absent. */
+    /**
+     * Reads a result's feedback once. The render calls this when ready and the entry is absent,
+     * and Strict Mode runs that effect twice, so a second call while the read is out does nothing.
+     */
     ensure(resultId: string): void;
     /** "Try again" on a failed read: a GET. */
     retryRead(resultId: string): void;
