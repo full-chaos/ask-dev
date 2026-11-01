@@ -513,10 +513,11 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
     //  - graph_answer_pull_requests_on_explicit_text_links and
     //    ..._on_heuristic_links: NEVER degrading (acr
     //    ContextFabricCoverageDetailCodeMayDegrade); a disclosure of the link tier.
-    //    The panel does not render a non-degrading detail, so the tier is not
-    //    shown yet; tracked in CHAOS-12442. The detail's own server label is the
-    //    only carrier (e.g. "... tied to the requested project only by a text
-    //    reference"); no answer or limitation sentence names the tier for this path.
+    //    CHAOS-12442: the panel shows the served label under "About this answer",
+    //    never under "What limits this answer", and the status does not change. It
+    //    chooses a non-degrading detail by its count, with no list of codes. The
+    //    detail is the only carrier (e.g. "... tied to the requested project only by
+    //    a text reference"): no answer or limitation sentence names the tier here.
     "context_fabric_common.v1.schema.json#/$defs/CoverageDetail/properties/code": [
         "fact_unconfigured",
         "fact_no_declaring_producer",
