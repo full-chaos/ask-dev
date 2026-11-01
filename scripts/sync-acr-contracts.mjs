@@ -439,7 +439,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "4baa3dc48f53e9a979a45aa6da761068a617efa5";
+export const SOURCE_COMMIT = "d617cbd2095820cf161a3852fc15f5d72147da94";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
