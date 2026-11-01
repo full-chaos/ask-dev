@@ -9,6 +9,7 @@ import { ChoiceNotice } from "./ChoiceNotice";
 import { ChosenAnswersSummaryCard } from "./ChosenAnswersSummaryCard";
 import { ClarificationPanel, type ClarificationChoice } from "./ClarificationPanel";
 import { CohortGroupsPanel } from "./CohortGroupsPanel";
+import { CohortMembersPanel } from "./CohortMembersPanel";
 import { RankingWithheldNotice } from "./RankingWithheldNotice";
 import { CohortRankingPanel } from "./CohortRankingPanel";
 import { CompletenessPanel } from "./CompletenessPanel";
@@ -26,7 +27,7 @@ import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { WorkItemStatusPanel } from "./WorkItemStatusPanel";
 import { choiceDisposition } from "../lib/clarification";
-import { cohortRanking } from "../lib/cohort-ranking";
+import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
@@ -480,9 +481,11 @@ function AnswerView({
                 result={result}
                 shape={result.interpretation.shape}
             />
+            <CohortMembersPanel result={result} />
             <CohortGroupsPanel cohort={result.cohort} />
             <WorkItemStatusPanel result={result} />
-            {cohortRanking(result.interpretation.shape, result.cohort).state === "rows" ? (
+            {cohortRanking(askedForCohort(result.interpretation.shape, result), result.cohort)
+                .state === "rows" ? (
                 <>
                     <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                     <FactRowsPanels facts={result.claimed_facts} result={result} />

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import WorkbenchPage from "@/app/workbench/page";
 import { mockScenarios } from "@/test/fixtures/investigations";
+import { servedWordScenarios as served } from "@/test/fixtures/served-words";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
 const clarification = mockScenarios().find((scenario) => scenario.id === "clarification")!.result;
@@ -264,5 +265,51 @@ describe("Workbench multi-select telemetry (CHAOS-4343, codex review round 2)", 
         ]);
         // The SECOND fired request must NOT resend the same telemetry.
         expect(thirdCallBody).not.toHaveProperty("structureSelectionEvents");
+    });
+});
+
+/** CHAOS-12417: the header reads the word the panel's pill reads, never a raw status. */
+describe("the header's status badge", () => {
+    const headerBadge = () => document.querySelector(".result__head .badge");
+
+    it.each([
+        ["corrected", "Partial answer"],
+        ["full-answer", "Full answer"],
+        ["no-match", "No answer"],
+    ] as const)("%s reads the served word", async (name, word) => {
+        respondWith({ result: served[name] });
+        await ask();
+        await screen.findByTestId("ask-dev-answer-status");
+        expect(headerBadge()).toHaveTextContent(new RegExp(`^${word}$`, "u"));
+        expect(headerBadge()).not.toHaveAttribute("title");
+    });
+
+    it("no served word: the neutral Answer, no raw status in the text or on hover", async () => {
+        const { vocabulary_labels: _dropped, ...noWords } = served.corrected;
+        respondWith({ result: noWords });
+        await ask();
+        await screen.findByTestId("ask-dev-answer-status");
+        expect(headerBadge()).toHaveTextContent(/^Answer$/u);
+        expect(headerBadge()).not.toHaveAttribute("title");
+    });
+
+    it("no served word on a no-match: no badge", async () => {
+        const { vocabulary_labels: _dropped, ...noWords } = served["no-match"];
+        respondWith({ result: noWords });
+        await ask();
+        await screen.findByRole("article", { name: "Answer" });
+        expect(headerBadge()).toBeNull();
+    });
+
+    it("a withheld answer keeps its badge, and names no raw status on hover", async () => {
+        respondWith({
+            result: served.corrected,
+            rankingWithheld: { reason: "subject_kind_not_ranked", members_affected: 1 },
+        });
+        await ask();
+        await screen.findByRole("article", { name: "Answer" });
+        const badge = headerBadge();
+        expect(badge).toHaveTextContent(/^withheld$/u);
+        expect(badge?.getAttribute("title")).not.toMatch(/partial/u);
     });
 });

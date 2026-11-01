@@ -174,6 +174,8 @@ describe("D: G1 — ranking shows for team, project and repository only", () => 
             ...withCohort(recolour("pull_request")),
             drivers: example.drivers.map((driver) => ({ ...driver, summary: "SHOWN_DRIVER." })),
             interpretation: { ...example.interpretation, shape: "status" },
+            // A served cohort chart is a ranking the service stands behind, so it would ask for one.
+            render_shapes: [],
         };
         expect(result.drivers.length).toBeGreaterThan(0);
         const { container } = render(<DriversPanel result={result} />);
