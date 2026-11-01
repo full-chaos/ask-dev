@@ -9,33 +9,43 @@ const END = "2026-10-30T12:00:00Z";
 describe("evidenceWindowRange", () => {
     it("reads both bounds as a range, over a relative id and an as_of", () => {
         expect(
-            evidenceWindowRange({
-                start: START,
-                end: END,
-                relative_id: "trailing_30d",
-                as_of: END,
-                provenance: "server_default",
-            }),
+            evidenceWindowRange(
+                {
+                    start: START,
+                    end: END,
+                    relative_id: "trailing_30d",
+                    as_of: END,
+                    provenance: "server_default",
+                },
+                undefined,
+            ),
         ).toBe(`${formatDay(START)} – ${formatDay(END)}`);
     });
 
     it("reads a relative id over an as_of", () => {
         expect(
-            evidenceWindowRange({
-                relative_id: "trailing_30d",
-                as_of: END,
-                provenance: "server_default",
-            }),
+            evidenceWindowRange(
+                {
+                    relative_id: "trailing_30d",
+                    as_of: END,
+                    provenance: "server_default",
+                },
+                undefined,
+            ),
         ).toBe("trailing 30d");
     });
 
     it("does not make a range from one bound", () => {
-        expect(evidenceWindowRange({ start: START, provenance: "server_default" })).toBeUndefined();
-        expect(evidenceWindowRange({ end: END, provenance: "server_default" })).toBeUndefined();
+        expect(
+            evidenceWindowRange({ start: START, provenance: "server_default" }, undefined),
+        ).toBeUndefined();
+        expect(
+            evidenceWindowRange({ end: END, provenance: "server_default" }, undefined),
+        ).toBeUndefined();
     });
 
     it("reads nothing as nothing, so the caller says Not reported", () => {
-        expect(evidenceWindowRange(undefined)).toBeUndefined();
+        expect(evidenceWindowRange(undefined, undefined)).toBeUndefined();
     });
 });
 

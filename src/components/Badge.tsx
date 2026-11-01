@@ -7,11 +7,24 @@ export type BadgeProps = {
     readonly title?: string;
     /** The raw contract term, for tests and for a host. A user never reads it here. */
     readonly "data-value"?: string;
+    /** Test hook, threaded onto the badge. */
+    readonly "data-testid"?: string;
 };
 
-export function Badge({ tone, children, title, "data-value": value }: BadgeProps) {
+export function Badge({
+    tone,
+    children,
+    title,
+    "data-value": value,
+    "data-testid": testId,
+}: BadgeProps) {
     return (
-        <span className={`badge badge--${tone}`} data-value={value} title={title}>
+        <span
+            className={`badge badge--${tone}`}
+            data-testid={testId}
+            data-value={value}
+            title={title}
+        >
             {children}
         </span>
     );

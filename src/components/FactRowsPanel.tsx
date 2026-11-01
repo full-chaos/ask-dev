@@ -15,6 +15,8 @@ import {
 import { rollupsOfClaims } from "../lib/investment-rollup";
 import { trendShapesForClaim } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
+import { Details } from "./Details";
+import { useVocabularyWord } from "./VocabularyWordContext";
 
 export type FactRowsPanelsProps = {
     readonly facts: readonly ClaimedFact[];
@@ -130,6 +132,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // existing pinned test selects on that prefix) while making the whole id
     // instance-unique, same pattern as every other panel touched here.
     const idPrefix = useId();
+    const word = useVocabularyWord();
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
     const rollups = rollupsOfClaims(allFacts, [
@@ -139,13 +142,20 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     return (
         <section role="group" aria-labelledby={titleId} className="panel panel--card">
             <h2 className="panel__title" id={titleId}>
-                {humanizeTerm(fact.kind)} · {humanizeTerm(fact.field)}
+                {word("fact_kind", fact.kind)} · {humanizeTerm(fact.field)}
             </h2>
             <p className="fact-panel__caption">
                 {fact.subject.label}
-                {rollupBasis !== undefined ? ` · ${humanizeTerm(rollupBasis)}` : ""}
                 {` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
             </p>
+            {rollupBasis === undefined ? null : (
+                // CHAOS-12417: no published vocabulary, composite tokens, so it stays in the fold.
+                <Details summary="How this was rolled up">
+                    <p className="record__meta" data-testid="fact-rollup-basis">
+                        {humanizeTerm(rollupBasis)}
+                    </p>
+                </Details>
+            )}
             {rollups.length === 0 ? null : (
                 // CHAOS-12178: the owning-team roll-ups among the claims this table backs.
                 <p className="fact-panel__caption" data-testid="fact-rollups">

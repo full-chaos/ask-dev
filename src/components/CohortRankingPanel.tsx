@@ -15,8 +15,9 @@ import { cohortRanking, formatCohortScore, memberDriversText } from "../lib/coho
 import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-import { cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
+import { cohortOutcomeTone } from "../lib/presentation";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
+import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 
 export type CohortRankingPanelProps = {
     /**
@@ -37,13 +38,16 @@ export type CohortRankingPanelProps = {
 
 /** A driver's contribution, as the member itself states it. Nothing re-derived. */
 function DriverCell({ driver }: { readonly driver: CohortMemberDriver }) {
+    const word = useVocabularyWord();
     const thresholdLabel = driver.threshold_labels?.[0];
     return (
         <li className="ranking__driver">
-            <span className="ranking__driver-signal">{humanizeTerm(driver.signal)}</span>{" "}
+            <span className="ranking__driver-signal">{word("ranking_signal", driver.signal)}</span>{" "}
             <span className="record__meta">
                 value {driver.value} · contributed {driver.weight_contributed} of {driver.weight}
-                {thresholdLabel === undefined ? null : <> · {humanizeTerm(thresholdLabel)}</>}
+                {thresholdLabel === undefined ? null : (
+                    <> · {word("threshold_label", thresholdLabel)}</>
+                )}
             </span>
         </li>
     );
@@ -126,6 +130,8 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     // panel's heading — the same multi-instance bug `DeterministicAnswerView`
     // and `StructureNeedsPanel` already use `useId()` to avoid.
     const idPrefix = useId();
+    const word = useVocabularyWord();
+    const served = useServedWord();
     const ranking = cohortRanking(shape, cohort);
     if (ranking.state === "not_requested" || ranking.state === "not_computed") return null;
     if (ranking.state === "kind_not_ranked") {
@@ -152,6 +158,9 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     }
     if (cohort === undefined) return null;
     const rows = ranking.rows;
+    // The served plural, or the cohort's own word for its rows: no pluralizer here (CHAOS-12417).
+    const plural = served("subject_kind_plural", cohort.kind) ?? "members";
+    const singular = word("subject_kind", cohort.kind);
 
     const unranked = unrankedLabels(cohort.members);
 
@@ -175,13 +184,13 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
             data-testid="cohort-ranking-panel"
         >
             <h2 className="panel__title" id={`${idPrefix}-cohort-ranking-title`}>
-                Ranked {humanizeTerm(cohort.kind)}s
+                Ranked {plural}
             </h2>
             {cohort.complete && !cohort.truncated ? null : (
                 <p className="record__meta" data-testid="cohort-incomplete-notice">
                     {cohort.truncated
-                        ? `This ranking covers only the ${humanizeTerm(cohort.kind)}s the service returned — the cohort was truncated, so it is not every ${humanizeTerm(cohort.kind)}.`
-                        : `The service did not report this cohort as complete, so this ranking may not cover every ${humanizeTerm(cohort.kind)}.`}
+                        ? `This ranking covers only the ${plural} the service returned — the cohort was truncated, so it is not every ${singular}.`
+                        : `The service did not report this cohort as complete, so this ranking may not cover every ${singular}.`}
                 </p>
             )}
             {
@@ -217,7 +226,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     <thead>
                         <tr>
                             <th scope="col">Rank</th>
-                            <th scope="col">{humanizeTerm(cohort.kind)}</th>
+                            <th scope="col">{singular}</th>
                             <th scope="col">Score</th>
                             <th scope="col">Outcome</th>
                             <th scope="col">Window</th>
@@ -264,13 +273,13 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                     ) : (
                                         <Badge
                                             tone={cohortOutcomeTone(row.member.outcome)}
-                                            title={row.member.outcome}
+                                            data-value={row.member.outcome}
                                         >
-                                            {humanizeTerm(row.member.outcome)}
+                                            {word("member_outcome", row.member.outcome)}
                                         </Badge>
                                     )}
                                 </td>
-                                <td>{humanizeTerm(row.window)}</td>
+                                <td>{word("driver_window", row.window)}</td>
                                 <td>
                                     {
                                         // The member's served driver rows, from the one shared
@@ -307,7 +316,9 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                 row.member.missing_signals === undefined ? null : (
                     <p className="record__meta" key={`${row.member.subject.canonical_id}-missing`}>
                         {row.member.subject.label} — missing signals:{" "}
-                        {row.member.missing_signals.map(humanizeTerm).join(", ")}
+                        {row.member.missing_signals
+                            .map((signal) => word("ranking_signal", signal))
+                            .join(", ")}
                     </p>
                 ),
             )}

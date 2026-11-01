@@ -1,5 +1,6 @@
 import { Details } from "./Details";
 import { Badge } from "./Badge";
+import { useVocabularyWord } from "./VocabularyWordContext";
 import type { ConfirmedStructureEntry } from "../lib/contracts";
 import { structureDispositionTone } from "../lib/presentation";
 import {
@@ -26,6 +27,7 @@ export function StructureConfirmationRecords({
 }: {
     readonly summaries: readonly ReturnType<typeof summarizeConfirmedStructure>[number][];
 }) {
+    const word = useVocabularyWord();
     return (
         <ul className="stack stack--tight" style={{ marginTop: 10 }}>
             {summaries.map((summary) => (
@@ -36,7 +38,7 @@ export function StructureConfirmationRecords({
                             data-value={summary.entry.disposition}
                             tone={structureDispositionTone(summary.entry.disposition)}
                         >
-                            {summary.entry.disposition.replaceAll("_", " ")}
+                            {word("structure_disposition", summary.entry.disposition)}
                         </Badge>
                     </div>
                     <p className="answer__body">{summary.sentence}</p>

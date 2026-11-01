@@ -44,9 +44,11 @@ describe("DriversPanel — narrated driver judgments", () => {
     });
 
     it("shows a principal driver's standing distinctly from a contributing one", () => {
-        render(<DriversPanel result={result} />);
-        expect(screen.getAllByTitle("principal").length).toBeGreaterThan(0);
-        expect(screen.getAllByTitle("contributing").length).toBeGreaterThan(0);
+        const { container } = render(<DriversPanel result={result} />);
+        expect(container.querySelector('[data-value="principal"]')).not.toBeNull();
+        expect(container.querySelector('[data-value="contributing"]')).not.toBeNull();
+        // A raw contract term is never a hover text (`Badge`).
+        expect(screen.queryAllByTitle("principal")).toEqual([]);
     });
 
     it("labels an inferred judgment as inferred, never as an observation", () => {

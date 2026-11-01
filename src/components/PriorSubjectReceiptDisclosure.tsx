@@ -1,9 +1,10 @@
 import { Details } from "./Details";
+import { useVocabularyWord } from "./VocabularyWordContext";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
 import type { PriorSubjectReceiptDispositionEntry } from "../lib/contracts";
-import { humanizeTerm, priorSubjectReceiptDispositionTone } from "../lib/presentation";
+import { priorSubjectReceiptDispositionTone } from "../lib/presentation";
 
 export type PriorSubjectReceiptDisclosureProps = {
     readonly dispositions: readonly PriorSubjectReceiptDispositionEntry[] | undefined;
@@ -38,6 +39,7 @@ export function PriorSubjectReceiptDisclosure({
     // turn (`@/app/page.tsx`), so a hardcoded id would collide across turns
     // and break `aria-labelledby` for every instance but the first.
     const idPrefix = useId();
+    const word = useVocabularyWord();
     if (dispositions === undefined || dispositions.length === 0) return null;
     return (
         <section role="group" aria-labelledby={`${idPrefix}-prior-subject-receipts-title`}>
@@ -64,7 +66,7 @@ export function PriorSubjectReceiptDisclosure({
                             tone={priorSubjectReceiptDispositionTone(entry.disposition)}
                             data-value={entry.disposition}
                         >
-                            {humanizeTerm(entry.disposition)}
+                            {word("prior_receipt_disposition", entry.disposition)}
                         </Badge>
                         <Details summary="Details">
                             <code>{entry.receipt_id}</code> from{" "}

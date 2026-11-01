@@ -31,10 +31,11 @@ export function AnswerPlanPanel({ answerPlan }: AnswerPlanPanelProps) {
     const narrowing = answerPlan.narrowing ?? [];
     return (
         <details className="disclosure" data-testid="answer-plan-panel">
-            <summary id={`${idPrefix}-answer-plan-title`}>
-                Plan — {humanizeTerm(answerPlan.family)}
-            </summary>
+            <summary id={`${idPrefix}-answer-plan-title`}>Plan</summary>
             <div className="stack stack--tight">
+                <p className="record__meta" data-testid="answer-plan-family">
+                    {humanizeTerm(answerPlan.family)}
+                </p>
                 <p className="record__meta" data-testid="answer-plan-budget">
                     Budget: {answerPlan.budget.max_items} items · {answerPlan.budget.max_members}{" "}
                     members · {answerPlan.budget.max_serialized_bytes} bytes

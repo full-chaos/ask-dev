@@ -4,7 +4,7 @@ import { SafeAnswerText } from "./SafeAnswerText";
 import type { EvidenceRefLabels } from "../lib/contracts";
 import type { DedupedFinding } from "../lib/fact-dedup";
 import { SURFACE_LABEL } from "../lib/fact-dedup";
-import { humanizeTerm } from "../lib/presentation";
+import { useVocabularyWord } from "./VocabularyWordContext";
 
 export type FindingsPanelProps = {
     readonly title: string;
@@ -33,6 +33,7 @@ export function FindingsPanel({
     evidenceRefLabels,
     withheld = false,
 }: FindingsPanelProps) {
+    const word = useVocabularyWord();
     const titleId = `findings-${title.toLowerCase().replaceAll(" ", "-")}`;
     return (
         <section role="group" className="panel" aria-labelledby={titleId}>
@@ -56,7 +57,7 @@ export function FindingsPanel({
                                      * primary can render BELOW this reference. "already"
                                      * would be a false positional claim in that case.
                                      */}
-                                    {humanizeTerm(finding.kind)} — also shown in full under{" "}
+                                    {word("fact_kind", finding.kind)} — also shown in full under{" "}
                                     {SURFACE_LABEL[primarySurface]}.
                                 </p>
                                 {/*
@@ -93,7 +94,7 @@ export function FindingsPanel({
                             <li className="record" key={finding.finding_id}>
                                 <div className="record__head">
                                     <span className="record__title">
-                                        {humanizeTerm(finding.kind)}
+                                        {word("fact_kind", finding.kind)}
                                     </span>
                                     {finding.subjects !== undefined &&
                                     finding.subjects.length > 0 ? (

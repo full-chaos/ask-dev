@@ -36,9 +36,11 @@ describe("AnswerPlanPanel", () => {
         expect(details).not.toHaveAttribute("open");
     });
 
-    it("shows the resolved question family in the summary", () => {
+    it('keeps the family in the fold: the summary is only "Plan" (CHAOS-12417)', () => {
         render(<AnswerPlanPanel answerPlan={BASE_PLAN} />);
-        expect(screen.getByTestId("answer-plan-panel")).toHaveTextContent(
+        const fold = screen.getByTestId("answer-plan-panel");
+        expect(fold.querySelector("summary")).toHaveTextContent(/^Plan$/u);
+        expect(screen.getByTestId("answer-plan-family")).toHaveTextContent(
             "discovered cohort ranking",
         );
     });

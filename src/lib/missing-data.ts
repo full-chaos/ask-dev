@@ -1,5 +1,6 @@
 import type { AnswerCompleteness, PlanRequirementOutcomeRow } from "./contracts";
 import { humanizeTerm } from "./presentation";
+import { type VocabularyLabels, vocabularyWord } from "./vocabulary-labels";
 
 /**
  * The one "Missing data" sentence a `partial` or `degraded` answer adds (CHAOS-12429; the rule of
@@ -10,8 +11,8 @@ import { humanizeTerm } from "./presentation";
  * sentence, built from the requirement rows, and it carries no state word.
  *
  * CHAOS-4690: no table over an ACR vocabulary. The requirement is named by `humanizeTerm` of the
- * served obligation, and what became of it by `humanizeTerm` of the served `outcome` (the rows
- * carry no label of their own). Whether a row is a gap is read from the served `impact`, which the
+ * served obligation (not a vocabulary), and what became of it by the served word of `outcome`
+ * (CHAOS-12417), else its generic path. Whether a row is a gap is read from the served `impact`, which the
  * contract sets to `none` exactly when the outcome is `satisfied` or `not_applicable`, so no outcome
  * value is named here either.
  */
@@ -37,12 +38,16 @@ function neededOf(row: PlanRequirementOutcomeRow, requirement: string): string {
     return row.obligation?.trim() || requirement.split("/")[0]?.trim() || "";
 }
 
-function gapOf(row: PlanRequirementOutcomeRow, requirement: string): string | null {
+function gapOf(
+    row: PlanRequirementOutcomeRow,
+    requirement: string,
+    labels: VocabularyLabels,
+): string | null {
     if (row.impact === "none") return null;
     const needed = neededOf(row, requirement);
     if (needed === "") return null;
     const what = humanizeTerm(needed).toLowerCase();
-    const how = humanizeTerm(row.outcome);
+    const how = vocabularyWord(labels, "requirement_outcome", row.outcome);
     if (STATE_WORD.test(what) || STATE_WORD.test(how)) return null;
     return row.declared > 0 && row.served < row.declared
         ? `${what} ${how} (${String(row.served)} of ${String(row.declared)})`
@@ -50,10 +55,13 @@ function gapOf(row: PlanRequirementOutcomeRow, requirement: string): string | nu
 }
 
 /** The sentence, or `null` for every other state and when no row names a gap. */
-export function missingDataSentence(completeness: AnswerCompleteness): string | null {
+export function missingDataSentence(
+    completeness: AnswerCompleteness,
+    labels: VocabularyLabels,
+): string | null {
     if (completeness.state !== "partial" && completeness.state !== "degraded") return null;
     const gaps = lastRows(completeness.outcomes ?? [])
-        .map(([requirement, row]) => gapOf(row, requirement))
+        .map(([requirement, row]) => gapOf(row, requirement, labels))
         .filter((gap): gap is string => gap !== null);
     return gaps.length === 0 ? null : `${MISSING_DATA_LEAD}: ${gaps.join("; ")}.`;
 }

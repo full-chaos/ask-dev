@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { AnswerPanel } from "./AnswerPanel";
 import { AnswerPlanPanel } from "./AnswerPlanPanel";
+import { AnswerStatus } from "./AnswerStatus";
 import { ChoiceNotice } from "./ChoiceNotice";
 import { ChosenAnswersSummaryCard } from "./ChosenAnswersSummaryCard";
 import { ClarificationPanel, type ClarificationChoice } from "./ClarificationPanel";
@@ -22,6 +23,7 @@ import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
 import { StructureConfirmationNotice } from "./StructureConfirmationNotice";
 import { StructureNeedsPanel } from "./StructureNeedsPanel";
 import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
+import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { WorkItemStatusPanel } from "./WorkItemStatusPanel";
 import { choiceDisposition } from "../lib/clarification";
 import { cohortRanking } from "../lib/cohort-ranking";
@@ -201,7 +203,15 @@ function AiLabel({ result }: { readonly result: InvestigationResult }) {
  */
 const EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS: ReadonlySet<string> = new Set();
 
-export function DeterministicAnswerView({
+export function DeterministicAnswerView(props: DeterministicAnswerViewProps) {
+    return (
+        <VocabularyLabelsContext.Provider value={props.result.vocabulary_labels}>
+            <AnswerView {...props} />
+        </VocabularyLabelsContext.Provider>
+    );
+}
+
+function AnswerView({
     result,
     rankingWithheld,
     selectedCandidateReceiptIds = EMPTY_SELECTED_CANDIDATE_RECEIPT_IDS,
@@ -339,6 +349,7 @@ export function DeterministicAnswerView({
             // regression pass vacuously — see tests/chat.spec.ts's positive
             // clarification-chip control.
             <article aria-label="Answer" data-state={result.status}>
+                <AnswerStatus result={result} />
                 <AiLabel result={result} />
                 {notice}
                 <RankingWithheldNotice rankingWithheld={rankingWithheld} />
@@ -419,6 +430,7 @@ export function DeterministicAnswerView({
 
     return (
         <article aria-label="Answer" data-state={result.status}>
+            <AnswerStatus result={result} />
             <AiLabel result={result} />
             {
                 // `notice` (a dishonoured prior choice) and `structureNeedsPanel`
