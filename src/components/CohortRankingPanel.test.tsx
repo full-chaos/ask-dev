@@ -495,6 +495,24 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             );
         });
 
+        it.each(["judgment_mismatch", "population_lower_bound"])(
+            "%s holding neither true nor false shows as what it holds",
+            (name) => {
+                draw(odd({ [name]: "unexpected" }));
+                expect(within(fold()).getByTestId(`cohort-raw-${name}`)).toHaveTextContent(
+                    `${name}: unexpected`,
+                );
+            },
+        );
+
+        it.each(["score_meaning", "population"])("%s false or null shows nothing", (name) => {
+            const first = draw(odd({ [name]: false }));
+            expect(within(fold()).queryByTestId(`cohort-raw-${name}`)).toBeNull();
+            first.unmount();
+            draw(odd({ [name]: null }));
+            expect(within(fold()).queryByTestId(`cohort-raw-${name}`)).toBeNull();
+        });
+
         it("a rationale that is not text draws nothing", () => {
             draw(odd({ rationale: { unexpected: 1 } }));
             expect(fold()).toBeInTheDocument();

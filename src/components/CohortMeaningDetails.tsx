@@ -8,17 +8,14 @@ function rawText(value: unknown): string {
 }
 
 /**
- * CHAOS-12480: the fields ACR serves no words for yet stay raw here until it does. A field that is
- * absent or false shows nothing. A population of zero is a measured value, so it shows.
+ * CHAOS-12480: the fields ACR serves no words for yet stay raw here until it does. Absent and false
+ * show nothing. Any other value shows as it is: a population of zero is a measured value.
  */
 function rawFields(cohort: Cohort): readonly (readonly [string, string])[] {
-    const fields: (readonly [string, string])[] = [];
-    if (cohort.score_meaning !== undefined)
-        fields.push(["score_meaning", rawText(cohort.score_meaning)]);
-    if (cohort.judgment_mismatch === true) fields.push(["judgment_mismatch", "true"]);
-    if (cohort.population !== undefined) fields.push(["population", rawText(cohort.population)]);
-    if (cohort.population_lower_bound === true) fields.push(["population_lower_bound", "true"]);
-    return fields;
+    const { score_meaning, judgment_mismatch, population, population_lower_bound } = cohort;
+    return Object.entries({ score_meaning, judgment_mismatch, population, population_lower_bound })
+        .filter(([, value]) => value !== undefined && value !== null && value !== false)
+        .map(([name, value]) => [name, rawText(value)] as const);
 }
 
 export type CohortMeaningDetailsProps = {
