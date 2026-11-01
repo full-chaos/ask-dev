@@ -3,9 +3,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { checkDrift, sourcePathsFromManifest } from "./check-acr-pin-drift.mjs";
+import { checkDrift, main, sourcePathsFromManifest } from "./check-acr-pin-drift.mjs";
 
 const SCRIPT = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -188,5 +188,196 @@ describe("cli exit codes", () => {
     it("exits 2 on a malformed pin", () => {
         const { repo } = fakeAcr();
         expect(run(repo, "main").status).toBe(2);
+    });
+});
+
+// CHAOS-12443: outcome naming. Real local git remotes; the only injected faults are a failing
+// temp-dir removal and a sleep hook that heals the remote between attempts.
+describe("outcome", () => {
+    const manifestFor = (pin, files = [{ path: "openapi/a.json" }]) => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-"));
+        tmpDirs.push(dir);
+        const manifest = path.join(dir, "manifest.json");
+        fs.writeFileSync(manifest, JSON.stringify({ source_commit: pin, files }));
+        return { manifest, out: path.join(dir, "github-output.txt") };
+    };
+    // Runs main() with stdout/stderr captured; returns the code, the text and the GITHUB_OUTPUT file.
+    const runMain = ({ remote, pin, files, enforce }, deps = {}) => {
+        const { manifest, out } = manifestFor(pin, files);
+        fs.writeFileSync(out, "");
+        const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const outw = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+        try {
+            const env = { ACR_REMOTE: remote, ACR_MANIFEST: manifest, GITHUB_OUTPUT: out };
+            if (enforce !== undefined) env.ACR_PIN_ENFORCE = enforce;
+            const code = main(env, deps);
+            return {
+                code,
+                stderr: err.mock.calls.map((c) => String(c[0])).join(""),
+                stdout: outw.mock.calls.map((c) => String(c[0])).join(""),
+                output: fs.readFileSync(out, "utf8"),
+            };
+        } finally {
+            err.mockRestore();
+            outw.mockRestore();
+        }
+    };
+    // The real fault seen on runners (ENOTEMPTY from rmSync), injected where it happens: fs.rmSync.
+    // The spy removes the dir for real first, so tests leave nothing behind, then throws.
+    const withFailingRemove = (fn) => {
+        const real = fs.rmSync;
+        const spy = vi.spyOn(fs, "rmSync").mockImplementation((p, o) => {
+            real(p, o);
+            throw new Error(`ENOTEMPTY: directory not empty, rmdir '${p}/.git/objects'`);
+        });
+        try {
+            return fn();
+        } finally {
+            spy.mockRestore();
+        }
+    };
+
+    it("a failed temp removal after a CLEAN measurement stays current (exit 0) and warns", () => {
+        const { repo, base } = fakeAcr();
+        const r = withFailingRemove(() => runMain({ remote: repo, pin: base }));
+        expect(r.code).toBe(0);
+        expect(r.output).toContain("status=current");
+        expect(r.stderr).toMatch(/warning: .*could not remove temp dir/);
+        expect(r.stderr).not.toContain("could NOT run");
+    });
+    it("a failed temp removal after a DRIFT measurement stays drift (exit 1)", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/a.json": "2" }, "planted");
+        const r = withFailingRemove(() => runMain({ remote: repo, pin: base }));
+        expect(r.code).toBe(1);
+        expect(r.output).toContain("status=drift");
+        expect(r.stderr).toMatch(/warning: .*could not remove temp dir/);
+    });
+    it("checkDrift returns the finished result when the removal fails", () => {
+        const { repo, base } = fakeAcr();
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        try {
+            expect(
+                withFailingRemove(() => checkDrift({ remote: repo, pin: base, paths: PATHS }))
+                    .status,
+            ).toBe("current");
+        } finally {
+            warn.mockRestore();
+        }
+    });
+    it("a transient fetch failure that then succeeds gives the true result", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/a.json": "2" }, "planted");
+        const away = `${repo}-away`;
+        tmpDirs.push(away);
+        fs.renameSync(repo, away);
+        const sleeps = [];
+        const r = checkDrift({
+            remote: repo,
+            pin: base,
+            paths: PATHS,
+            sleep: (ms) => {
+                sleeps.push(ms);
+                fs.renameSync(away, repo); // the network heals during the first backoff
+            },
+        });
+        expect(r.status).toBe("drift");
+        expect(sleeps).toHaveLength(1);
+    });
+    it("a fetch that keeps failing exits 2 with status=error after a bounded retry", () => {
+        const sleeps = [];
+        const r = runMain(
+            { remote: "/nonexistent/acr.git", pin: "a".repeat(40) },
+            { sleep: (ms) => sleeps.push(ms) },
+        );
+        expect(r.code).toBe(2);
+        expect(r.output).toContain("status=error");
+        expect(r.output).not.toContain("status=current");
+        expect(sleeps).toHaveLength(2); // 3 attempts: the first + 2 retries
+        expect(r.stderr).toContain("::error title=ACR pin drift: tool failure, not drift::");
+        expect(r.stderr).not.toContain("ACR contract pin drift");
+    });
+    it("a broken manifest path exits 2 at once, with no retry", () => {
+        const { repo, base } = fakeAcr();
+        const sleeps = [];
+        const r = runMain(
+            { remote: repo, pin: base, files: [{ path: "openapi/no-such.json" }] },
+            { sleep: (ms) => sleeps.push(ms) },
+        );
+        expect(r.code).toBe(2);
+        expect(r.output).toContain("status=error");
+        expect(sleeps).toHaveLength(0);
+        // an unrecognised manifest path and a bad pin are also instant
+        const bad = runMain(
+            { remote: repo, pin: base, files: [{ path: "weird/x.json" }] },
+            { sleep: (ms) => sleeps.push(ms) },
+        );
+        expect(bad.code).toBe(2);
+        expect(
+            runMain({ remote: repo, pin: "main" }, { sleep: (ms) => sleeps.push(ms) }).code,
+        ).toBe(2);
+        expect(sleeps).toHaveLength(0);
+    });
+    it("drift prints the drift title; a tool failure never does", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/a.json": "2" }, "planted");
+        const r = runMain({ remote: repo, pin: base });
+        expect(r.code).toBe(1);
+        expect(r.stderr).toContain("::error title=ACR contract pin drift::");
+        expect(r.stderr).not.toContain("tool failure");
+        expect(r.output).toContain(`pin=${base}`);
+    });
+    it("a clean run writes status=current and no annotation", () => {
+        const { repo, base } = fakeAcr();
+        const r = runMain({ remote: repo, pin: base });
+        expect(r.code).toBe(0);
+        expect(r.output).toContain("status=current");
+        expect(r.stderr).not.toContain("::error");
+        expect(r.stderr).not.toContain("::warning");
+    });
+    it("ACR_PIN_ENFORCE=false turns annotations into warnings and keeps the exit codes", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/a.json": "2" }, "planted");
+        const drift = runMain({ remote: repo, pin: base, enforce: "false" });
+        expect(drift.code).toBe(1);
+        expect(drift.stderr).toContain("::warning title=ACR contract pin drift::");
+        expect(drift.stderr).not.toContain("::error");
+        const tool = runMain(
+            { remote: "/nonexistent/acr.git", pin: "a".repeat(40), enforce: "false" },
+            { sleep: () => {} },
+        );
+        expect(tool.code).toBe(2);
+        expect(tool.stderr).toContain("::warning title=ACR pin drift: tool failure, not drift::");
+        expect(tool.stderr).not.toContain("::error");
+    });
+});
+
+describe("workflow contract", () => {
+    const wf = fs.readFileSync(
+        path.resolve(path.dirname(SCRIPT), "../.github/workflows/acr-pin-drift.yml"),
+        "utf8",
+    );
+    const step = (name) => {
+        const i = wf.indexOf(`- name: ${name}`);
+        expect(i).toBeGreaterThan(-1);
+        const next = wf.indexOf("\n            - ", i + 1);
+        return wf.slice(i, next === -1 ? undefined : next);
+    };
+    it("the PR-file step has the token; the scope step (runs PR code) does not", () => {
+        expect(step("List the files this PR changes")).toContain("GH_TOKEN");
+        const scope = step("Decide whether drift is enforced");
+        expect(scope).not.toMatch(/GH_TOKEN|github\.token|secrets\./);
+        expect(scope).toContain("scripts/acr-pin-scope.mjs");
+    });
+    it("checkout does not persist credentials; permissions stay narrow", () => {
+        expect(wf).toMatch(/persist-credentials: false/);
+        expect(wf).toMatch(/pull-requests: read/);
+        expect(wf).not.toMatch(/(contents|issues|pull-requests): write/);
+    });
+    it("a PR that does not touch the pin cannot fail the job on drift", () => {
+        expect(step("Compare the vendored pin with acr main")).toContain("continue-on-error: true");
+        const fail = step("Fail when drift is enforced");
+        expect(fail).toContain("steps.scope.outputs.enforce == 'true'");
+        expect(fail).toContain("steps.check.outcome == 'failure'");
     });
 });
