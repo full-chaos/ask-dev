@@ -404,6 +404,34 @@ describe("History: when it is read", () => {
         });
     });
 
+    describe("a read no retry can clear", () => {
+        it("says Ask Dev is not available here, with no way to try again", () => {
+            setup({ status: "unavailable" });
+
+            expect(screen.getByTestId("ask-dev-history-unavailable")).toHaveTextContent(
+                NOT_RUN_COPY.not_entitled,
+            );
+            expect(screen.queryByTestId("ask-dev-history-retry")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-empty")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-loading")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-no-repository")).toBeNull();
+        });
+
+        it("shows no row and no way to more", () => {
+            setup({ status: "unavailable", rows: [rowA, rowB], hasMore: true, moreFailed: true });
+
+            expect(screen.queryByTestId("ask-dev-history-list")).toBeNull();
+            expect(screen.queryByTestId("ask-dev-history-more")).toBeNull();
+            expect(screen.queryByText(HISTORY_COPY.moreFailed)).toBeNull();
+        });
+
+        it("does not offer Connect", () => {
+            const { connect } = setup({ status: "unavailable" });
+
+            expect(connect).not.toHaveBeenCalled();
+        });
+    });
+
     it("reads nothing until the host publishes a history, then reads once", () => {
         const api = fakeHistory();
         const host = hostSource(snapshotOf(), { history: api });

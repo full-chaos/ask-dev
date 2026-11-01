@@ -237,8 +237,12 @@ export type ChatHistorySnapshot = {
      * `no_repository`: ACR's 409, the viewer has no repository in scope. It is not a failed read,
      * so it offers no Try again, and not an empty list: conversations may exist that this viewer
      * cannot reach now. The render shows no row while it holds.
+     *
+     * `unavailable`: ACR says no retry can clear the read: an organization above its access limit.
+     * It holds as `no_repository` does, with no Try again and no row.
      */
-    readonly status: "idle" | "loading" | "ready" | "read_failed" | "connect" | "no_repository";
+    readonly status:
+        "idle" | "loading" | "ready" | "read_failed" | "connect" | "no_repository" | "unavailable";
     readonly rows: readonly ChatHistoryRow[];
     /** The conversation shown now, or `null`. A change reads the list again. */
     readonly currentId: string | null;

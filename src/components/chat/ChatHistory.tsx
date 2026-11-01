@@ -174,6 +174,8 @@ function HistoryRow({
  */
 export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: ChatHistoryProps) {
     const sectionRef = useRef<HTMLElement>(null);
+    /** ACR's answer holds: no row can show, and no read can open one. */
+    const closed = history.status === "no_repository" || history.status === "unavailable";
     return (
         <section
             className="rail__section"
@@ -219,6 +221,10 @@ export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: C
                 <p className="rail__note" data-testid="ask-dev-history-no-repository">
                     {NOT_RUN_COPY.no_repository}
                 </p>
+            ) : history.status === "unavailable" ? (
+                <p className="rail__note" data-testid="ask-dev-history-unavailable">
+                    {NOT_RUN_COPY.not_entitled}
+                </p>
             ) : history.rows.length === 0 ? (
                 history.status === "loading" || history.status === "idle" ? (
                     <p className="rail__empty" data-testid="ask-dev-history-loading">
@@ -243,10 +249,10 @@ export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: C
                     ))}
                 </ul>
             )}
-            {history.moreFailed && history.status !== "no_repository" ? (
+            {history.moreFailed && !closed ? (
                 <p className="rail__note">{HISTORY_COPY.moreFailed}</p>
             ) : null}
-            {history.hasMore && history.status !== "no_repository" ? (
+            {history.hasMore && !closed ? (
                 <button
                     className="rail__button"
                     data-testid="ask-dev-history-more"
