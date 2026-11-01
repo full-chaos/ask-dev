@@ -4,6 +4,7 @@ import { FactChart } from "./FactChart";
 import { FactTable } from "./FactTable";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { RenderShapeChart } from "./RenderShapeChart";
+import { aboutNoPerson, ScalarFactsPanel } from "./ScalarFactsPanel";
 import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
     factRowTiles,
@@ -32,8 +33,8 @@ export type FactRowsPanelsProps = {
 /**
  * One panel per DISTINCT table a claimed fact's `rows` names (CHAOS-4347),
  * stacked under the answer text (CHAOS-4355). A fact with no `rows`, or an
- * empty `rows` array, contributes nothing — an empty state here only ever
- * means "the service sent no table for this fact", never a missing feature.
+ * empty `rows` array, has no panel of its own: `ScalarFactsPanel` draws it,
+ * after them (CHAOS-12478).
  *
  * CHAOS-4672: the service attaches the WHOLE table to every claim that cites
  * it, so several claims (different `field`s, e.g. one measure per claim)
@@ -43,9 +44,7 @@ export type FactRowsPanelsProps = {
  * the others as references rather than re-plotting their identical rows.
  */
 export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
-    const withRows = factsWithRows(facts);
-    if (withRows.length === 0) return null;
-    const groups = groupFactsByTable(withRows);
+    const groups = groupFactsByTable(factsWithRows(facts).filter(aboutNoPerson));
     return (
         <>
             {groups.map((group) => (
@@ -57,6 +56,7 @@ export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
                     result={result}
                 />
             ))}
+            <ScalarFactsPanel facts={facts} result={result} />
         </>
     );
 }

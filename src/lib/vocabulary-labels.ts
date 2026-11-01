@@ -17,6 +17,7 @@ export type Vocabulary =
     | "driver_source_state"
     | "driver_standing"
     | "driver_window"
+    | "fact_field"
     | "fact_kind"
     | "member_outcome"
     | "prior_receipt_disposition"
