@@ -332,6 +332,7 @@ describe("DriversPanel — a driver's source state", () => {
         const state = within(shown).getByTestId("driver-source-state");
         expect(state).toHaveTextContent("source_state: stale");
         expect(state.closest("details")).not.toBeNull();
+        expect(state.closest("details")).not.toHaveAttribute("open");
         expect(within(shown).getByTestId("driver-summary-corrected")).toHaveTextContent(
             "summary_corrected: true",
         );
