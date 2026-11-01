@@ -423,6 +423,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // The vendored investigation_result example's driver note now reads "truncated:
 // the source read was cut"; no schema changed. The canonical-id vectors stay
 // web-only.
+// 53bdb0b6 -> 7c3734c6 (CHAOS-12371): the structure_needs train (acr #1836,
+// CHAOS-12073, and acr #1847, CHAOS-12334), the same SHA as web (CHAOS-12370).
+// The v2 result and response require `structure_needs`, and StructureNeedsV2
+// requires `anchor_options`; the MCP output schemas admit a v2 result.
 // 1e983670 -> 09c9706a: acr widened its served refusals with four
 // `details.reason` members on a 403 `feature_not_enabled`: own_model_gate_closed,
 // ai_features_turned_off, byo_no_investigate_config, own_model_turned_off
@@ -430,7 +434,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "53bdb0b65b81d7ae7b63816c993ff95ee696b9bd";
+export const SOURCE_COMMIT = "7c3734c690691f827a86bb800a894ac32153e798";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
