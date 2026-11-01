@@ -50,7 +50,7 @@ export const REFUSAL_COPY = {
         `It held ${measured.toLocaleString("en-US")} items; an answer can hold ${max.toLocaleString("en-US")}.`,
     overrunBytes: (measured: string, max: string) => `It was ${measured}; an answer can be ${max}.`,
     nothingLeftToCut: "Nothing more could be cut from it.",
-    sameAgain: "Asking the same question again gives the same result.",
+    sameAgain: "Asking the same question again is likely to give the same result.",
     noAxis: "No narrower form of this question can be suggested.",
 } as const;
 

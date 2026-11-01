@@ -1027,7 +1027,7 @@ function ChatSurface({
                                                         // The same rule and the same path as
                                                         // `FailurePanel`'s Retry below: latest
                                                         // turn, plain ask, through the composer.
-                                                        isLatest &&
+                                                        offersChoice &&
                                                         isRetryableStatus(turn.outcome) &&
                                                         turn.retryQuestion !== undefined
                                                             ? () => {
@@ -1049,7 +1049,7 @@ function ChatSurface({
                                                     pending={isPending}
                                                     originalQuestion={turn.rootQuestion}
                                                     onRetry={
-                                                        isLatest &&
+                                                        offersChoice &&
                                                         turn.retryQuestion !== undefined &&
                                                         turn.outcome.failure.retryable
                                                             ? () => {

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskDevChat } from "@/components/chat/AskDevChat";
 import type { InvestigationResult } from "@/lib/contracts";
-import type { ChatProgress, ChatTurn } from "@/render/source";
+import type { AssistantOutcome, ChatProgress, ChatTurn } from "@/render/source";
 import { assistantTurn, hostSource, snapshotOf, userTurn } from "@/test/fixtures/host-source";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
@@ -81,6 +81,31 @@ describe("a question ACR did not record", () => {
         it("a recorded clarification opens the popup: the control", () => {
             render(<AskDevChat source={clarifying(userTurn(0, question))} />);
             expect(screen.getByRole("dialog")).toBeInTheDocument();
+        });
+
+        it.each<[string, AssistantOutcome]>([
+            ["a retryable status", { kind: "status", status: { kind: "stalled" }, retry: true }],
+            [
+                "a retryable status of a kind that may retry",
+                { kind: "status", status: { kind: "failed" }, retry: true },
+            ],
+            [
+                "a retryable failure",
+                {
+                    kind: "failed",
+                    failure: { code: "acr_unreachable", message: "No.", retryable: true },
+                },
+            ],
+        ])("offers no Retry on %s, even with a retry question", (_name, outcome) => {
+            render(
+                <AskDevChat
+                    source={hostSource(
+                        snapshotOf(userTurn(0, null), assistantTurn(1, outcome, "A guess?")),
+                    )}
+                />,
+            );
+
+            expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
         });
 
         it("a null-question clarification shows no popup and no confirm", () => {

@@ -57,13 +57,16 @@ const STATE_TABLES: readonly Readonly<Record<string, string>>[] = [
 ];
 
 /** The raw values, and their old spaced form. A value that is its own word ("stale") is allowed. */
-const RAW_STATES = new Set(
-    STATE_TABLES.flatMap((table) =>
+const RAW_STATES = new Set([
+    // The one state with no word at all: it renders nothing (CHAOS-12245).
+    "not_derived",
+    "not derived",
+    ...STATE_TABLES.flatMap((table) =>
         Object.entries(table)
             .filter(([value, word]) => value !== word)
             .flatMap(([value]) => [value, value.replaceAll("_", " ")]),
     ),
-);
+]);
 
 afterEach(cleanup);
 

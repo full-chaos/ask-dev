@@ -69,11 +69,16 @@ function values(def: string, property?: string): readonly string[] {
 
 const sorted = (list: Iterable<string>): string[] => [...list].sort();
 
+describe("COMPLETENESS_STATE_WORDS", () => {
+    it("has a word only for a state that can disagree with the status", () => {
+        expect(sorted(Object.keys(COMPLETENESS_STATE_WORDS))).toEqual(["degraded", "partial"]);
+    });
+});
+
 describe("every value the schema names has a word", () => {
     type Row = [string, Readonly<Record<string, string>>, string, string?];
     const TABLES: readonly Row[] = [
         ["ANSWER_STATUS_LABEL", ANSWER_STATUS_LABEL, "AnswerCompleteness", "terminal_status"],
-        ["COMPLETENESS_STATE_WORDS", COMPLETENESS_STATE_WORDS, "AnswerCompleteness", "state"],
         ["TERMINAL_REASON_WORDS", TERMINAL_REASON_WORDS, "AnswerCompleteness", "terminal_reason"],
         [
             "REQUIREMENT_OUTCOME_WORDS",

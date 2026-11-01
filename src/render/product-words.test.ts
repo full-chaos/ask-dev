@@ -26,8 +26,13 @@ const FAILURE_MESSAGE_FILES = [
     "src/app/api/investigations/route.ts",
 ];
 
+/** What a raw field is called: read straight into a user's view, it shows the raw value. */
+const RAW_FIELDS = new Set(["code", "details", "httpStatus", "terminal_status", "upstreamCode"]);
+
 const FORBIDDEN = [
     /\bACR\b/u,
+    /Context Fabric/u,
+    /^raw field: /u,
     /Workbench/u,
     /CHAOS-\d+/u,
     /terminal_status/u,
@@ -100,6 +105,16 @@ function visibleLiterals(fileName: string, text: string): readonly Literal[] {
             node.statements.forEach(visit);
             return;
         }
+        // A value read into text is not a literal, so the words above cannot see it.
+        if (
+            (ts.isTemplateSpan(node) || ts.isJsxExpression(node)) &&
+            node.expression !== undefined &&
+            ts.isPropertyAccessExpression(node.expression) &&
+            RAW_FIELDS.has(node.expression.name.text)
+        ) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
+            found.push({ line: line + 1, text: `raw field: ${node.expression.getText(source)}` });
+        }
         if (
             ts.isStringLiteralLike(node) ||
             ts.isJsxText(node) ||
@@ -169,6 +184,25 @@ describe("the guard", () => {
     });
 
     it.each([
+        ["a template", "const a = <p>{`Failure: ${failure.code}`}</p>;"],
+        ["a JSX expression", "const a = <p>{failure.upstreamCode}</p>;"],
+        ["a title", "const a = <p title={failure.httpStatus} />;"],
+        ["the details", "const a = <p>{failure.details}</p>;"],
+    ])("fires on a raw field read into %s", (_name, source) => {
+        expect(offences("plant.tsx", source)).toHaveLength(1);
+    });
+
+    it("fires on a raw status read into a template", () => {
+        const source = "const a = <p>{`was ${completeness.terminal_status}`}</p>;";
+        expect(offences("plant.tsx", source).join(" ")).toContain("raw field");
+    });
+
+    it("does not fire on a raw field read into a data attribute, or into a lookup", () => {
+        const source = "const a = <p data-failure-code={failure.code}>{WORDS[failure.code]}</p>;";
+        expect(offences("plant.tsx", source)).toEqual([]);
+    });
+
+    it.each([
         ["JSX text", "const a = <p>ACR said so</p>;"],
         ["a title", 'const a = <p title="ACR said so" />;'],
         ["an aria-label", 'const a = <p aria-label="ACR said so" />;'],
@@ -185,6 +219,7 @@ describe("the guard", () => {
 
     it.each([
         ["ACR", "the ACR service"],
+        ["Context Fabric", "the Context Fabric engine"],
         ["Workbench", "the Workbench"],
         ["a ticket", "see CHAOS-3813"],
         ["terminal_status", "terminal_status: x"],

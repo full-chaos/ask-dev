@@ -169,12 +169,14 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                         >
                             {statusLabel(completeness.terminal_status, completeness)}
                         </Badge>
-                        <Badge
-                            data-value={`state: ${completeness.state}`}
-                            tone={completenessStateTone(completeness.state)}
-                        >
-                            {COMPLETENESS_STATE_WORDS[completeness.state]}
-                        </Badge>
+                        {completeness.state === "partial" || completeness.state === "degraded" ? (
+                            <Badge
+                                data-value={`state: ${completeness.state}`}
+                                tone={completenessStateTone(completeness.state)}
+                            >
+                                {COMPLETENESS_STATE_WORDS[completeness.state]}
+                            </Badge>
+                        ) : null}
                     </>
                 )}
             </div>

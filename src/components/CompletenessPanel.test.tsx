@@ -103,20 +103,31 @@ describe("CompletenessPanel", () => {
  * `complete` and never hides it.
  */
 describe("CompletenessPanel — completeness.state badge", () => {
-    const EXPECTED_TONE: Record<AnswerCompleteness["state"], string> = {
-        not_derived: "badge--neutral",
-        complete: "badge--ok",
-        partial: "badge--warn",
-        degraded: "badge--bad",
-    };
-    const EXPECTED_WORDS: Record<AnswerCompleteness["state"], string> = {
-        not_derived: "Coverage not known",
-        complete: "Read in full",
+    const EXPECTED_TONE = { partial: "badge--warn", degraded: "badge--bad" } as const;
+    const EXPECTED_WORDS = {
         partial: "Read in part",
         degraded: "Some data not available",
-    };
+    } as const;
 
-    for (const state of ["not_derived", "complete", "partial", "degraded"] as const) {
+    // CHAOS-12245, chris's ruling: not derived renders nothing about completeness, and a complete
+    // state adds nothing to the status pill, which already reads "Full answer".
+    it.each(["not_derived", "complete"] as const)("says nothing for the %s state", (state) => {
+        render(
+            <CompletenessPanel
+                completeness={{
+                    terminal_status: "complete",
+                    claimed_facts_count: 0,
+                    rows_count: 0,
+                    state,
+                }}
+            />,
+        );
+
+        expect(document.querySelector(`[data-value="state: ${state}"]`)).toBeNull();
+        expect(screen.getByTestId("completeness-chip-row")).not.toHaveTextContent("Coverage");
+    });
+
+    for (const state of ["partial", "degraded"] as const) {
         it(`renders the "${state}" state with its own words and tone`, () => {
             const completeness: AnswerCompleteness = {
                 terminal_status: "no_match",
@@ -243,7 +254,7 @@ describe("CompletenessPanel — requirement outcomes", () => {
             "No requirement outcomes were derived",
         );
         expect(screen.queryByTestId("completeness-outcomes-table")).not.toBeInTheDocument();
-        expect(badge(document.body, "state: not_derived")).toBeInTheDocument();
+        expect(document.querySelector('[data-value="state: not_derived"]')).toBeNull();
     });
 
     it("shows an explicit empty-state line when outcomes is an empty array, agreeing with not_derived", () => {

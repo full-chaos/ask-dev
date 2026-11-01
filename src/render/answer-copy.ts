@@ -76,15 +76,14 @@ export function statusLabel(
 }
 
 /**
- * The derived completeness, as its own badge. Web's reader says these in sentences; this panel
- * keeps the two signals side by side, because they can disagree (D25/B2), so each needs a word.
+ * The derived completeness, as its own badge, for a state that can disagree with the status
+ * (D25/B2). CHAOS-12245, chris's ruling: not derived renders nothing about completeness, and a
+ * complete state adds nothing to the status label, so neither has a word.
  */
-export const COMPLETENESS_STATE_WORDS: Readonly<Record<AnswerCompleteness["state"], string>> = {
-    complete: "Read in full",
+export const COMPLETENESS_STATE_WORDS = {
     partial: "Read in part",
     degraded: "Some data not available",
-    not_derived: "Coverage not known",
-};
+} as const satisfies Partial<Record<AnswerCompleteness["state"], string>>;
 
 /** Why an answer stopped short (open vocabulary). */
 export const TERMINAL_REASON_WORDS: Readonly<Record<string, string>> = {

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useEffect, useId } from "react";
 
 import { NarrowerReask } from "./NarrowerReask";
 import { SafeAnswerText } from "./SafeAnswerText";
@@ -50,6 +50,11 @@ export function FailurePanel({
     // One per failed turn: a transcript can hold several, each named by its own heading.
     const titleId = useId();
     const budgetRefusal = isBudgetRefusal(failure);
+    // No user reads a failure's details, and a tester still needs them.
+    const { code, details } = failure;
+    useEffect(() => {
+        if (details !== undefined) console.error("investigation failed", code, details);
+    }, [code, details]);
     return (
         <section
             className="panel panel--failure"

@@ -141,7 +141,7 @@ describe("a budget refusal through a host source", () => {
         renderRefusal(hostFailure(REFUSAL_ITEMS_RESULT_COUNT));
 
         expect(
-            screen.getByText("Asking the same question again gives the same result."),
+            screen.getByText("Asking the same question again is likely to give the same result."),
         ).toBeInTheDocument();
     });
 
