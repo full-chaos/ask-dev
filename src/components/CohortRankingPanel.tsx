@@ -11,7 +11,12 @@ import type {
     InterpretedShape,
     InvestigationResult,
 } from "../lib/contracts";
-import { cohortRanking, formatCohortScore, memberDriversText } from "../lib/cohort-ranking";
+import {
+    askedForCohort,
+    cohortRanking,
+    formatCohortScore,
+    memberDriversText,
+} from "../lib/cohort-ranking";
 import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
@@ -97,9 +102,7 @@ function MemberRollup({
  *    question asked for one (`interpretation.shape`), not merely because the
  *    result carries cohort data — the pinned canonical example is
  *    `single_subject` and still carries a ranked team cohort, so the two come
- *    apart in practice (AGENTS.md check 10; see `isCohortIntent`). Nothing is
- *    lost when the gate closes: the raw cohort stays visible in the canonical
- *    result inspector, which is the view that exists to show everything.
+ *    apart in practice (AGENTS.md check 10; see `isCohortIntent`).
  *
  * 1. **Never a bare score, and fail closed.** Every score renders with its
  *    `outcome` beside it and its strongest drivers below it. A member that
@@ -110,10 +113,9 @@ function MemberRollup({
  *    masking an answer-quality failure. Withheld rather than dropped: the row
  *    and its outcome still render, because omitting the member silently would
  *    be the opposite failure.
- * 2. **A missing ranking is not an empty one.** When acr ranked no member the
- *    panel renders nothing at all, because an empty table would read as
- *    "ranked, and nothing qualified" — a different claim from "ranking never
- *    ran" (`ranking_computed`'s own distinction).
+ * 2. **A missing ranking is not an empty one.** When nothing was ranked this
+ *    panel renders nothing, because an empty table would read as "ranked, and
+ *    nothing qualified". `CohortMembersPanel` draws the members instead.
  * 3. **Nothing is silently discarded.** acr's reference table drops members it
  *    did not rank; dropping them without a word is the exact shape
  *    `silent-discard-closure.test.ts` exists to close, so they are named
@@ -132,13 +134,13 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     const idPrefix = useId();
     const word = useVocabularyWord();
     const served = useServedWord();
-    const ranking = cohortRanking(shape, cohort);
+    const ranking = cohortRanking(askedForCohort(shape, result), cohort);
     if (ranking.state === "not_requested" || ranking.state === "not_computed") return null;
     if (ranking.state === "kind_not_ranked") {
         // The cohort's kind (or a member's) is outside the closed allowlist --
         // an open-vocabulary value, or `person`, which is never ranked
         // (AGENTS.md: no person-to-person rankings). No score, rank or
-        // member name is rendered; the raw cohort stays in the inspector.
+        // member name is rendered.
         return (
             <section
                 role="group"

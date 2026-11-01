@@ -5,7 +5,7 @@ import { EvidenceReferences } from "./EvidenceReferences";
 import { SafeAnswerText } from "./SafeAnswerText";
 import type { ClaimedFact, CohortMember, InvestigationResult, SubjectRef } from "../lib/contracts";
 import { cellText } from "../lib/fact-rows";
-import { isCohortIntent } from "../lib/cohort-ranking";
+import { askedForCohort } from "../lib/cohort-ranking";
 import { nonBlank } from "../lib/presentation";
 
 export type WorkItemStatusPanelProps = {
@@ -20,7 +20,8 @@ function subjectKey(subject: SubjectRef): string {
     return JSON.stringify([subject.kind, subject.canonical_id]);
 }
 
-function unrankedWorkItemMembers(cohort: InvestigationResult["cohort"]): CohortMember[] {
+/** The members this panel's table draws. `CohortMembersPanel` lists the others. */
+export function unrankedWorkItemMembers(cohort: InvestigationResult["cohort"]): CohortMember[] {
     if (cohort === undefined || cohort.kind !== "work_item") return [];
     return cohort.members.filter(
         (member) => member.subject.kind === "work_item" && member.ranking_computed !== true,
@@ -82,7 +83,7 @@ function StatusCell({ facts }: { readonly facts: readonly ClaimedFact[] }) {
  */
 export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
     const idPrefix = useId();
-    if (!isCohortIntent(result.interpretation.shape)) return null;
+    if (!askedForCohort(result.interpretation.shape, result)) return null;
 
     const members = unrankedWorkItemMembers(result.cohort);
     if (members.length === 0) return null;
