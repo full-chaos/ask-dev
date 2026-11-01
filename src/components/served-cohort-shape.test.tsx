@@ -119,7 +119,7 @@ describe("the gate keeps what it must keep", () => {
             const { score: _score, drivers: _drivers, ...rest } = member;
             return rest;
         });
-        draw({ ...open, cohort: { ...open.cohort!, members } } as InvestigationResult);
+        draw({ ...open, cohort: { ...open.cohort!, members } });
         expect(
             within(screen.getByTestId("cohort-members-panel")).getByTestId(
                 "render-shapes-withheld",
