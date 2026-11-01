@@ -11,8 +11,17 @@ import {
 } from "react";
 
 import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
+import { ChatContextChips } from "./ChatContextChips";
+import { ChatFeedback } from "./ChatFeedback";
+import { ChatHistory } from "./ChatHistory";
 import { ChatProgressView } from "./ChatProgressView";
 import { ChatStatusPanel } from "./ChatStatusPanel";
+import {
+    ChatEarlierTurns,
+    ChatNotSavedNotice,
+    ChatThreadNotShown,
+    isNotShownThread,
+} from "./ChatThreadState";
 import { ClarificationPopup } from "./ClarificationPopup";
 import { InspectorRail } from "./InspectorRail";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
@@ -29,12 +38,16 @@ import {
 } from "../../lib/structure-selections";
 import { useCandidateSelections } from "../../lib/use-candidate-selections";
 import { useStructureSelections } from "../../lib/use-structure-selections";
+import { CTA_LABELS, TRANSCRIPT_COPY } from "../../render/chat-copy";
 import {
     type AskIntent,
     type BatchItem,
+    type ChatHistorySnapshot,
     type ChatSource,
     type ChatTurn,
     type ChatUserTurn,
+    composerLockOf,
+    isNonAnswer,
     isRetryableStatus,
     type SubmittedSelections,
 } from "../../render/source";
@@ -62,6 +75,14 @@ import { createStandaloneSource } from "../../render/standalone-source";
  * Workbench). A host (web) passes its own source and gets this same render,
  * including the outcomes only a host reports: a pending turn's progress, a
  * no-answer `status`, and Stop.
+ *
+ * CHAOS-12387: the same seam carries what only a host has. The left rail
+ * gains the saved conversations (`ChatHistory`), an answer gains feedback
+ * (`ChatFeedback`), the composer gains the page's context
+ * (`ChatContextChips`) and a lock, and the timeline gains the states of a
+ * conversation opened from History (`ChatThreadState`). All of it is
+ * optional on the source: the standalone source offers none, so the
+ * standalone app is unchanged.
  *
  * Every assistant turn is rendered with `DeterministicAnswerView` UNCHANGED
  * from the Workbench — it already composes the answer, the subject
@@ -142,6 +163,24 @@ export type AskDevChatProps = {
     readonly source?: ChatSource;
 };
 
+/** What the chat column shows. `history` is reachable only under the left rail's width. */
+type ChatView = "conversation" | "history";
+
+/** A source that offers history and has not published one: the list says it is loading. */
+const HISTORY_NOT_READ: ChatHistorySnapshot = {
+    status: "idle",
+    rows: [],
+    currentId: null,
+    hasMore: false,
+    loadingMore: false,
+    moreFailed: false,
+    deleting: [],
+    deleteFailed: null,
+    running: false,
+};
+
+const NO_TURNS: readonly ChatTurn[] = [];
+
 export function AskDevChat({ source }: AskDevChatProps = {}) {
     const [standaloneSource] = useState(() => createStandaloneSource());
     const chat = source ?? standaloneSource;
@@ -149,18 +188,66 @@ export function AskDevChat({ source }: AskDevChatProps = {}) {
     // per source only, so a dismissal, a selection or a pending retry must
     // not reach the next source's turns. A new generation remounts it.
     const [mounted, setMounted] = useState({ chat, generation: 0 });
-    if (mounted.chat !== chat) setMounted({ chat, generation: mounted.generation + 1 });
-    return <ChatSurface chat={chat} key={mounted.generation} />;
+    // Above `ChatSurface`, because it outlives a conversation: deleting the
+    // conversation shown leaves the viewer on the list, as web's panel does.
+    const [view, setView] = useState<ChatView>("conversation");
+    if (mounted.chat !== chat) {
+        setMounted({ chat, generation: mounted.generation + 1 });
+        setView("conversation");
+    }
+    // The same rule inside one source (CHAOS-12387): turn ids may repeat across
+    // its conversations, so another conversation remounts `ChatSurface` too.
+    // Read by its own store hook: a primitive is stable, so a turn of this
+    // conversation does not render this component. See
+    // `ChatSnapshot.conversationKey`.
+    const subscribe = useCallback((listener: () => void) => chat.subscribe(listener), [chat]);
+    const getConversationKey = () => chat.getSnapshot().conversationKey;
+    const conversationKey = useSyncExternalStore(subscribe, getConversationKey, getConversationKey);
+    return (
+        <ChatSurface
+            chat={chat}
+            key={JSON.stringify([mounted.generation, conversationKey ?? null])}
+            onViewChange={setView}
+            view={view}
+        />
+    );
 }
 
-function ChatSurface({ chat }: { readonly chat: ChatSource }) {
+function ChatSurface({
+    chat,
+    view,
+    onViewChange,
+}: {
+    readonly chat: ChatSource;
+    readonly view: ChatView;
+    readonly onViewChange: (view: ChatView) => void;
+}) {
     const domId = useId();
     // Called through the source (never detached), so a source whose methods
     // read `this` still works; stable per source, so React subscribes once.
     const subscribe = useCallback((listener: () => void) => chat.subscribe(listener), [chat]);
     const getSnapshot = () => chat.getSnapshot();
     const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-    const turns = useMemo(() => snapshot.turns.map(withheldTurn), [snapshot.turns]);
+    const { thread } = snapshot;
+    // A conversation that cannot be shown draws none of its turns: not in the
+    // timeline, the rail, the popup or the sources rail.
+    const threadNotShown = isNotShownThread(thread) ? thread : undefined;
+    const turnsToShow = threadNotShown === undefined ? snapshot.turns : NO_TURNS;
+    const turns = useMemo(() => turnsToShow.map(withheldTurn), [turnsToShow]);
+    const composerLock = composerLockOf(snapshot);
+    // The first read of the list waits for the host's first history (see
+    // `ChatHistorySource.load`). Here and not in `ChatHistory`: that component
+    // is drawn in two places, and neither may read on its own.
+    const historyPublished = snapshot.history !== undefined;
+    const currentHistoryId = snapshot.history?.currentId ?? null;
+    // Held in a ref, because Strict Mode runs a mount's effect twice and one
+    // surface reads a conversation's list once.
+    const historyReadFor = useRef<string | null | undefined>(undefined);
+    useEffect(() => {
+        if (!historyPublished || historyReadFor.current === currentHistoryId) return;
+        historyReadFor.current = currentHistoryId;
+        chat.history?.load();
+    }, [chat, historyPublished, currentHistoryId]);
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
@@ -260,7 +347,7 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
         const el = timelineRef.current;
         if (el === null || !isPinnedToBottom) return;
         el.scrollTop = el.scrollHeight;
-    }, [turns, isPinnedToBottom, draftClears]);
+    }, [turns, isPinnedToBottom, draftClears, view]);
 
     function handleTimelineScroll() {
         const el = timelineRef.current;
@@ -608,6 +695,7 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
     }
 
     const popupPages =
+        composerLock === undefined &&
         latestAssistantTurn?.role === "assistant" &&
         latestAssistantTurn.outcome.kind === "answered" &&
         latestAssistantTurn.id !== dismissedPopupTurnId
@@ -642,11 +730,33 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
         setDismissedPopupTurnId(undefined);
         setIsPinnedToBottom(true);
         setHasUnseenBelow(false);
+        onViewChange("conversation");
         composerRef.current?.focus();
     }
 
     function showTurn(turnId: number) {
         document.getElementById(turnDomId(turnId))?.scrollIntoView({ block: "start" });
+    }
+
+    /**
+     * One component, drawn where the viewer can reach it. `inColumn`: `rail__new` is not there, so
+     * the list brings its own way to start over.
+     */
+    function historyList(inColumn: boolean) {
+        if (chat.history === undefined) return null;
+        const { history } = chat;
+        return (
+            <ChatHistory
+                history={snapshot.history ?? HISTORY_NOT_READ}
+                onNew={inColumn ? () => startOver() : undefined}
+                onOpen={(id) => {
+                    history.open(id);
+                    onViewChange("conversation");
+                }}
+                renderConnect={() => chat.slots?.connect?.()}
+                source={history}
+            />
+        );
     }
 
     return (
@@ -705,10 +815,43 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                             </ol>
                         )}
                     </div>
+                    {/* One list at a time, so its test ids stay unique on a page. */}
+                    {view === "conversation" ? historyList(false) : null}
                 </aside>
 
                 <section aria-label="Ask Dev conversation" className="chat">
-                    <div className="chat__timeline-wrap">
+                    {chat.history === undefined ? null : (
+                        // The left rail goes away at the container's 860px, and this
+                        // bar comes in at that width (ask-dev.css). It stays while the
+                        // list is open, so a wider container keeps its way back.
+                        <div
+                            className={
+                                view === "history"
+                                    ? "chat__narrow-bar chat__narrow-bar--open"
+                                    : "chat__narrow-bar"
+                            }
+                        >
+                            <button
+                                aria-pressed={view === "history"}
+                                className="chat__action"
+                                data-testid="ask-dev-history-toggle"
+                                onClick={() => {
+                                    onViewChange(view === "history" ? "conversation" : "history");
+                                }}
+                                type="button"
+                            >
+                                {view === "history"
+                                    ? CTA_LABELS.askDevBackToConversation
+                                    : CTA_LABELS.askDevHistory}
+                            </button>
+                        </div>
+                    )}
+                    {view === "history" ? (
+                        <div className="chat__history">{historyList(true)}</div>
+                    ) : null}
+                    {/* Hidden, not unmounted: the draft, the scroll and a run's
+                        `await` in the composer all outlive a look at the list. */}
+                    <div className="chat__timeline-wrap" hidden={view === "history"}>
                         <div
                             aria-label="Conversation"
                             className="chat__timeline"
@@ -717,14 +860,48 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                             onScroll={handleTimelineScroll}
                             ref={timelineRef}
                         >
-                            {turns.length === 0 ? (
+                            {thread?.kind === "loaded" &&
+                            thread.earlier !== "none" &&
+                            chat.loadEarlier !== undefined ? (
+                                <ChatEarlierTurns
+                                    earlier={thread.earlier}
+                                    onLoad={() => {
+                                        chat.loadEarlier?.();
+                                    }}
+                                />
+                            ) : null}
+                            {threadNotShown !== undefined ? (
+                                <ChatThreadNotShown
+                                    kind={threadNotShown.kind}
+                                    onNew={startOver}
+                                    onRetry={
+                                        chat.reloadThread === undefined
+                                            ? undefined
+                                            : () => {
+                                                  chat.reloadThread?.();
+                                              }
+                                    }
+                                    renderConnect={() => chat.slots?.connect?.()}
+                                />
+                            ) : turns.length === 0 && thread?.kind === "restoring" ? (
+                                <p
+                                    className="chat__status-meta"
+                                    data-testid="ask-dev-conversation-loading"
+                                >
+                                    {TRANSCRIPT_COPY.loading}
+                                </p>
+                            ) : turns.length === 0 && snapshot.notSaved === true ? (
+                                <ChatNotSavedNotice />
+                            ) : turns.length === 0 ? (
                                 <div className="chat__intro">
                                     <h2 className="chat__intro-title">
                                         Where is your engineering effort{" "}
                                         <span className="chat__intro-accent">actually going?</span>
                                     </h2>
                                     <p className="chat__empty">
-                                        Ask a question to start an investigation.
+                                        {thread === undefined
+                                            ? "Ask a question to start an investigation."
+                                            : TRANSCRIPT_COPY.empty}
                                     </p>
                                 </div>
                             ) : (
@@ -748,7 +925,12 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                                         );
                                     }
 
-                                    const isLatest = turn.id === latestAssistantTurn?.id;
+                                    // A locked conversation takes no question, so its
+                                    // last turn is read-only like every earlier one:
+                                    // web's `usable`, and an old receipt cannot be sent.
+                                    const isLatest =
+                                        composerLock === undefined &&
+                                        turn.id === latestAssistantTurn?.id;
                                     // The turns BEFORE this assistant turn's own user
                                     // turn are what this follow-up derived its carry
                                     // from; say so when a subject could not ride along.
@@ -928,6 +1110,14 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                                                     }
                                                 />
                                             ) : null}
+                                            {turn.outcome.kind === "answered" &&
+                                            chat.feedback !== undefined &&
+                                            !isNonAnswer(turn.outcome.result.status) ? (
+                                                <ChatFeedback
+                                                    feedback={chat.feedback}
+                                                    resultId={turn.outcome.result.result_id}
+                                                />
+                                            ) : null}
                                         </div>
                                     );
                                 })
@@ -944,7 +1134,7 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                         ) : null}
                     </div>
 
-                    <div className="chat__composer-bar">
+                    <div className="chat__composer-bar" hidden={view === "history"}>
                         {popupPages.length === 0 ? null : (
                             // Floats above the composer via CSS (`.clarification-popup`
                             // is `position: absolute`, this wrapper `position:
@@ -975,7 +1165,9 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                                 pending={isPending}
                             />
                         )}
-                        {snapshot.stoppable && chat.stop !== undefined ? (
+                        {snapshot.stoppable &&
+                        chat.stop !== undefined &&
+                        threadNotShown === undefined ? (
                             <div className="chat__stop-row">
                                 <button
                                     className="chat__stop"
@@ -995,7 +1187,16 @@ function ChatSurface({ chat }: { readonly chat: ChatSource }) {
                                 </button>
                             </div>
                         ) : null}
+                        {chat.pageContext === undefined ? null : (
+                            <ChatContextChips
+                                onRemove={(ref) => {
+                                    chat.pageContext?.remove(ref);
+                                }}
+                                refs={snapshot.pageContext ?? []}
+                            />
+                        )}
                         <ChatComposer
+                            lock={composerLock}
                             onAsk={ask}
                             onDraftCleared={() => {
                                 setDraftClears((count) => count + 1);

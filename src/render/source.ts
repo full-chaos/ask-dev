@@ -11,6 +11,11 @@
  * dismissal and auto-confirm, scroll pinning, the composer, the rails. What a source owns is the
  * turns and the wire.
  *
+ * CHAOS-12387 adds what only a host has: saved conversations, feedback on an answer, page context,
+ * the states of a conversation opened from History, and a composer that may refuse. Each is
+ * optional, on both the snapshot and the source. The standalone source offers none, so none of it
+ * renders there.
+ *
  * This file holds types and small pure helpers. It imports React only as a type.
  */
 import type { ReactNode } from "react";
@@ -200,10 +205,170 @@ export type ChatAssistantTurn = {
 /** One entry of the conversation timeline. */
 export type ChatTurn = ChatUserTurn | ChatAssistantTurn;
 
+/** The kinds of subject a page may propose: web's `ScopeKind`. */
+export type ScopeKind =
+    "organization" | "team" | "project" | "repository" | "work_item" | "pull_request";
+
+/**
+ * One saved conversation, as a view row the host builds. No ACR body crosses the seam. A
+ * `firstQuestion` is the user's own text: the render draws it as inert text and never logs it.
+ */
+export type ChatHistoryRow = {
+    readonly id: string;
+    /** `null` when none is served, or a blank one: the row is then named by its date and count. */
+    readonly firstQuestion: string | null;
+    /** ISO timestamp of the conversation's last turn. */
+    readonly lastTurnAt: string;
+    readonly turnCount: number;
+};
+
+/** The saved conversations of the signed-in viewer. The host owns all of it. */
+export type ChatHistorySnapshot = {
+    /** `connect`: the host holds no access for the list. The render shows the Connect slot. */
+    readonly status: "idle" | "loading" | "ready" | "read_failed" | "connect";
+    readonly rows: readonly ChatHistoryRow[];
+    /** The conversation shown now, or `null`. A change reads the list again. */
+    readonly currentId: string | null;
+    readonly hasMore: boolean;
+    readonly loadingMore: boolean;
+    readonly moreFailed: boolean;
+    /** Ids whose delete is in flight. */
+    readonly deleting: readonly string[];
+    /** The id whose last delete failed, if any. */
+    readonly deleteFailed: string | null;
+    /** The current conversation has a question running: a delete says it does not stop it. */
+    readonly running: boolean;
+};
+
+/**
+ * The saved conversations' actions. The render owns none of their state: it draws
+ * `ChatSnapshot.history` and calls these. A delete is confirmed in the render first, and `remove`
+ * means the user confirmed.
+ */
+export type ChatHistorySource = {
+    /**
+     * Reads the first page. `ChatSurface` calls this, once per surface, not per place the list is
+     * drawn: on mount, when `history.currentId` changes (a new conversation appears once it is
+     * admitted), and from "Try again". It waits for `ChatSnapshot.history`: a host that cannot read
+     * yet (no session) publishes none, and its first history starts the read.
+     */
+    load(): void;
+    loadMore(): void;
+    /** Shows this conversation. Opening the one already shown is the host's to ignore. */
+    open(id: string): void;
+    remove(id: string): void;
+};
+
+/** The two questions asked of an answer, in the order the controls show them. */
+export const FEEDBACK_QUESTIONS = ["correct", "useful"] as const;
+
+export type FeedbackQuestion = (typeof FEEDBACK_QUESTIONS)[number];
+
+/** One flag, as web's store holds it (`FeedbackFlag`). `unset` is a value, not a missing one. */
+export type FeedbackValue = "yes" | "no" | "unset";
+
+/** The feedback on one answer. One entry per `result_id`, shared by every turn that shows it. */
+export type ChatFeedbackEntry = {
+    /**
+     * `loading`: the first read is out. `ready`: the controls work. `unavailable`: not this
+     * viewer's answer, or not served now, so the render draws nothing. `read_failed`: the controls
+     * stay disabled, with "Try again".
+     */
+    readonly state: "loading" | "ready" | "unavailable" | "read_failed";
+    /** What the controls show: the viewer's latest choice, sent or about to be. */
+    readonly desired: Readonly<Record<FeedbackQuestion, FeedbackValue>>;
+    readonly saving: boolean;
+    /** The last failed write was rolled back. The host clears this on the next choice. */
+    readonly notSaved: boolean;
+};
+
+/**
+ * The per-answer feedback store. The host owns the entries, the reads and the writes, and sends no
+ * product telemetry from them. The render reads through `subscribe` and `entryFor`, so one store
+ * serves every answer without a new snapshot.
+ */
+export type ChatFeedbackSource = {
+    /** Calls `listener` after any entry or `isReady` changes; returns the unsubscribe. Stable. */
+    subscribe(listener: () => void): () => void;
+    /** Whether `ensure` may read now. False, for example, before the session is known. */
+    isReady(): boolean;
+    /** `undefined` before `ensure`. The same object until it changes. */
+    entryFor(resultId: string): ChatFeedbackEntry | undefined;
+    /**
+     * Reads a result's feedback once. The render calls this when ready and the entry is absent,
+     * and Strict Mode runs that effect twice, so a second call while the read is out does nothing.
+     */
+    ensure(resultId: string): void;
+    /** "Try again" on a failed read: a GET. */
+    retryRead(resultId: string): void;
+    /** The press of a value. Pressing the chosen value again clears it: that is the store's job. */
+    choose(resultId: string, question: FeedbackQuestion, value: "yes" | "no"): void;
+};
+
+/**
+ * One entity of the host's page, offered with the next question: web's `PageEntityRef`. The render
+ * draws it as an inert chip. The hints a question carries stay in the source.
+ */
+export type ChatContextRef = {
+    readonly kind: ScopeKind;
+    readonly id: string;
+    readonly label: string;
+};
+
+/**
+ * Whether the conversation shown can be read and take a question: web's `ThreadAccess`.
+ *
+ * - `new`: no thread yet.
+ * - `restoring`: the thread is being read. No question yet.
+ * - `loaded`: the thread is the host's. `earlier` says whether earlier turns can be read.
+ * - `unavailable`: not served, for a cause the render does not name. Read-only.
+ * - `read_failed`: the read failed. Read-only, with "Try again" (`reloadThread`).
+ * - `connect`: the host holds no access. Read-only, with the Connect slot and no "Try again".
+ */
+export type ChatThreadAccess =
+    | { readonly kind: "new" }
+    | { readonly kind: "restoring" }
+    | {
+          readonly kind: "loaded";
+          readonly earlier: "none" | "available" | "loading" | "failed";
+      }
+    | { readonly kind: "unavailable" }
+    | { readonly kind: "read_failed" }
+    | { readonly kind: "connect" };
+
 export type ChatSnapshot = {
     readonly turns: readonly ChatTurn[];
     /** Whether a run can be stopped now. The render shows Stop only when this and `stop` hold. */
     readonly stoppable: boolean;
+    /**
+     * The saved conversations. Absent from the standalone source, and from a host that cannot read
+     * them yet: with `ChatSource.history` offered, the render then says it is loading and waits.
+     */
+    readonly history?: ChatHistorySnapshot;
+    /** The entities offered with the next question. Absent or empty: no chips. */
+    readonly pageContext?: readonly ChatContextRef[];
+    /**
+     * Names the conversation shown. It changes only when ANOTHER conversation is shown, never for a
+     * turn of this one, so it is not a thread id: a new conversation gets its id at its first
+     * question. Web's `selection` fits. All of the render's per-conversation state (a popup
+     * dismissal, a selection, a pending retry, the draft) goes with it, because turn ids may repeat
+     * across conversations of one source.
+     */
+    readonly conversationKey?: string | number;
+    /** Absent from the standalone source: the render then shows no thread state. */
+    readonly thread?: ChatThreadAccess;
+    /**
+     * The composer refuses to send, and the last turn is read-only like every earlier one. On a
+     * `loaded` thread this means an answer of it is being read (web's `replaying`); on a `new` or
+     * absent one, that the viewer is signed out (web's `!ready`). The other thread kinds lock the
+     * composer by themselves: see `composerLockOf`.
+     */
+    readonly composerLocked?: boolean;
+    /**
+     * A conversation of this tab was lost to a reload. The host owns the marker; the render says so
+     * while nothing else is shown. The standalone source never sends it.
+     */
+    readonly notSaved?: boolean;
 };
 
 /**
@@ -292,17 +457,58 @@ export type ChatSource = {
     newConversation(): void;
     slots?: {
         /**
-         * The Connect affordance, rendered after the `connect` status words. ask-dev cannot hold
-         * this because the auth flow (OAuth start, consent, token store) belongs to the host:
-         * ask-dev has no credential of the viewer's and no route to start one.
+         * The Connect affordance, rendered after the `connect` words of a turn, the history list
+         * or a conversation that cannot be shown. ask-dev cannot hold this because the auth flow
+         * (OAuth start, consent, token store) belongs to the host: ask-dev has no credential of
+         * the viewer's and no route to start one.
          */
         readonly connect?: () => ReactNode;
     };
-    // Reserved for the next ticket; comment-only, not implemented here:
-    // history?: the host's saved conversations (list, open, delete) for the left rail.
-    // feedback?: the host's per-answer feedback sink (helpful / not helpful, with a reason).
-    // pageContext?: what the host page is showing (a team, a project), offered as ask context.
+    /** Present only when the host has saved conversations. Absent: no list and no toggle. */
+    history?: ChatHistorySource;
+    /** Present only when the host stores feedback. Absent: no controls on any answer. */
+    feedback?: ChatFeedbackSource;
+    /**
+     * Present only when the host offers page context. The render calls `remove` and draws what the
+     * next snapshot lists; it keeps no removal of its own, and never reads a hint.
+     */
+    pageContext?: { remove(ref: ChatContextRef): void };
+    /** "Try again" on a `read_failed` thread: a GET. Web's `retryThreadRead`. */
+    reloadThread?(): void;
+    /** "Show earlier turns" on a `loaded` thread. Web's `loadEarlierTurns`. */
+    loadEarlier?(): void;
 };
+
+/** A clarification or a no-match asks nothing to judge, so it takes no feedback. Web's rule. */
+export function isNonAnswer(status: string): boolean {
+    return status === "clarification_required" || status === "no_match";
+}
+
+/** Why the composer takes no question: each lock has its own words (`COMPOSER_LOCK_WORDS`). */
+export type ComposerLock = "signed_out" | "restoring" | "read_only";
+
+/**
+ * Why the composer refuses now, or `undefined` when it takes a question. Web's `lockedReason` and
+ * its composer's `!ready`, read from the seam: a `restoring` thread and a thread that cannot be
+ * shown lock it whatever `composerLocked` says, so a host cannot open a read-only conversation.
+ */
+export function composerLockOf(
+    snapshot: Pick<ChatSnapshot, "thread" | "composerLocked">,
+): ComposerLock | undefined {
+    const locked = snapshot.composerLocked === true;
+    switch (snapshot.thread?.kind) {
+        case "restoring":
+            return "restoring";
+        case "unavailable":
+        case "read_failed":
+        case "connect":
+            return "read_only";
+        case "loaded":
+            return locked ? "restoring" : undefined;
+        default:
+            return locked ? "signed_out" : undefined;
+    }
+}
 
 /**
  * Whether a status offers Retry: only these kinds may be sent again, and only when the source says

@@ -1,15 +1,22 @@
 /**
- * The words of a turn's progress and status (CHAOS-12382).
+ * The words of a turn's progress and status (CHAOS-12382), and of what only a host offers
+ * (CHAOS-12387).
  *
  * `CHAT_STATUS_COPY` and `CHAT_PROGRESS_COPY` are web's strings, copied exactly: web drives this
  * render from its own store, and web's tests pin these words. Change one here only together with
  * web. `NOT_RUN_COPY`, `STOPPED_COPY`, `CHAT_STAGE_COPY`, `retryAfterText` and `formatElapsed` are
- * web's too, copied the same way.
+ * web's too, copied the same way, and so are `HISTORY_COPY`, `FEEDBACK_COPY`, `TRANSCRIPT_COPY`,
+ * `COMPOSER_COPY`, `CONTEXT_CHIPS_COPY`, `SCOPE_KIND_LABEL`, `CTA_LABELS` and the row helpers.
  */
 import type {
+    ChatContextRef,
+    ChatHistoryRow,
     ChatStatus,
+    ComposerLock,
+    FeedbackQuestion,
     InvestigationStage,
     NotRunReason,
+    ScopeKind,
     StageRowState,
     StoppedReason,
 } from "./source";
@@ -121,6 +128,119 @@ export const CHAT_STAGE_COPY = {
     readonly stages: Record<InvestigationStage, string>;
     readonly state: Record<StageRowState, string>;
 };
+
+/** The labels of web's `CTA_LABELS` this render uses, under web's keys. */
+export const CTA_LABELS = {
+    askDevBackToConversation: "Back to conversation",
+    askDevDeleteConversation: "Delete conversation",
+    askDevHistory: "History",
+    askDevNewConversation: "New conversation",
+    askDevShowEarlierTurns: "Show earlier turns",
+    askDevShowMoreConversations: "Show more",
+    cancel: "Cancel",
+    confirmDelete: "Confirm delete?",
+    remove: "Remove",
+    tryAgain: "Try again",
+} as const;
+
+/** The saved conversations. */
+export const HISTORY_COPY = {
+    title: "Conversations",
+    loading: "Loading conversations…",
+    empty: "No conversations yet.",
+    readFailed: "History could not be read.",
+    /** The host holds no access for the list. Its Connect slot follows. */
+    connect:
+        "Ask Dev needs your permission to show your conversations. Connect Ask Dev to see them.",
+    moreFailed: "More conversations could not be loaded.",
+    current: "Current",
+    confirm: "Delete this conversation? This cannot be undone.",
+    /** Delete is not Stop: a running question goes on. */
+    confirmRunning: "This does not stop the running question.",
+    deleteFailed: "This conversation was not deleted. Try again.",
+} as const;
+
+/** "<date> · <n> questions": when the conversation last moved, and how many questions it holds. */
+export function historyRowMeta(row: ChatHistoryRow): string {
+    const when = new Date(row.lastTurnAt);
+    const date = Number.isNaN(when.getTime())
+        ? row.lastTurnAt
+        : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(
+              when,
+          );
+    const count = `${String(row.turnCount)} ${row.turnCount === 1 ? "question" : "questions"}`;
+    return `${date} · ${count}`;
+}
+
+/** "Conversation of <date> · <n> questions": the name of a row with no first question. */
+export function historyRowLabel(row: ChatHistoryRow): string {
+    return `Conversation of ${historyRowMeta(row)}`;
+}
+
+/** The row's title: its first question, or `null` when none was served or only blanks. */
+export function historyRowTitle(row: ChatHistoryRow): string | null {
+    return row.firstQuestion !== null && row.firstQuestion.trim() !== "" ? row.firstQuestion : null;
+}
+
+/** Feedback on one answer. There is no free text. */
+export const FEEDBACK_COPY = {
+    region: "Feedback on this answer",
+    correct: "Correct?",
+    useful: "Useful?",
+    yes: "Yes",
+    no: "No",
+    readFailed: "Feedback could not be read.",
+    notSaved: "Feedback was not saved.",
+} as const satisfies Record<
+    FeedbackQuestion | "region" | "yes" | "no" | "readFailed" | "notSaved",
+    string
+>;
+
+/** The conversation's own states, and the composer while it cannot take a question. */
+export const TRANSCRIPT_COPY = {
+    empty: "Your conversation will appear here.",
+    notSaved: "This conversation was not saved yet.",
+    notSavedHint: "Reloading the page started a new one. Ask again to continue.",
+    loading: "Loading this conversation…",
+    /** The same for every cause, so it says no cause. */
+    unavailable: "This conversation is not available.",
+    unavailableHint: "Start a new conversation, or open another one from the history.",
+    readFailed: "This conversation could not be read.",
+    /** The host holds no access for the read. Its Connect slot follows. */
+    connect: "Ask Dev needs your permission to show this conversation. Connect Ask Dev to see it.",
+    earlierFailed: "Earlier turns could not be loaded.",
+    lockedRestoring: "Loading the conversation…",
+    lockedReadOnly: "Start a new conversation to ask a question.",
+} as const;
+
+/** The composer's line for a viewer who is signed out. */
+export const COMPOSER_COPY = { signedOut: "Sign in again to ask a question." } as const;
+
+/** Why the composer refuses. */
+export const COMPOSER_LOCK_WORDS: Readonly<Record<ComposerLock, string>> = {
+    signed_out: COMPOSER_COPY.signedOut,
+    restoring: TRANSCRIPT_COPY.lockedRestoring,
+    read_only: TRANSCRIPT_COPY.lockedReadOnly,
+};
+
+export const SCOPE_KIND_LABEL = {
+    organization: "Organization",
+    team: "Team",
+    project: "Project",
+    repository: "Repository",
+    work_item: "Work item",
+    pull_request: "Pull request",
+} as const satisfies Record<ScopeKind, string>;
+
+export const CONTEXT_CHIPS_COPY = {
+    title: "Context from this page",
+    note: "Sent as hints with your next question. Remove any you do not want.",
+} as const;
+
+/** The accessible name of a chip's remove button: the action and what it removes. */
+export function removeLabel(ref: ChatContextRef): string {
+    return `${CTA_LABELS.remove} ${SCOPE_KIND_LABEL[ref.kind]} ${ref.label}`;
+}
 
 /** The words of one status. `retry` is the outcome's: only `failed` reads it. */
 export function chatStatusWords(status: ChatStatus, retry: boolean): string {
