@@ -2,6 +2,7 @@ import type { InvestigationResult } from "@/lib/contracts";
 
 import openCohortFamily from "./cohort-members/open-cohort-family.json";
 import pullRequests from "./cohort-members/pull-requests.json";
+import servedShapeOpen from "./cohort-members/served-shape-open.json";
 import subjectWithCohort from "./cohort-members/subject-with-cohort.json";
 import unrankedRepositories from "./cohort-members/unranked-repositories.json";
 import workItems from "./cohort-members/work-items.json";
@@ -16,10 +17,12 @@ import zeroMatch from "./cohort-members/zero-match.json";
  * sets `ranking_computed` on every member, so "no score and no driver on any member" is what
  * means that nothing was ranked. `work-items` is acr's own test data. `open-cohort-family` and
  * `subject-with-cohort` are the two sides of the family gate, each with a real captured answer plan.
+ * `served-shape-open` is the real `SelectRenderShapes` over a cohort frame, reading `open` (gap 2).
  */
 export const cohortMemberScenarios = {
     "open-cohort-family": openCohortFamily as unknown as InvestigationResult,
     "pull-requests": pullRequests as unknown as InvestigationResult,
+    "served-shape-open": servedShapeOpen as unknown as InvestigationResult,
     "subject-with-cohort": subjectWithCohort as unknown as InvestigationResult,
     "unranked-repositories": unrankedRepositories as unknown as InvestigationResult,
     "work-items": workItems as unknown as InvestigationResult,

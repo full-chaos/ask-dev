@@ -20,6 +20,7 @@ import type {
     InterpretedShape,
     InvestigationResult,
 } from "./contracts";
+import { servesCohortShape } from "./render-shapes";
 
 /**
  * The interpreted shapes a cohort ranking is an answer TO.
@@ -267,15 +268,20 @@ export const COHORT_FAMILIES: readonly string[] = [
 
 /**
  * Whether this answer is about a cohort. `interpretation.shape` alone is not reliable: an answer
- * can read `open`, so a served cohort family counts too. A single-subject answer that only carries
- * a cohort as context answers neither, so it draws no list and no ranking (AGENTS.md check 10).
+ * can read `open`, so a served cohort family counts too, and so does a cohort chart ACR served
+ * (`servesCohortShape`). A single-subject answer that only carries a cohort as context has neither,
+ * so it draws no list and no ranking (AGENTS.md check 10).
  */
 export function askedForCohort(
     shape: InterpretedShape,
-    result: Pick<InvestigationResult, "answer_plan"> | undefined,
+    result: Pick<InvestigationResult, "answer_plan" | "render_shapes"> | undefined,
 ): boolean {
     const family = result?.answer_plan?.family;
-    return isCohortIntent(shape) || (family !== undefined && COHORT_FAMILIES.includes(family));
+    return (
+        isCohortIntent(shape) ||
+        (family !== undefined && COHORT_FAMILIES.includes(family)) ||
+        servesCohortShape(result)
+    );
 }
 
 /**
