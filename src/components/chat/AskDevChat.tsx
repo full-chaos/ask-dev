@@ -1,39 +1,44 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useId,
+    useMemo,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from "react";
 
 import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
+import { ChatProgressView } from "./ChatProgressView";
+import { ChatStatusPanel } from "./ChatStatusPanel";
 import { ClarificationPopup } from "./ClarificationPopup";
 import { InspectorRail } from "./InspectorRail";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
 import { FailurePanel } from "../FailurePanel";
 import type { ClarificationChoice } from "../ClarificationPanel";
-import type { WorkbenchFailure } from "../../lib/acr/errors";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "../../lib/candidate-selections";
 import { subjectForReceipt } from "../../lib/clarification";
 import { buildClarificationPages, type PopupOptionSource } from "../../lib/clarification-popup";
+import type { BoundStructureReceipt, InvestigationResult } from "../../lib/contracts";
+import { withholdUnrankableRankings } from "../../lib/ranking-withheld";
 import {
-    buildConversationTurns,
-    deriveParentReference,
-    type UnsentSubject,
-} from "../../lib/conversation";
-import { type RankingWithheld, withholdUnrankableRankings } from "../../lib/ranking-withheld";
-import type {
-    BoundStructureReceipt,
-    ConversationTurn,
-    InvestigationResult,
-    SubjectHint,
-    SubjectRef,
-} from "../../lib/contracts";
-import { literalKindNounsInQuestion } from "../../lib/kind-nouns";
-import {
-    buildStructureReceiptFields,
     EMPTY_SELECTION_EVENTS,
-    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "../../lib/structure-selections";
 import { useCandidateSelections } from "../../lib/use-candidate-selections";
 import { useStructureSelections } from "../../lib/use-structure-selections";
+import {
+    type AskIntent,
+    type BatchItem,
+    type ChatSource,
+    type ChatTurn,
+    type ChatUserTurn,
+    isRetryableStatus,
+    type SubmittedSelections,
+} from "../../render/source";
+import { createStandaloneSource } from "../../render/standalone-source";
 
 /**
  * Ask Dev — the chat surface (chat pivot, Phase 1), as one embeddable unit:
@@ -45,10 +50,18 @@ import { useStructureSelections } from "../../lib/use-structure-selections";
  * The Workbench (`/workbench`) is a panel-stack shell chris has declared
  * TEMPORARY; this is the target UX — a Claude/ChatGPT-style conversation:
  * a growing timeline of user/assistant turns and a composer at the bottom.
- * It calls the SAME server hop the Workbench does (`/api/investigations`),
- * which calls the real ACR investigation API — there is no mock path here
- * either (CHAOS-3738's hard boundary holds for every surface, not just the
- * Workbench).
+ *
+ * CHAOS-12382: the conversation comes from a `ChatSource` (`@/render/source`).
+ * The component holds UI state only — the selection hooks, the popup's
+ * dismissal and auto-confirm, scroll pinning, the composer — and asks
+ * through the source with an intent; it never builds a request body. With
+ * no `source` prop it creates `createStandaloneSource()`, which calls the
+ * SAME server hop the Workbench does (`/api/investigations`), which calls
+ * the real ACR investigation API — there is no mock path here either
+ * (CHAOS-3738's hard boundary holds for every surface, not just the
+ * Workbench). A host (web) passes its own source and gets this same render,
+ * including the outcomes only a host reports: a pending turn's progress, a
+ * no-answer `status`, and Stop.
  *
  * Every assistant turn is rendered with `DeterministicAnswerView` UNCHANGED
  * from the Workbench — it already composes the answer, the subject
@@ -92,107 +105,6 @@ import { useStructureSelections } from "../../lib/use-structure-selections";
  * ACR change.
  */
 
-type AssistantOutcome =
-    | { readonly kind: "pending" }
-    | {
-          readonly kind: "answered";
-          readonly result: InvestigationResult;
-          /** Typed marker beside the result: parts were withheld by the boundary. */
-          readonly rankingWithheld?: RankingWithheld;
-          /** Built once, server side (the route); rendered here, never rebuilt. */
-          readonly scopeLossNotice?: string;
-      }
-    | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
-
-type Turn =
-    | {
-          readonly role: "user";
-          readonly id: number;
-          readonly question: string;
-          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
-          readonly createdAt: string;
-          /**
-           * CHAOS-4670: a receipt-carrying re-ask (a panel selection's
-           * turn-2 request) resends this SAME question text — the turn
-           * still runs for real on the wire (receipts/supersession
-           * unchanged, still threaded into `buildConversationTurns` below
-           * exactly as before), but showing it as a second user bubble
-           * reads as though the tester asked twice. `false` for every
-           * receipt-carrying re-ask (`confirmSelections`, and `ask()`'s own
-           * non-plain call from `chooseStructure`'s single-batch fallback);
-           * `true` for a plain composer ask or a plain-ask retry, which are
-           * genuinely new/repeated questions and must render. The compact
-           * record of what a silent re-run carried is the superseded
-           * assistant turn's own selection chips
-           * (`submittedStructureBatch`/`submittedCandidateReceiptIds`
-           * below), already rendered — nothing else needs to change.
-           */
-          readonly showBubble: boolean;
-      }
-    | {
-          readonly role: "assistant";
-          readonly id: number;
-          /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
-          readonly createdAt: string;
-          readonly outcome: AssistantOutcome;
-          /** The subject the tester chose, when this turn answers a re-ask that carried one. */
-          readonly chosenSubject: SubjectRef | undefined;
-          /**
-           * A SNAPSHOT of the structure-need batch this turn's own "Ask
-           * again with these selections" confirmed, if it ever did —
-           * distinct from `useStructureSelections()`'s live `batch`, which
-           * this turn stops owning the instant it is no longer the latest
-           * (codex review round 1, finding 3). Without this, a frozen
-           * turn's own `StructureNeedsPanel` echo would render EMPTY rather
-           * than what was actually submitted, the moment a newer turn takes
-           * over the shared selection hook.
-           */
-          readonly submittedStructureBatch: StructureSelectionBatch | undefined;
-          /**
-           * The SAME snapshot discipline as `submittedStructureBatch`, for
-           * the two multi-select candidate axes (codex review, round on
-           * CHAOS-4343: without this, a frozen turn's own candidate panel
-           * loses every "selected" badge the instant a newer turn takes
-           * over the shared selection hook — the same dead end
-           * `submittedStructureBatch` already closes for kind/anchor/
-           * handle/window). `subjectCandidates` is `subject_resolution.
-           * candidates` (ClarificationPanel); `structureCandidates` is
-           * `structure_needs.candidate_options` (StructureNeedsPanel) —
-           * two independent axes, two independent snapshots.
-           */
-          readonly submittedCandidateReceiptIds: ReadonlySet<string> | undefined;
-          readonly submittedStructureCandidateReceiptIds: ReadonlySet<string> | undefined;
-          /**
-           * The exact question to retry, set ONLY when this turn came from a
-           * plain composer ask (no prior receipts, no chosen subject, no
-           * structure batch). A receipt-carrying re-ask is never retried
-           * from the failure panel — re-deriving which receipts to resend is
-           * this lane's boundary, not presentation's, so that turn's
-           * `FailurePanel` gets no retry action at all.
-           */
-          readonly retryQuestion: string | undefined;
-          /**
-           * CHAOS-5107 (codex review round 3): the tester's ORIGINAL typed
-           * question that started this exchange, carried forward across a
-           * CHAIN of narrower re-asks — distinct from `retryQuestion`,
-           * which is the exact (possibly already-narrowed) text this turn
-           * itself sent. Without this, a second consecutive budget refusal
-           * would narrow the ALREADY-narrowed text ("…, top 5 only, top 5
-           * only?") instead of narrowing the tester's real question again.
-           * Set ONLY alongside `retryQuestion` (same plain-ask condition).
-           */
-          readonly rootQuestion: string | undefined;
-      };
-
-function isFailure(value: unknown): value is WorkbenchFailure {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        typeof (value as { code?: unknown }).code === "string" &&
-        typeof (value as { message?: unknown }).message === "string"
-    );
-}
-
 function formatTurnTime(isoTimestamp: string): string {
     return new Date(isoTimestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
@@ -203,114 +115,52 @@ function formatTurnTime(isoTimestamp: string): string {
 const BOTTOM_PIN_THRESHOLD_PX = 48;
 
 /**
- * The one place a request actually goes out over the wire, shared by `ask`
- * (one request) and `confirmSelections` (N independent requests, CHAOS-4343
- * items 1/2) — both build the SAME body shape and interpret the SAME
- * response shape, and duplicating that between them would be the
- * two-branches-one-tested trap: a fix to one would silently not apply to
- * the other.
- *
- * Takes no turn ids and touches no timeline state: the caller owns settling
- * whichever turn(s) this outcome belongs to, which is what lets
- * `confirmSelections` fire several of these concurrently and settle each
- * independently as it resolves, rather than waiting for the slowest.
+ * The withheld boundary where a result enters this render (`@/lib/ranking-withheld`). No person
+ * ranking may reach a screen, and a host's turns reach this component without passing through
+ * ask-dev's route or `createStandaloneSource`, so the render applies the boundary itself and no
+ * source can skip it. A result that needs nothing keeps its turn's object identity; a result the
+ * boundary has already rebuilt has no cohort, so a second pass keeps the marker beside it.
  */
-async function fireInvestigation(params: {
-    readonly question: string;
-    readonly priorSubjectReceipts: readonly ClarificationChoice[];
-    readonly conversation: readonly ConversationTurn[];
-    // CHAOS-5837: same-conversation carry. Undefined/empty on a first turn —
-    // see `deriveParentReference`'s own doc comment, this function's only
-    // producer of both.
-    readonly parentResultId: string | undefined;
-    readonly subjectHints: readonly SubjectHint[];
-    /** Committed subjects that could not ride as hints; the route words the notice. */
-    readonly unsentSubjects: readonly UnsentSubject[];
-    readonly structureReceiptFields: Record<string, unknown>;
-    readonly selectionEvents: readonly PendingSelectionEvent[];
-}): Promise<AssistantOutcome> {
-    // CHAOS-4343 item 3: derived from the SAME `question` text this request
-    // sends, every time — a fresh ask and a receipt-carrying re-ask (which
-    // resends the ORIGINAL question unchanged) both get the literal-noun
-    // hint consistently, with no separate call site to keep in sync.
-    const expectedKinds = literalKindNounsInQuestion(params.question);
-    try {
-        const response = await fetch("/api/investigations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                question: params.question,
-                priorSubjectReceipts: params.priorSubjectReceipts,
-                conversation: params.conversation,
-                ...(params.parentResultId !== undefined
-                    ? { parentResultId: params.parentResultId }
-                    : {}),
-                ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
-                ...(params.unsentSubjects.length > 0
-                    ? { unsentSubjects: params.unsentSubjects }
-                    : {}),
-                ...params.structureReceiptFields,
-                ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
-                ...(params.selectionEvents.length > 0
-                    ? { structureSelectionEvents: params.selectionEvents }
-                    : {}),
-            }),
-        });
-        const payload: unknown = await response.json();
-        const failure = (payload as { failure?: unknown }).failure;
-        if (isFailure(failure)) {
-            return { kind: "failed", failure };
-        }
-        const result = (payload as { result?: unknown }).result;
-        if (result === undefined || result === null) {
-            return {
-                kind: "failed",
-                failure: {
-                    code: "acr_contract_violation",
-                    message: "Ask Dev's server returned neither a result nor a failure.",
-                    retryable: false,
-                },
-            };
-        }
-        const scopeLossNotice = (payload as { scopeLossNotice?: unknown }).scopeLossNotice;
-        // The route already withholds; applying the same idempotent boundary
-        // where the result enters client state keeps a caller that bypasses
-        // the route from ever holding the unwithheld form. The route's own
-        // marker (beside the result) wins: a second pass returns none.
-        const boundary = withholdUnrankableRankings(result as InvestigationResult);
-        const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
-        const rankingWithheld =
-            boundary.rankingWithheld ??
-            (typeof routeMarker === "object" && routeMarker !== null
-                ? (routeMarker as RankingWithheld)
-                : undefined);
-        return {
-            kind: "answered",
+export function withheldTurn(turn: ChatTurn): ChatTurn {
+    if (turn.role !== "assistant" || turn.outcome.kind !== "answered") return turn;
+    // A host's value crosses the seam here: its type proves nothing at run time.
+    const result: unknown = turn.outcome.result;
+    const boundary = withholdUnrankableRankings(result as InvestigationResult);
+    if (boundary.result === result) return turn;
+    return {
+        ...turn,
+        outcome: {
+            ...turn.outcome,
             result: boundary.result,
-            ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
-            ...(typeof scopeLossNotice === "string" ? { scopeLossNotice } : {}),
-        };
-    } catch (error) {
-        // Never swallow: a dead server hop is itself a reportable outcome.
-        console.error("investigation request failed", error);
-        return {
-            kind: "failed",
-            failure: {
-                code: "acr_unreachable",
-                message: "Ask Dev's server could not be reached.",
-                retryable: true,
-            },
-        };
-    }
+            rankingWithheld: boundary.rankingWithheld,
+        },
+    };
 }
 
-export function AskDevChat() {
+export type AskDevChatProps = {
+    /** Where the conversation comes from. Absent: one standalone source per mount. */
+    readonly source?: ChatSource;
+};
+
+export function AskDevChat({ source }: AskDevChatProps = {}) {
+    const [standaloneSource] = useState(() => createStandaloneSource());
+    const chat = source ?? standaloneSource;
+    // All of `ChatSurface`'s state belongs to one source: a turn id is unique
+    // per source only, so a dismissal, a selection or a pending retry must
+    // not reach the next source's turns. A new generation remounts it.
+    const [mounted, setMounted] = useState({ chat, generation: 0 });
+    if (mounted.chat !== chat) setMounted({ chat, generation: mounted.generation + 1 });
+    return <ChatSurface chat={chat} key={mounted.generation} />;
+}
+
+function ChatSurface({ chat }: { readonly chat: ChatSource }) {
     const domId = useId();
-    const [turns, setTurns] = useState<readonly Turn[]>([]);
-    // A monotonic counter, not crypto.randomUUID(): turn identity only needs
-    // to be unique within this session, and a counter keeps the ask/settle
-    // pairing trivially traceable in a debugger.
-    const nextId = useRef(0);
+    // Called through the source (never detached), so a source whose methods
+    // read `this` still works; stable per source, so React subscribes once.
+    const subscribe = useCallback((listener: () => void) => chat.subscribe(listener), [chat]);
+    const getSnapshot = () => chat.getSnapshot();
+    const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    const turns = useMemo(() => snapshot.turns.map(withheldTurn), [snapshot.turns]);
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
@@ -367,8 +217,19 @@ export function AskDevChat() {
     // composer ask (typed by hand, or a bare Retry) never sets it, so `ask`
     // falls back to the text actually being sent.
     const pendingNarrowingRootRef = useRef<string | undefined>(undefined);
+    // CHAOS-12382: the turn a Retry sends again, set by `retryTurn` and
+    // consumed synchronously at the START of the `ask()` call it triggers,
+    // for the same reason `pendingNarrowingRootRef` above is a ref. A Retry
+    // reaches `source.retry`, never `source.ask`: a host re-sends under the
+    // SAME key, and `ask` would start a second run.
+    const pendingRetryTurnRef = useRef<number | undefined>(undefined);
     const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
     const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
+    // A source's update renders synchronously, BEFORE the ask resolves and
+    // the composer clears its draft. The emptied composer then takes another
+    // height, which moves the timeline's bottom, so the autoscroll below
+    // runs once more for that commit.
+    const [draftClears, setDraftClears] = useState(0);
     // Mirrors `turns` so the block below can tell "new content just landed"
     // apart from an ordinary re-render, and adjust derived state DURING
     // render rather than in an effect (react-hooks/set-state-in-effect: an
@@ -399,7 +260,7 @@ export function AskDevChat() {
         const el = timelineRef.current;
         if (el === null || !isPinnedToBottom) return;
         el.scrollTop = el.scrollHeight;
-    }, [turns, isPinnedToBottom]);
+    }, [turns, isPinnedToBottom, draftClears]);
 
     function handleTimelineScroll() {
         const el = timelineRef.current;
@@ -417,107 +278,66 @@ export function AskDevChat() {
         setHasUnseenBelow(false);
     }
 
-    function settleTurn(assistantTurnId: number, outcome: AssistantOutcome) {
-        setTurns((current) =>
-            current.map((turn) =>
-                turn.role === "assistant" && turn.id === assistantTurnId
-                    ? { ...turn, outcome }
-                    : turn,
-            ),
-        );
-    }
-
     /**
-     * Appends a user turn and a pending assistant turn, then settles the
-     * assistant turn in place once the server hop answers. Mirrors the
-     * Workbench's own `ask()` (same request shape, same failure mapping) —
-     * see that component for why the question travels UNCHANGED alongside a
-     * chosen receipt rather than being rewritten to mention it.
+     * Asks through the source. Reads and resets the selection hooks first,
+     * so every selection outcome observed since the last reset rides this
+     * request (CHAOS-4171), and a plain new ask (the common composer path)
+     * clears any unconfirmed candidate picks left over from the turn it
+     * supersedes too — otherwise the NEXT result's candidate panel would
+     * open with stale selections from a different result's candidates.
      *
-     * Returns whether the turn answered (`true`) or failed (`false`), so the
+     * A Retry (`retryTurn`) comes through here too, so it keeps the same
+     * selection reads and resets, and goes to `source.retry` instead.
+     *
+     * Returns whether the turn answered (`true`) or not (`false`), so the
      * composer can decide whether to clear its draft — the only thing that
      * return value is for.
      */
-    async function ask(
+    function ask(
         question: string,
-        priorSubjectReceipts: readonly ClarificationChoice[] = [],
-        chosen?: SubjectRef,
-        structureSelectionsToSend?: StructureSelectionBatch,
+        intent: Omit<AskIntent, "narrowingRoot" | "selectionEvents"> = {},
     ): Promise<boolean> {
-        const userTurnId = nextId.current++;
-        const assistantTurnId = nextId.current++;
-        const isPlainAsk =
-            priorSubjectReceipts.length === 0 &&
-            chosen === undefined &&
-            structureSelectionsToSend === undefined;
         // Consumed ONCE, synchronously, before anything else in this
-        // function can yield — see the ref's own doc comment.
+        // function can yield — see each ref's own doc comment.
+        const retryTurnId = pendingRetryTurnRef.current;
+        pendingRetryTurnRef.current = undefined;
         const narrowingRoot = pendingNarrowingRootRef.current;
         pendingNarrowingRootRef.current = undefined;
-        // Captured from the CURRENT timeline, BEFORE the pending pair below
-        // is appended — a re-ask's own not-yet-answered turn must never be
-        // threaded as its own prior context.
-        const conversation = buildConversationTurns(turns);
-        // Same "before the pending pair" capture, same source —
-        // the immediately preceding turn's own result_id/committed subjects.
-        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
-        structureSelections.reset();
-        // A plain new ask (the common composer path) must clear any
-        // unconfirmed candidate picks left over from the turn it supersedes
-        // too — otherwise the NEXT result's candidate panel would open with
-        // stale selections from a different result's candidates.
-        candidateSelections.reset();
-        structureCandidateSelections.reset();
-        const askedAt = new Date().toISOString();
-        setTurns((current) => [
-            ...current,
-            { role: "user", id: userTurnId, question, createdAt: askedAt, showBubble: isPlainAsk },
-            {
-                role: "assistant",
-                id: assistantTurnId,
-                createdAt: askedAt,
-                outcome: { kind: "pending" },
-                chosenSubject: chosen,
-                submittedStructureBatch: undefined,
-                submittedCandidateReceiptIds: undefined,
-                submittedStructureCandidateReceiptIds: undefined,
-                retryQuestion: isPlainAsk ? question : undefined,
-                rootQuestion: isPlainAsk ? (narrowingRoot ?? question) : undefined,
-            },
-        ]);
-
-        const structureReceiptFields =
-            structureSelectionsToSend === undefined
-                ? {}
-                : buildStructureReceiptFields(structureSelectionsToSend);
         // CHAOS-4171: every selection outcome observed since the last
         // reset() rides this SAME request — the route is the sink (see
         // `useStructureSelections`'s own `pendingSelectionEvents` header).
-        // Read AFTER every hook's `reset()` above but still the pre-reset
-        // value: `setState` schedules a re-render, it does not mutate this
-        // closure's already-captured array. All THREE selection hooks are
-        // merged here (codex review: a tester can toggle a candidate, then
-        // fire a PLAIN ask or a structure confirm without ever confirming
-        // that candidate pick — `reset()` above would otherwise discard its
-        // queued telemetry silently, since only THIS path's own request
-        // would have carried it).
+        // Read before every hook's `reset()` below. All THREE selection
+        // hooks are merged here (codex review: a tester can toggle a
+        // candidate, then fire a PLAIN ask or a structure confirm without
+        // ever confirming that candidate pick — `reset()` would otherwise
+        // discard its queued telemetry silently).
         const selectionEvents = [
             ...structureSelections.pendingSelectionEvents,
             ...candidateSelections.pendingSelectionEvents,
             ...structureCandidateSelections.pendingSelectionEvents,
         ];
-        const outcome = await fireInvestigation({
-            question,
-            priorSubjectReceipts,
-            conversation,
-            parentResultId,
-            subjectHints,
-            unsentSubjects,
-            structureReceiptFields,
-            selectionEvents,
-        });
-        settleTurn(assistantTurnId, outcome);
-        return outcome.kind === "answered";
+        structureSelections.reset();
+        candidateSelections.reset();
+        structureCandidateSelections.reset();
+        return retryTurnId === undefined
+            ? chat.ask(question, { ...intent, narrowingRoot, selectionEvents })
+            : chat.retry(retryTurnId, { ...intent, narrowingRoot, selectionEvents });
+    }
+
+    /**
+     * Sends a turn again through the composer's OWN submit path
+     * (draft-clear-on-success, preserve-and-select-on-failure) — never
+     * `source.retry` directly, which would leave the composer showing stale,
+     * already-answered text after a successful retry (codex review round 2).
+     *
+     * The ref is cleared after the call: `ask()` has already consumed it
+     * when the composer submitted, and a composer that refused (a blank
+     * question) must not leave it for the next typed question.
+     */
+    function retryTurn(turnId: number, question: string) {
+        pendingRetryTurnRef.current = turnId;
+        composerRef.current?.retry(question);
+        pendingRetryTurnRef.current = undefined;
     }
 
     /**
@@ -581,22 +401,17 @@ export function AskDevChat() {
         subjectChoices: readonly ClarificationChoice[],
         structureCandidateReceipts: readonly BoundStructureReceipt[],
         otherStructureBatch: StructureSelectionBatch,
+        supersedes: SubmittedSelections,
     ): void {
         const question = result.question;
         if (subjectChoices.length === 0 && structureCandidateReceipts.length === 0) return;
-        const conversation = buildConversationTurns(turns);
-        // Same source and same "before any reset()" timing as
-        // `conversation` above — the receipts fired below already name a
-        // subject explicitly, but the carry still applies (this re-ask
-        // follows `result` exactly as much as a plain typed follow-up would).
-        const { parentResultId, subjectHints, unsentSubjects } = deriveParentReference(turns);
         // Read BEFORE any reset() — a plain synchronous read at the top of
         // this ONE call, never re-read after a loop iteration's own
         // re-render (codex review: a stale closure re-reading a hook after
         // `.reset()` sees the SAME pre-reset value on every iteration,
-        // which is why the per-request fan-out below fires everything from
-        // ONE synchronous pass rather than a sequence of awaited `ask()`
-        // calls that could each re-enter this component's hooks).
+        // which is why the per-request fan-out below is built in ONE
+        // synchronous pass rather than a sequence of awaited `ask()` calls
+        // that could each re-enter this component's hooks).
         const selectionEvents = [
             ...structureSelections.pendingSelectionEvents,
             ...candidateSelections.pendingSelectionEvents,
@@ -605,17 +420,7 @@ export function AskDevChat() {
         structureSelections.reset();
         candidateSelections.reset();
         structureCandidateSelections.reset();
-        const askedAt = new Date().toISOString();
 
-        const structureReceiptFieldsBase = buildStructureReceiptFields(otherStructureBatch);
-
-        type PendingItem =
-            | {
-                  readonly kind: "subject";
-                  readonly choice: ClarificationChoice;
-                  readonly structureReceipt?: BoundStructureReceipt;
-              }
-            | { readonly kind: "structure"; readonly receipt: BoundStructureReceipt };
         // CHAOS-12003: both axes picked against the SAME `result` (the popup
         // walks them as consecutive pages) must travel in ONE request. Two
         // requests would be sequential against one result, and the second
@@ -630,74 +435,32 @@ export function AskDevChat() {
             foldedStructureReceipt === undefined
                 ? structureCandidateReceipts
                 : structureCandidateReceipts.slice(1);
-        const items: readonly PendingItem[] = [
-            ...subjectChoices.map((choice, index): PendingItem =>
-                index === 0 && foldedStructureReceipt !== undefined
-                    ? { kind: "subject", choice, structureReceipt: foldedStructureReceipt }
-                    : { kind: "subject", choice },
-            ),
-            ...fanOutStructureReceipts.map((receipt): PendingItem => ({
-                kind: "structure",
-                receipt,
+        const fanOut: readonly Omit<BatchItem, "selectionEvents">[] = [
+            ...subjectChoices.map((choice, index) => ({
+                priorSubjectReceipts: [choice],
+                structureBatch:
+                    index === 0 && foldedStructureReceipt !== undefined
+                        ? { ...otherStructureBatch, subject_candidate: foldedStructureReceipt }
+                        : otherStructureBatch,
+                chosenSubject: subjectForReceipt(result, choice.receipt_id),
+            })),
+            // Structure `candidate_options` entries carry no `SubjectRef`
+            // (unlike `subject_resolution.candidates`) — nothing to show
+            // via ChoiceNotice for those.
+            ...fanOutStructureReceipts.map((receipt) => ({
+                priorSubjectReceipts: [],
+                structureBatch: { ...otherStructureBatch, subject_candidate: receipt },
+                chosenSubject: undefined,
             })),
         ];
-
-        const userTurnId = nextId.current++;
-        const assistantTurns = items.map((item) => ({ id: nextId.current++, item }));
-
-        setTurns((current) => [
-            ...current,
-            // CHAOS-4670: always silent — every `confirmSelections` call is
-            // a receipt-carrying re-ask of a question already shown as a
-            // user bubble on the turn(s) it supersedes.
-            { role: "user", id: userTurnId, question, createdAt: askedAt, showBubble: false },
-            ...assistantTurns.map(({ id, item }) => ({
-                role: "assistant" as const,
-                id,
-                createdAt: askedAt,
-                outcome: { kind: "pending" as const },
-                // Structure `candidate_options` entries carry no `SubjectRef`
-                // (unlike `subject_resolution.candidates`) — nothing to show
-                // via ChoiceNotice for those.
-                chosenSubject:
-                    item.kind === "subject"
-                        ? subjectForReceipt(result, item.choice.receipt_id)
-                        : undefined,
-                submittedStructureBatch: undefined,
-                submittedCandidateReceiptIds: undefined,
-                submittedStructureCandidateReceiptIds: undefined,
-                retryQuestion: undefined,
-                rootQuestion: undefined,
-            })),
-        ]);
-
-        assistantTurns.forEach(({ id, item }, index) => {
-            const priorSubjectReceipts = item.kind === "subject" ? [item.choice] : [];
-            const structureReceiptFields =
-                item.kind === "structure"
-                    ? buildStructureReceiptFields({
-                          ...otherStructureBatch,
-                          subject_candidate: item.receipt,
-                      })
-                    : item.structureReceipt !== undefined
-                      ? buildStructureReceiptFields({
-                            ...otherStructureBatch,
-                            subject_candidate: item.structureReceipt,
-                        })
-                      : structureReceiptFieldsBase;
-            void fireInvestigation({
-                question,
-                priorSubjectReceipts,
-                conversation,
-                parentResultId,
-                subjectHints,
-                unsentSubjects,
-                structureReceiptFields,
+        chat.askBatch(
+            fanOut.map((item, index) => ({
+                ...item,
                 selectionEvents: index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            }).then((outcome) => {
-                settleTurn(id, outcome);
-            });
-        });
+            })),
+            question,
+            supersedes,
+        );
     }
     const latestAssistantTurn = [...turns].reverse().find((turn) => turn.role === "assistant");
 
@@ -726,28 +489,20 @@ export function AskDevChat() {
         // rounds: without this, a frozen turn's candidate panel loses every
         // "selected" badge the instant a newer turn takes over the shared
         // selection hook).
-        const supersededTurnId = latestAssistantTurn.id;
-        const submittedCandidateReceiptIds = new Set(choices.map((choice) => choice.receipt_id));
-        const submittedStructureCandidateReceiptIds = new Set(
-            pendingStructureCandidateReceipts.map((receipt) => receipt.receipt_id),
-        );
-        setTurns((current) =>
-            current.map((turn) =>
-                turn.role === "assistant" && turn.id === supersededTurnId
-                    ? {
-                          ...turn,
-                          submittedStructureBatch: pendingStructureBatch,
-                          submittedCandidateReceiptIds,
-                          submittedStructureCandidateReceiptIds,
-                      }
-                    : turn,
+        const supersedes: SubmittedSelections = {
+            turnId: latestAssistantTurn.id,
+            submittedStructureBatch: pendingStructureBatch,
+            submittedCandidateReceiptIds: new Set(choices.map((choice) => choice.receipt_id)),
+            submittedStructureCandidateReceiptIds: new Set(
+                pendingStructureCandidateReceipts.map((receipt) => receipt.receipt_id),
             ),
-        );
+        };
         confirmSelections(
             result,
             choices,
             pendingStructureCandidateReceipts,
             pendingStructureBatch,
+            supersedes,
         );
     }
 
@@ -781,32 +536,23 @@ export function AskDevChat() {
         // review round 1, finding 3; extended to the candidate axes in
         // later rounds, same reason `chooseCandidates` above snapshots its
         // own candidate picks).
-        const supersededTurnId = latestAssistantTurn.id;
-        const submittedStructureCandidateReceiptIds = new Set(
-            candidateReceipts.map((receipt) => receipt.receipt_id),
-        );
-        const submittedCandidateReceiptIds = new Set(
-            pendingSubjectChoices.map((choice) => choice.receipt_id),
-        );
-        setTurns((current) =>
-            current.map((turn) =>
-                turn.role === "assistant" && turn.id === supersededTurnId
-                    ? {
-                          ...turn,
-                          submittedStructureBatch: batch,
-                          submittedStructureCandidateReceiptIds,
-                          submittedCandidateReceiptIds,
-                      }
-                    : turn,
+        const supersedes: SubmittedSelections = {
+            turnId: latestAssistantTurn.id,
+            submittedStructureBatch: batch,
+            submittedStructureCandidateReceiptIds: new Set(
+                candidateReceipts.map((receipt) => receipt.receipt_id),
             ),
-        );
+            submittedCandidateReceiptIds: new Set(
+                pendingSubjectChoices.map((choice) => choice.receipt_id),
+            ),
+        };
         if (candidateReceipts.length === 0 && pendingSubjectChoices.length === 0) {
             // Exact pre-CHAOS-4343 shape: no candidate axis in play at all,
             // one plain re-ask carrying only the ordinary structure batch.
-            void ask(result.question, [], undefined, batch);
+            void ask(result.question, { structureBatch: batch, supersedes });
             return;
         }
-        confirmSelections(result, pendingSubjectChoices, candidateReceipts, batch);
+        confirmSelections(result, pendingSubjectChoices, candidateReceipts, batch, supersedes);
     }
 
     /**
@@ -874,7 +620,7 @@ export function AskDevChat() {
             : [];
 
     const askedQuestions = turns.filter(
-        (turn): turn is Extract<Turn, { role: "user" }> => turn.role === "user" && turn.showBubble,
+        (turn): turn is ChatUserTurn => turn.role === "user" && turn.showBubble,
     );
     const latestAnswered =
         latestAssistantTurn?.role === "assistant" && latestAssistantTurn.outcome.kind === "answered"
@@ -892,7 +638,7 @@ export function AskDevChat() {
      * pending selection telemetry, so nothing queued is dropped.
      */
     function startOver() {
-        setTurns([]);
+        chat.newConversation();
         setDismissedPopupTurnId(undefined);
         setIsPinnedToBottom(true);
         setHasUnseenBelow(false);
@@ -986,7 +732,7 @@ export function AskDevChat() {
                                     if (turn.role === "user") {
                                         // CHAOS-4670: a silent receipt-carrying
                                         // re-ask renders nothing here — see
-                                        // `Turn`'s `showBubble` doc comment.
+                                        // `ChatUserTurn`'s `showBubble` doc comment.
                                         if (!turn.showBubble) return null;
                                         return (
                                             <div
@@ -1032,9 +778,54 @@ export function AskDevChat() {
                                                 </p>
                                             )}
                                             {turn.outcome.kind === "pending" ? (
-                                                <p className="chat__pending" role="status">
-                                                    Investigating…
-                                                </p>
+                                                turn.outcome.progress === undefined ? (
+                                                    <p className="chat__pending" role="status">
+                                                        Investigating…
+                                                    </p>
+                                                ) : (
+                                                    <ChatProgressView
+                                                        progress={turn.outcome.progress}
+                                                    />
+                                                )
+                                            ) : null}
+                                            {turn.outcome.kind === "status" ? (
+                                                <ChatStatusPanel
+                                                    connect={
+                                                        turn.outcome.status.kind === "connect"
+                                                            ? chat.slots?.connect?.()
+                                                            : undefined
+                                                    }
+                                                    onReload={
+                                                        // A GET re-read, never a resend, so it is
+                                                        // not held to the latest turn. Web offers
+                                                        // it on any restored turn.
+                                                        turn.outcome.status.kind ===
+                                                            "restore_failed" &&
+                                                        chat.reloadTurn !== undefined
+                                                            ? () => {
+                                                                  chat.reloadTurn?.(turn.id);
+                                                              }
+                                                            : undefined
+                                                    }
+                                                    onRetry={
+                                                        // The same rule and the same path as
+                                                        // `FailurePanel`'s Retry below: latest
+                                                        // turn, plain ask, through the composer.
+                                                        isLatest &&
+                                                        isRetryableStatus(turn.outcome) &&
+                                                        turn.retryQuestion !== undefined
+                                                            ? () => {
+                                                                  retryTurn(
+                                                                      turn.id,
+                                                                      turn.retryQuestion!,
+                                                                  );
+                                                              }
+                                                            : undefined
+                                                    }
+                                                    pending={isPending}
+                                                    retry={turn.outcome.retry}
+                                                    status={turn.outcome.status}
+                                                />
                                             ) : null}
                                             {turn.outcome.kind === "failed" ? (
                                                 <FailurePanel
@@ -1046,15 +837,8 @@ export function AskDevChat() {
                                                         turn.retryQuestion !== undefined &&
                                                         turn.outcome.failure.retryable
                                                             ? () => {
-                                                                  // Through the composer's OWN submit
-                                                                  // path (draft-clear-on-success,
-                                                                  // preserve-and-select-on-failure) —
-                                                                  // never `ask()` directly, which would
-                                                                  // leave the composer showing stale,
-                                                                  // already-answered text after a
-                                                                  // successful retry (codex review
-                                                                  // round 2).
-                                                                  composerRef.current?.retry(
+                                                                  retryTurn(
+                                                                      turn.id,
                                                                       turn.retryQuestion!,
                                                                   );
                                                               }
@@ -1191,7 +975,34 @@ export function AskDevChat() {
                                 pending={isPending}
                             />
                         )}
-                        <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
+                        {snapshot.stoppable && chat.stop !== undefined ? (
+                            <div className="chat__stop-row">
+                                <button
+                                    className="chat__stop"
+                                    onClick={() => chat.stop?.()}
+                                    type="button"
+                                >
+                                    <svg
+                                        aria-hidden="true"
+                                        fill="currentColor"
+                                        height="10"
+                                        viewBox="0 0 10 10"
+                                        width="10"
+                                    >
+                                        <rect height="10" rx="2" width="10" />
+                                    </svg>
+                                    Stop
+                                </button>
+                            </div>
+                        ) : null}
+                        <ChatComposer
+                            onAsk={ask}
+                            onDraftCleared={() => {
+                                setDraftClears((count) => count + 1);
+                            }}
+                            pending={isPending}
+                            ref={composerRef}
+                        />
                     </div>
                 </section>
 

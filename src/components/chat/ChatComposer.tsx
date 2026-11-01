@@ -10,6 +10,8 @@ export type ChatComposerProps = {
      * draft — never to inspect or re-derive what was sent.
      */
     readonly onAsk: (question: string) => Promise<boolean>;
+    /** Called in the same update that clears the draft, after an ask answered. */
+    readonly onDraftCleared?: (() => void) | undefined;
 };
 
 export type ChatComposerHandle = {
@@ -56,7 +58,7 @@ export type ChatComposerHandle = {
  * escape hatch into that logic from outside — see its own doc comment.
  */
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-    { pending, onAsk },
+    { pending, onAsk, onDraftCleared },
     ref,
 ) {
     const [question, setQuestion] = useState("");
@@ -105,6 +107,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
         // answered.
         if (answered) {
             setQuestion("");
+            onDraftCleared?.();
         } else {
             setQuestion(trimmed);
             textareaRef.current?.select();

@@ -33,11 +33,11 @@ export const MAX_CONVERSATION_TURNS_SENT = 20;
 /**
  * A chat-timeline turn this module can thread into `conversation`.
  *
- * Deliberately NOT imported from `src/app/page.tsx` — that file owns the
- * full `Turn` union (chosenSubject, submittedStructureBatch, and other
+ * Deliberately NOT imported from `src/render/source.ts` — that file owns the
+ * full `ChatTurn` union (chosenSubject, submittedStructureBatch, and other
  * chat-surface-only fields this module has no use for); this is the minimal
- * structural shape `buildConversationTurns` actually reads, and page.tsx's
- * own `Turn[]` already satisfies it.
+ * structural shape `buildConversationTurns` actually reads, and the render's
+ * own `ChatTurn[]` already satisfies it.
  */
 export type ConversationSourceTurn =
     | {
@@ -53,6 +53,8 @@ export type ConversationSourceTurn =
           readonly outcome:
               | { readonly kind: "pending" }
               | { readonly kind: "failed" }
+              // A host's no-answer status (`ChatStatus`): never threaded, like a failure.
+              | { readonly kind: "status" }
               | {
                     readonly kind: "answered";
                     readonly result: {
