@@ -583,6 +583,44 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             expect(raw("score_meaning")).toBeNull();
         });
 
+        it.each([
+            ["zero", 0, "population: 0"],
+            ["negative", -1, "population: -1"],
+            ["not a number", { unexpected: 1 }, 'population: {"unexpected":1}'],
+            ["a string", "40", "population: 40"],
+        ])(
+            "a population that is %s keeps its raw value, not a stray sentence",
+            (_n, value, text) => {
+                worded({ ...meaning, population: value } as unknown as Cohort);
+                expect(line("population")).toBeNull();
+                expect(raw("population")).toHaveTextContent(text);
+                expect(raw("population_lower_bound")).toHaveTextContent(
+                    "population_lower_bound: true",
+                );
+            },
+        );
+
+        it("a bound with no population stays raw, not lost between the two", () => {
+            const { population: _population, ...rest } = meaning;
+            worded(rest);
+            expect(line("population")).toBeNull();
+            expect(raw("population_lower_bound")).toHaveTextContent("population_lower_bound: true");
+        });
+
+        it("keeps the rationale in the fold when no member has reasons", () => {
+            const members = meaning.members.map(({ inclusion_reasons: _reasons, ...rest }) => rest);
+            worded({ ...meaning, members } as unknown as Cohort);
+            expect(screen.getByTestId("cohort-meaning-details")).toHaveTextContent(
+                meaning.rationale,
+            );
+        });
+
+        it("a mismatch that is not true keeps its raw value, not the sentence", () => {
+            worded({ ...meaning, judgment_mismatch: "yes" } as unknown as Cohort);
+            expect(line("judgment_mismatch")).toBeNull();
+            expect(raw("judgment_mismatch")).toHaveTextContent("judgment_mismatch: yes");
+        });
+
         it("shows no line for a false flag, even with a word in the map", () => {
             worded({ ...meaning, judgment_mismatch: false });
             expect(line("judgment_mismatch")).toBeNull();

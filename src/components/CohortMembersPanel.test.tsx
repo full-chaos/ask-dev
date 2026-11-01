@@ -359,6 +359,19 @@ describe("the members' fold", () => {
         expect(screen.getByTestId("cohort-raw-score_meaning")).toBeInTheDocument();
     });
 
+    it("draws no fold with nothing in it: a restored member has no reasons", () => {
+        const member = { ...base.cohort!.members[0]!, inclusion_reasons: undefined };
+        const {
+            score_meaning: _meaning,
+            judgment_mismatch: _mismatch,
+            population: _population,
+            population_lower_bound: _bound,
+            ...rest
+        } = base.cohort!;
+        draw({ ...base, cohort: { ...rest, members: [member] } } as unknown as InvestigationResult);
+        expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
+    });
+
     it("does not repeat the rationale or the exclusions in the fold", () => {
         draw(withMeaning);
         const rationale = base.cohort!.rationale;

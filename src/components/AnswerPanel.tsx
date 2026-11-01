@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { SafeAnswerText } from "./SafeAnswerText";
 import type { InvestigationResult } from "../lib/contracts";
+import { formatDay } from "../lib/evidence-window";
 import { nonBlank } from "../lib/presentation";
 import { servedNote } from "../lib/vocabulary-labels";
 
@@ -47,13 +48,11 @@ type ScopeField = {
     readonly line: string | undefined;
 };
 
-/** ACR's lead word, then the date in the reader's format. A stamp that is no date stays raw. */
+/** ACR's lead word, then the day in the reader's format. A stamp that is no date stays raw. */
 function answeredLine(result: InvestigationResult): string | undefined {
     const lead = servedNote(result.vocabulary_labels, "generated_at");
-    const date = new Date(result.generated_at);
-    if (lead === undefined || Number.isNaN(date.getTime())) return undefined;
-    const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-    return `${lead} ${when.format(date)}`;
+    const day = formatDay(result.generated_at);
+    return lead === undefined || day === result.generated_at ? undefined : `${lead} ${day}`;
 }
 
 /**
@@ -63,19 +62,22 @@ function answeredLine(result: InvestigationResult): string | undefined {
  */
 function scopeFields(result: InvestigationResult): readonly ScopeField[] {
     const labels = result.vocabulary_labels;
-    const field = (name: string, raw: string) => ({
+    // A sentence states a value ACR would write it for. An odd one stays raw: a word must not hide it.
+    const field = (name: string, raw: string, stated: boolean) => ({
         name,
         raw,
-        line: servedNote(labels, name),
+        line: stated ? servedNote(labels, name) : undefined,
     });
     const fields: ScopeField[] = [
         { name: "generated_at", raw: result.generated_at, line: answeredLine(result) },
     ];
-    if (result.reused) fields.push(field("reused", "true"));
+    if (result.reused) fields.push(field("reused", "true", result.reused === true));
     const displaced = result.limitations_displaced ?? 0;
-    if (displaced !== 0) fields.push(field("limitations_displaced", String(displaced)));
+    if (displaced !== 0) {
+        fields.push(field("limitations_displaced", String(displaced), displaced > 0));
+    }
     if (result.subject_resolution?.retrieval_degraded === true) {
-        fields.push(field("retrieval_degraded", "true"));
+        fields.push(field("retrieval_degraded", "true", true));
     }
     return fields;
 }

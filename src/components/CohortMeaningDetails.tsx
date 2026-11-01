@@ -28,7 +28,11 @@ function meaningFields(
     ranked: boolean,
 ): readonly MeaningField[] {
     const { score_meaning, judgment_mismatch, population, population_lower_bound } = cohort;
-    const populationLine = servedNote(labels, "population");
+    // A sentence states a value ACR would write it for. An odd one stays raw: a word must not hide it.
+    const populationLine =
+        typeof population === "number" && population > 0
+            ? servedNote(labels, "population")
+            : undefined;
     const scoreLine =
         ranked && typeof score_meaning === "string"
             ? servedWord(labels, "cohort_score_meaning", score_meaning)
@@ -37,7 +41,7 @@ function meaningFields(
         {
             name: "judgment_mismatch",
             value: judgment_mismatch,
-            line: servedNote(labels, "judgment_mismatch"),
+            line: judgment_mismatch === true ? servedNote(labels, "judgment_mismatch") : undefined,
         },
         { name: "score_meaning", value: score_meaning, line: scoreLine },
         { name: "population", value: population, line: populationLine },
@@ -83,20 +87,18 @@ export function CohortMeaningDetails({ cohort, ranked, children }: CohortMeaning
     const fields = meaningFields(cohort, useVocabularyLabels(), ranked).filter(
         ({ line }) => line === undefined,
     );
-    const { members } = cohort;
-    if (members.length === 0 && fields.length === 0) return null;
+    const members = cohort.members.filter((member) => Array.isArray(member.inclusion_reasons));
+    if (children === undefined && members.length === 0 && fields.length === 0) return null;
     return (
         <details className="disclosure" data-testid="cohort-meaning-details">
             <summary>Details</summary>
             {children}
-            {members.map((member, index) =>
-                Array.isArray(member.inclusion_reasons) ? (
-                    // Index key: the contract does not promise a unique canonical id.
-                    <p className="record__meta" data-testid="cohort-inclusion-reasons" key={index}>
-                        {member.subject.label}: {member.inclusion_reasons.join(" ")}
-                    </p>
-                ) : null,
-            )}
+            {members.map((member, index) => (
+                // Index key: the contract does not promise a unique canonical id.
+                <p className="record__meta" data-testid="cohort-inclusion-reasons" key={index}>
+                    {member.subject.label}: {member.inclusion_reasons.join(" ")}
+                </p>
+            ))}
             {fields.map(({ name, value }) => (
                 <p className="record__meta" data-testid={`cohort-raw-${name}`} key={name}>
                     <code>

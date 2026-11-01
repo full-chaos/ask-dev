@@ -1,3 +1,4 @@
+import { formatDay } from "@/lib/evidence-window";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -177,11 +178,9 @@ describe("AnswerPanel — the scope fields ACR serves words for", () => {
 
     it("leads the date with ACR's word, in the reader's format, never the raw stamp", () => {
         render(<AnswerPanel result={served} />);
-        const date = new Intl.DateTimeFormat(undefined, {
-            dateStyle: "medium",
-            timeStyle: "short",
-        }).format(new Date(served.generated_at));
-        expect(line("generated_at")).toHaveTextContent(`Answered ${date}`);
+        expect(line("generated_at")).toHaveTextContent(
+            `Answered ${formatDay(served.generated_at)}`,
+        );
         expect(line("generated_at")).not.toHaveTextContent("2026-11-01T10:00:00Z");
     });
 
@@ -202,6 +201,15 @@ describe("AnswerPanel — the scope fields ACR serves words for", () => {
         render(<AnswerPanel result={{ ...served, generated_at: "not a date" }} />);
         expect(line("generated_at")).toBeNull();
         expect(raw("generated_at")).toHaveTextContent("generated_at: not a date");
+    });
+
+    it("keeps an odd value raw: a stray word must not hide it", () => {
+        const odd = { ...served, reused: "yes", limitations_displaced: -1 } as unknown;
+        render(<AnswerPanel result={odd as InvestigationResult} />);
+        expect(line("reused")).toBeNull();
+        expect(raw("reused")).toHaveTextContent("reused: true");
+        expect(line("limitations_displaced")).toBeNull();
+        expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: -1");
     });
 
     it("shows nothing for a false flag or a zero, even with a word in the map", () => {
