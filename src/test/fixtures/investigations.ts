@@ -29,7 +29,7 @@ import type {
     ClaimedFact,
     ConfirmedStructureEntry,
     CoverageDetail,
-    InvestigationResult,
+    InvestigationResultV1,
     SubjectRef,
 } from "@/lib/contracts";
 
@@ -37,8 +37,8 @@ import type {
  * The canonical example, unmodified. Structurally cloned on every read so a
  * component (or a test) can never mutate the shared fixture.
  */
-function canonical(): InvestigationResult {
-    return structuredClone(canonicalResult) as unknown as InvestigationResult;
+function canonical(): InvestigationResultV1 {
+    return structuredClone(canonicalResult) as unknown as InvestigationResultV1;
 }
 
 /**
@@ -70,10 +70,10 @@ export type MockScenario = {
     readonly question: string;
     /** What this scenario exists to exercise in the renderer. */
     readonly demonstrates: string;
-    readonly result: InvestigationResult;
+    readonly result: InvestigationResultV1;
 };
 
-function completeScenario(): InvestigationResult {
+function completeScenario(): InvestigationResultV1 {
     return canonical();
 }
 
@@ -102,7 +102,7 @@ function completeScenario(): InvestigationResult {
  * string key such as `day`). That rule is exercised by a synthetic claim
  * local to `FactRowsPanel.test.tsx`, labelled as synthetic.
  */
-function rowsScenario(): InvestigationResult {
+function rowsScenario(): InvestigationResultV1 {
     const result = canonical();
     const ciRollup: ClaimedFact = {
         claim_id: "claim_rows_ci_daily",
@@ -241,7 +241,7 @@ function rowsScenario(): InvestigationResult {
  *     which requires `prior_result_id` and forbids `receipt_id` (unlike
  *     every other source, which requires neither or the opposite pairing).
  */
-function flowLandscapeScenario(): InvestigationResult {
+function flowLandscapeScenario(): InvestigationResultV1 {
     const result = canonical();
     const confirmedStructure: [ConfirmedStructureEntry, ConfirmedStructureEntry] = [
         {
@@ -464,7 +464,7 @@ const DEGRADED_SCENARIO_DETAILS: CoverageDetail[] = [
  * investigation in the OLD (pre-4690) shape — the ruled exception this
  * pin's consumer code renders via the generic floor, never by parsing.
  */
-function degradedScenario(): InvestigationResult {
+function degradedScenario(): InvestigationResultV1 {
     const result = canonical();
     return {
         ...result,
@@ -650,7 +650,7 @@ function degradedScenario(): InvestigationResult {
  * never reconstruct the old sentence-table behavior by parsing the raw
  * strings that are still, correctly, all this shape carries.
  */
-function degradedLegacyScenario(): InvestigationResult {
+function degradedLegacyScenario(): InvestigationResultV1 {
     const newShape = degradedScenario();
     // `_evidenceRefLabels` is deliberately dropped: this scenario predates
     // evidence_ref_labels entirely (see this function's own doc comment).
@@ -683,7 +683,7 @@ function degradedLegacyScenario(): InvestigationResult {
  * contract only requires a non-empty judgment for `complete` and `partial`,
  * and a service that has not resolved a subject has no judgment to give.
  */
-function clarificationScenario(): InvestigationResult {
+function clarificationScenario(): InvestigationResultV1 {
     const result = canonical();
     return {
         ...result,
@@ -752,7 +752,7 @@ function clarificationScenario(): InvestigationResult {
 }
 
 /** Nothing in the graph answers the question. */
-function noMatchScenario(): InvestigationResult {
+function noMatchScenario(): InvestigationResultV1 {
     const result = canonical();
     return {
         ...result,
