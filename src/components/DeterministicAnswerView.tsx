@@ -21,6 +21,7 @@ import { FindingsPanel } from "./FindingsPanel";
 import { LimitationsPanel } from "./LimitationsPanel";
 import { SemanticReadingNotice } from "./SemanticReadingNotice";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
+import { OtherPathsPanel } from "./RelationshipPaths";
 import { StructureConfirmationNotice } from "./StructureConfirmationNotice";
 import { StructureNeedsPanel } from "./StructureNeedsPanel";
 import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
@@ -496,6 +497,7 @@ function AnswerView({
                     <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                 </>
             )}
+            <OtherPathsPanel result={result} />
             {
                 // Everything below here is the COLLAPSED EVIDENCE tier
                 // (CHAOS-4669): coverage/completeness/limitations as a
