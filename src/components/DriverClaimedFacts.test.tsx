@@ -26,7 +26,7 @@ function drawWithOpener(answer: InvestigationResult) {
 /** The first driver, citing exactly these claims. */
 function citing(claimIds: readonly string[], facts: readonly ClaimedFact[] = result.claimed_facts) {
     const driver = { ...result.drivers[0]!, claimed_fact_ids: [...claimIds] } as DriverJudgment;
-    return { ...result, claimed_facts: [...facts], drivers: [driver] } as InvestigationResult;
+    return { ...result, claimed_facts: [...facts], drivers: [driver] };
 }
 
 const claims = () => screen.getAllByTestId("driver-claimed-fact");
