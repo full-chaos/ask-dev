@@ -848,8 +848,11 @@ test.describe("cohort ranking", () => {
         await expect(cohortDriver.getByTestId("driver-affected-subjects")).toContainText(
             "CHAOS (team)",
         );
-        // The claimed fact the judgment cites, verbatim.
-        await expect(cohortDriver).toContainText("claim_cohort_88cad88367c815eae568ce1f979c1471");
+        // The fact the judgment cites, by what it is. A claim id is never shown (CHAOS-12482).
+        await expect(cohortDriver.getByTestId("driver-claimed-fact")).toContainText(
+            "severity: critical",
+        );
+        await expect(cohortDriver).not.toContainText("claim_cohort_");
     });
 
     test("NEGATIVE: a single_subject answer carrying cohort data renders no ranking table", async ({
