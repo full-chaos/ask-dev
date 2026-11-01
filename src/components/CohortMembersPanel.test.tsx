@@ -59,7 +59,7 @@ describe("a cohort with nothing ranked draws its members (render audit gap 1)", 
         draw(result);
         expect(screen.queryByText("Ranking not shown")).toBeNull();
         expect(screen.queryByTestId("cohort-ranking-panel")).toBeNull();
-        expect(within(panel()).getAllByRole("listitem")).toHaveLength(
+        expect(panel().querySelectorAll("li.record__title")).toHaveLength(
             result.cohort!.members.length,
         );
         expect(screen.getByRole("heading", { name: "pull requests" })).toBeVisible();
@@ -360,7 +360,11 @@ describe("the members' fold", () => {
     });
 
     it("draws no fold with nothing in it: a restored member has no reasons", () => {
-        const member = { ...base.cohort!.members[0]!, inclusion_reasons: undefined };
+        const member = {
+            ...base.cohort!.members[0]!,
+            inclusion_reasons: undefined,
+            evidence_ref_ids: undefined,
+        };
         const {
             score_meaning: _meaning,
             judgment_mismatch: _mismatch,
@@ -370,6 +374,46 @@ describe("the members' fold", () => {
         } = base.cohort!;
         draw({ ...base, cohort: { ...rest, members: [member] } } as unknown as InvestigationResult);
         expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
+    });
+
+    it("holds each member's evidence (CHAOS-12514)", () => {
+        const member = { ...base.cohort!.members[0]!, evidence_ref_ids: ["evidence_probe"] };
+        draw({
+            ...base,
+            cohort: { ...base.cohort!, members: [member] },
+            evidence_ref_labels: { evidence_probe: "Team roster" },
+        });
+        expect(within(fold()).getByTestId("cohort-member-evidence")).toHaveTextContent(
+            "Team roster",
+        );
+    });
+
+    it("keeps the fold for evidence alone: a restored member has no reasons", () => {
+        const member = {
+            ...base.cohort!.members[0]!,
+            inclusion_reasons: undefined,
+            evidence_ref_ids: ["evidence_probe"],
+        };
+        const {
+            score_meaning: _meaning,
+            judgment_mismatch: _mismatch,
+            population: _population,
+            population_lower_bound: _bound,
+            ...rest
+        } = base.cohort!;
+        draw({ ...base, cohort: { ...rest, members: [member] } } as unknown as InvestigationResult);
+        expect(within(fold()).getByTestId("cohort-member-evidence")).toBeInTheDocument();
+    });
+
+    it("does not draw a work item's evidence twice: the status table has it", () => {
+        const member = {
+            ...base.cohort!.members[0]!,
+            subject: { kind: "work_item", canonical_id: "work_item:1", label: "Fix the login" },
+            evidence_ref_ids: ["evidence_probe"],
+            ranking_computed: false,
+        } as CohortMember;
+        draw({ ...base, cohort: { ...base.cohort!, kind: "work_item", members: [member] } });
+        expect(screen.queryByTestId("cohort-member-evidence")).toBeNull();
     });
 
     it("does not repeat the rationale or the exclusions in the fold", () => {
