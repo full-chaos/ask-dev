@@ -120,6 +120,23 @@ describe("fail-closed withholding (allowlist)", () => {
         expect(JSON.stringify(withheld.result)).not.toContain("Ada rank");
     });
 
+    it("a result with no cohort keeps its vocabulary label map, unchanged", () => {
+        // The boundary acts only on a cohort; a cohort-less result has no ranking for it to
+        // withhold, and a withheld result cannot hold the map, because it is rebuilt from the keep list.
+        const labels = { "answer_status:partial": "partial answer" };
+        const input = {
+            ...teamResult,
+            cohort: undefined,
+            vocabulary_labels: labels,
+        } as unknown as InvestigationResult;
+        const out = withholdUnrankableRankings(input);
+        expect(out.result).toBe(input);
+        expect((out.result as unknown as Record<string, unknown>).vocabulary_labels).toEqual(
+            labels,
+        );
+        expect(out.rankingWithheld).toBeUndefined();
+    });
+
     it("is idempotent and drops a field a future producer adds", () => {
         const once = withholdUnrankableRankings({
             ...personResult(),

@@ -53,6 +53,17 @@ export function degradingDetails(coverage: Coverage | undefined): readonly Cover
     return coverage?.details?.filter((detail) => detail.degrading) ?? [];
 }
 
+/** The line for a disclosure with no words served: its raw string stays in the fold. */
+export const DISCLOSURE_FLOOR = "A detail of this answer has no description.";
+
+/**
+ * What a disclosure SHOWS. The served label first: it is the deterministic text that names the
+ * tier, and engine phrasing may leave the tier out (AGENTS.md: a consumer names the tier).
+ */
+export function disclosureText(detail: Pick<CoverageDetail, "label" | "phrasing">): string {
+    return nonBlank(detail.label) ?? nonBlank(detail.phrasing) ?? DISCLOSURE_FLOOR;
+}
+
 /**
  * What the answer rests on, though it costs nothing: a non-degrading detail that counts something
  * in it, such as the pull requests that stand on a lower-tier project link. AGENTS.md's entity tree
@@ -60,12 +71,17 @@ export function degradingDetails(coverage: Coverage | undefined): readonly Cover
  *
  * Chosen by the contract's own fields, never by a list of codes (chris, CHAOS-4690): a counted
  * disclosure ACR adds later shows with no change here. An uncounted one, such as facts that do not
- * apply to what was asked, says nothing of this answer.
+ * apply to what was asked, says nothing of this answer, and a narrowed read's count is what was
+ * left out of it.
  */
 export function disclosedDetails(coverage: Coverage | undefined): readonly CoverageDetail[] {
     return (
         coverage?.details?.filter(
-            (detail) => !detail.degrading && detail.count !== undefined && detail.count > 0,
+            (detail) =>
+                !detail.degrading &&
+                detail.narrowed !== true &&
+                detail.count !== undefined &&
+                detail.count > 0,
         ) ?? []
     );
 }

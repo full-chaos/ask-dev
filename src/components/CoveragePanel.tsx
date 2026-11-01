@@ -8,6 +8,7 @@ import {
     degradedReasonDisplay,
     degradingDetails as degradingDetailsOf,
     disclosedDetails as disclosedDetailsOf,
+    disclosureText,
     uncoveredLegacyReasons,
 } from "../lib/degraded-reasons";
 import { type EvidenceWindow, evidenceWindowRange, formatDay } from "../lib/evidence-window";
@@ -275,9 +276,7 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
                                     data-value={detail.code}
                                     key={detail.detail_id}
                                 >
-                                    <p className="record__body">
-                                        {nonBlank(detail.phrasing) ?? nonBlank(detail.label)}
-                                    </p>
+                                    <p className="record__body">{disclosureText(detail)}</p>
                                     {raw === undefined ? null : (
                                         <Details summary="Details">
                                             <code>{raw}</code>

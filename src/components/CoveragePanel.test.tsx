@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import originStateExample from "@/contracts/examples/context_fabric_investigation_result_origin_state.v1.json";
 import commonSchemaPinned from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import { CoveragePanel } from "@/components/CoveragePanel";
+import { DISCLOSURE_FLOOR } from "@/lib/degraded-reasons";
 import { validateContract } from "@/lib/acr/validate";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { isVisibleText, visibleText } from "@/test/visible-text";
@@ -1219,14 +1220,39 @@ describe("CoveragePanel — what a non-degrading count discloses", () => {
         ).toContain(raw);
     });
 
-    it("shows engine phrasing over the label", () => {
+    it("keeps the served label when the engine phrases it: phrasing may omit the tier", () => {
         const [code, label, raw] = TIERS[0];
-        const detail = { ...tierDetail(code, label, raw), phrasing: "Three rest on a text link." };
+        const detail = {
+            ...tierDetail(code, label, raw),
+            phrasing: "3 pull requests are tied to the requested project.",
+        };
         const { container } = render(<CoveragePanel coverage={coverageOf([detail])} />);
-        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
 
-        expect(visibleText(panel)).toContain("Three rest on a text link.");
-        expect(visibleText(panel)).not.toContain(label);
+        expect(visibleText(container.querySelector('[data-testid="coverage-panel"]')!)).toContain(
+            label,
+        );
+    });
+
+    it("falls back to the phrasing when the label is blank", () => {
+        const [code, , raw] = TIERS[0];
+        const detail = { ...tierDetail(code, "   ", raw), phrasing: "Three rest on a text link." };
+        const { container } = render(<CoveragePanel coverage={coverageOf([detail])} />);
+
+        expect(visibleText(container.querySelector('[data-testid="coverage-panel"]')!)).toContain(
+            "Three rest on a text link.",
+        );
+    });
+
+    it("never draws an empty line: the plain floor, with the raw string in its fold", () => {
+        const [code, , raw] = TIERS[0];
+        const { container } = render(
+            <CoveragePanel coverage={coverageOf([tierDetail(code, "   ", raw)])} />,
+        );
+        const list = container.querySelector('[data-testid="coverage-disclosures"]')!;
+
+        expect(visibleText(list)).toContain(DISCLOSURE_FLOOR);
+        expect(visibleText(list)).not.toContain(raw);
+        expect(list.querySelector("details")?.textContent).toContain(raw);
     });
 
     it("a result with neither detail shows no disclosure", () => {
@@ -1247,6 +1273,7 @@ describe("CoveragePanel — what a non-degrading count discloses", () => {
     it.each([
         ["an uncounted fact that does not apply", { count: undefined }],
         ["a zero count", { count: 0 }],
+        ["a narrowed read, whose count is what was skipped", { narrowed: true }],
         ["a degrading detail, which belongs in the limits", { degrading: true }],
     ])("does not disclose %s", (_name, patch) => {
         const [code, label, raw] = TIERS[0];
