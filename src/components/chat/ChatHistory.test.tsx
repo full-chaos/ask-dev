@@ -342,6 +342,17 @@ describe("History: when it is read", () => {
         expect(api.load).toHaveBeenCalledTimes(2);
     });
 
+    it("reads again on a return to an earlier conversation", () => {
+        const { api, host } = setup({ currentId: "thread_a" });
+        expect(api.load).toHaveBeenCalledOnce();
+
+        host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: "thread_b" }) });
+        expect(api.load).toHaveBeenCalledTimes(2);
+
+        host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: "thread_a" }) });
+        expect(api.load).toHaveBeenCalledTimes(3);
+    });
+
     it("reads nothing until the host publishes a history, then reads once", () => {
         const api = fakeHistory();
         const host = hostSource(snapshotOf(), { history: api });
