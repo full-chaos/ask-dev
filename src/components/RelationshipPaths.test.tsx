@@ -100,6 +100,7 @@ describe("a driver shows the paths it cites (CHAOS-12479)", () => {
         );
         expect(within(driverFold()).queryByTestId("relationship-path")).toBeNull();
         expect(within(driverFold()).queryByText(NOT_CAUSE)).toBeNull();
+        expect(within(driverFold()).queryByText("Why this is relevant")).toBeNull();
     });
 });
 
@@ -211,6 +212,47 @@ describe("evidence and the guardrails (CHAOS-12479)", () => {
         );
         expect(screen.queryByTestId("relationship-path")).toBeNull();
         expect(otherPanel()).toBeNull();
+    });
+
+    const LEFT_OUT = "A path is not shown: it names a subject this view does not list.";
+
+    it.each<[string, (path: RelationshipPath) => void]>([
+        ["a node", (path) => void (path.nodes[1].kind = "person")],
+        ["an edge's from", (path) => void (path.edges[0].from.kind = "person")],
+        ["an edge's to", (path) => void (path.edges[0].to.kind = "person")],
+        ["a kind no pin documents", (path) => void (path.edges[0].to.kind = "robot")],
+    ])("leaves out a path whose subject the view does not list: %s", (_, change) => {
+        draw(
+            changed((result) => {
+                change(result.paths.find((path) => path.path_id === citedId)!);
+            }),
+        );
+        const fold = driverFold();
+        expect(within(fold).queryByTestId("relationship-path")).toBeNull();
+        expect(fold).not.toHaveTextContent(cited.why_relevant);
+        expect(fold).not.toHaveTextContent("Release acceptance —");
+        expect(within(fold).getByTestId("paths-left-out")).toHaveTextContent(LEFT_OUT);
+        expect(within(fold).queryByText(NOT_CAUSE)).toBeNull();
+    });
+
+    it("leaves such a path out of the other panel too, and says how many", () => {
+        draw(
+            changed((result) => {
+                const [first, second] = result.paths.filter((path) => path.path_id !== citedId);
+                first!.edges[0].from.kind = "person";
+                second!.edges[0].to.kind = "person";
+            }),
+        );
+        const panel = otherPanel()!;
+        expect(within(panel).getAllByTestId("relationship-path")).toHaveLength(others.length - 2);
+        expect(within(panel).getByTestId("paths-left-out")).toHaveTextContent(
+            "2 paths are not shown: they name subjects this view does not list.",
+        );
+    });
+
+    it("says nothing of it when every path can show", () => {
+        draw(answer);
+        expect(screen.queryByTestId("paths-left-out")).toBeNull();
     });
 
     it("draws no path when the drivers are withheld for the cohort's kind", () => {

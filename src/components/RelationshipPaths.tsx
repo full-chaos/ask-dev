@@ -1,7 +1,7 @@
 import { Details } from "./Details";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { SafeAnswerText } from "./SafeAnswerText";
-import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
+import { askedForCohort, cohortRanking, isRankableSubjectKind } from "../lib/cohort-ranking";
 import type { EvidenceRefLabels, InvestigationResult, RelationshipPath } from "../lib/contracts";
 import { humanizeTerm } from "../lib/presentation";
 
@@ -16,6 +16,17 @@ function edgeWord(type: string): string {
     return humanizeTerm(type.toLowerCase());
 }
 
+/**
+ * A path may name only a kind the render may list: the closed allowlist the ranking uses, so
+ * `person` and any kind no pin documents fail closed. The result boundary reads the cohort only, so
+ * a person who stands on a path alone would pass it (AGENTS.md: no person ranking or listing here).
+ */
+function isDrawable(path: RelationshipPath): boolean {
+    return [...path.nodes, ...path.edges.flatMap((edge) => [edge.from, edge.to])].every((subject) =>
+        isRankableSubjectKind(subject.kind),
+    );
+}
+
 function PathList({
     paths,
     evidenceRefLabels,
@@ -23,11 +34,13 @@ function PathList({
     readonly paths: readonly RelationshipPath[];
     readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
+    const drawn = paths.filter(isDrawable);
+    const leftOut = paths.length - drawn.length;
     return (
         <>
-            <p className="record__meta">{NOT_CAUSE}</p>
+            {drawn.length === 0 ? null : <p className="record__meta">{NOT_CAUSE}</p>}
             <ul className="stack stack--tight">
-                {paths.map((path, index) => (
+                {drawn.map((path, index) => (
                     // Index key: a driver may cite a path twice, and this list is never reordered.
                     <li data-testid="relationship-path" key={index}>
                         <p className="record__meta">
@@ -55,6 +68,13 @@ function PathList({
                     </li>
                 ))}
             </ul>
+            {leftOut === 0 ? null : (
+                <p className="record__meta" data-testid="paths-left-out">
+                    {leftOut === 1
+                        ? "A path is not shown: it names a subject this view does not list."
+                        : `${String(leftOut)} paths are not shown: they name subjects this view does not list.`}
+                </p>
+            )}
         </>
     );
 }
