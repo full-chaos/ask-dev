@@ -187,13 +187,17 @@ describe("CohortRankingPanel", () => {
                     missing_signals: ["workload.forecast_pressure"],
                     score: undefined,
                     drivers: [],
+                    attention_rank: 2,
                 },
+                // A ranking exists because this member carries one; with no score on any member
+                // there is no ranking, and `CohortMembersPanel` draws the list.
+                { ...cohort.members[0]!, attention_rank: 1 },
             ],
         } as unknown as Cohort;
         render(
             <CohortRankingPanel cohort={scoreless} result={undefined} shape="discovered_cohort" />,
         );
-        const cells = within(screen.getAllByTestId("ranking-row")[0]!).getAllByRole("cell");
+        const cells = within(screen.getAllByTestId("ranking-row")[1]!).getAllByRole("cell");
         expect(cells[2]!.textContent).toBe("—");
         expect(screen.getByText("No drivers reported.")).toBeInTheDocument();
         // Nothing was withheld — there was no score to withhold.

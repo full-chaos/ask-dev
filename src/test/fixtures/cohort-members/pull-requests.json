@@ -1,0 +1,3416 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_aa79363e719d664230852770305f2648",
+    "request_id": "req_7633b20eab68567aa8c39e13beeea645",
+    "generated_at": "2026-10-30T20:27:11.551681259Z",
+    "status": "degraded",
+    "question": "How many pull requests were merged in full-chaos/dev-health-ops over the last 7 days?",
+    "interpretation": {
+        "shape": "explicit_cohort",
+        "requested_judgment": "Count the pull requests merged in full-chaos/dev-health-ops over the last 7 days",
+        "subject_terms": ["full-chaos/dev-health-ops"],
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "pull_requests"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [
+            {
+                "receipt_id": "00000000-0000-4000-8000-000000000047",
+                "subject": {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                },
+                "state": "committed",
+                "matched_terms": ["full-chaos/dev-health-ops"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "evidence_ref_ids": ["acr:v1:repository:00000000-0000-4000-8000-000000000002"],
+                "provider": "github",
+                "match_mechanisms": ["exact", "lexical"]
+            }
+        ],
+        "committed": [
+            {
+                "kind": "repository",
+                "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                "label": "full-chaos/dev-health-ops"
+            }
+        ],
+        "commit_decision_digests": [
+            {
+                "subject": {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                },
+                "commit_gate": "exact_index",
+                "search_truncated": true,
+                "alias_lookup_complete": true,
+                "identity_lookup": "complete"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "scoped_cohort_status",
+        "family_source": "model",
+        "family_version": "question-family.v4",
+        "member_kind": "pull_request",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["table"],
+        "fact_kinds": [
+            "pull_requests",
+            "health",
+            "workload",
+            "readiness",
+            "operational_deficiencies",
+            "investment"
+        ],
+        "axes": ["subject_anchor", "expected_kind", "window"],
+        "budget": {
+            "max_items": 66,
+            "max_serialized_bytes": 262144,
+            "max_members": 50,
+            "synthesis_headroom": 16,
+            "narrowing_basis": "canonical_id_lexical"
+        },
+        "requirements": [
+            {
+                "requirement": "count/member/pull_request",
+                "obligation": "count",
+                "role": "member",
+                "subject": "pull_request",
+                "kind": "computed",
+                "step": "membership_cardinality",
+                "step_execution": "server_executed",
+                "input_class": "resolved_member_set",
+                "scope": "each_member",
+                "quantifier": "exact"
+            }
+        ]
+    },
+    "cohort": {
+        "kind": "pull_request",
+        "members": [
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:10",
+                    "label": "Synthetic pull request title 034"
+                },
+                "rank": 1,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:10"],
+                "ranking_computed": true,
+                "attention_rank": 1,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:100",
+                    "label": "Synthetic pull request title 035"
+                },
+                "rank": 2,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:100"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 2,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1000",
+                    "label": "Synthetic pull request title 036"
+                },
+                "rank": 3,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1000"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 3,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1001",
+                    "label": "Synthetic pull request title 037"
+                },
+                "rank": 4,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1001"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 4,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1002",
+                    "label": "Synthetic pull request title 038"
+                },
+                "rank": 5,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1002"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 5,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1003",
+                    "label": "Synthetic pull request title 039"
+                },
+                "rank": 6,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1003"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 6,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1004",
+                    "label": "Synthetic pull request title 040"
+                },
+                "rank": 7,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1004"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 7,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1005",
+                    "label": "Synthetic pull request title 041"
+                },
+                "rank": 8,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1005"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 8,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1006",
+                    "label": "Synthetic pull request title 042"
+                },
+                "rank": 9,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1006"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 9,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1007",
+                    "label": "Synthetic pull request title 043"
+                },
+                "rank": 10,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1007"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 10,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1008",
+                    "label": "Synthetic pull request title 044"
+                },
+                "rank": 11,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1008"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 11,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1009",
+                    "label": "Synthetic pull request title 045"
+                },
+                "rank": 12,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1009"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 12,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:101",
+                    "label": "Synthetic pull request title 046"
+                },
+                "rank": 13,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:101"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 13,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1010",
+                    "label": "Synthetic pull request title 047"
+                },
+                "rank": 14,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1010"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 14,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1011",
+                    "label": "Synthetic pull request title 048"
+                },
+                "rank": 15,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1011"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 15,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1012",
+                    "label": "Synthetic pull request title 049"
+                },
+                "rank": 16,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1012"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 16,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1014",
+                    "label": "Synthetic pull request title 050"
+                },
+                "rank": 17,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1014"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 17,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1015",
+                    "label": "Synthetic pull request title 051"
+                },
+                "rank": 18,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1015"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 18,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1016",
+                    "label": "Synthetic pull request title 052"
+                },
+                "rank": 19,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1016"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 19,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1017",
+                    "label": "Synthetic pull request title 053"
+                },
+                "rank": 20,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1017"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 20,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1018",
+                    "label": "Synthetic pull request title 054"
+                },
+                "rank": 21,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1018"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 21,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1019",
+                    "label": "Synthetic pull request title 055"
+                },
+                "rank": 22,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1019"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 22,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:102",
+                    "label": "Synthetic pull request title 056"
+                },
+                "rank": 23,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:102"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 23,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1020",
+                    "label": "Synthetic pull request title 057"
+                },
+                "rank": 24,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1020"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 24,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            },
+            {
+                "subject": {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1021",
+                    "label": "Synthetic pull request title 058"
+                },
+                "rank": 25,
+                "inclusion_reasons": [
+                    "Member reached from the repository the question names over the entity tree in the authorized Context Fabric graph."
+                ],
+                "evidence_ref_ids": [
+                    "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1021"
+                ],
+                "ranking_computed": true,
+                "attention_rank": 25,
+                "data_completeness": "degraded",
+                "outcome": "not_applicable",
+                "missing_signals": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ]
+            }
+        ],
+        "rationale": "Members were reached from the repository the question names over the entity tree in the authorized Context Fabric graph.",
+        "complete": false,
+        "truncated": true,
+        "score_meaning": "attention",
+        "population": 2000,
+        "population_lower_bound": true
+    },
+    "direct_judgment": "This investigation is degraded: coverage was limited.",
+    "current_state": "Current observed values: state: merged (Synthetic pull request title 036, Synthetic pull request title 037, Synthetic pull request title 038, Synthetic pull request title 039, Synthetic pull request title 040, Synthetic pull request title 041, Synthetic pull request title 042, Synthetic pull request title 043, Synthetic pull request title 044, Synthetic pull request title 045, Synthetic pull request title 035, Synthetic pull request title 047, Synthetic pull request title 046, Synthetic pull request title 034).",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [
+        {
+            "path_id": "00000000-0000-4000-8000-00000000006c",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:10",
+                    "label": "Synthetic pull request title 034"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:10",
+                        "label": "Synthetic pull request title 034"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-05T16:50:14.241Z",
+                    "valid_from": "2025-12-05T15:36:21Z",
+                    "valid_to": "2025-12-05T16:29:46Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:10"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 034 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:10"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000006d",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:100",
+                    "label": "Synthetic pull request title 035"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:100",
+                        "label": "Synthetic pull request title 035"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-05T16:10:31.257Z",
+                    "valid_from": "2025-12-30T22:28:54Z",
+                    "valid_to": "2025-12-30T23:32:24Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:100"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 035 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:100"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000006e",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1000",
+                    "label": "Synthetic pull request title 036"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1000",
+                        "label": "Synthetic pull request title 036"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-20T17:57:22Z",
+                    "valid_to": "2026-06-20T22:42:03Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1000"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 036 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1000"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000006f",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1001",
+                    "label": "Synthetic pull request title 037"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1001",
+                        "label": "Synthetic pull request title 037"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-20T20:36:48Z",
+                    "valid_to": "2026-06-20T21:01:10Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1001"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 037 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1001"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000070",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1002",
+                    "label": "Synthetic pull request title 038"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1002",
+                        "label": "Synthetic pull request title 038"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-20T22:20:31Z",
+                    "valid_to": "2026-06-21T00:53:07Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1002"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 038 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1002"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000071",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1003",
+                    "label": "Synthetic pull request title 039"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1003",
+                        "label": "Synthetic pull request title 039"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-20T23:32:24Z",
+                    "valid_to": "2026-06-21T01:03:43Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1003"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 039 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1003"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000072",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1004",
+                    "label": "Synthetic pull request title 040"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1004",
+                        "label": "Synthetic pull request title 040"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-20T23:56:43Z",
+                    "valid_to": "2026-06-21T04:05:02Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1004"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 040 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1004"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000073",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1005",
+                    "label": "Synthetic pull request title 041"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1005",
+                        "label": "Synthetic pull request title 041"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-21T01:04:22Z",
+                    "valid_to": "2026-06-21T01:32:45Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1005"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 041 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1005"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000074",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1006",
+                    "label": "Synthetic pull request title 042"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1006",
+                        "label": "Synthetic pull request title 042"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-21T12:29:59Z",
+                    "valid_to": "2026-06-21T12:39:42Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1006"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 042 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1006"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000075",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1007",
+                    "label": "Synthetic pull request title 043"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1007",
+                        "label": "Synthetic pull request title 043"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-21T14:11:52Z",
+                    "valid_to": "2026-06-21T14:50:29Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1007"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 043 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1007"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000076",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1008",
+                    "label": "Synthetic pull request title 044"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1008",
+                        "label": "Synthetic pull request title 044"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-21T17:41:41Z",
+                    "valid_to": "2026-06-22T20:57:55Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1008"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 044 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1008"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000077",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1009",
+                    "label": "Synthetic pull request title 045"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1009",
+                        "label": "Synthetic pull request title 045"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-21T23:39:40Z",
+                    "valid_to": "2026-06-21T23:48:33Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1009"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 045 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1009"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000078",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:101",
+                    "label": "Synthetic pull request title 046"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:101",
+                        "label": "Synthetic pull request title 046"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-05T16:10:31.257Z",
+                    "valid_from": "2025-12-30T23:34:08Z",
+                    "valid_to": "2025-12-31T12:53:07Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:101"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 046 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:101"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000079",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1010",
+                    "label": "Synthetic pull request title 047"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1010",
+                        "label": "Synthetic pull request title 047"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T00:24:05Z",
+                    "valid_to": "2026-06-22T00:31:57Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1010"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 047 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1010"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007a",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1011",
+                    "label": "Synthetic pull request title 048"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1011",
+                        "label": "Synthetic pull request title 048"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T01:34:29Z",
+                    "valid_to": "2026-06-22T02:02:14Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1011"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 048 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1011"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007b",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1012",
+                    "label": "Synthetic pull request title 049"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1012",
+                        "label": "Synthetic pull request title 049"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T03:40:13Z",
+                    "valid_to": "2026-06-22T03:46:38Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1012"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 049 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1012"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007c",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1014",
+                    "label": "Synthetic pull request title 050"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1014",
+                        "label": "Synthetic pull request title 050"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T12:47:18Z",
+                    "valid_to": "2026-06-22T12:48:21Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1014"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 050 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1014"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007d",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1015",
+                    "label": "Synthetic pull request title 051"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1015",
+                        "label": "Synthetic pull request title 051"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T13:54:53Z",
+                    "valid_to": "2026-06-22T13:57:52Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1015"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 051 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1015"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007e",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1016",
+                    "label": "Synthetic pull request title 052"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1016",
+                        "label": "Synthetic pull request title 052"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T14:16:47Z",
+                    "valid_to": "2026-06-22T14:17:04Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1016"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 052 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1016"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000007f",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1017",
+                    "label": "Synthetic pull request title 053"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1017",
+                        "label": "Synthetic pull request title 053"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T15:08:20Z",
+                    "valid_to": "2026-06-22T15:08:50Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1017"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 053 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1017"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000080",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1018",
+                    "label": "Synthetic pull request title 054"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1018",
+                        "label": "Synthetic pull request title 054"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T15:46:31Z",
+                    "valid_to": "2026-06-22T16:05:52Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1018"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 054 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1018"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000081",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1019",
+                    "label": "Synthetic pull request title 055"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1019",
+                        "label": "Synthetic pull request title 055"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T17:00:56Z",
+                    "valid_to": "2026-06-22T17:07:38Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1019"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 055 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1019"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000082",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:102",
+                    "label": "Synthetic pull request title 056"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:102",
+                        "label": "Synthetic pull request title 056"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-05T16:10:31.257Z",
+                    "valid_from": "2025-12-31T12:37:20Z",
+                    "valid_to": "2025-12-31T13:03:27Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:102"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 056 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:102"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000083",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1020",
+                    "label": "Synthetic pull request title 057"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1020",
+                        "label": "Synthetic pull request title 057"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T17:41:48Z",
+                    "valid_to": "2026-06-22T17:49:12Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1020"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 057 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1020"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000084",
+            "nodes": [
+                {
+                    "kind": "pull_request",
+                    "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1021",
+                    "label": "Synthetic pull request title 058"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "pull_request",
+                        "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1021",
+                        "label": "Synthetic pull request title 058"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-07-08T02:14:59.164Z",
+                    "valid_from": "2026-06-22T19:11:39Z",
+                    "valid_to": "2026-06-22T19:35:20Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1021"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 058 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": ["acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1021"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000067",
+            "nodes": [
+                {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046",
+                    "label": "Synthetic pull request title 031"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                    "label": "full-chaos/dev-health-ops"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "work_item",
+                        "canonical_id": "work_item.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046",
+                        "label": "Synthetic pull request title 031"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                        "label": "full-chaos/dev-health-ops"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-08-31T13:21:26Z",
+                    "valid_from": "2026-08-31T12:34:25Z",
+                    "valid_to": "2026-08-31T13:21:24Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:work-item:00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic pull request title 031 belongs to repository full-chaos/dev-health-ops",
+            "evidence_ref_ids": [
+                "acr:v1:work-item:00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046"
+            ],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000069",
+            "nodes": [
+                {
+                    "kind": "work_item",
+                    "canonical_id": "work_item.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046",
+                    "label": "Synthetic pull request title 031"
+                },
+                {
+                    "kind": "team",
+                    "canonical_id": "team:linear:TEAMA",
+                    "label": "Teamalpha"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "OWNED_BY_TEAM",
+                    "from": {
+                        "kind": "work_item",
+                        "canonical_id": "work_item.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046",
+                        "label": "Synthetic pull request title 031"
+                    },
+                    "to": {
+                        "kind": "team",
+                        "canonical_id": "team:linear:TEAMA",
+                        "label": "Teamalpha"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "inferred",
+                    "observed_at": "2026-10-30T02:30:11.742Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:work-item-team.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046:linear%3ATEAMA:repo_ownership"
+                    ]
+                }
+            ],
+            "why_relevant": "ghpr:full-chaos/dev-health-ops#2046 owned by team linear:TEAMA",
+            "evidence_ref_ids": [
+                "acr:v1:work-item-team.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046:linear%3ATEAMA:repo_ownership"
+            ],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000085",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387810",
+                    "label": "Synthetic CI run title 073"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387810",
+                        "label": "Synthetic CI run title 073"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:10:15Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T17:10:15Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387810"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 073 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387810"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000086",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387828",
+                    "label": "Synthetic CI run title 074"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387828",
+                        "label": "Synthetic CI run title 074"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T16:54:14Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T16:54:14Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387828"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 074 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387828"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000087",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387837",
+                    "label": "Synthetic CI run title 075"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387837",
+                        "label": "Synthetic CI run title 075"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:04:53Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T17:04:53Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387837"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 075 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387837"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000088",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387853",
+                    "label": "Synthetic CI run title 076"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387853",
+                        "label": "Synthetic CI run title 076"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T16:53:53Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T16:53:53Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387853"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 076 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387853"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000089",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387855",
+                    "label": "Synthetic CI run title 077"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387855",
+                        "label": "Synthetic CI run title 077"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T16:54:42Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T16:54:42Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387855"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 077 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387855"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008a",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387920",
+                    "label": "Synthetic CI run title 078"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38069387920",
+                        "label": "Synthetic CI run title 078"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T16:56:14Z",
+                    "valid_from": "2026-10-10T16:52:03Z",
+                    "valid_to": "2026-10-10T16:56:14Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387920"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 078 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387920"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008b",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196848",
+                    "label": "Synthetic CI run title 079"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196848",
+                        "label": "Synthetic CI run title 079"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:20:48Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:20:48Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196848"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 079 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196848"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008c",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196870",
+                    "label": "Synthetic CI run title 080"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196870",
+                        "label": "Synthetic CI run title 080"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:22:03Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:22:03Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196870"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 080 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196870"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008d",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196898",
+                    "label": "Synthetic CI run title 081"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196898",
+                        "label": "Synthetic CI run title 081"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:30:45Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:30:45Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196898"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 081 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196898"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008e",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196902",
+                    "label": "Synthetic CI run title 082"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196902",
+                        "label": "Synthetic CI run title 082"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:33:11Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:33:11Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196902"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 082 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196902"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000008f",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196952",
+                    "label": "Synthetic CI run title 083"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196952",
+                        "label": "Synthetic CI run title 083"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:18:34Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:18:34Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196952"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 083 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196952"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000090",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196964",
+                    "label": "Synthetic CI run title 084"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071196964",
+                        "label": "Synthetic CI run title 084"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:23:17Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:23:17Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196964"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 084 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196964"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000091",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071197557",
+                    "label": "Synthetic CI run title 085"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38071197557",
+                        "label": "Synthetic CI run title 085"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:19:02Z",
+                    "valid_from": "2026-10-10T17:18:32Z",
+                    "valid_to": "2026-10-10T17:19:02Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071197557"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 085 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071197557"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000092",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432195",
+                    "label": "Synthetic CI run title 086"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432195",
+                        "label": "Synthetic CI run title 086"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:38:25Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:38:25Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432195"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 086 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432195"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000093",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432199",
+                    "label": "Synthetic CI run title 087"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432199",
+                        "label": "Synthetic CI run title 087"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:45:42Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:45:42Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432199"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 087 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432199"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000094",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432216",
+                    "label": "Synthetic CI run title 088"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432216",
+                        "label": "Synthetic CI run title 088"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:46:00Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:46:00Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432216"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 088 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432216"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000095",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432294",
+                    "label": "Synthetic CI run title 089"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432294",
+                        "label": "Synthetic CI run title 089"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:45:45Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:45:45Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432294"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 089 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432294"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000096",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432302",
+                    "label": "Synthetic CI run title 090"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432302",
+                        "label": "Synthetic CI run title 090"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:45:02Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:45:02Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432302"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 090 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432302"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000097",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432319",
+                    "label": "Synthetic CI run title 091"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38072432319",
+                        "label": "Synthetic CI run title 091"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:44:55Z",
+                    "valid_from": "2026-10-10T17:36:33Z",
+                    "valid_to": "2026-10-10T17:44:55Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432319"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 091 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432319"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000098",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030971",
+                    "label": "Synthetic CI run title 092"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030971",
+                        "label": "Synthetic CI run title 092"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:53:16Z",
+                    "valid_from": "2026-10-10T17:45:23Z",
+                    "valid_to": "2026-10-10T17:53:16Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030971"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 092 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030971"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-000000000099",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030982",
+                    "label": "Synthetic CI run title 093"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030982",
+                        "label": "Synthetic CI run title 093"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:47:50Z",
+                    "valid_from": "2026-10-10T17:45:23Z",
+                    "valid_to": "2026-10-10T17:47:50Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030982"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 093 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030982"],
+            "truncated": false
+        },
+        {
+            "path_id": "00000000-0000-4000-8000-00000000009a",
+            "nodes": [
+                {
+                    "kind": "ci_pipeline_run",
+                    "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030985",
+                    "label": "Synthetic CI run title 094"
+                },
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                    "label": "full-chaos/dev-health-web"
+                }
+            ],
+            "edges": [
+                {
+                    "type": "BELONGS_TO_REPOSITORY",
+                    "from": {
+                        "kind": "ci_pipeline_run",
+                        "canonical_id": "ci_pipeline_run.v2:00000000-0000-4000-8000-00000000002c:38073030985",
+                        "label": "Synthetic CI run title 094"
+                    },
+                    "to": {
+                        "kind": "repository",
+                        "canonical_id": "repository:00000000-0000-4000-8000-00000000002c",
+                        "label": "full-chaos/dev-health-web"
+                    },
+                    "derivation": "graph_associated",
+                    "epistemic_status": "observed",
+                    "observed_at": "2026-10-10T17:55:02Z",
+                    "valid_from": "2026-10-10T17:45:23Z",
+                    "valid_to": "2026-10-10T17:55:02Z",
+                    "evidence_ref_ids": [
+                        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030985"
+                    ]
+                }
+            ],
+            "why_relevant": "Synthetic CI run title 094 belongs to repository full-chaos/dev-health-web",
+            "evidence_ref_ids": ["acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030985"],
+            "truncated": false
+        }
+    ],
+    "conflicts": [],
+    "limitations": [
+        "The supplied pull-request facts include state but no merge timestamp, so membership in the last 7 days cannot be established.",
+        "The pull-request cohort is truncated: 25 members are shown from a population of 2000, and the population is a lower bound.",
+        "Not every member is listed: 25 of at least 2000 members are listed, because the request's max_cohort_members limits the list.",
+        "Members are the pull requests whose current state is merged; the state is read as of now, over no period."
+    ],
+    "evidence_ref_ids": [
+        "acr:v1:repository:00000000-0000-4000-8000-000000000002",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:10",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:100",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1000",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1001",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1002",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1003",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1004",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1005",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1006",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1007",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1008",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1009",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:101"
+    ],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_pr_10_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:10",
+                "label": "Synthetic pull request title 034"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_a78a2478eb751ba263eac735"
+        },
+        {
+            "claim_id": "claim_pr_100_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:100",
+                "label": "Synthetic pull request title 035"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_fa8f0e77775af06fdf1e8338"
+        },
+        {
+            "claim_id": "claim_pr_1000_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1000",
+                "label": "Synthetic pull request title 036"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_fcd248b1979ada05eb87d4f2",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1001_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1001",
+                "label": "Synthetic pull request title 037"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_bcb2f214b90ecc166bd396d9"
+        },
+        {
+            "claim_id": "claim_pr_1002_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1002",
+                "label": "Synthetic pull request title 038"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_a0089b24d49567a989548f2d",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1003_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1003",
+                "label": "Synthetic pull request title 039"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_da8ff13de320cbc9bd69e043",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1004_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1004",
+                "label": "Synthetic pull request title 040"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_5c982ce6b0450f815fb2a2e1",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1005_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1005",
+                "label": "Synthetic pull request title 041"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_ed231de2b3bcbc7dbef4e5f6",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1006_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1006",
+                "label": "Synthetic pull request title 042"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_76ad89fa21ccb2c4df2be1e2",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1007_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1007",
+                "label": "Synthetic pull request title 043"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_547276772fce2e78665b4c01",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1008_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1008",
+                "label": "Synthetic pull request title 044"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_e7f27bd15a98d62352a8c8dd",
+            "rows": [
+                {
+                    "fields": {
+                        "link_tier": {
+                            "string": "native"
+                        },
+                        "scope": {
+                            "string": "project"
+                        },
+                        "scope_id": {
+                            "string": "project.v2:linear:00000000-0000-4000-8000-000000000005"
+                        },
+                        "scope_name": {
+                            "string": "Synthetic Project Alpha"
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "project_breakdown",
+                "shape": "breakdown",
+                "key": ["scope_id"],
+                "observations": ["scope", "scope_name", "link_tier"]
+            }
+        },
+        {
+            "claim_id": "claim_pr_1009_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1009",
+                "label": "Synthetic pull request title 045"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_288ecaaab28000bc9dddcc7b"
+        },
+        {
+            "claim_id": "claim_pr_101_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:101",
+                "label": "Synthetic pull request title 046"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_e4483235fbcb4a696a3ec266"
+        },
+        {
+            "claim_id": "claim_pr_1010_state",
+            "kind": "pull_requests",
+            "subject": {
+                "kind": "pull_request",
+                "canonical_id": "pull_request:00000000-0000-4000-8000-000000000002:1010",
+                "label": "Synthetic pull request title 047"
+            },
+            "field": "state",
+            "value": {
+                "string": "merged"
+            },
+            "fact_id": "fact_2773b9421207b1a7ccfc62ef"
+        },
+        {
+            "claim_id": "server:cardinality:pull_request",
+            "kind": "cardinality",
+            "subject": {
+                "kind": "repository",
+                "canonical_id": "repository:00000000-0000-4000-8000-000000000002",
+                "label": "repository:00000000-0000-4000-8000-000000000002"
+            },
+            "field": "pull_request_count",
+            "value": {
+                "integer": 25
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [
+            {
+                "source": "canonical_fact:health",
+                "state": "available",
+                "reason": "25 subject(s) were not queried because this capability does not support their kind (skipped kinds: pull requests; supported kinds: repositories, teams, projects)",
+                "label": "Canonical facts — health",
+                "state_label": "available"
+            },
+            {
+                "source": "canonical_fact:investment",
+                "state": "available",
+                "reason": "25 subject(s) were not queried because this capability does not support their kind (skipped kinds: pull requests; supported kinds: teams, projects, repositories, organizations); investment_units_uncategorized: 1878 of 7066 work units in the window had too little text to categorize (insufficient_evidence or no_text_sources) and are left out of the theme mix and of work_unit_count",
+                "label": "Canonical facts — investment",
+                "state_label": "available"
+            },
+            {
+                "source": "canonical_fact:operational_deficiencies",
+                "state": "pruned",
+                "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams)",
+                "label": "Canonical facts — operational deficiency",
+                "state_label": "not needed"
+            },
+            {
+                "source": "canonical_fact:pull_requests",
+                "state": "available",
+                "reason": "1 subject(s) were not queried because this capability does not support their kind (skipped kinds: repositories; supported kinds: pull requests, teams, projects)",
+                "label": "Canonical facts — pull request",
+                "state_label": "available"
+            },
+            {
+                "source": "canonical_fact:readiness",
+                "state": "pruned",
+                "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)",
+                "label": "Canonical facts — readiness",
+                "state_label": "not needed"
+            },
+            {
+                "source": "canonical_fact:workload",
+                "state": "pruned",
+                "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)",
+                "label": "Canonical facts — workload",
+                "state_label": "not needed"
+            },
+            {
+                "source": "context-fabric:graph",
+                "state": "available",
+                "observed_at": "2026-10-30T20:26:49.959962014Z",
+                "label": "Relationship graph",
+                "state_label": "available"
+            }
+        ],
+        "partial": false,
+        "details": [
+            {
+                "detail_id": "cov-01",
+                "source": "canonical_fact:health",
+                "code": "fact_narrowed",
+                "degrading": false,
+                "fact_kind": "health",
+                "source_state": "available",
+                "supported_kinds": ["repository", "team", "project"],
+                "skipped_kinds": ["pull_request"],
+                "count": 25,
+                "narrowed": true,
+                "label": "25 subjects were skipped for health facts",
+                "raw": "25 subject(s) were not queried because this capability does not support their kind (skipped kinds: pull requests; supported kinds: repositories, teams, projects)"
+            },
+            {
+                "detail_id": "cov-02",
+                "source": "canonical_fact:investment",
+                "code": "fact_provider_reported",
+                "degrading": false,
+                "fact_kind": "investment",
+                "source_state": "available",
+                "supported_kinds": ["team", "project", "repository", "organization"],
+                "skipped_kinds": ["pull_request"],
+                "narrowed": true,
+                "label": "Investment facts were limited; some subjects were skipped",
+                "raw": "25 subject(s) were not queried because this capability does not support their kind (skipped kinds: pull requests; supported kinds: teams, projects, repositories, organizations); investment_units_uncategorized: 1878 of 7066 work units in the window had too little text to categorize (insufficient_evidence or no_text_sources) and are left out of the theme mix and of work_unit_count"
+            },
+            {
+                "detail_id": "cov-03",
+                "source": "canonical_fact:operational_deficiencies",
+                "code": "fact_pruned",
+                "degrading": false,
+                "fact_kind": "operational_deficiencies",
+                "source_state": "pruned",
+                "supported_kinds": ["team"],
+                "label": "Operational deficiency facts do not apply to what was asked",
+                "raw": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams)"
+            },
+            {
+                "detail_id": "cov-04",
+                "source": "canonical_fact:pull_requests",
+                "code": "fact_narrowed",
+                "degrading": false,
+                "fact_kind": "pull_requests",
+                "source_state": "available",
+                "supported_kinds": ["pull_request", "team", "project"],
+                "skipped_kinds": ["repository"],
+                "count": 1,
+                "narrowed": true,
+                "label": "1 subject was skipped for pull request facts",
+                "raw": "1 subject(s) were not queried because this capability does not support their kind (skipped kinds: repositories; supported kinds: pull requests, teams, projects)"
+            },
+            {
+                "detail_id": "cov-05",
+                "source": "canonical_fact:readiness",
+                "code": "fact_pruned",
+                "degrading": false,
+                "fact_kind": "readiness",
+                "source_state": "pruned",
+                "supported_kinds": ["team", "project"],
+                "label": "Readiness facts do not apply to what was asked",
+                "raw": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)"
+            },
+            {
+                "detail_id": "cov-06",
+                "source": "canonical_fact:workload",
+                "code": "fact_pruned",
+                "degrading": false,
+                "fact_kind": "workload",
+                "source_state": "pruned",
+                "supported_kinds": ["team", "project"],
+                "label": "Workload facts do not apply to what was asked",
+                "raw": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)"
+            }
+        ]
+    },
+    "evidence_ref_labels": {
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387810": "CI run: 00000000-0000-4000-8000-00000000002c:38069387810",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387828": "CI run: 00000000-0000-4000-8000-00000000002c:38069387828",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387837": "CI run: 00000000-0000-4000-8000-00000000002c:38069387837",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387853": "CI run: 00000000-0000-4000-8000-00000000002c:38069387853",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387855": "CI run: 00000000-0000-4000-8000-00000000002c:38069387855",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38069387920": "CI run: 00000000-0000-4000-8000-00000000002c:38069387920",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196848": "CI run: 00000000-0000-4000-8000-00000000002c:38071196848",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196870": "CI run: 00000000-0000-4000-8000-00000000002c:38071196870",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196898": "CI run: 00000000-0000-4000-8000-00000000002c:38071196898",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196902": "CI run: 00000000-0000-4000-8000-00000000002c:38071196902",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196952": "CI run: 00000000-0000-4000-8000-00000000002c:38071196952",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071196964": "CI run: 00000000-0000-4000-8000-00000000002c:38071196964",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38071197557": "CI run: 00000000-0000-4000-8000-00000000002c:38071197557",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432195": "CI run: 00000000-0000-4000-8000-00000000002c:38072432195",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432199": "CI run: 00000000-0000-4000-8000-00000000002c:38072432199",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432216": "CI run: 00000000-0000-4000-8000-00000000002c:38072432216",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432294": "CI run: 00000000-0000-4000-8000-00000000002c:38072432294",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432302": "CI run: 00000000-0000-4000-8000-00000000002c:38072432302",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38072432319": "CI run: 00000000-0000-4000-8000-00000000002c:38072432319",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030971": "CI run: 00000000-0000-4000-8000-00000000002c:38073030971",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030982": "CI run: 00000000-0000-4000-8000-00000000002c:38073030982",
+        "acr:v1:ci:00000000-0000-4000-8000-00000000002c:38073030985": "CI run: 00000000-0000-4000-8000-00000000002c:38073030985",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:10": "Pull request: 00000000-0000-4000-8000-000000000002:10",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:100": "Pull request: 00000000-0000-4000-8000-000000000002:100",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1000": "Pull request: 00000000-0000-4000-8000-000000000002:1000",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1001": "Pull request: 00000000-0000-4000-8000-000000000002:1001",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1002": "Pull request: 00000000-0000-4000-8000-000000000002:1002",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1003": "Pull request: 00000000-0000-4000-8000-000000000002:1003",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1004": "Pull request: 00000000-0000-4000-8000-000000000002:1004",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1005": "Pull request: 00000000-0000-4000-8000-000000000002:1005",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1006": "Pull request: 00000000-0000-4000-8000-000000000002:1006",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1007": "Pull request: 00000000-0000-4000-8000-000000000002:1007",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1008": "Pull request: 00000000-0000-4000-8000-000000000002:1008",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1009": "Pull request: 00000000-0000-4000-8000-000000000002:1009",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:101": "Pull request: 00000000-0000-4000-8000-000000000002:101",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1010": "Pull request: 00000000-0000-4000-8000-000000000002:1010",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1011": "Pull request: 00000000-0000-4000-8000-000000000002:1011",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1012": "Pull request: 00000000-0000-4000-8000-000000000002:1012",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1014": "Pull request: 00000000-0000-4000-8000-000000000002:1014",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1015": "Pull request: 00000000-0000-4000-8000-000000000002:1015",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1016": "Pull request: 00000000-0000-4000-8000-000000000002:1016",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1017": "Pull request: 00000000-0000-4000-8000-000000000002:1017",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1018": "Pull request: 00000000-0000-4000-8000-000000000002:1018",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1019": "Pull request: 00000000-0000-4000-8000-000000000002:1019",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:102": "Pull request: 00000000-0000-4000-8000-000000000002:102",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1020": "Pull request: 00000000-0000-4000-8000-000000000002:1020",
+        "acr:v1:pull-request:00000000-0000-4000-8000-000000000002:1021": "Pull request: 00000000-0000-4000-8000-000000000002:1021",
+        "acr:v1:repository:00000000-0000-4000-8000-000000000002": "Repository: 00000000-0000-4000-8000-000000000002",
+        "acr:v1:work-item-team.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046:linear%3ATEAMA:repo_ownership": "Work item/team link: 00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046:linear:TEAMA:repo_ownership",
+        "acr:v1:work-item:00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046": "Work item: 00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046"
+    },
+    "versions": {
+        "service_version": "0.0.0-dev",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "devhealthsource.clickhouse.v19+devhealthsource.episodes.v1+devhealthsource.teams_projects.v23",
+        "query_version": "devhealthfacts.clickhouse.v257",
+        "interpretation_version": "context-fabric-model-output.v12",
+        "synthesis_version": "context-fabric-synthesis.v27+gpt-5.6-luna",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "openai/gpt-5.6-luna",
+        "interpretation_source": "server",
+        "interpretation_model_identity": "openai/gpt-5.6-luna",
+        "synthesis_source": "server"
+    },
+    "deterministic_answer": "This investigation is degraded: coverage was limited. Counted 25 pull requests of 2000 found.",
+    "warnings": [],
+    "reused": false,
+    "completeness": {
+        "terminal_status": "degraded",
+        "terminal_reason": "limitation_disclosed",
+        "claimed_facts_count": 15,
+        "rows_count": 8,
+        "state": "partial",
+        "outcomes": [
+            {
+                "stage": "planning",
+                "requirement": "count/member/pull_request",
+                "obligation": "count",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "count/member/pull_request",
+                "obligation": "count",
+                "outcome": "narrowed",
+                "impact": "scope",
+                "cause_coverage": "population_truncated",
+                "cause_observed": true,
+                "served": 25,
+                "declared": 2000,
+                "refinements": [
+                    {
+                        "stage": "assembled_result",
+                        "coverage": "population_truncated",
+                        "before": 2000,
+                        "after": 25
+                    }
+                ]
+            }
+        ]
+    }
+}

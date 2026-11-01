@@ -20,7 +20,8 @@ function subjectKey(subject: SubjectRef): string {
     return JSON.stringify([subject.kind, subject.canonical_id]);
 }
 
-function unrankedWorkItemMembers(cohort: InvestigationResult["cohort"]): CohortMember[] {
+/** The members this panel's table draws. `CohortMembersPanel` lists the others. */
+export function unrankedWorkItemMembers(cohort: InvestigationResult["cohort"]): CohortMember[] {
     if (cohort === undefined || cohort.kind !== "work_item") return [];
     return cohort.members.filter(
         (member) => member.subject.kind === "work_item" && member.ranking_computed !== true,
