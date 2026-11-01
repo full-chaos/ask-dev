@@ -302,3 +302,53 @@ describe("DriversPanel — a withheld driver references the table instead of res
         expect(within(card).queryByText(/Ranked teams above/i)).toBeNull();
     });
 });
+
+/**
+ * CHAOS-12481: a driver whose source was stale or truncated says so. `source_state_note` is ACR's
+ * own sentence, so it shows on the card. `source_state` and `summary_corrected` have no served
+ * words, so they stay raw in the card's fold.
+ */
+describe("DriversPanel — a driver's source state", () => {
+    const stale: DriverJudgment = {
+        ...result.drivers[0]!,
+        source_state: "stale",
+        source_state_note: "This driver's source was out of date when it was read.",
+        summary_corrected: true,
+    };
+    const card = (driver: DriverJudgment) => {
+        render(<DriversPanel result={{ ...result, drivers: [driver] }} />);
+        return screen.getByText(driver.title).closest("li")!;
+    };
+
+    it("shows ACR's sentence on the card, outside the fold", () => {
+        const shown = card(stale);
+        const note = within(shown).getByTestId("driver-source-note");
+        expect(note).toHaveTextContent(stale.source_state_note!);
+        expect(note.closest("details")).toBeNull();
+    });
+
+    it("keeps the raw state and the correction in the closed fold", () => {
+        const shown = card(stale);
+        const state = within(shown).getByTestId("driver-source-state");
+        expect(state).toHaveTextContent("source_state: stale");
+        expect(state.closest("details")).not.toBeNull();
+        expect(state.closest("details")).not.toHaveAttribute("open");
+        expect(within(shown).getByTestId("driver-summary-corrected")).toHaveTextContent(
+            "summary_corrected: true",
+        );
+    });
+
+    it("says nothing when ACR served none of them", () => {
+        const { source_state: _s, source_state_note: _n, summary_corrected: _c, ...plain } = stale;
+        const shown = card(plain);
+        expect(within(shown).queryByTestId("driver-source-note")).toBeNull();
+        expect(within(shown).queryByTestId("driver-source-state")).toBeNull();
+        expect(within(shown).queryByTestId("driver-summary-corrected")).toBeNull();
+    });
+
+    it("shows no fold line for a blank note or a false correction", () => {
+        const shown = card({ ...stale, source_state_note: " ", summary_corrected: false });
+        expect(within(shown).queryByTestId("driver-source-note")).toBeNull();
+        expect(within(shown).queryByTestId("driver-summary-corrected")).toBeNull();
+    });
+});
