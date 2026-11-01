@@ -102,6 +102,19 @@ describe("fail-closed withholding (allowlist)", () => {
         expect(after.rankingWithheld).toBeUndefined();
     });
 
+    it("keeps the vocabulary label map on a withheld result, and drops the evidence-keyed label map", () => {
+        const labels = { "answer_status:partial": "partial answer" };
+        const withheld = withholdUnrankableRankings({
+            ...personResult(),
+            vocabulary_labels: labels,
+            evidence_ref_labels: { "ev:1": "an evidence label" },
+        } as unknown as InvestigationResult);
+        const built = withheld.result as unknown as Record<string, unknown>;
+        expect(withheld.rankingWithheld).toBeDefined();
+        expect(built.vocabulary_labels).toEqual(labels);
+        expect(built.evidence_ref_labels).toBeUndefined();
+    });
+
     it("is idempotent and drops a field a future producer adds", () => {
         const once = withholdUnrankableRankings({
             ...personResult(),

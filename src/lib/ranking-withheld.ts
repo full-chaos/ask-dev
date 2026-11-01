@@ -44,7 +44,10 @@ export type WithheldBoundary = {
  * member-keyed ranking points: envelope ids, status and completeness,
  * interpretation, coverage/versions/limitations/warnings, subject
  * resolution (candidate offers, no scores), temporal and window fields,
- * refusal/correction/semantic-reading notices. The answer prose
+ * refusal/correction/semantic-reading notices, and `vocabulary_labels`
+ * (keyed `<vocabulary>:<value>` of closed vocabularies, fixed display words,
+ * so it cannot name, rank or order a member; unlike `evidence_ref_labels`,
+ * which is keyed by evidence id and stays dropped). The answer prose
  * (`deterministic_answer`, `direct_judgment`, `current_state`) is
  * producer-owned and is not rewritten here.
  */
@@ -73,6 +76,7 @@ export const RESULT_FIELDS_KEPT = [
     "refusal_basis",
     "status_correction",
     "semantic_reading",
+    "vocabulary_labels",
 ] as const;
 
 /** Required arrays the contract needs present; withheld to `[]`. */
