@@ -17,6 +17,7 @@ import {
     RESULT_FIELDS_KEPT,
     withholdUnrankableRankings,
 } from "@/lib/ranking-withheld";
+import { validateContract } from "@/lib/acr/validate";
 import { findRankReads, findRankReadsTyped } from "@/test/rank-read-scan";
 
 const teamResult = shapesExample as unknown as InvestigationResult;
@@ -102,17 +103,21 @@ describe("fail-closed withholding (allowlist)", () => {
         expect(after.rankingWithheld).toBeUndefined();
     });
 
-    it("keeps the vocabulary label map on a withheld result, and drops the evidence-keyed label map", () => {
-        const labels = { "answer_status:partial": "partial answer" };
-        const withheld = withholdUnrankableRankings({
+    it("drops the whole vocabulary label map: a schema-valid label can carry ranking text", () => {
+        const leak = "Ada rank 1 score 43.5 driver weight 30";
+        const input = {
             ...personResult(),
-            vocabulary_labels: labels,
-            evidence_ref_labels: { "ev:1": "an evidence label" },
-        } as unknown as InvestigationResult);
-        const built = withheld.result as unknown as Record<string, unknown>;
+            vocabulary_labels: { "answer_status:partial": leak },
+        } as unknown as InvestigationResult;
+        // The contract checks only the shape of a label, so this passes schema validation.
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", input).valid,
+        ).toBe(true);
+        const withheld = withholdUnrankableRankings(input);
         expect(withheld.rankingWithheld).toBeDefined();
-        expect(built.vocabulary_labels).toEqual(labels);
-        expect(built.evidence_ref_labels).toBeUndefined();
+        const built = withheld.result as unknown as Record<string, unknown>;
+        expect(built.vocabulary_labels).toBeUndefined();
+        expect(JSON.stringify(withheld.result)).not.toContain("Ada rank");
     });
 
     it("is idempotent and drops a field a future producer adds", () => {
