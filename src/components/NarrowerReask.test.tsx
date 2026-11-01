@@ -27,7 +27,9 @@ describe("NarrowerReask", () => {
             />,
         );
 
-        expect(screen.getByText(/more results than fit one response/i)).toBeInTheDocument();
+        expect(
+            screen.getByText("Ask for fewer results, for example the top 10."),
+        ).toBeInTheDocument();
         const button = screen.getByRole("button", { name: "Ask for fewer results" });
 
         await user.click(button);
@@ -72,7 +74,7 @@ describe("NarrowerReask", () => {
             />,
         );
 
-        expect(screen.getByText(/would have included 42 items; only 25 fit/i)).toBeInTheDocument();
+        expect(screen.getByText("It held 42 items; an answer can hold 25.")).toBeInTheDocument();
     });
 
     /**

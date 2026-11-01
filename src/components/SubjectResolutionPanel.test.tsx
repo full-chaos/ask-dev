@@ -15,7 +15,7 @@ describe("SubjectResolutionPanel", () => {
             <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
         );
 
-        expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
+        expect(screen.queryByRole("heading", { name: "Earlier subject choices" })).toBeNull();
     });
 
     /**
@@ -46,7 +46,7 @@ describe("SubjectResolutionPanel", () => {
         render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
 
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
         expect(screen.getByText("subr_0001")).toBeInTheDocument();
         expect(screen.getByText("result_prior_0001")).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
             <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
         );
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
-        expect(screen.getByText(/Committed: atlas/)).toBeInTheDocument();
+        expect(screen.getByText(/Settled on: atlas/)).toBeInTheDocument();
     });
 
     it("still renders when the ONLY content is a prior-receipt disclosure", () => {
@@ -97,7 +97,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
         render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
     });
 

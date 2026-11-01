@@ -6,7 +6,7 @@
 export function WithheldPart({ label }: { readonly label: string }) {
     return (
         <p className="panel__empty" data-testid="withheld-part">
-            {`${label} withheld by the Workbench: this answer covers subjects of a kind this view does not rank. It is not reported as none.`}
+            {`${label} withheld: this answer covers subjects of a kind this view does not rank. It is not reported as none.`}
         </p>
     );
 }

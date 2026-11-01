@@ -1,5 +1,6 @@
 "use client";
 
+import { Details } from "./Details";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
@@ -85,7 +86,7 @@ function CandidateRecord({
             <div className="record__head">
                 <span className="record__meta">#{rank}</span>
                 <span className="record__title">{candidate.subject.label}</span>
-                <Badge tone={candidateStateTone(candidate.state)} title={candidate.state}>
+                <Badge data-value={candidate.state} tone={candidateStateTone(candidate.state)}>
                     {humanizeTerm(candidate.state)}
                 </Badge>
                 {selected ? (
@@ -94,8 +95,7 @@ function CandidateRecord({
                     </Badge>
                 ) : null}
                 <span className="record__meta">
-                    {candidate.subject.kind} · {candidate.subject.canonical_id} · confidence{" "}
-                    {formatConfidence(candidate.confidence)}
+                    confidence {formatConfidence(candidate.confidence)}
                 </span>
             </div>
             <ul className="stack stack--tight record__body">
@@ -110,9 +110,12 @@ function CandidateRecord({
                 evidenceRefLabels={evidenceRefLabels}
                 label="Evidence"
             />
-            <p className="record__meta">
-                receipt <code>{candidate.receipt_id}</code>
-            </p>
+            <Details summary="Details">
+                <p className="record__meta">
+                    {candidate.subject.kind} · {candidate.subject.canonical_id} · receipt{" "}
+                    <code>{candidate.receipt_id}</code>
+                </p>
+            </Details>
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}
@@ -161,7 +164,7 @@ export function ClarificationPanel({
             </h2>
             {prompt === undefined ? (
                 <p className="answer__body">
-                    ACR could not commit to a subject and asked for a choice.
+                    Ask Dev could not settle on a subject and asked for a choice.
                 </p>
             ) : (
                 // The service's own wording. The Workbench never writes a

@@ -104,7 +104,7 @@ function OptionRow({
                         // own `OfferButton` "structural: {label}" line.
                         option.displayText === option.label ? null : (
                             <span className="clarification-popup__option-structural">
-                                structural: {option.label}
+                                Offered: {option.label}
                             </span>
                         )
                     }

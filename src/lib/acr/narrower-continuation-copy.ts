@@ -1,3 +1,4 @@
+import type { WorkbenchFailure } from "./errors";
 import type { NarrowingContinuationAxis } from "./upstream-vocabulary";
 
 /**
@@ -13,11 +14,16 @@ import type { NarrowingContinuationAxis } from "./upstream-vocabulary";
  * structural dimension a tester can do something about from here (fewer
  * results, a shorter window, a narrower scope); `family` rides along on the
  * wire for diagnosis but this Workbench does not phrase per-family copy.
+ *
+ * CHAOS-12406: a budget refusal says web's words (`REFUSAL_COPY`, each
+ * `explanation`, `describeBudgetOverrun`), copied exactly: one render, one
+ * wording. The button's label and the clause a re-ask appends stay ask-dev's:
+ * its re-ask appends a clause and goes through the composer.
  */
 export type NarrowerContinuationCopy = {
     /** Shown on the one-click button. */
     readonly actionLabel: string;
-    /** Shown beside the button, explaining what the tester is about to try. */
+    /** The sentence that says what a narrower question would be. */
     readonly explanation: string;
     /**
      * Builds the re-ask question from the TESTER'S OWN original question
@@ -35,6 +41,29 @@ export type NarrowerContinuationCopy = {
  * codex review round 1 caught the literal living in the component instead.
  */
 export const NARROWER_REASK_PENDING_LABEL = "Asking…";
+
+/** Words of a budget refusal. ACR sends tokens and numbers only. */
+export const REFUSAL_COPY = {
+    status: "No answer: too large to send",
+    lead: "The answer to this question was too large to send.",
+    overrunItems: (measured: number, max: number) =>
+        `It held ${measured.toLocaleString("en-US")} items; an answer can hold ${max.toLocaleString("en-US")}.`,
+    overrunBytes: (measured: string, max: string) => `It was ${measured}; an answer can be ${max}.`,
+    nothingLeftToCut: "Nothing more could be cut from it.",
+    sameAgain: "Asking the same question again is likely to give the same result.",
+    noAxis: "No narrower form of this question can be suggested.",
+} as const;
+
+/**
+ * Whether a failure is a budget refusal. `budget_refusal` is ACR's code for one, and a 413 is one
+ * whatever its code says: ACR's route has sent `invalid_request` on it, and the client carries a
+ * refusal's fields on the status alone. A host names it either way.
+ */
+export function isBudgetRefusal(
+    failure: Pick<WorkbenchFailure, "httpStatus" | "upstreamCode">,
+): boolean {
+    return failure.upstreamCode === "budget_refusal" || failure.httpStatus === 413;
+}
 
 /** Strips a trailing `?`/`.`/`!` run so an appended clause reads naturally. */
 function withoutTrailingPunctuation(question: string): string {
@@ -61,61 +90,68 @@ export const narrowerContinuationCopy: Record<NarrowingContinuationAxis, Narrowe
     {
         evidence_window: {
             actionLabel: "Ask over a shorter window",
-            explanation:
-                "This answer needed more history than fits one response. Asking about a shorter period narrows it.",
+            explanation: "Ask about a shorter time period.",
             narrowQuestion: (question) =>
                 `${withoutTrailingPunctuation(question)}, over the last 7 days?`,
         },
         result_count: {
             actionLabel: "Ask for fewer results",
-            explanation:
-                "This answer had more results than fit one response. Asking for a smaller number narrows it.",
+            explanation: "Ask for fewer results, for example the top 10.",
             narrowQuestion: (question) => `${withoutTrailingPunctuation(question)}, top 5 only?`,
         },
         scope_anchor: {
             actionLabel: "Ask about a narrower scope",
-            explanation:
-                "This answer covered more than fits one response. Scoping the question to one team or project narrows it.",
+            explanation: "Ask about a narrower scope, for example one project or one repository.",
             narrowQuestion: (question) =>
                 `${withoutTrailingPunctuation(question)}, for just one team?`,
         },
         group_selection: {
             actionLabel: "Ask about fewer groups",
-            explanation:
-                "This answer covered more groups than fit one response. Asking about fewer groups at a time narrows it.",
+            explanation: "Ask about fewer groups.",
             narrowQuestion: (question) =>
                 `${withoutTrailingPunctuation(question)}, for the top group only?`,
         },
         comparison_pair: {
             actionLabel: "Compare fewer subjects",
-            explanation:
-                "This comparison had more subjects than fit one response. Comparing fewer of them at a time narrows it.",
+            explanation: "Compare fewer subjects at a time.",
             narrowQuestion: (question) =>
                 `${withoutTrailingPunctuation(question)}, comparing just two of them?`,
         },
     };
 
+const kilobytes = (bytes: number): string =>
+    `${Math.ceil(bytes / 1024).toLocaleString("en-US")} KB`;
+
 /**
  * A client-authored sentence naming which budget ceiling was exceeded, when
- * ACR reported one. Built ONLY from two closed-vocabulary tokens
- * (`overrun`) and two measured counts (`measuredItems`/`maxItems`) — never
- * from ACR's own `error.message`, which this Workbench never reads at all
- * (see `UpstreamError` in `@/lib/acr/client`).
+ * ACR reported one and its numbers. Built ONLY from a closed-vocabulary token
+ * (`overrun`) and measured counts — never from ACR's own `error.message`,
+ * which this Workbench never reads at all (see `UpstreamError` in
+ * `@/lib/acr/client`).
  */
 export function describeBudgetOverrun(details: {
     readonly overrun?: string | undefined;
     readonly measuredItems?: number | undefined;
     readonly maxItems?: number | undefined;
+    readonly measuredBytes?: number | undefined;
+    readonly maxBytes?: number | undefined;
 }): string | undefined {
     if (
         details.overrun === "items" &&
         details.measuredItems !== undefined &&
         details.maxItems !== undefined
     ) {
-        return `The answer would have included ${String(details.measuredItems)} items; only ${String(details.maxItems)} fit one response.`;
+        return REFUSAL_COPY.overrunItems(details.measuredItems, details.maxItems);
     }
-    if (details.overrun === "bytes") {
-        return "The answer would have been larger than one response allows.";
+    if (
+        details.overrun === "bytes" &&
+        details.measuredBytes !== undefined &&
+        details.maxBytes !== undefined
+    ) {
+        return REFUSAL_COPY.overrunBytes(
+            kilobytes(details.measuredBytes),
+            kilobytes(details.maxBytes),
+        );
     }
     return undefined;
 }

@@ -601,7 +601,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             {
                 code: "acr_rejected_request",
                 message:
-                    "A supplied clarification receipt was malformed. The request was rejected rather than run without the chosen subject.",
+                    "A supplied choice was malformed. The request was rejected rather than run without the chosen subject.",
                 retryable: false,
             },
             400,
@@ -631,7 +631,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 requestStartedAt,
                 {
                     code: "acr_rejected_request",
-                    message: `A supplied ${label} structure receipt was malformed. The request was rejected rather than run without the chosen selection.`,
+                    message: `A supplied ${label} choice was malformed. The request was rejected rather than run without the chosen selection.`,
                     retryable: false,
                 },
                 400,
@@ -682,7 +682,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             {
                 code: "acr_rejected_request",
                 message:
-                    "The supplied parent result id was malformed. The request was rejected rather than run without it.",
+                    "The link to the earlier answer was malformed. The request was rejected rather than run without it.",
                 retryable: false,
             },
             400,
@@ -735,7 +735,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             {
                 code: "acr_rejected_request",
                 message:
-                    "The supplied structure-selection telemetry was malformed. The request was rejected rather than run without it.",
+                    "The supplied selection record was malformed. The request was rejected rather than run without it.",
                 retryable: false,
             },
             400,
@@ -750,15 +750,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         config = loadAcrRuntimeConfig();
     } catch (error) {
         // Configuration errors name the missing variable but never its value,
-        // and never key material.
+        // and never key material. The variable is the operator's, so it goes
+        // to the log, never to the page.
+        console.error(
+            "the server is not configured",
+            error instanceof AcrConfigError ? error.message : "unexpected configuration error",
+        );
         return failureResponse(
             requestStartedAt,
             {
                 code: "workbench_misconfigured",
-                message:
-                    error instanceof AcrConfigError
-                        ? `The server is not configured: ${error.message}.`
-                        : "The server is not configured.",
+                message: "Ask Dev's server is not configured.",
                 retryable: false,
             },
             500,

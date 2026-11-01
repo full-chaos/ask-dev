@@ -160,7 +160,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                     placeholder="Ask about a project, a repository, a team…"
                     onChange={(event) => setQuestion(event.target.value)}
                     onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
+                        // An Enter that commits an IME candidate is not a send.
+                        if (
+                            event.key === "Enter" &&
+                            !event.shiftKey &&
+                            !event.nativeEvent.isComposing
+                        ) {
                             event.preventDefault();
                             void submitQuestion(question.trim());
                         }
@@ -196,8 +201,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 </p>
             )}
             <p className="chat-composer__hint">
-                Every answer comes from a real ACR investigation — Ask Dev never renders a mock
-                result.
+                Every answer comes from a real investigation — Ask Dev never renders a mock result.
             </p>
         </form>
     );

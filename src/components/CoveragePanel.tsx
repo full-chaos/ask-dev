@@ -17,7 +17,7 @@ import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
  * nothing, never a state or a kind reconstructed from another field.
  */
 const GENERIC_READ_ORIGIN_STATE_SENTENCE =
-    "A read reported its origin state, but said nothing readable about it.";
+    "A read reported its state, but said nothing readable about it.";
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
@@ -56,11 +56,11 @@ const GENERIC_SOURCE_LABEL = "Source";
  * but NONE of the new fields — `coverage.details` is simply absent, not an
  * empty array. Rendering it via the SAME sentence-table parser this ticket
  * deletes would be exactly the banned "reconstruct by parsing" shape, so a
- * legacy result's raw string is therefore never parsed into a sentence — it
- * is shown VERBATIM instead, on screen rather than behind a closed
- * disclosure, so the visible page discloses what the result carries.
- * Degraded, not silently dropped, and not reconstructed. This legacy
- * rendering is triggered by "no DEGRADING detail covers this" — `details`
+ * legacy result's raw string is therefore never parsed into a sentence: the
+ * plain generic sentence shows, and the raw string sits verbatim in a collapsed
+ * fold (chris, CHAOS-12406). Degraded, not silently dropped, and not
+ * reconstructed. This legacy rendering is triggered by "no DEGRADING detail
+ * covers this" — `details`
  * absent (the true legacy shape) OR merely insufficient (present but empty,
  * or present without a matching degrading entry) both count, so a
  * schema-valid but internally inconsistent response can never silently
@@ -139,8 +139,8 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                 {!hasSources
                     ? "No sources were recorded."
                     : coverage.partial || !everySourceContributed
-                      ? "Partial — some sources did not contribute."
-                      : "Complete — every source contributed."}
+                      ? "Some sources did not contribute."
+                      : "Every source contributed."}
             </p>
             {!hasSources ? null : (
                 <>
@@ -169,7 +169,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                 <Badge
                                     key={`${source.source}:${source.state}`}
                                     tone={coverageStateTone(source.state)}
-                                    title={`${name}: ${source.state}`}
+                                    data-value={`${name}: ${source.state}`}
                                 >
                                     {name} · {stateText}
                                 </Badge>
@@ -232,7 +232,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         label, so a row reading `available` cannot be mistaken
                         for a statement about the source it belongs to. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Per-kind read states
+                        What each read found
                     </h3>
                     <ul className="stack stack--tight">
                         {readOriginStates.map((detail) => {
@@ -267,7 +267,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         degraded-reasons list: a cut kind census is its own
                         cause, with its own numbers, not a fold over sources. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Kind census
+                        Counts by kind
                     </h3>
                     <ul className="stack stack--tight">
                         {kindCensusTruncated.map((detail) => {
@@ -288,8 +288,8 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     {detail.declared === undefined ||
                                     detail.served === undefined ? null : (
                                         <p className="record__meta">
-                                            declared {detail.declared} (floor) · served{" "}
-                                            {detail.served}
+                                            at least {detail.declared} found · {detail.served}{" "}
+                                            included
                                         </p>
                                     )}
                                 </li>
@@ -304,7 +304,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         disclosure, and a response carrying both shapes must not
                         render "Degraded reasons" twice. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Degraded reasons
+                        What limits this answer
                     </h3>
                     <ul className="stack stack--tight">
                         {genericDegradingDetails.map((detail) => {
@@ -329,21 +329,12 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             );
                         })}
                         {legacyDegradedReasons.map((reason) => {
-                            // The legacy `degraded_reasons[]` string IS the only
-                            // reason text there is, so it is what shows; there is
-                            // nothing left to put behind a disclosure.
+                            // A legacy `degraded_reasons[]` string is no served
+                            // sentence, so the floor shows and the string folds.
                             const shown = degradedReasonDisplay({ raw: reason });
                             return (
                                 <li className="record" key={reason}>
-                                    {/* `<code>` only when what shows IS the raw
-                                        wire text; the generic floor is prose. */}
-                                    <p className="record__body">
-                                        {shown.text === nonBlank(reason) ? (
-                                            <code>{shown.text}</code>
-                                        ) : (
-                                            shown.text
-                                        )}
-                                    </p>
+                                    <p className="record__body">{shown.text}</p>
                                     {shown.supplementaryRaw === undefined ? null : (
                                         <Details
                                             data-testid="degraded-reason-raw"

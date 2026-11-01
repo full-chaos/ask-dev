@@ -19,6 +19,12 @@ export {
     DeterministicAnswerView,
     type DeterministicAnswerViewProps,
 } from "../components/DeterministicAnswerView";
+export type { WorkbenchFailure } from "../lib/acr/errors";
+export {
+    isBudgetRefusal,
+    narrowerContinuationCopy,
+    REFUSAL_COPY,
+} from "../lib/acr/narrower-continuation-copy";
 export { createStandaloneSource } from "./standalone-source";
 export {
     composerLockOf,

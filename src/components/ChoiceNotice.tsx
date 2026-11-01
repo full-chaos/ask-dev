@@ -1,3 +1,4 @@
+import { Details } from "./Details";
 import type { ChoiceDisposition } from "../lib/clarification";
 import type { SubjectRef } from "../lib/contracts";
 
@@ -29,17 +30,19 @@ export function ChoiceNotice({ chosen, disposition }: ChoiceNoticeProps) {
             <h2 className="panel__title">Your choice was not applied</h2>
             <p className="answer__judgment">
                 {disposition.answered
-                    ? `This answer is NOT about ${chosen.label}. ACR did not commit that subject, so the result below concerns something else.`
-                    : `ACR did not commit ${chosen.label} and is asking again. Choosing the same candidate is likely to repeat this.`}
+                    ? `This answer is NOT about ${chosen.label}. Ask Dev did not settle on that subject, so the result below concerns something else.`
+                    : `Ask Dev did not settle on ${chosen.label} and is asking again. Choosing the same candidate is likely to repeat this.`}
             </p>
+            <p className="record__meta">chosen: {chosen.label}</p>
+            <Details summary="Details">
+                <p className="record__meta">
+                    {chosen.kind} · {chosen.canonical_id}
+                </p>
+            </Details>
             <p className="record__meta">
-                chosen: {chosen.label} · {chosen.kind} · {chosen.canonical_id}
-            </p>
-            <p className="record__meta">
-                ACR discards a clarification receipt without reporting it (CHAOS-3813): the prior
-                result may be unreadable, the receipt may match no candidate, or the subject may be
-                outside this principal&apos;s authorization. The Workbench detects this; it does not
-                retry.
+                Ask Dev can drop a choice without saying so: the earlier answer may be unreadable,
+                the choice may match no candidate, or the subject may be outside what you can read.
+                It appears that happened here. Nothing was retried.
             </p>
         </section>
     );

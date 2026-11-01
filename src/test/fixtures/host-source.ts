@@ -20,7 +20,7 @@ import type {
 
 export const ASKED_AT = "2026-10-30T12:00:00.000Z";
 
-export function userTurn(id: number, question: string): ChatTurn {
+export function userTurn(id: number, question: string | null): ChatTurn {
     return { role: "user", id, question, createdAt: ASKED_AT, showBubble: true };
 }
 

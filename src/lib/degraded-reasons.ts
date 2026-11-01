@@ -3,27 +3,31 @@ import { nonBlank } from "./presentation";
 
 /**
  * The deterministic fail-readable floor for a degraded reason with no usable
- * text at all: `phrasing`, `label` and the raw string every one of them absent
- * or whitespace-only (`label`'s only wire bound is `minLength: 1`, which a lone
- * space satisfies). A fixed, content-independent sentence, never derived from
- * the reason it stands in for.
+ * text at all: `phrasing` and `label` both absent or whitespace-only (`label`'s
+ * only wire bound is `minLength: 1`, which a lone space satisfies). A fixed,
+ * content-independent sentence, never derived from the reason it stands in for.
  */
 export const GENERIC_DEGRADED_REASON_SENTENCE =
     "This source didn't fully contribute; no reason was reported.";
 
 /**
+ * The plain sentence over a raw reason no sentence was served for: the fold below it holds the
+ * reason, so this one must not say that none was reported.
+ */
+export const RAW_ONLY_DEGRADED_REASON_SENTENCE = "This source did not fully contribute.";
+
+/**
  * What a degraded reason SHOWS, and what is left over as supplementary detail.
  *
- * INVARIANT: whenever the coverage headline is non-complete, the reason itself
- * is VISIBLE BY DEFAULT; a collapsed `<details>` carries only supplementary
- * detail, and only once a reason already shows. A reason whose sole text is the
- * raw string must not put a content-free sentence on screen with the real
- * reason one click away — the visible page would disclose less than the result
- * carries.
+ * INVARIANT: visible text is served text. A raw string is a machine token (a
+ * real one reads `no_member_found:incident`), so it is never the visible line:
+ * it sits in the collapsed fold, under the served sentence, or under the plain
+ * floor when none was served. Chris's ruling (CHAOS-12406) on the legacy shape.
+ * No reason is dropped.
  *
  * ONE rule for both reason shapes rather than per-shape branches: show the best
- * REAL text available, and disclose `raw` only when it is not already what
- * shows. Displaying `raw` verbatim is not the consumer-side "reconstruct a
+ * SERVED text available, and disclose `raw` only when it is not already what
+ * shows. Disclosing `raw` verbatim is not the consumer-side "reconstruct a
  * sentence by parsing" this repo forbids — nothing here derives a sentence from
  * it.
  */
@@ -32,10 +36,14 @@ export function degradedReasonDisplay(reason: {
     readonly label?: string;
     readonly raw?: string;
 }): { readonly text: string; readonly supplementaryRaw: string | undefined } {
-    const shown = nonBlank(reason.phrasing) ?? nonBlank(reason.label) ?? nonBlank(reason.raw);
+    const shown = nonBlank(reason.phrasing) ?? nonBlank(reason.label);
     const raw = nonBlank(reason.raw);
     return {
-        text: shown ?? GENERIC_DEGRADED_REASON_SENTENCE,
+        text:
+            shown ??
+            (raw === undefined
+                ? GENERIC_DEGRADED_REASON_SENTENCE
+                : RAW_ONLY_DEGRADED_REASON_SENTENCE),
         supplementaryRaw: raw !== undefined && raw !== shown ? raw : undefined,
     };
 }

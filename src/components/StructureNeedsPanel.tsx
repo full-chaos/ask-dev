@@ -1,5 +1,6 @@
 "use client";
 
+import { Details } from "./Details";
 import { useId, useState } from "react";
 
 import { Badge } from "./Badge";
@@ -137,10 +138,12 @@ function OfferButton({
                     </Badge>
                 ) : null}
             </div>
-            {phrasing === undefined ? null : <p className="record__meta">structural: {label}</p>}
-            <p className="record__meta">
-                receipt <code>{receiptId}</code>
-            </p>
+            {phrasing === undefined ? null : <p className="record__meta">Offered: {label}</p>}
+            <Details summary="Details">
+                <p className="record__meta">
+                    receipt <code>{receiptId}</code>
+                </p>
+            </Details>
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}
@@ -390,7 +393,7 @@ export function StructureNeedsPanel({
      */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         if (!structureReceiptHasExpectedNamespace(member, receipt)) {
-            const message = `That offer's receipt is not valid for ${structureMemberLabel(member)} and could not be selected. This is a Workbench bug, not something you did — please report it.`;
+            const message = `That option is not valid for ${structureMemberLabel(member)} and could not be selected. This is an Ask Dev bug, not something you did — please report it.`;
             console.error(
                 `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
             );
@@ -414,7 +417,7 @@ export function StructureNeedsPanel({
                 More structure would narrow this
             </h2>
             <p className="record__meta">
-                ACR named {structureNeeds.missing.length}{" "}
+                Ask Dev named {structureNeeds.missing.length}{" "}
                 {structureNeeds.missing.length === 1 ? "thing" : "things"} it needs to answer
                 decisively:{" "}
                 {structureNeeds.missing.map((member) => structureMemberLabel(member)).join(", ")}.

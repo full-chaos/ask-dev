@@ -49,8 +49,9 @@ test.describe("Ask Dev chat shell", () => {
 
         const failure = page.getByRole("alert", { name: "No answer" });
         await expect(failure).toBeVisible();
-        await expect(failure.getByText(/workbench_misconfigured/)).toBeVisible();
-        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveCount(0);
+        await expect(failure).toHaveAttribute("data-failure-code", "workbench_misconfigured");
+        await expect(failure).not.toContainText("workbench_misconfigured");
+        await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(0);
     });
 
     test("links to the Context Fabric Workbench", async ({ page }) => {
@@ -82,7 +83,7 @@ test.describe("composer ergonomics", () => {
 
         // Shift+Enter must NOT have sent anything — still zero turns, and the
         // newline it inserted is still sitting in the box.
-        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveCount(0);
+        await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(0);
         await expect(page.getByRole("alert", { name: "No answer" })).toHaveCount(0);
         await expect(box).toHaveValue("First line\nSecond line");
 
@@ -127,7 +128,7 @@ test.describe("composer ergonomics", () => {
 
         const failure = page.getByRole("alert", { name: "No answer" });
         await expect(failure).toBeVisible();
-        await expect(failure.getByText(/not retryable/)).toBeVisible();
+        await expect(failure).toHaveAttribute("data-retryable", "false");
         await expect(failure.getByRole("button", { name: "Retry" })).toHaveCount(0);
     });
 
@@ -147,7 +148,7 @@ test.describe("composer ergonomics", () => {
 
         const failures = page.getByRole("alert", { name: "No answer" });
         await expect(failures).toHaveCount(1);
-        await expect(failures.first().getByText(/retryable/)).toBeVisible();
+        await expect(failures.first()).toHaveAttribute("data-retryable", "true");
         const retry = failures.first().getByRole("button", { name: "Retry" });
         await expect(retry).toBeVisible();
 
@@ -159,8 +160,11 @@ test.describe("composer ergonomics", () => {
         await retry.click();
 
         await expect(failures).toHaveCount(2);
-        await expect(failures.first().getByText(/retryable/)).toBeVisible();
-        await expect(failures.last().getByText(/workbench_misconfigured/)).toBeVisible();
+        await expect(failures.first()).toHaveAttribute("data-retryable", "true");
+        await expect(failures.last()).toHaveAttribute(
+            "data-failure-code",
+            "workbench_misconfigured",
+        );
         // The now-superseded turn's OWN Retry is gone — only the latest
         // turn's failure can still act, same "only the latest turn is live"
         // rule the clarification/structure chips hold.
@@ -194,7 +198,7 @@ test.describe("composer ergonomics", () => {
         // The retry answered decisively (codex round 2 regression check):
         // the composer is EMPTY, not still showing the already-answered
         // question selected and one accidental Enter away from resending it.
-        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveAttribute(
+        await expect(page.getByRole("article", { name: "Answer" })).toHaveAttribute(
             "data-state",
             "complete",
         );
@@ -287,13 +291,13 @@ test.describe("clarification chips", () => {
         await expect(page.getByRole("button", { name: "Atlas" })).toBeVisible();
 
         // Every DeterministicAnswerView turn shares the SAME `aria-label`
-        // ("Deterministic answer") whether the result is a clarification or
+        // ("Answer") whether the result is a clarification or
         // a decisive answer — so "an article is present" does not, by
         // itself, prove the chip actually resolved anything. `data-state`
         // mirrors the result's own `status` field and is the one signal
         // that can ONLY read "complete" when ACR actually committed a
         // subject (see DeterministicAnswerView.tsx's own comment on it).
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
@@ -333,7 +337,7 @@ test.describe("clarification chips", () => {
      * fixture change the double inherited the canonical example's 3-source
      * coverage instead, so the CHAOS-4524/4568 defect (`CoveragePanel.tsx`'s
      * `hasSources` guard: a bare `partial === false` check rendering
-     * "Complete — every source contributed." over zero sources) was
+     * "Every source contributed." over zero sources) was
      * unreachable through this real HTTP round trip — only a hand-written
      * component test could catch it. This is the standing-suite proof that
      * class is now reachable.
@@ -346,17 +350,13 @@ test.describe("clarification chips", () => {
         await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_CLARIFICATION}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn).toHaveAttribute("data-state", "clarification_required");
 
         const coveragePanel = turn.getByTestId("coverage-panel");
         await expect(coveragePanel.getByText("No sources were recorded.")).toBeVisible();
-        await expect(coveragePanel.getByText("Complete — every source contributed.")).toHaveCount(
-            0,
-        );
-        await expect(
-            coveragePanel.getByText("Partial — some sources did not contribute."),
-        ).toHaveCount(0);
+        await expect(coveragePanel.getByText("Every source contributed.")).toHaveCount(0);
+        await expect(coveragePanel.getByText("Some sources did not contribute.")).toHaveCount(0);
     });
 
     test("NEGATIVE: a decisive answer renders no clarification chips", async ({ page }) => {
@@ -365,7 +365,7 @@ test.describe("clarification chips", () => {
         await page.getByLabel("Ask a question").fill("What is the status of dev-health-ops?");
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn).toHaveCount(1);
         // Discriminating, not just "no chip buttons happen to be on screen":
         // the turn's own state is decisive, not a clarification the UI
@@ -465,7 +465,7 @@ test.describe("structure needs chips", () => {
         // `data-state` mirrors the result's own `status`, so "the popup is
         // present" cannot be conflated with "the popup is present AND the
         // result is actually non-decisive."
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
@@ -522,7 +522,7 @@ test.describe("structure needs chips", () => {
             page.getByRole("button", { name: "WORK-9002: Rotate signing key" }),
         ).toBeVisible();
 
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(1);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
 
@@ -600,7 +600,7 @@ test.describe("mixed receipt families", () => {
         await page.getByRole("button", { name: "Ask Dev" }).click();
         await page.getByRole("button", { name: "Continue with 1 selected" }).click();
 
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(2);
         await expect(turns.first()).toHaveAttribute("data-state", "clarification_required");
         await expect(turns.last()).toHaveAttribute("data-state", "complete");
@@ -635,7 +635,7 @@ test.describe("conversation threading", () => {
             .fill(`What is Ask Dev, ${TRIGGER_CONVERSATION_ECHO}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(1);
         // A turn's own FIRST ask carries no prior conversation.
         await expect(turns.first()).toContainText("conversation_turns=0");
@@ -680,7 +680,7 @@ test.describe("same-conversation carry", () => {
             .fill(`What is Ask Dev, ${TRIGGER_PARENT_REFERENCE_ECHO}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turns = page.getByRole("article", { name: "Deterministic answer" });
+        const turns = page.getByRole("article", { name: "Answer" });
         await expect(turns).toHaveCount(1);
         // A turn's own FIRST ask names no parent to follow.
         await expect(turns.first()).toContainText("parent_result_id=undefined");
@@ -749,7 +749,7 @@ test.describe("cohort ranking", () => {
             .fill(`Which teams are struggling, and why, ${TRIGGER_COHORT}?`);
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn).toHaveCount(1);
         // Decisive, not a clarification the UI merely rendered thinly.
         await expect(turn).toHaveAttribute("data-state", "complete");
@@ -798,7 +798,7 @@ test.describe("cohort ranking", () => {
         await page.getByLabel("Ask a question").fill("Why is Ask Dev still not ready to ship?");
         await page.getByRole("button", { name: "Send" }).click();
 
-        const turn = page.getByRole("article", { name: "Deterministic answer" });
+        const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn).toHaveAttribute("data-state", "complete");
         // Discriminating: the answer really did arrive and really does carry
         // the cohort's own driver narration — so this is the gate closing,

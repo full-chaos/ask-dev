@@ -23,14 +23,19 @@ const clarificationCoverage = mockScenarios().find((s) => s.id === "clarificatio
  * removed (AGENTS.md: "hiding a known gap would turn it into apparent
  * completeness").
  */
+/** The raw reasons in a panel's closed folds. */
+function rawReasons(panel: Element): readonly string[] {
+    return [...panel.querySelectorAll('details[data-testid="degraded-reason-raw"] code')].map(
+        (raw) => raw.textContent ?? "",
+    );
+}
+
 describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
     it("shows a chip per source (engine-provided label, CHAOS-4690) and the summary sentence, always", () => {
         render(<CoveragePanel coverage={degradedCoverage} />);
 
         const panel = screen.getByTestId("coverage-panel");
-        expect(
-            within(panel).getByText("Partial — some sources did not contribute."),
-        ).toBeInTheDocument();
+        expect(within(panel).getByText("Some sources did not contribute.")).toBeInTheDocument();
         const chipRow = within(panel).getByTestId("coverage-chip-row");
         // CHAOS-4673/CHAOS-4690: the always-visible chip carries the
         // ENGINE'S OWN `label`, never the raw `canonical_fact:*`/
@@ -118,16 +123,14 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         // state — a vacuous version of this test could pass merely because
         // SOME element elsewhere said "No sources were recorded." while the
         // headline above it still claimed "Partial"/"Complete".
-        expect(
-            screen.queryByText("Partial — some sources did not contribute."),
-        ).not.toBeInTheDocument();
-        expect(screen.queryByText("Complete — every source contributed.")).not.toBeInTheDocument();
+        expect(screen.queryByText("Some sources did not contribute.")).not.toBeInTheDocument();
+        expect(screen.queryByText("Every source contributed.")).not.toBeInTheDocument();
     });
 
     /**
      * CHAOS-4524 / CHAOS-4568: zero sources is absence of evidence, not
      * completeness. `partial === false` over an empty source list must
-     * never render the "Complete — every source contributed." headline —
+     * never render the "Every source contributed." headline —
      * that reads a known gap as apparent completeness, the one failure
      * this panel's doc comment says it exists to prevent (AGENTS.md check
      * 12: missing is not healthy).
@@ -135,11 +138,9 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
     it("never shows the Complete headline when zero sources were recorded, even with partial=false", () => {
         render(<CoveragePanel coverage={{ sources: [], partial: false, degraded_reasons: [] }} />);
         const panel = screen.getByTestId("coverage-panel");
+        expect(within(panel).queryByText("Every source contributed.")).not.toBeInTheDocument();
         expect(
-            within(panel).queryByText("Complete — every source contributed."),
-        ).not.toBeInTheDocument();
-        expect(
-            within(panel).queryByText("Partial — some sources did not contribute."),
+            within(panel).queryByText("Some sources did not contribute."),
         ).not.toBeInTheDocument();
         expect(within(panel).getByText("No sources were recorded.")).toBeInTheDocument();
     });
@@ -160,9 +161,7 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         expect(clarificationCoverage.partial).toBe(false);
         render(<CoveragePanel coverage={clarificationCoverage} />);
         const panel = screen.getByTestId("coverage-panel");
-        expect(
-            within(panel).queryByText("Complete — every source contributed."),
-        ).not.toBeInTheDocument();
+        expect(within(panel).queryByText("Every source contributed.")).not.toBeInTheDocument();
         expect(within(panel).getByText("No sources were recorded.")).toBeInTheDocument();
     });
 
@@ -195,7 +194,9 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
     it("renders the model's synthesis-phrased sentence when the detail carries one", () => {
         render(<CoveragePanel coverage={degradedCoverage} />);
 
-        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "What limits this answer" }),
+        ).toBeInTheDocument();
         // cov-incidents-unauthorized carries a `phrasing` in the fixture.
         expect(
             screen.getByText(
@@ -250,28 +251,24 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
      * reconstruct a sentence by parsing that raw string — the exact banned
      * shape this ticket deletes.
      *
-     * The raw string is shown VERBATIM and VISIBLY, not behind a closed
-     * disclosure under a content-free sentence: showing it is not parsing it,
-     * and the reason a non-complete headline is reporting belongs on screen
-     * rather than one click away. The generic floor applies only where there
-     * is no usable reason text at all.
+     * Chris's ruling (CHAOS-12406): the plain generic sentence shows, and the raw
+     * string sits in a collapsed fold. A real one reads `no_member_found:incident`.
+     * No reason is dropped, and nothing is parsed.
      */
-    it("shows each legacy degraded_reasons entry verbatim and visibly, never a parsed sentence", () => {
+    it("shows the generic sentence for each legacy degraded_reasons entry, with the raw string in its fold", () => {
         render(<CoveragePanel coverage={legacyCoverage} />);
 
-        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "What limits this answer" }),
+        ).toBeInTheDocument();
         const panel = screen.getByTestId("coverage-panel");
 
-        // Every raw entry is VISIBLE text, not collapsed-DOM text.
+        // Every raw entry is in a closed fold, and in no visible text.
         for (const reason of legacyCoverage.degraded_reasons!) {
-            expect(visibleText(panel)).toContain(reason);
+            expect(visibleText(panel)).not.toContain(reason);
+            expect(rawReasons(panel)).toContain(reason);
         }
-        // Nothing is left behind a disclosure, because nothing is left over.
-        expect(within(panel).queryAllByTestId("degraded-reason-raw")).toEqual([]);
-        // The content-free floor does not appear when real text exists.
-        expect(visibleText(panel)).not.toContain(
-            "This source didn't fully contribute; no reason was reported.",
-        );
+        expect(visibleText(panel)).toContain("This source did not fully contribute.");
 
         // The old vocab-mapping.ts sentence for this exact raw shape never
         // reappears (that module, and the sentence it composed, are both
@@ -300,14 +297,14 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
         };
         render(<CoveragePanel coverage={coverage} />);
 
-        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "What limits this answer" }),
+        ).toBeInTheDocument();
         const panel = screen.getByTestId("coverage-panel");
-        // Both entries are on screen verbatim — the drop this test exists for
-        // would now also be caught by their absence from VISIBLE text, not
-        // merely from the DOM.
-        expect(visibleText(panel)).toContain("blockers: unexpanded:failed");
-        expect(visibleText(panel)).toContain("incidents: pruned");
-        expect(within(panel).queryAllByTestId("degraded-reason-raw")).toEqual([]);
+        // Both entries keep a line and a fold, so a drop still fails here.
+        expect(rawReasons(panel)).toEqual(["blockers: unexpanded:failed", "incidents: pruned"]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(2);
+        expect(visibleText(panel)).not.toContain("blockers: unexpanded:failed");
     });
 
     /**
@@ -334,11 +331,12 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
             ],
         };
         render(<CoveragePanel coverage={coverage} />);
-        const visible = visibleText(screen.getByTestId("coverage-panel"));
-        expect(visible).toContain("Metrics facts may be out of date");
-        expect(visible).toContain("metrics: canonical fact capability returned stale");
+        const panel = screen.getByTestId("coverage-panel");
+        expect(visibleText(panel)).toContain("Metrics facts may be out of date");
+        expect(rawReasons(panel)).toEqual(["metrics: canonical fact capability returned stale"]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(2);
         // ONE heading for the union, never one per shape.
-        expect(screen.getAllByRole("heading", { name: "Degraded reasons" })).toHaveLength(1);
+        expect(screen.getAllByRole("heading", { name: "What limits this answer" })).toHaveLength(1);
     });
 
     it("shows the detail ALONE when a rendered line is byte-identical to the raw reason", () => {
@@ -441,9 +439,9 @@ describe("CoveragePanel — codex round 1 P2: blank engine strings fall through 
      * blank there is nothing left to fall back to except the generic
      * sentence (never a blank paragraph on the always-visible surface).
      *
-     * `raw` is tried BEFORE the floor, so the floor fires only when phrasing,
-     * label AND raw are all unusable — the case built here. The sibling case
-     * (blank phrasing/label but a usable `raw`) is its own test below.
+     * `raw` is never the visible text, so the floor fires when phrasing and
+     * label are both unusable: the case built here. The sibling case (blank
+     * phrasing/label but a usable `raw`) is its own test below.
      */
     it("falls back to the generic sentence when phrasing, label AND raw are all blank/whitespace-only", () => {
         const coverage = {
@@ -467,7 +465,9 @@ describe("CoveragePanel — codex round 1 P2: blank engine strings fall through 
             "This source didn't fully contribute; no reason was reported.",
         );
         // Never a lone blank paragraph in the degraded-reasons list.
-        const list = screen.getByRole("heading", { name: "Degraded reasons" }).closest("section")!;
+        const list = screen
+            .getByRole("heading", { name: "What limits this answer" })
+            .closest("section")!;
         expect(list.querySelector(".record__body")!.textContent.trim()).not.toBe("");
     });
 });
@@ -475,7 +475,7 @@ describe("CoveragePanel — codex round 1 P2: blank engine strings fall through 
 /**
  * The NON-EMPTY sibling of the zero-source rule above (CHAOS-4524/4568),
  * `partial === false` beside sources that did not contribute must not render
- * "Complete — every source contributed.": that is the same "known gap reads
+ * "Every source contributed.": that is the same "known gap reads
  * as apparent completeness" failure the empty-list tests pin, with sources
  * present instead of absent.
  *
@@ -485,8 +485,8 @@ describe("CoveragePanel — codex round 1 P2: blank engine strings fall through 
  * only one that may carry the Complete headline.
  */
 describe("CoveragePanel — Complete is gated on the sources, not on partial alone", () => {
-    const CONTRIBUTED = "Complete — every source contributed.";
-    const DID_NOT = "Partial — some sources did not contribute.";
+    const CONTRIBUTED = "Every source contributed.";
+    const DID_NOT = "Some sources did not contribute.";
     // Every member of the contract's closed `state` enum
     // (context_fabric_common.v1 $defs/Coverage/properties/sources/items).
     const NON_CONTRIBUTING = [
@@ -577,6 +577,7 @@ describe("CoveragePanel — Complete is gated on the sources, not on partial alo
  */
 describe("CoveragePanel — a degraded reason is visible, never only collapsed", () => {
     const FLOOR = "This source didn't fully contribute; no reason was reported.";
+    const RAW_ONLY = "This source did not fully contribute.";
 
     function detailCoverage(detail: Record<string, unknown>) {
         return {
@@ -628,7 +629,7 @@ describe("CoveragePanel — a degraded reason is visible, never only collapsed",
         expect(visibleText(panel)).not.toContain(FLOOR);
     });
 
-    it("raw shows VISIBLY when phrasing and label are both blank — never the floor over a real reason", () => {
+    it("the floor shows when phrasing and label are both blank, with the raw string in its fold", () => {
         render(
             <CoveragePanel
                 coverage={detailCoverage({
@@ -639,10 +640,9 @@ describe("CoveragePanel — a degraded reason is visible, never only collapsed",
             />,
         );
         const panel = screen.getByTestId("coverage-panel");
-        expect(visibleText(panel)).toContain("metrics: stale_provider_window");
-        expect(visibleText(panel)).not.toContain(FLOOR);
-        // Nothing left over, so nothing is collapsed.
-        expect(within(panel).queryAllByTestId("degraded-reason-raw")).toEqual([]);
+        expect(visibleText(panel)).not.toContain("metrics: stale_provider_window");
+        expect(visibleText(panel)).toContain(RAW_ONLY);
+        expect(rawReasons(panel)).toEqual(["metrics: stale_provider_window"]);
     });
 });
 
@@ -663,8 +663,8 @@ describe("CoveragePanel — an unknown source state never carries the Complete h
         } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
         render(<CoveragePanel coverage={coverage} />);
         const panel = screen.getByTestId("coverage-panel");
-        expect(visibleText(panel)).not.toContain("Complete — every source contributed.");
-        expect(visibleText(panel)).toContain("Partial — some sources did not contribute.");
+        expect(visibleText(panel)).not.toContain("Every source contributed.");
+        expect(visibleText(panel)).toContain("Some sources did not contribute.");
         // The unrecognized state itself is still shown, not swallowed.
         expect(visibleText(panel)).toContain("withheld by policy");
     });
@@ -683,6 +683,7 @@ describe("CoveragePanel — an unknown source state never carries the Complete h
  */
 describe("CoveragePanel — the degraded-reason display rule, whole input domain", () => {
     const FLOOR = "This source didn't fully contribute; no reason was reported.";
+    const RAW_ONLY = "This source did not fully contribute.";
 
     function show(detail: Record<string, unknown>) {
         const coverage = {
@@ -716,7 +717,7 @@ describe("CoveragePanel — the degraded-reason display rule, whole input domain
         ["all absent", {}, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing real only", { phrasing: "P." }, { shows: "P.", collapsedCount: 0 }],
         ["label real only", { label: "L." }, { shows: "L.", collapsedCount: 0 }],
-        ["raw real only", { raw: "R." }, { shows: "R.", collapsedCount: 0 }],
+        ["raw real only", { raw: "R." }, { shows: RAW_ONLY, collapsedCount: 1 }],
         ["phrasing empty", { phrasing: "" }, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing whitespace", { phrasing: "  " }, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing zero-width", { phrasing: "​" }, { shows: FLOOR, collapsedCount: 0 }],
@@ -746,9 +747,9 @@ describe("CoveragePanel — the degraded-reason display rule, whole input domain
             { shows: "L.", collapsedCount: 1 },
         ],
         [
-            "both blank, raw shows and nothing collapses",
+            "both blank, the floor shows and raw collapses",
             { phrasing: " ", label: "​", raw: "R." },
-            { shows: "R.", collapsedCount: 0 },
+            { shows: RAW_ONLY, collapsedCount: 1 },
         ],
         [
             "raw identical to what shows is not repeated in a disclosure",
@@ -810,17 +811,19 @@ describe("CoveragePanel — degraded reasons are a union over the whole shape do
 
     it("details none x reasons none: no section at all", () => {
         panelFor([], []);
-        expect(screen.queryByRole("heading", { name: "Degraded reasons" })).toBeNull();
+        expect(screen.queryByRole("heading", { name: "What limits this answer" })).toBeNull();
     });
 
-    it("details none x reasons one: the raw reason shows", () => {
-        const visible = visibleText(panelFor([], [RAW_A]));
-        expect(visible).toContain(RAW_A);
+    it("details none x reasons one: the raw reason has a line and a fold", () => {
+        const panel = panelFor([], [RAW_A]);
+        expect(rawReasons(panel)).toEqual([RAW_A]);
+        expect(visibleText(panel)).not.toContain(RAW_A);
     });
 
-    it("details none x reasons many: every raw reason shows", () => {
-        const visible = visibleText(panelFor([], [RAW_A, RAW_B, RAW_C]));
-        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+    it("details none x reasons many: every raw reason has a line and a fold", () => {
+        const panel = panelFor([], [RAW_A, RAW_B, RAW_C]);
+        expect(rawReasons(panel)).toEqual([RAW_A, RAW_B, RAW_C]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(3);
     });
 
     it("details one x reasons none: the detail shows", () => {
@@ -828,11 +831,12 @@ describe("CoveragePanel — degraded reasons are a union over the whole shape do
         expect(visible).toContain("Structured reason 0");
     });
 
-    it("details one x reasons many, DISJOINT: the detail and every raw reason show", () => {
-        const visible = visibleText(panelFor([detail(0)], [RAW_A, RAW_B, RAW_C]));
-        expect(visible).toContain("Structured reason 0");
-        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
-        expect(screen.getAllByRole("heading", { name: "Degraded reasons" })).toHaveLength(1);
+    it("details one x reasons many, DISJOINT: the detail and every raw reason have a line", () => {
+        const panel = panelFor([detail(0)], [RAW_A, RAW_B, RAW_C]);
+        expect(visibleText(panel)).toContain("Structured reason 0");
+        expect(rawReasons(panel)).toEqual([RAW_A, RAW_B, RAW_C]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(4);
+        expect(screen.getAllByRole("heading", { name: "What limits this answer" })).toHaveLength(1);
     });
 
     it("details one x reasons one, BYTE-IDENTICAL to the detail's rendered line: shown once", () => {
@@ -850,17 +854,17 @@ describe("CoveragePanel — degraded reasons are a union over the whole shape do
         expect(panel.querySelectorAll("li.record")).toHaveLength(1);
     });
 
-    it("a raw reason matching NO detail line and NO detail raw still shows", () => {
+    it("a raw reason matching NO detail line and NO detail raw still has a line and a fold", () => {
         const panel = panelFor([{ ...detail(0), raw: RAW_B }], [RAW_A]);
-        const visible = visibleText(panel);
-        expect(visible).toContain("Structured reason 0");
-        expect(visible).toContain(RAW_A);
+        expect(visibleText(panel)).toContain("Structured reason 0");
+        expect(rawReasons(panel)).toEqual([RAW_B, RAW_A]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(2);
     });
 
     it("n details about one source never withhold n raw reasons about another", () => {
         const panel = panelFor([detail(0), detail(1), detail(2)], [RAW_A, RAW_B, RAW_C]);
-        const visible = visibleText(panel);
-        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+        expect(rawReasons(panel)).toEqual([RAW_A, RAW_B, RAW_C]);
+        expect(panel.querySelectorAll("li.record")).toHaveLength(6);
     });
 
     it("details many x reasons many, PARTIALLY byte-identical: the repeats are dropped, the rest show", () => {
@@ -869,7 +873,11 @@ describe("CoveragePanel — degraded reasons are a union over the whole shape do
             [RAW_A, RAW_B, RAW_C],
         );
         const visible = visibleText(panel);
-        for (const raw of [RAW_A, RAW_B, RAW_C]) expect(visible).toContain(raw);
+        // Served lines read as served, and the raw reason with no line sits in its fold.
+        expect(visible).toContain(RAW_A);
+        expect(visible).toContain(RAW_B);
+        expect(visible).not.toContain(RAW_C);
+        expect(rawReasons(panel)).toEqual([RAW_C]);
         // Three entries, not five: RAW_A and RAW_B are the details' own lines.
         expect(panel.querySelectorAll("li.record")).toHaveLength(3);
     });
@@ -882,9 +890,9 @@ describe("CoveragePanel — degraded reasons are a union over the whole shape do
 
     it("a NON-degrading detail withholds nothing, even when it renders the same line", () => {
         const nonDegrading = { ...detailRendering(0, RAW_A), degrading: false };
-        const visible = visibleText(panelFor([nonDegrading], [RAW_A]));
-        expect(visible).not.toContain("Structured reason 0");
-        expect(visible).toContain(RAW_A);
+        const panel = panelFor([nonDegrading], [RAW_A]);
+        expect(visibleText(panel)).not.toContain("Structured reason 0");
+        expect(rawReasons(panel)).toEqual([RAW_A]);
     });
 
     it("a blank raw reason is kept as the floor, never dropped", () => {
@@ -1037,7 +1045,7 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
     /**
      * Exactly TWO codes get rendering of their own: `fact_read_origin_state`
      * (a per-kind read-state row) and `kind_census_truncated` (a per-kind
-     * census row, its own "Kind census" section). Every other code renders
+     * census row, its own "Counts by kind" section). Every other code renders
      * identically for identical text.
      *
      * What this pins is the exception SET, so a code quietly GAINING its own
@@ -1071,8 +1079,8 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
 
     it("a read-origin-state detail does not soften the headline: an unavailable source still reads non-complete", () => {
         const { visible } = renderWithCode("fact_read_origin_state");
-        expect(visible).toContain("Partial — some sources did not contribute.");
-        expect(visible).not.toContain("Complete — every source contributed.");
+        expect(visible).toContain("Some sources did not contribute.");
+        expect(visible).not.toContain("Every source contributed.");
         // The per-source state stays visible on the chip, beside the detail.
         expect(visible).toContain("unavailable");
     });
@@ -1106,7 +1114,7 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
         } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
     }
 
-    it("shows the kind, the declared/served numbers, and the engine label under its own 'Kind census' heading", () => {
+    it("shows the kind, the declared/served numbers, and the engine label under its own 'Counts by kind' heading", () => {
         const { container } = render(
             <CoveragePanel
                 coverage={coverageWithKindCensusDetail({
@@ -1118,10 +1126,10 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
         );
         const panel = container.querySelector('[data-testid="coverage-panel"]')!;
         const visible = visibleText(panel);
-        expect(visible).toContain("Kind census");
+        expect(visible).toContain("Counts by kind");
         expect(visible).toContain("team");
         expect(visible).toContain("At least 2000 team found; 25 included");
-        expect(visible).toContain("declared 2000 (floor) · served 25");
+        expect(visible).toContain("at least 2000 found · 25 included");
     });
 
     it("prefers the synthesis phrasing over the label when both are present, keeping the numbers line separate", () => {
@@ -1138,15 +1146,15 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
         const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
         expect(visible).toContain("There are far more teams than the census could enumerate.");
         expect(visible).toContain("At least 2000 team found; 25 included");
-        expect(visible).toContain("declared 2000 (floor) · served 25");
+        expect(visible).toContain("at least 2000 found · 25 included");
     });
 
     it("omits the kind label and the numbers line when kind/declared/served are absent (legacy-shaped detail)", () => {
         const { container } = render(<CoveragePanel coverage={coverageWithKindCensusDetail({})} />);
         const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
-        expect(visible).toContain("Kind census");
+        expect(visible).toContain("Counts by kind");
         expect(visible).toContain("At least 2000 team found; 25 included");
-        expect(visible).not.toContain("declared");
+        expect(visible).not.toContain("found ·");
         expect(visible).not.toContain("served");
     });
 
@@ -1157,7 +1165,7 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
             />,
         );
         const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
-        expect(visible).toContain("declared 5 (floor) · served 5");
+        expect(visible).toContain("at least 5 found · 5 included");
     });
 
     it("renders served === 0 (no cohort of this kind was assembled) as a real number, not a fallback", () => {
@@ -1167,7 +1175,7 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
             />,
         );
         const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
-        expect(visible).toContain("declared 2000 (floor) · served 0");
+        expect(visible).toContain("at least 2000 found · 0 included");
     });
 
     it("does not double-render the row in the generic 'Degraded reasons' list", () => {
@@ -1181,7 +1189,7 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
             />,
         );
         const panel = container.querySelector('[data-testid="coverage-panel"]')!;
-        expect(panel.textContent ?? "").not.toContain("Degraded reasons");
+        expect(panel.textContent ?? "").not.toContain("What limits this answer");
     });
 
     it("still shows a generic degraded reason alongside a kind_census_truncated row, without merging the two", () => {
@@ -1211,8 +1219,8 @@ describe("CoveragePanel — kind_census_truncated (D47)", () => {
         } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
         const { container } = render(<CoveragePanel coverage={coverage} />);
         const visible = visibleText(container.querySelector('[data-testid="coverage-panel"]')!);
-        expect(visible).toContain("Kind census");
-        expect(visible).toContain("Degraded reasons");
+        expect(visible).toContain("Counts by kind");
+        expect(visible).toContain("What limits this answer");
         expect(visible).toContain("At least 2000 team found; 25 included");
         expect(visible).toContain("Status facts could not be read");
     });
@@ -1245,7 +1253,7 @@ describe("CoveragePanel — per-kind read states, from acr's golden example", ()
         render(<CoveragePanel coverage={COVERAGE} />);
         const visible = visibleText(screen.getByTestId("coverage-panel"));
         for (const row of ROWS) expect(visible).toContain(row.label);
-        expect(screen.getByRole("heading", { name: "Per-kind read states" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "What each read found" })).toBeInTheDocument();
     });
 
     it("the worse SOURCE fold stays visible beside them — the rows never stand in for it", () => {
@@ -1253,17 +1261,18 @@ describe("CoveragePanel — per-kind read states, from acr's golden example", ()
         const visible = visibleText(screen.getByTestId("coverage-panel"));
         expect(visible).toContain("no data");
         expect(visible).toContain("unavailable");
-        expect(visible).toContain("Partial — some sources did not contribute.");
-        expect(visible).not.toContain("Complete — every source contributed.");
+        expect(visible).toContain("Some sources did not contribute.");
+        expect(visible).not.toContain("Every source contributed.");
     });
 
-    it("the reported degraded reason is still shown, and the non-degrading rows are NOT listed as reasons", () => {
+    it("the reported degraded reason keeps its line, and the non-degrading rows are NOT listed as reasons", () => {
         render(<CoveragePanel coverage={COVERAGE} />);
         const panel = screen.getByTestId("coverage-panel");
-        const visible = visibleText(panel);
-        for (const reason of COVERAGE.degraded_reasons ?? []) expect(visible).toContain(reason);
+        for (const reason of COVERAGE.degraded_reasons ?? []) {
+            expect(rawReasons(panel)).toContain(reason);
+        }
         const reasonsList = screen.getByRole("heading", {
-            name: "Degraded reasons",
+            name: "What limits this answer",
         }).nextElementSibling!;
         for (const row of ROWS) expect(reasonsList.textContent).not.toContain(row.label);
     });
@@ -1281,8 +1290,10 @@ describe("CoveragePanel — per-kind read states, from acr's golden example", ()
         } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
         render(<CoveragePanel coverage={coverage} />);
         const panel = screen.getByTestId("coverage-panel");
-        expect(screen.getByRole("heading", { name: "Per-kind read states" })).toBeInTheDocument();
-        expect(screen.getByRole("heading", { name: "Degraded reasons" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "What each read found" })).toBeInTheDocument();
+        expect(
+            screen.getByRole("heading", { name: "What limits this answer" }),
+        ).toBeInTheDocument();
         const occurrences = visibleText(panel).split(degradingRow.label).length - 1;
         expect(occurrences).toBe(2);
     });
@@ -1307,7 +1318,7 @@ describe("CoveragePanel — a per-kind row always names its kind and its state",
     function rowTexts(coverage: Parameters<typeof CoveragePanel>[0]["coverage"]) {
         const { container, unmount } = render(<CoveragePanel coverage={coverage} />);
         const heading = Array.from(container.querySelectorAll("h3")).find(
-            (node) => node.textContent === "Per-kind read states",
+            (node) => node.textContent === "What each read found",
         )!;
         const list = heading.nextElementSibling!;
         const texts = Array.from(list.querySelectorAll("li")).map((li) => visibleText(li));
@@ -1367,9 +1378,7 @@ describe("CoveragePanel — a per-kind row always names its kind and its state",
         const texts = rowTexts(
             coverage as unknown as Parameters<typeof CoveragePanel>[0]["coverage"],
         );
-        expect(texts).toEqual([
-            "A read reported its origin state, but said nothing readable about it.",
-        ]);
+        expect(texts).toEqual(["A read reported its state, but said nothing readable about it."]);
     });
 
     /**

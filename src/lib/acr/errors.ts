@@ -115,7 +115,8 @@ export type WorkbenchFailureCode = (typeof workbenchFailureCodes)[number];
 export type WorkbenchFailure = {
     readonly code: WorkbenchFailureCode;
     /**
-     * Shown to the tester. **Always Workbench-authored.**
+     * Shown to the user. **Always authored here, in product words** (CHAOS-12406:
+     * no internal service, code or status reaches a user on any surface).
      *
      * Never ACR's `error.message`, and therefore never any text that could have
      * originated with a model or provider. The Workbench classifies a failure
@@ -138,7 +139,7 @@ export type WorkbenchFailure = {
      * it turns "it broke" into something an operator can actually look up.
      */
     readonly upstreamRequestId?: string;
-    /** Contract validation errors, when the payload failed validation. */
+    /** Contract validation errors, when the payload failed validation. Never rendered. */
     readonly details?: readonly string[];
     readonly retryable: boolean;
     /**
@@ -162,6 +163,12 @@ export type WorkbenchFailure = {
     readonly measuredItems?: number | undefined;
     /** The item ceiling the refused answer exceeded, when ACR said. */
     readonly maxItems?: number | undefined;
+    /** The size the refused answer measured, in bytes, when ACR said. */
+    readonly measuredBytes?: number | undefined;
+    /** The size ceiling the refused answer exceeded, in bytes, when ACR said. */
+    readonly maxBytes?: number | undefined;
+    /** `true` when ACR said nothing was left to cut from the refused answer. */
+    readonly nothingLeftToCut?: boolean | undefined;
 };
 
 export class AcrRequestError extends Error {

@@ -60,7 +60,10 @@ export function InspectorRail({ result }: InspectorRailProps) {
                                 <span className="rail__row-name">
                                     {nonBlank(source.label) ?? GENERIC_SOURCE_LABEL}
                                 </span>
-                                <Badge tone={coverageStateTone(source.state)} title={source.state}>
+                                <Badge
+                                    data-value={source.state}
+                                    tone={coverageStateTone(source.state)}
+                                >
                                     {nonBlank(source.state_label) ?? humanizeTerm(source.state)}
                                 </Badge>
                                 {source.observed_at === undefined ? null : (
@@ -81,7 +84,7 @@ export function InspectorRail({ result }: InspectorRailProps) {
                     <p className="rail__value">{windowRange}</p>
                 )}
                 {window === undefined ? null : (
-                    <p className="rail__note" title={window.provenance}>
+                    <p className="rail__note" data-value={window.provenance}>
                         {humanizeTerm(window.provenance)}
                     </p>
                 )}

@@ -186,7 +186,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                         {rows.map((row) => (
                             <tr data-testid="ranking-row" key={row.member.subject.canonical_id}>
                                 <td>{row.attentionRank}</td>
-                                <td title={row.member.subject.canonical_id}>
+                                <td data-subject-id={row.member.subject.canonical_id}>
                                     {row.member.subject.label}
                                 </td>
                                 <td>

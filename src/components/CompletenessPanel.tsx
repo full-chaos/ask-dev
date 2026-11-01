@@ -32,6 +32,17 @@ export type CompletenessPanelProps = {
  * THIS row's named cause was reported by a mechanism or defaulted to, and is
  * appended so a defaulted cause is never mistaken for an observed one.
  */
+/** How many facts and source rows stand behind the answer; zero is said as zero. */
+function factCountText(completeness: AnswerCompleteness): string {
+    const facts = completeness.claimed_facts_count;
+    const rows = completeness.rows_count;
+    if (facts === 0) return "No facts stand behind this answer.";
+    const factWord = facts === 1 ? "1 fact" : `${facts.toLocaleString("en-US")} facts`;
+    if (rows === 0) return `${factWord}, with no source rows.`;
+    const rowWord = rows === 1 ? "1 source row" : `${rows.toLocaleString("en-US")} source rows`;
+    return `${factWord} from ${rowWord}.`;
+}
+
 function outcomeCauses(row: PlanRequirementOutcomeRow): readonly string[] {
     const causes = [row.cause_coverage, row.cause_narrowing, row.cause_overrun].filter(
         (value): value is string => value !== undefined,
@@ -88,11 +99,10 @@ function RefinementStep({
  * and can legitimately disagree on the same result (e.g. a `complete`
  * disposition with a `partial` derived state); when they do, BOTH badges
  * stay visible side by side — this panel never picks a winner or collapses
- * one into the other. `not_derived` gets its own badge and tone
- * (`completenessStateTone`), never the `complete` tone and never omitted:
- * an answer with no derived outcomes is an honest gap, not a vacuous
- * success (the exact failure `AnswerCompleteness.state`'s schema doc
- * comment names).
+ * one into the other. `not_derived` renders no badge (CHAOS-12245, chris's
+ * ruling): it never gets the `complete` tone, and the outcomes section below
+ * says that no outcomes were derived, so the gap stays an honest gap rather
+ * than a vacuous success.
  *
  * `outcomes` (CHAOS-5109) is the one authority for what this answer was
  * supposed to contain and what became of it — rendered one row per entry,
@@ -136,7 +146,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                 {withheld ? (
                     <Badge
                         tone="warn"
-                        title={`withheld by the Workbench; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
+                        data-value={`withheld; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
                     >
                         Withheld
                     </Badge>
@@ -144,26 +154,29 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                     <>
                         <Badge
                             tone={statusTone(completeness.terminal_status)}
-                            title={`terminal_status: ${completeness.terminal_status}`}
+                            data-value={`terminal_status: ${completeness.terminal_status}`}
                         >
                             {humanizeTerm(completeness.terminal_status)}
                         </Badge>
-                        <Badge
-                            tone={completenessStateTone(completeness.state)}
-                            title={`state: ${completeness.state}`}
-                        >
-                            {humanizeTerm(completeness.state)}
-                        </Badge>
+                        {
+                            // CHAOS-12245, chris's ruling: not derived renders nothing
+                            // about completeness.
+                            completeness.state === "not_derived" ? null : (
+                                <Badge
+                                    tone={completenessStateTone(completeness.state)}
+                                    data-value={`state: ${completeness.state}`}
+                                >
+                                    {humanizeTerm(completeness.state)}
+                                </Badge>
+                            )
+                        }
                     </>
                 )}
             </div>
-            <p className="record__meta">
-                {`${String(completeness.claimed_facts_count)} claimed fact${completeness.claimed_facts_count === 1 ? "" : "s"} · ${String(completeness.rows_count)} row${completeness.rows_count === 1 ? "" : "s"}`}
-            </p>
+            <p className="record__meta">{factCountText(completeness)}</p>
             {withheld ? (
                 <p className="coverage__reason" data-testid="completeness-withheld">
-                    Parts of this answer were withheld by the Workbench, so completeness is not
-                    stated here.
+                    Parts of this answer were withheld, so completeness is not stated here.
                 </p>
             ) : null}
             {completeness.terminal_reason !== undefined ? (
@@ -186,7 +199,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                 <th scope="col">Requirement</th>
                                 <th scope="col">Outcome</th>
                                 <th scope="col">Impact</th>
-                                <th scope="col">Served / declared</th>
+                                <th scope="col">Served / needed</th>
                                 <th scope="col">Reason</th>
                             </tr>
                         </thead>
@@ -200,7 +213,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                     // filtered, only ever rendered in the
                                     // server's own append-only order.
                                     <tr data-testid="completeness-outcome-row" key={index}>
-                                        <td title={row.requirement}>
+                                        <td data-value={row.requirement}>
                                             {row.requirement === undefined
                                                 ? "—"
                                                 : humanizeTerm(row.requirement)}
@@ -219,7 +232,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                         <td>
                                             <Badge
                                                 tone={planRequirementOutcomeTone(row.outcome)}
-                                                title={`outcome: ${row.outcome}`}
+                                                data-value={`outcome: ${row.outcome}`}
                                             >
                                                 {humanizeTerm(row.outcome)}
                                             </Badge>

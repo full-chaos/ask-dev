@@ -7,6 +7,8 @@
  * web. `NOT_RUN_COPY`, `STOPPED_COPY`, `CHAT_STAGE_COPY`, `retryAfterText` and `formatElapsed` are
  * web's too, copied the same way, and so are `HISTORY_COPY`, `FEEDBACK_COPY`, `TRANSCRIPT_COPY`,
  * `COMPOSER_COPY`, `CONTEXT_CHIPS_COPY`, `SCOPE_KIND_LABEL`, `CTA_LABELS` and the row helpers.
+ * `CHAT_PROGRESS_COPY.queued` and `.batchPosition` are ask-dev's (CHAOS-12406): web's source sends
+ * them, and web has no words for them yet.
  */
 import type {
     ChatContextRef,
@@ -103,6 +105,9 @@ export const CHAT_PROGRESS_COPY = {
     canceling: "Canceling…",
     stopRequested: "Stopping…",
     stopNotLeased: "This run cannot be stopped. It ends on its own.",
+    queued: "Waiting for the question before it to finish.",
+    batchPosition: (position: number, total: number) =>
+        `Question ${String(position)} of ${String(total)}`,
 } as const;
 
 /** The stage checklist: one line per ACR stage, and each row's state for a screen reader. */

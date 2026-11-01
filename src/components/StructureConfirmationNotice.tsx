@@ -1,3 +1,4 @@
+import { Details } from "./Details";
 import { Badge } from "./Badge";
 import type { ConfirmedStructureEntry } from "../lib/contracts";
 import { structureDispositionTone } from "../lib/presentation";
@@ -32,17 +33,19 @@ export function StructureConfirmationRecords({
                     <div className="record__head">
                         <span className="record__title">{summary.label}</span>
                         <Badge
-                            title={summary.entry.disposition}
+                            data-value={summary.entry.disposition}
                             tone={structureDispositionTone(summary.entry.disposition)}
                         >
                             {summary.entry.disposition.replaceAll("_", " ")}
                         </Badge>
                     </div>
                     <p className="answer__body">{summary.sentence}</p>
-                    <p className="record__meta">
-                        applied value <code>{summary.entry.applied_value}</code> · source{" "}
-                        {summary.entry.source} · provenance {summary.entry.provenance}
-                    </p>
+                    <Details summary="Details">
+                        <p className="record__meta">
+                            applied value <code>{summary.entry.applied_value}</code> · source{" "}
+                            {summary.entry.source} · provenance {summary.entry.provenance}
+                        </p>
+                    </Details>
                 </li>
             ))}
         </ul>
@@ -89,8 +92,13 @@ export function StructureConfirmationNotice({ entries }: StructureConfirmationNo
             </h2>
             <div className="chip-row" data-testid="structure-confirmation-chips">
                 {summaries.map((summary) => (
-                    <span className="chip" key={summary.entry.member} title={summary.sentence}>
-                        {summary.label}: <code>{summary.entry.applied_value}</code>
+                    <span
+                        className="chip"
+                        data-applied-value={summary.entry.applied_value}
+                        key={summary.entry.member}
+                        title={summary.sentence}
+                    >
+                        {summary.label}
                     </span>
                 ))}
             </div>

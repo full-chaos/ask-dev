@@ -16,6 +16,39 @@ const budgetRefusalFailure: WorkbenchFailure = {
     retryable: false,
 };
 
+describe("FailurePanel — details", () => {
+    it("logs what a failure's details say, because no user reads them", () => {
+        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const failure: WorkbenchFailure = {
+            code: "acr_contract_violation",
+            details: ["/deterministic_answer: must be object"],
+            message: "The answer could not be read.",
+            retryable: false,
+        };
+        render(<FailurePanel failure={failure} />);
+
+        expect(logged).toHaveBeenCalledExactlyOnceWith(
+            "investigation failed",
+            "acr_contract_violation",
+            failure.details,
+        );
+        expect(screen.queryByText(/deterministic_answer/u)).toBeNull();
+        logged.mockRestore();
+    });
+
+    it("logs nothing for a failure with no details", () => {
+        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        render(
+            <FailurePanel
+                failure={{ code: "acr_timeout", message: "Timed out.", retryable: true }}
+            />,
+        );
+
+        expect(logged).not.toHaveBeenCalled();
+        logged.mockRestore();
+    });
+});
+
 /**
  * CHAOS-5107: `FailurePanel` gates the one-click narrower re-ask on the SAME
  * three things `onRetry` already requires (present continuation, an

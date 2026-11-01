@@ -39,10 +39,10 @@ export function CohortGroupsPanel({ cohort }: CohortGroupsPanelProps) {
                     <li className="record__meta" key={group.subject.canonical_id}>
                         {group.subject.label}:{" "}
                         {group.complete && !group.truncated
-                            ? "complete"
+                            ? "all included"
                             : group.truncated
-                              ? "truncated"
-                              : "incomplete"}{" "}
+                              ? "partly included"
+                              : "may be incomplete"}{" "}
                         — {group.member_canonical_ids.length} of {group.total}{" "}
                         {humanizeTerm(cohort?.kind ?? "member")}
                         {group.total === 1 ? "" : "s"} shown

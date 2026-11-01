@@ -1,3 +1,4 @@
+import { Details } from "./Details";
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
@@ -50,9 +51,9 @@ export function SubjectResolutionPanel({
             ) : null}
             <p className="record__meta">
                 {resolution.committed.length === 0
-                    ? "Nothing committed."
-                    : `Committed: ${resolution.committed
-                          .map((subject) => `${subject.label} (${subject.kind})`)
+                    ? "No subject settled on."
+                    : `Settled on: ${resolution.committed
+                          .map((subject) => subject.label)
                           .join(", ")}`}
             </p>
             {resolution.candidates.length === 0 ? (
@@ -65,15 +66,19 @@ export function SubjectResolutionPanel({
                                 <span className="record__title">{candidate.subject.label}</span>
                                 <Badge
                                     tone={candidateStateTone(candidate.state)}
-                                    title={candidate.state}
+                                    data-value={candidate.state}
                                 >
                                     {humanizeTerm(candidate.state)}
                                 </Badge>
                                 <span className="record__meta">
-                                    {candidate.subject.kind} · {candidate.subject.canonical_id} ·
                                     confidence {formatConfidence(candidate.confidence)}
                                 </span>
                             </div>
+                            <Details summary="Details">
+                                <p className="record__meta">
+                                    {candidate.subject.kind} · {candidate.subject.canonical_id}
+                                </p>
+                            </Details>
                             <ul className="stack stack--tight record__body">
                                 {candidate.match_reasons.map((reason) => (
                                     <li className="record__meta" key={reason}>

@@ -224,12 +224,12 @@ describe("StructureNeedsPanel", () => {
             screen.getByRole("button", { name: `Select ${phrased!.phrasing}` }),
         ).toBeInTheDocument();
         // ...but the structural label is still shown, for inspection.
-        expect(screen.getByText(`structural: ${phrased!.label}`)).toBeInTheDocument();
+        expect(screen.getByText(`Offered: ${phrased!.label}`)).toBeInTheDocument();
         // The unphrased sibling: no change from the pre-phrasing behavior.
         expect(
             screen.getByRole("button", { name: `Select ${unphrased!.label}` }),
         ).toBeInTheDocument();
-        expect(screen.queryByText(`structural: ${unphrased!.label}`)).toBeNull();
+        expect(screen.queryByText(`Offered: ${unphrased!.label}`)).toBeNull();
     });
 
     /**
@@ -287,7 +287,7 @@ describe("StructureNeedsPanel", () => {
             expect(
                 screen.getByRole("button", { name: `Select ${option.phrasing}` }),
             ).toBeInTheDocument();
-            expect(screen.getByText(`structural: ${option.label}`)).toBeInTheDocument();
+            expect(screen.getByText(`Offered: ${option.label}`)).toBeInTheDocument();
         }
     });
 
@@ -482,7 +482,7 @@ describe("StructureNeedsPanel", () => {
         // codex round 2: a rejected click must not look like nothing
         // happened — it is surfaced as a visible alert, not left as a
         // silently-disabled confirm button with no explanation.
-        expect(screen.getByRole("alert")).toHaveTextContent("This is a Workbench bug");
+        expect(screen.getByRole("alert")).toHaveTextContent("This is an Ask Dev bug");
         expect(
             screen.getByRole("button", { name: "Ask again with these selections" }),
         ).toBeDisabled();

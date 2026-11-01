@@ -142,13 +142,13 @@ describe("finding 3: a phrased option still shows its structural value", () => {
         renderPopup([PHRASED_PAGE]);
 
         expect(screen.getByText("How a pull request went")).toBeInTheDocument();
-        expect(screen.getByText("structural: pull_request")).toBeInTheDocument();
+        expect(screen.getByText("Offered: pull_request")).toBeInTheDocument();
     });
 
     it("shows no structural line when there is no phrasing (displayText === label)", () => {
         renderPopup([SINGLE_PAGE_ONE_OPTION]);
 
-        expect(screen.queryByText(/^structural:/)).toBeNull();
+        expect(screen.queryByText(/^Offered:/)).toBeNull();
     });
 });
 

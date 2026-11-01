@@ -119,14 +119,20 @@ const packageOf = (specifier) =>
         : specifier.split("/")[0];
 
 /**
- * Walks the graph from `entry` (relative to `root`). Returns the reached files and every break.
- * @returns {{ files: string[], breaks: { rule: string, file: string, specifier?: string }[] }}
+ * Walks the graph from `entry` (relative to `root`). Returns the reached files, the ones of them a
+ * host loads at run time (`runtimeFiles`: a file reached only through type edges is erased), and
+ * every break.
+ * @returns {{
+ *     files: string[],
+ *     runtimeFiles: string[],
+ *     breaks: { rule: string, file: string, specifier?: string }[],
+ * }}
  */
 export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles = 50 }) {
     const breaks = [];
     const entryPath = resolve(root, entry);
     if (!existsSync(entryPath)) {
-        return { files: [], breaks: [{ rule: "missing_entry", file: entry }] };
+        return { files: [], runtimeFiles: [], breaks: [{ rule: "missing_entry", file: entry }] };
     }
     const src = join(resolve(root), "src") + sep;
     const app = join(src, "app") + sep;
@@ -183,11 +189,15 @@ export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles
         }
     }
     const files = [...runtime.keys()].map((file) => relative(root, file)).sort();
+    const runtimeFiles = [...runtime.entries()]
+        .filter(([, live]) => live)
+        .map(([file]) => relative(root, file))
+        .sort();
     if (files.length < minFiles) breaks.push({ rule: "too_few_files", file: entry });
     // A file first reached through a type edge is walked again when a value edge reaches it: one
     // break is reported once.
     const unique = new Map(
         breaks.map((item) => [`${item.rule}|${item.file}|${item.specifier ?? ""}`, item]),
     );
-    return { files, breaks: [...unique.values()] };
+    return { files, runtimeFiles, breaks: [...unique.values()] };
 }

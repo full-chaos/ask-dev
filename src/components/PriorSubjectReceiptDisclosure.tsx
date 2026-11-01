@@ -1,3 +1,4 @@
+import { Details } from "./Details";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
@@ -41,7 +42,7 @@ export function PriorSubjectReceiptDisclosure({
     return (
         <section aria-labelledby={`${idPrefix}-prior-subject-receipts-title`}>
             <h3 className="panel__title" id={`${idPrefix}-prior-subject-receipts-title`}>
-                Prior-turn subject receipts
+                Earlier subject choices
             </h3>
             <ul className="stack stack--tight">
                 {dispositions.map((entry, index) => (
@@ -59,13 +60,16 @@ export function PriorSubjectReceiptDisclosure({
                         className="record__meta"
                         key={`${index}:${entry.prior_result_id}:${entry.receipt_id}`}
                     >
-                        <code>{entry.receipt_id}</code> from <code>{entry.prior_result_id}</code>:{" "}
                         <Badge
                             tone={priorSubjectReceiptDispositionTone(entry.disposition)}
-                            title={entry.disposition}
+                            data-value={entry.disposition}
                         >
                             {humanizeTerm(entry.disposition)}
                         </Badge>
+                        <Details summary="Details">
+                            <code>{entry.receipt_id}</code> from{" "}
+                            <code>{entry.prior_result_id}</code>
+                        </Details>
                     </li>
                 ))}
             </ul>

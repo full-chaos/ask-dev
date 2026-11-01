@@ -43,7 +43,8 @@ export type ConversationSourceTurn =
     | {
           readonly role: "user";
           readonly id: number;
-          readonly question: string;
+          /** `null`: not recorded. Such a question is never sent again. */
+          readonly question: string | null;
           readonly createdAt: string;
       }
     | {
@@ -103,6 +104,7 @@ export function buildConversationTurns(
     const settled: ConversationTurn[] = [];
     for (const turn of priorTurns) {
         if (turn.role === "user") {
+            if (turn.question === null) continue;
             settled.push({
                 turn_id: `turn_${String(turn.id)}`,
                 role: "user",
