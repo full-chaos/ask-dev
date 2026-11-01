@@ -15,6 +15,7 @@ export type Vocabulary =
     | "candidate_state"
     | "driver_standing"
     | "driver_window"
+    | "fact_field"
     | "fact_kind"
     | "member_outcome"
     | "prior_receipt_disposition"
