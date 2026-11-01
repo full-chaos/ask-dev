@@ -278,7 +278,7 @@ describe("F: the owning-team roll-up label (CHAOS-12178)", () => {
     it("labels a project only: the same mark on another subject is not this roll-up (codex r1)", () => {
         const claim = rollupClaim("owning_team_rollup", {
             subject: { kind: "organization", canonical_id: "org:acme", label: "Acme" },
-        } as Partial<ClaimedFact>);
+        });
         expect(investmentRollupOf(claim)).toBeNull();
         expect(investmentRollupOf(rollupClaim("owning_team_rollup"))).not.toBeNull();
     });
