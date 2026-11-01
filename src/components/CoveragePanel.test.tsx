@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import originStateExample from "@/contracts/examples/context_fabric_investigation_result_origin_state.v1.json";
 import commonSchemaPinned from "@/contracts/schemas/context_fabric_common.v1.schema.json";
 import { CoveragePanel } from "@/components/CoveragePanel";
+import { DISCLOSURE_FLOOR } from "@/lib/degraded-reasons";
 import { validateContract } from "@/lib/acr/validate";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { isVisibleText, visibleText } from "@/test/visible-text";
@@ -1155,6 +1156,164 @@ describe("CoveragePanel — train 4 coverage codes: tone is measured, not assume
         expect(r.chipTone).toContain("badge--ok");
         expect(r.visible).not.toContain("What limits this answer");
         expect(r.visible).toContain("Every source contributed.");
+    });
+});
+
+/**
+ * CHAOS-12442, the entity tree: a consumer names the tier a link stands on and never presents a
+ * lower tier as native. ACR's two tier details are never degrading, and their served label is the
+ * only carrier. Labels and raw strings below are ACR's own, at the train 4 pin.
+ */
+describe("CoveragePanel — what a non-degrading count discloses", () => {
+    const TIERS = [
+        [
+            "graph_answer_pull_requests_on_explicit_text_links",
+            "3 pull requests tied to the requested project only by a text reference",
+            "pull requests in this answer whose project membership stands on explicit_text links: 3",
+        ],
+        [
+            "graph_answer_pull_requests_on_heuristic_links",
+            "1 pull request tied to the requested project only by an inferred link",
+            "pull requests in this answer whose project membership stands on heuristic links: 1",
+        ],
+    ] as const;
+
+    function coverageOf(details: readonly Record<string, unknown>[]) {
+        return {
+            ...structuredClone(originStateExample.coverage),
+            partial: false,
+            degraded_reasons: [],
+            details,
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+    }
+
+    const tierDetail = (code: string, label: string, raw: string) => ({
+        detail_id: "cov-tier",
+        source: "context-fabric:graph",
+        code,
+        degrading: false,
+        count: 3,
+        label,
+        raw,
+    });
+
+    it.each(TIERS)("%s: shows the served label, and adds no limit", (code, label, raw) => {
+        const { container } = render(
+            <CoveragePanel coverage={coverageOf([tierDetail(code, label, raw)])} />,
+        );
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+
+        expect(visibleText(panel)).toContain(label);
+        expect(visibleText(panel)).not.toContain("What limits this answer");
+        expect(visibleText(panel)).not.toContain(raw);
+        expect(panel.querySelector(`[data-value="${code}"]`)).not.toBeNull();
+    });
+
+    it("keeps the raw string in a closed fold", () => {
+        const [code, label, raw] = TIERS[0];
+        const { container } = render(
+            <CoveragePanel coverage={coverageOf([tierDetail(code, label, raw)])} />,
+        );
+
+        expect(
+            container.querySelector('[data-testid="coverage-disclosures"] details')?.textContent,
+        ).toContain(raw);
+    });
+
+    it("keeps the served label when the engine phrases it: phrasing may omit the tier", () => {
+        const [code, label, raw] = TIERS[0];
+        const detail = {
+            ...tierDetail(code, label, raw),
+            phrasing: "3 pull requests are tied to the requested project.",
+        };
+        const { container } = render(<CoveragePanel coverage={coverageOf([detail])} />);
+
+        expect(visibleText(container.querySelector('[data-testid="coverage-panel"]')!)).toContain(
+            label,
+        );
+    });
+
+    it("falls back to the phrasing when the label is blank", () => {
+        const [code, , raw] = TIERS[0];
+        const detail = { ...tierDetail(code, "   ", raw), phrasing: "Three rest on a text link." };
+        const { container } = render(<CoveragePanel coverage={coverageOf([detail])} />);
+
+        expect(visibleText(container.querySelector('[data-testid="coverage-panel"]')!)).toContain(
+            "Three rest on a text link.",
+        );
+    });
+
+    it("never draws an empty line: the plain floor, with the raw string in its fold", () => {
+        const [code, , raw] = TIERS[0];
+        const { container } = render(
+            <CoveragePanel coverage={coverageOf([tierDetail(code, "   ", raw)])} />,
+        );
+        const list = container.querySelector('[data-testid="coverage-disclosures"]')!;
+
+        expect(visibleText(list)).toContain(DISCLOSURE_FLOOR);
+        expect(visibleText(list)).not.toContain(raw);
+        expect(list.querySelector("details")?.textContent).toContain(raw);
+    });
+
+    it("a result with neither detail shows no disclosure", () => {
+        const { container } = render(<CoveragePanel coverage={coverageOf([])} />);
+
+        expect(container.querySelector('[data-testid="coverage-disclosures"]')).toBeNull();
+    });
+
+    it("a new counted disclosure shows with no change here: no list of codes", () => {
+        const detail = tierDetail("a_code_acr_adds_later", "2 members of a new kind", "raw");
+        const { container } = render(<CoveragePanel coverage={coverageOf([detail])} />);
+
+        expect(visibleText(container.querySelector('[data-testid="coverage-panel"]')!)).toContain(
+            "2 members of a new kind",
+        );
+    });
+
+    it.each([
+        ["an uncounted fact that does not apply", { count: undefined }],
+        ["a zero count", { count: 0 }],
+        ["a narrowed read, whose count is what was skipped", { narrowed: true }],
+        ["a degrading detail, which belongs in the limits", { degrading: true }],
+    ])("does not disclose %s", (_name, patch) => {
+        const [code, label, raw] = TIERS[0];
+        const { container } = render(
+            <CoveragePanel
+                coverage={coverageOf([{ ...tierDetail(code, label, raw), ...patch }])}
+            />,
+        );
+
+        expect(container.querySelector('[data-testid="coverage-disclosures"]')).toBeNull();
+    });
+
+    it("a disclosure beside a limit keeps both, each in its own place", () => {
+        const [code, label, raw] = TIERS[1];
+        const limit = {
+            detail_id: "cov-limit",
+            source: "context-fabric:graph",
+            code: "read_population_unverified",
+            degrading: true,
+            label: "The set of work items read could not be confirmed.",
+            raw: "the raw limit",
+        };
+        const { container } = render(
+            <CoveragePanel
+                coverage={{
+                    ...coverageOf([limit, tierDetail(code, label, raw)]),
+                    partial: true,
+                    degraded_reasons: ["the raw limit"],
+                }}
+            />,
+        );
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+
+        expect(visibleText(panel)).toContain("What limits this answer");
+        expect(
+            container.querySelector('[data-testid="coverage-disclosures"]')?.textContent,
+        ).toContain(label);
+        expect(
+            container.querySelector('[data-testid="coverage-disclosures"]')?.textContent,
+        ).not.toContain(limit.label);
     });
 });
 
