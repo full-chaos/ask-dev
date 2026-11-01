@@ -5,7 +5,7 @@ import { EvidenceReferences } from "./EvidenceReferences";
 import { SafeAnswerText } from "./SafeAnswerText";
 import type { ClaimedFact, CohortMember, InvestigationResult, SubjectRef } from "../lib/contracts";
 import { cellText } from "../lib/fact-rows";
-import { isCohortIntent } from "../lib/cohort-ranking";
+import { askedForCohort } from "../lib/cohort-ranking";
 import { nonBlank } from "../lib/presentation";
 
 export type WorkItemStatusPanelProps = {
@@ -83,7 +83,7 @@ function StatusCell({ facts }: { readonly facts: readonly ClaimedFact[] }) {
  */
 export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
     const idPrefix = useId();
-    if (!isCohortIntent(result.interpretation.shape)) return null;
+    if (!askedForCohort(result.interpretation.shape, result)) return null;
 
     const members = unrankedWorkItemMembers(result.cohort);
     if (members.length === 0) return null;

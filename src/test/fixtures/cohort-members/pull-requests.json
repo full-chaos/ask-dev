@@ -3197,7 +3197,7 @@
                 "state": "pruned",
                 "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams)",
                 "label": "Canonical facts — operational deficiency",
-                "state_label": "not needed"
+                "state_label": "not needed for this question"
             },
             {
                 "source": "canonical_fact:pull_requests",
@@ -3211,14 +3211,14 @@
                 "state": "pruned",
                 "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)",
                 "label": "Canonical facts — readiness",
-                "state_label": "not needed"
+                "state_label": "not needed for this question"
             },
             {
                 "source": "canonical_fact:workload",
                 "state": "pruned",
                 "reason": "no resolved subject has a kind this capability supports (resolved kinds: pull requests, repositories; supported kinds: teams, projects)",
                 "label": "Canonical facts — workload",
-                "state_label": "not needed"
+                "state_label": "not needed for this question"
             },
             {
                 "source": "context-fabric:graph",
@@ -3357,6 +3357,22 @@
         "acr:v1:repository:00000000-0000-4000-8000-000000000002": "Repository: 00000000-0000-4000-8000-000000000002",
         "acr:v1:work-item-team.v2:00000000-0000-4000-8000-000000000002:ghpr%3Afull-chaos/dev-health-ops#2046:linear%3ATEAMA:repo_ownership": "Work item/team link: 00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046:linear:TEAMA:repo_ownership",
         "acr:v1:work-item:00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046": "Work item: 00000000-0000-4000-8000-000000000002:ghpr:full-chaos/dev-health-ops#2046"
+    },
+    "vocabulary_labels": {
+        "answer_status:degraded": "Degraded answer",
+        "candidate_state:committed": "selected",
+        "fact_kind:cardinality": "member count",
+        "fact_kind:pull_requests": "pull request",
+        "member_outcome:not_applicable": "not applicable",
+        "ranking_signal:health.compounding_risk": "health risk",
+        "ranking_signal:investment_mix": "investment mix",
+        "ranking_signal:operational_deficiencies.severity": "operational deficiencies",
+        "ranking_signal:readiness.coverage_gap": "readiness gap",
+        "ranking_signal:workload.forecast_pressure": "workload pressure",
+        "requirement_outcome:narrowed": "narrowed",
+        "requirement_outcome:satisfied": "met",
+        "subject_kind:pull_request": "pull request",
+        "subject_kind_plural:pull_request": "pull requests"
     },
     "versions": {
         "service_version": "0.0.0-dev",

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import type { InvestigationResult, RenderShape } from "@/lib/contracts";
-import { cohortRanking } from "@/lib/cohort-ranking";
+import { askedForCohort, cohortRanking } from "@/lib/cohort-ranking";
 import { servesCohortShape } from "@/lib/render-shapes";
 import { cohortMemberScenarios as cohorts } from "@/test/fixtures/cohort-members";
 
@@ -56,7 +56,7 @@ describe("a served cohort shape draws, whatever interpretation.shape says (gap 2
     });
 
     it("gives the drivers their footnote target: the ranking is on screen", () => {
-        expect(cohortRanking("open", open.cohort, servesCohortShape(open)).state).toBe("rows");
+        expect(cohortRanking(askedForCohort("open", open), open.cohort).state).toBe("rows");
     });
 
     it("a shape that fails its check is said, never a silent absence", () => {
@@ -112,6 +112,19 @@ describe("the gate keeps what it must keep", () => {
         expect(
             within(screen.getByTestId("drivers-panel")).getByTestId("withheld-part"),
         ).toBeVisible();
+    });
+
+    it("a served shape over a list says its charts were withheld (codex r1 on #132)", () => {
+        const members = open.cohort!.members.map((member) => {
+            const { score: _score, drivers: _drivers, ...rest } = member;
+            return rest;
+        });
+        draw({ ...open, cohort: { ...open.cohort!, members } } as InvestigationResult);
+        expect(
+            within(screen.getByTestId("cohort-members-panel")).getByTestId(
+                "render-shapes-withheld",
+            ),
+        ).toHaveTextContent(/2 charts were withheld/u);
     });
 
     it("a served shape over a cohort with nothing ranked draws the members", () => {

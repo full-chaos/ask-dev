@@ -279,27 +279,20 @@ describe("G1: the kinds the render may rank", () => {
     });
 
     it("a rankable cohort of rankable members ranks", () => {
-        expect(
-            cohortRanking("explicit_cohort", rankedCohort("project", ["project", "project"]), false)
-                .state,
-        ).toBe("rows");
+        expect(cohortRanking(true, rankedCohort("project", ["project", "project"])).state).toBe(
+            "rows",
+        );
     });
 
     it("one non-rankable MEMBER fails the whole cohort closed", () => {
-        expect(
-            cohortRanking(
-                "explicit_cohort",
-                rankedCohort("team", ["team", "person", "team"]),
-                false,
-            ).state,
-        ).toBe("kind_not_ranked");
+        expect(cohortRanking(true, rankedCohort("team", ["team", "person", "team"])).state).toBe(
+            "kind_not_ranked",
+        );
     });
 
     it("a non-rankable COHORT kind fails closed even when every member is a team", () => {
         for (const kind of ["person", "organization", "pull_request", "brand_new_kind"]) {
-            expect(
-                cohortRanking("explicit_cohort", rankedCohort(kind, ["team"]), false).state,
-            ).toBe("kind_not_ranked");
+            expect(cohortRanking(true, rankedCohort(kind, ["team"])).state).toBe("kind_not_ranked");
         }
     });
 });

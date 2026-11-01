@@ -18,7 +18,9 @@ import type {
     CohortMember,
     CohortMemberDriver,
     InterpretedShape,
+    InvestigationResult,
 } from "./contracts";
+import { servesCohortShape } from "./render-shapes";
 
 /**
  * The interpreted shapes a cohort ranking is an answer TO.
@@ -257,22 +259,42 @@ function isRanked({ member, score }: RankedCohortRow): boolean {
     return score !== null || (member.drivers?.length ?? 0) > 0;
 }
 
+/** The served question families whose answer is a cohort (CHAOS-12477). */
+export const COHORT_FAMILIES: readonly string[] = [
+    "discovered_cohort_ranking",
+    "scoped_cohort_status",
+    "grouped_cohort_status",
+];
+
+/**
+ * Whether this answer is about a cohort. `interpretation.shape` alone is not reliable: an answer
+ * can read `open`, so a served cohort family counts too, and so does a cohort chart ACR served
+ * (`servesCohortShape`). A single-subject answer that only carries a cohort as context has neither,
+ * so it draws no list and no ranking (AGENTS.md check 10).
+ */
+export function askedForCohort(
+    shape: InterpretedShape,
+    result: Pick<InvestigationResult, "answer_plan" | "render_shapes"> | undefined,
+): boolean {
+    const family = result?.answer_plan?.family;
+    return (
+        isCohortIntent(shape) ||
+        (family !== undefined && COHORT_FAMILIES.includes(family)) ||
+        servesCohortShape(result)
+    );
+}
+
 /**
  * The single gate every ranking consumer goes through (lead's ruling on CHAOS-3748, gap 1).
  *
- * 1. Intent: the interpreted shape, or a cohort chart ACR served (`servesCohortShape`, gap 2).
+ * 1. Intent (`askedForCohort`).
  * 2. The guardrail: a kind off `RANKABLE_SUBJECT_KINDS` (`person`, or one no pin documents) is
  *    never listed and never ranked, whether or not ACR ranked it.
  * 3. Nothing ranked: the members are the answer, for every other kind.
  * 4. Only now the kinds this view ranks: "Ranking not shown" says a ranking existed and was
  *    withheld, so it is never said of a cohort with none.
  */
-export function cohortRanking(
-    shape: InterpretedShape,
-    cohort: Cohort | undefined,
-    servedCohortShape: boolean,
-): CohortRankingState {
-    const asked = isCohortIntent(shape) || servedCohortShape;
+export function cohortRanking(asked: boolean, cohort: Cohort | undefined): CohortRankingState {
     if (!asked || cohort === undefined) return { state: "not_requested" };
     const kinds = [cohort.kind, ...cohort.members.map((member) => member.subject.kind)];
     if (!kinds.every(isRankableSubjectKind)) return { state: "kind_not_ranked" };

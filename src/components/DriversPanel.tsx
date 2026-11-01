@@ -7,7 +7,7 @@ import { EvidenceReferences } from "./EvidenceReferences";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { SafeAnswerText } from "./SafeAnswerText";
 import { rollupsOfClaims } from "../lib/investment-rollup";
-import { cohortRanking } from "../lib/cohort-ranking";
+import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
 import type {
     ClaimedFact,
     DriverJudgment,
@@ -16,7 +16,6 @@ import type {
     SubjectRef,
 } from "../lib/contracts";
 import { formatConfidence, humanizeTerm } from "../lib/presentation";
-import { servesCohortShape } from "../lib/render-shapes";
 import { useVocabularyWord } from "./VocabularyWordContext";
 
 /**
@@ -186,9 +185,8 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
     // all, so a withheld driver about one has nothing to point at even
     // though the table itself is on screen.
     const ranking = cohortRanking(
-        result.interpretation.shape,
+        askedForCohort(result.interpretation.shape, result),
         result.cohort,
-        servesCohortShape(result),
     );
     const rows = ranking.state === "rows" ? ranking.rows : null;
     // G1 (CHAOS-12429): a cohort of a kind the render does not rank keeps its subjects out of the

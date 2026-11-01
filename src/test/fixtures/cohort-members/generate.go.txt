@@ -12,7 +12,7 @@ import (
 	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
 )
 
-const maxBytes = 65536
+const maxBytes = 262144
 
 func must(err error) {
 	if err != nil {
@@ -49,7 +49,7 @@ func unranked(result contextfabric.InvestigationResult, kind contextfabric.Subje
 }
 
 func main() {
-	out, capture := os.Args[1], os.Args[2]
+	out, capture, subjectCapture := os.Args[1], os.Args[2], os.Args[3]
 	shapes := "contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json"
 
 	repositories := unranked(load(shapes), "repository")
@@ -74,7 +74,22 @@ func main() {
 	}}
 	open.RenderShapes, _ = contextfabric.SelectRenderShapes(open, frame)
 
+	// CHAOS-12477's two sides of the family gate, each with a real answer plan from a capture. A
+	// list on an `open` answer draws because its family is a cohort family. A single-subject answer
+	// that carries a cohort as context does not (check 10).
+	openList := unranked(load(shapes), "repository")
+	openList.Interpretation.Shape = "open"
+	openList.AnswerPlan = load(capture).AnswerPlan
+	openList.Completeness = contextfabric.ComputeAnswerCompleteness(openList)
+
+	contextCohort := unranked(load(shapes), "repository")
+	contextCohort.Interpretation.Shape = "single_subject"
+	contextCohort.AnswerPlan = load(subjectCapture).AnswerPlan
+	contextCohort.Completeness = contextfabric.ComputeAnswerCompleteness(contextCohort)
+
 	cases := map[string]contextfabric.InvestigationResult{
+		"open-cohort-family":    openList,
+		"subject-with-cohort":   contextCohort,
 		"served-shape-open":     open,
 		"unranked-repositories": repositories,
 		"zero-match":            zero,

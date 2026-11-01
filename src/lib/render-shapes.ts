@@ -43,7 +43,9 @@ export const COHORT_SHAPE_RULES: readonly RenderShapeRule[] = [
  * shape is ACR's own statement that a ranking is the answer, so it counts as intent. A shape that
  * then fails its check still counts: the panel says it was withheld, never a silent absence.
  */
-export function servesCohortShape(result: InvestigationResult | undefined): boolean {
+export function servesCohortShape(
+    result: Pick<InvestigationResult, "render_shapes"> | undefined,
+): boolean {
     return (result?.render_shapes ?? []).some((shape) =>
         COHORT_SHAPE_RULES.includes(shape.selected_by),
     );
