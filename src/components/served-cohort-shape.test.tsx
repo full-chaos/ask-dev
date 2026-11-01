@@ -127,6 +127,21 @@ describe("the gate keeps what it must keep", () => {
         ).toHaveTextContent(/2 charts were withheld/u);
     });
 
+    it("a served shape with no cohort at all is said too (codex r2 on #132)", () => {
+        const { cohort: _cohort, ...noCohort } = open;
+        draw(noCohort);
+        expect(screen.getByTestId("render-shapes-withheld")).toHaveTextContent(
+            /2 charts were withheld/u,
+        );
+        expect(screen.queryByTestId("cohort-ranking-panel")).toBeNull();
+    });
+
+    it("no served shape and no cohort: nothing is said", () => {
+        const { cohort: _cohort, ...noCohort } = withShapes(trendShapes);
+        draw(noCohort);
+        expect(screen.queryByTestId("render-shapes-withheld")).toBeNull();
+    });
+
     it("a served shape over a cohort with nothing ranked draws the members", () => {
         const members = open.cohort!.members.map((member) => {
             const { score: _score, drivers: _drivers, ...rest } = member;

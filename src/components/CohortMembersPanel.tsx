@@ -29,6 +29,21 @@ export function CohortExclusions({ cohort }: { readonly cohort: Cohort }) {
 }
 
 /**
+ * A cohort chart ACR served that cannot be checked: over a list with no scores, or with no cohort at
+ * all. Said, never a silent absence (CHAOS-12484).
+ */
+function ChartsWithheld({ result }: { readonly result: InvestigationResult }) {
+    const { withheld } = renderShapesFor(result, COHORT_SHAPE_RULES);
+    if (withheld === 0) return null;
+    return (
+        <p className="record__meta" data-testid="render-shapes-withheld">
+            {withheld === 1 ? "A chart was" : `${withheld} charts were`} withheld: it could not be
+            checked against the facts it cites in this answer.
+        </p>
+    );
+}
+
+/**
  * A cohort with nothing ranked: "who owns this", "which pull requests are open" (lead's ruling on
  * CHAOS-3748, gap 1). The members are the answer, for every kind the gate lets through, so they are
  * drawn in the service's order with the service's own `rationale` and `exclusions`. No rank, no
@@ -43,17 +58,14 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
     const served = useServedWord();
     const { cohort } = result;
     const asked = askedForCohort(result.interpretation.shape, result);
+    if (cohort === undefined) return asked ? <ChartsWithheld result={result} /> : null;
     if (cohortRanking(asked, cohort).state !== "not_computed") return null;
-    if (cohort === undefined) return null;
 
     const drawnByStatusTable = new Set(unrankedWorkItemMembers(cohort));
     const members = cohort.members.filter((member) => !drawnByStatusTable.has(member));
     const plural = served("subject_kind_plural", cohort.kind);
     const singular = word("subject_kind", cohort.kind);
     const rationale = nonBlank(cohort.rationale);
-    // A cohort chart ACR served that cannot be checked against a list with no scores: said, never
-    // a silent absence (CHAOS-12484).
-    const { withheld } = renderShapesFor(result, COHORT_SHAPE_RULES);
     const titleId = `${idPrefix}-cohort-members-title`;
     return (
         <section
@@ -73,12 +85,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </p>
             )}
             {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
-            {withheld === 0 ? null : (
-                <p className="record__meta" data-testid="render-shapes-withheld">
-                    {withheld === 1 ? "A chart was" : `${withheld} charts were`} withheld: it could
-                    not be checked against the facts it cites in this answer.
-                </p>
-            )}
+            <ChartsWithheld result={result} />
             {cohort.members.length === 0 ? (
                 <p className="panel__empty">The service returned no members.</p>
             ) : members.length === 0 ? null : (
