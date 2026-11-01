@@ -362,3 +362,117 @@ describe("CohortRankingPanel — the charts acr selected (CHAOS-4415)", () => {
         ).not.toBeInTheDocument();
     });
 });
+
+/**
+ * CHAOS-12480: what the ranking rests on. The service's own sentences sit in the fold, and the
+ * fields it serves no words for stay raw there. Absent and false show nothing.
+ */
+describe("CohortRankingPanel — what the ranking rests on", () => {
+    const meaning: Cohort = {
+        ...cohort,
+        rationale: "Matched every team owning a repository.",
+        score_meaning: "attention",
+        judgment_mismatch: true,
+        population: 40,
+        population_lower_bound: true,
+        exclusions: [
+            {
+                subject: { kind: "team", canonical_id: "team:left-out", label: "Left Out Team" },
+                reason: "It owns no repository.",
+            },
+        ],
+    };
+    const draw = (value: Cohort) =>
+        render(<CohortRankingPanel cohort={value} result={undefined} shape="explicit_cohort" />);
+    const fold = () => screen.getByTestId("cohort-meaning-details");
+
+    it("keeps the fold closed", () => {
+        draw(meaning);
+        expect(fold()).not.toHaveAttribute("open");
+    });
+
+    it("holds the service's rationale, inclusion reasons and exclusions", () => {
+        draw(meaning);
+        expect(within(fold()).getByText(meaning.rationale)).toBeInTheDocument();
+        const lines = within(fold()).getAllByTestId("cohort-inclusion-reasons");
+        expect(lines).toHaveLength(meaning.members.length);
+        meaning.members.forEach((member, index) => {
+            expect(lines[index]).toHaveTextContent(
+                `${member.subject.label}: ${member.inclusion_reasons.join(" ")}`,
+            );
+        });
+        expect(within(fold()).getByText(/It owns no repository/u)).toBeInTheDocument();
+    });
+
+    it("holds the fields with no served words, raw", () => {
+        draw(meaning);
+        expect(within(fold()).getByTestId("cohort-raw-score_meaning")).toHaveTextContent(
+            "score_meaning: attention",
+        );
+        expect(within(fold()).getByTestId("cohort-raw-judgment_mismatch")).toHaveTextContent(
+            "judgment_mismatch: true",
+        );
+        expect(within(fold()).getByTestId("cohort-raw-population")).toHaveTextContent(
+            "population: 40",
+        );
+        expect(within(fold()).getByTestId("cohort-raw-population_lower_bound")).toHaveTextContent(
+            "population_lower_bound: true",
+        );
+    });
+
+    it("says nothing for a field that is absent or false", () => {
+        const {
+            score_meaning: _meaning,
+            population: _population,
+            population_lower_bound: _bound,
+            ...rest
+        } = meaning;
+        draw({ ...rest, judgment_mismatch: false });
+        for (const name of [
+            "score_meaning",
+            "judgment_mismatch",
+            "population",
+            "population_lower_bound",
+        ]) {
+            expect(within(fold()).queryByTestId(`cohort-raw-${name}`)).toBeNull();
+        }
+    });
+
+    it("shows every reason a member carries, not only the first", () => {
+        const [first, ...others] = meaning.members;
+        const twoReasons: Cohort["members"][number] = {
+            ...first!,
+            inclusion_reasons: ["One reason.", "A second."],
+        };
+        draw({ ...meaning, members: [twoReasons, ...others] });
+        expect(within(fold()).getAllByTestId("cohort-inclusion-reasons")[0]).toHaveTextContent(
+            "One reason. A second.",
+        );
+    });
+
+    it("says nothing for a bound that is false", () => {
+        draw({ ...meaning, population_lower_bound: false });
+        expect(within(fold()).queryByTestId("cohort-raw-population_lower_bound")).toBeNull();
+    });
+
+    it("draws no empty line for a blank rationale", () => {
+        draw({ ...meaning, rationale: "   " });
+        for (const line of fold().querySelectorAll("p")) {
+            expect(line.textContent?.trim()).not.toBe("");
+        }
+    });
+
+    it("keeps a zero population: zero is a value, not a missing one", () => {
+        draw({ ...meaning, population: 0 });
+        expect(within(fold()).getByTestId("cohort-raw-population")).toHaveTextContent(
+            "population: 0",
+        );
+    });
+
+    it("shows no raw token outside the fold", () => {
+        const { container } = draw(meaning);
+        const outside = container.cloneNode(true) as HTMLElement;
+        outside.querySelectorAll("details").forEach((node) => node.remove());
+        expect(outside.textContent).not.toMatch(/score_meaning|judgment_mismatch|population/u);
+    });
+});

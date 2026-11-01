@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { CohortMeaningDetails } from "./CohortMeaningDetails";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
@@ -100,6 +101,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </ul>
             )}
             <CohortExclusions cohort={cohort} />
+            <CohortMeaningDetails cohort={cohort} />
         </section>
     );
 }
