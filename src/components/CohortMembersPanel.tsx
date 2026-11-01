@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { CohortMeaningDetails } from "./CohortMeaningDetails";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
@@ -7,9 +8,15 @@ import type { Cohort, InvestigationResult } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
 
-/** Who the service left out of a cohort, and why, in its own words. */
+/**
+ * Who the service left out of a cohort, and why, in its own words. A restored answer is not
+ * validated, so a row that does not hold both draws nothing.
+ */
 export function CohortExclusions({ cohort }: { readonly cohort: Cohort }) {
-    const exclusions = cohort.exclusions ?? [];
+    const exclusions = (Array.isArray(cohort.exclusions) ? cohort.exclusions : []).filter(
+        (exclusion: Partial<NonNullable<Cohort["exclusions"]>[number]> | null) =>
+            typeof exclusion?.subject?.label === "string" && typeof exclusion.reason === "string",
+    );
     if (exclusions.length === 0) return null;
     return (
         <>
@@ -100,6 +107,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </ul>
             )}
             <CohortExclusions cohort={cohort} />
+            <CohortMeaningDetails cohort={cohort} />
         </section>
     );
 }

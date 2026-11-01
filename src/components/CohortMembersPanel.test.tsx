@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { validateContract } from "@/lib/acr/validate";
 import { askedForCohort, cohortRanking } from "@/lib/cohort-ranking";
-import type { AnswerPlan, InvestigationResult } from "@/lib/contracts";
+import type { AnswerPlan, CohortMember, InvestigationResult } from "@/lib/contracts";
 import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import { cohortMemberScenarios as cohorts } from "@/test/fixtures/cohort-members";
 import { servedWordScenarios as served } from "@/test/fixtures/served-words";
@@ -313,5 +313,85 @@ describe("the gate keeps what it must keep", () => {
         };
         draw(result);
         expect(screen.queryByTestId("cohort-members-panel")).toBeNull();
+    });
+});
+
+/**
+ * CHAOS-12480: with nothing ranked, the rationale and exclusions are on the page already, so the
+ * fold holds only what is not: inclusion reasons and the raw fields.
+ */
+describe("the members' fold", () => {
+    const cases = Object.entries(cohorts);
+    const [, base] = cases.find(([, result]) => (result.cohort?.members.length ?? 0) > 0)!;
+    const withMeaning: InvestigationResult = {
+        ...base,
+        cohort: { ...base.cohort!, population: 12, population_lower_bound: true },
+    };
+    const fold = () => screen.getByTestId("cohort-meaning-details");
+
+    it("holds the inclusion reasons and the raw fields, closed", () => {
+        draw(withMeaning);
+        expect(fold()).not.toHaveAttribute("open");
+        expect(within(fold()).getByTestId("cohort-raw-population")).toHaveTextContent(
+            "population: 12",
+        );
+        const member = base.cohort!.members[0]!;
+        expect(fold().textContent).toContain(member.inclusion_reasons[0]);
+    });
+
+    it("does not repeat the rationale or the exclusions in the fold", () => {
+        draw(withMeaning);
+        const rationale = base.cohort!.rationale;
+        expect(fold().textContent).not.toContain(rationale);
+        expect(within(fold()).queryByTestId("cohort-exclusion")).toBeNull();
+    });
+
+    it("a zero match keeps its population: zero members is not zero to say", () => {
+        const empty = { ...base.cohort!, members: [], population: 0 };
+        draw({ ...base, cohort: empty });
+        expect(within(fold()).getByTestId("cohort-raw-population")).toHaveTextContent(
+            "population: 0",
+        );
+    });
+
+    it("draws no empty fold", () => {
+        const {
+            score_meaning: _meaning,
+            judgment_mismatch: _mismatch,
+            population: _population,
+            population_lower_bound: _bound,
+            ...rest
+        } = base.cohort!;
+        draw({ ...base, cohort: { ...rest, members: [] } });
+        expect(screen.getByTestId("cohort-members-panel")).toBeInTheDocument();
+        expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
+    });
+
+    it("a work item the status table draws still says why it is here", () => {
+        const member: CohortMember = {
+            ...base.cohort!.members[0]!,
+            subject: { kind: "work_item", canonical_id: "work_item:1", label: "Fix the login" },
+            inclusion_reasons: ["It is open and assigned to this project."],
+            ranking_computed: false,
+        };
+        draw({ ...base, cohort: { ...base.cohort!, kind: "work_item", members: [member] } });
+        expect(fold()).toHaveTextContent("Fix the login: It is open and assigned to this project.");
+    });
+
+    it("a person cohort stays withheld: no fold names a person", () => {
+        const member: CohortMember = {
+            ...base.cohort!.members[0]!,
+            subject: { kind: "person", canonical_id: "person:1", label: "A Person" },
+            inclusion_reasons: ["A reason about a person."],
+        };
+        const { container } = render(
+            <DeterministicAnswerView
+                offersPresentation="popup"
+                result={{ ...base, cohort: { ...base.cohort!, kind: "person", members: [member] } }}
+            />,
+        );
+        expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
+        expect(container.textContent).not.toContain("A reason about a person.");
+        expect(container.textContent).not.toContain("A Person");
     });
 });
