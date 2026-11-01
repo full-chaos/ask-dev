@@ -1029,6 +1029,15 @@ test.describe("narrow windows and the host rules", () => {
         await ask(page, "Why is Ask Dev still not ready to ship?");
         const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn.getByText("AI-written", { exact: true })).toBeVisible();
-        await expect(turn).not.toContainText(/CHAOS-\d+/u);
+        // A relationship path carries the served work item labels, in a closed fold: data, not copy.
+        const copy = await turn.evaluate((node) => {
+            const clone = node.cloneNode(true) as HTMLElement;
+            for (const row of clone.querySelectorAll('[data-testid="relationship-path"]')) {
+                row.remove();
+            }
+            return clone.textContent;
+        });
+        expect(copy).not.toMatch(/CHAOS-\d+/u);
+        expect(await turn.innerText()).not.toMatch(/CHAOS-\d+/u);
     });
 });

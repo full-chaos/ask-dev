@@ -5,6 +5,7 @@ import { useId } from "react";
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
+import { DriverPaths } from "./RelationshipPaths";
 import { SafeAnswerText } from "./SafeAnswerText";
 import { rollupsOfClaims } from "../lib/investment-rollup";
 import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
@@ -13,6 +14,7 @@ import type {
     DriverJudgment,
     EvidenceRefLabels,
     InvestigationResult,
+    RelationshipPath,
     SubjectRef,
 } from "../lib/contracts";
 import { cellText } from "../lib/fact-rows";
@@ -119,12 +121,15 @@ function DriverCard({
     membersWithFootnote,
     evidenceRefLabels,
     claims,
+    paths,
 }: {
     readonly driver: DriverJudgment;
     readonly membersWithFootnote: ReadonlySet<string>;
     readonly evidenceRefLabels: EvidenceRefLabels;
     /** The answer's claimed facts: a cited owning-team roll-up claim is labelled (CHAOS-12178). */
     readonly claims: readonly ClaimedFact[];
+    /** The answer's relationship paths: the ones this driver cites show in its Details. */
+    readonly paths: readonly RelationshipPath[];
 }) {
     const word = useVocabularyWord();
     const served = useServedWord();
@@ -213,6 +218,11 @@ function DriverCard({
                     label="Evidence"
                 />
                 <ClaimedFacts claimIds={driver.claimed_fact_ids} claims={claims} />
+                <DriverPaths
+                    evidenceRefLabels={evidenceRefLabels}
+                    pathIds={driver.path_ids}
+                    paths={paths}
+                />
             </details>
         </li>
     );
@@ -284,6 +294,7 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
                             evidenceRefLabels={result.evidence_ref_labels}
                             key={driver.driver_id}
                             membersWithFootnote={membersWithFootnote}
+                            paths={result.paths}
                         />
                     ))}
                 </ul>

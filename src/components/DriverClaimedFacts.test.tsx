@@ -38,6 +38,8 @@ function evidenceIds(answer: InvestigationResult): ReadonlySet<string> {
         ...answer.evidence_ref_ids,
         ...findings.flatMap((finding) => finding.evidence_ref_ids ?? []),
         ...answer.drivers.flatMap((driver) => driver.evidence_ref_ids ?? []),
+        // ACR's citing closure holds them, so the read serves them (CHAOS-12479).
+        ...answer.paths.flatMap((path) => path.evidence_ref_ids),
         ...(answer.cohort?.members ?? []).flatMap((member) => member.evidence_ref_ids ?? []),
         ...answer.subject_resolution.candidates.flatMap((row) => row.evidence_ref_ids ?? []),
     ]);

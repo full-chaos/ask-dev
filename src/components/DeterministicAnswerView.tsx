@@ -22,6 +22,7 @@ import { LimitationsPanel } from "./LimitationsPanel";
 import { SemanticReadingNotice } from "./SemanticReadingNotice";
 import { ShapesNotDrawn } from "./ShapesNotDrawn";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
+import { OtherPathsPanel } from "./RelationshipPaths";
 import { StructureConfirmationNotice } from "./StructureConfirmationNotice";
 import { StructureNeedsPanel } from "./StructureNeedsPanel";
 import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
@@ -497,6 +498,7 @@ function AnswerView({
                     <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                 </>
             )}
+            <OtherPathsPanel result={result} />
             <ShapesNotDrawn result={result} />
             {
                 // Everything below here is the COLLAPSED EVIDENCE tier
