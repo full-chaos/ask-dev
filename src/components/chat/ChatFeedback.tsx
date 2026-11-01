@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { CTA_LABELS, FEEDBACK_COPY } from "../../render/chat-copy";
 import {
@@ -14,6 +14,28 @@ export type ChatFeedbackProps = {
     readonly feedback: ChatFeedbackSource;
     readonly resultId: string;
 };
+
+function sameEntry(a: ChatFeedbackEntry, b: ChatFeedbackEntry): boolean {
+    return (
+        a.state === b.state &&
+        a.saving === b.saving &&
+        a.notSaved === b.notSaved &&
+        FEEDBACK_QUESTIONS.every((question) => a.desired[question] === b.desired[question])
+    );
+}
+
+/**
+ * A snapshot reader that keeps the last entry while the next one is equal. React's store hook loops
+ * on a new object per read, so a host that builds its entry on every read must not stop the render.
+ */
+function entryReader(feedback: ChatFeedbackSource, resultId: string) {
+    let last: ChatFeedbackEntry | undefined;
+    return () => {
+        const next = feedback.entryFor(resultId);
+        if (next === undefined || last === undefined || !sameEntry(last, next)) last = next;
+        return last;
+    };
+}
 
 /**
  * Feedback on one answer: "Correct?" and "Useful?", each yes or no. Pressing the chosen value again
@@ -32,11 +54,8 @@ export function ChatFeedback({ feedback, resultId }: ChatFeedbackProps) {
         (listener: () => void) => feedback.subscribe(listener),
         [feedback],
     );
-    const entry = useSyncExternalStore(
-        subscribe,
-        () => feedback.entryFor(resultId),
-        () => undefined,
-    );
+    const readEntry = useMemo(() => entryReader(feedback, resultId), [feedback, resultId]);
+    const entry = useSyncExternalStore(subscribe, readEntry, () => undefined);
     const ready = useSyncExternalStore(
         subscribe,
         () => feedback.isReady(),

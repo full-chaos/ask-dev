@@ -272,3 +272,51 @@ describe("Feedback: which turns show it", () => {
         expect(feedback.choose).toHaveBeenCalledExactlyOnceWith(R1, "correct", "yes");
     });
 });
+
+describe("ChatFeedback: a host that builds its entry on every read", () => {
+    function building(feedback: ReturnType<typeof fakeFeedback>) {
+        const read = feedback.entryFor;
+        return {
+            ...feedback,
+            entryFor: (resultId: string) => {
+                const entry = read(resultId);
+                return entry === undefined ? undefined : { ...entry, desired: { ...entry.desired } };
+            },
+        };
+    }
+
+    it("drops the controls when the entry goes away", () => {
+        const feedback = fakeFeedback({ [R1]: feedbackEntry() });
+        const host = building(feedback);
+        let gone = false;
+        setup({ ...host, entryFor: (id) => (gone ? undefined : host.entryFor(id)) });
+        expect(region()).toBeInTheDocument();
+
+        gone = true;
+        feedback.setReady(false);
+
+        expect(screen.queryByRole("group", { name: "Feedback on this answer" })).toBeNull();
+    });
+
+    it("renders: an equal entry is the same snapshot", () => {
+        setup(building(fakeFeedback({ [R1]: feedbackEntry() })));
+        expect(region()).toBeInTheDocument();
+    });
+
+    it.each([
+        ["a state", { state: "read_failed" as const }],
+        ["a choice", { desired: { correct: "yes" as const, useful: "unset" as const } }],
+        ["the other choice", { desired: { correct: "unset" as const, useful: "no" as const } }],
+        ["a save", { saving: true }],
+        ["a failed save", { notSaved: true }],
+    ])("still shows a change of %s", (_name, change) => {
+        const feedback = fakeFeedback({ [R1]: feedbackEntry() });
+        setup(building(feedback));
+        const before = region().outerHTML;
+
+        feedback.setEntry(R1, feedbackEntry(change));
+
+        expect(region().outerHTML).not.toBe(before);
+    });
+});
+
