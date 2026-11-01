@@ -28,9 +28,15 @@ const flowLandscapeResult = mockScenarios().find(
 )!.result;
 
 describe("FactRowsPanels", () => {
-    it("renders nothing when no claimed fact carries rows (empty state = no data, not a missing feature)", () => {
-        const { container } = render(<FactRowsPanels facts={[NO_ROWS_FACT]} result={undefined} />);
+    it("renders nothing when there is no claimed fact (empty state = no data, not a missing feature)", () => {
+        const { container } = render(<FactRowsPanels facts={[]} result={undefined} />);
         expect(container).toBeEmptyDOMElement();
+    });
+
+    it("gives a fact with no rows no table panel: the scalar panel takes it", () => {
+        render(<FactRowsPanels facts={[NO_ROWS_FACT]} result={undefined} />);
+        expect(screen.getAllByRole("heading")).toHaveLength(1);
+        expect(screen.getByTestId("scalar-facts-panel")).toBeInTheDocument();
     });
 
     it("renders the complete scenario's own rows-bearing fact (readiness/release_ready, acr #303)", () => {

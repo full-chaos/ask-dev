@@ -277,7 +277,7 @@ export function selectPresentation(rows: readonly ClaimedFactRow[]): FactRowsPre
     };
 }
 
-function sameSubject(a: SubjectRef, b: SubjectRef): boolean {
+export function sameSubject(a: SubjectRef, b: SubjectRef): boolean {
     return a.kind === b.kind && a.canonical_id === b.canonical_id;
 }
 
