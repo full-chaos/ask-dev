@@ -392,5 +392,6 @@ describe("the members' fold", () => {
         );
         expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
         expect(container.textContent).not.toContain("A reason about a person.");
+        expect(container.textContent).not.toContain("A Person");
     });
 });

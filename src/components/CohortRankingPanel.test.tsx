@@ -469,6 +469,51 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
         );
     });
 
+    describe("a restored answer is not validated, so a field can hold anything", () => {
+        const odd = (fields: object) => ({ ...meaning, ...fields }) as unknown as Cohort;
+
+        it("a member with no reasons draws, and the others keep theirs", () => {
+            const [first, ...others] = meaning.members;
+            const { inclusion_reasons: _reasons, ...noReasons } = first!;
+            draw(odd({ members: [noReasons, ...others] }));
+            expect(within(fold()).getAllByTestId("cohort-inclusion-reasons")).toHaveLength(
+                others.length,
+            );
+        });
+
+        it("a score meaning that is not a word shows as what it holds", () => {
+            draw(odd({ score_meaning: { unexpected: 1 } }));
+            expect(within(fold()).getByTestId("cohort-raw-score_meaning")).toHaveTextContent(
+                'score_meaning: {"unexpected":1}',
+            );
+        });
+
+        it("a population that is not a number shows as what it holds", () => {
+            draw(odd({ population: { unexpected: 1 } }));
+            expect(within(fold()).getByTestId("cohort-raw-population")).toHaveTextContent(
+                'population: {"unexpected":1}',
+            );
+        });
+
+        it("a rationale that is not text draws nothing", () => {
+            draw(odd({ rationale: { unexpected: 1 } }));
+            expect(fold()).toBeInTheDocument();
+        });
+
+        it("exclusions that are not a list draw nothing", () => {
+            draw(odd({ exclusions: { unexpected: 1 } }));
+            expect(within(fold()).queryByTestId("cohort-exclusion")).toBeNull();
+        });
+
+        it("an exclusion with no subject or reason draws nothing, and the others stay", () => {
+            const whole = meaning.exclusions![0]!;
+            const { reason: _reason, ...noReason } = whole;
+            const { subject: _subject, ...noSubject } = whole;
+            draw(odd({ exclusions: [noReason, noSubject, null, whole] }));
+            expect(within(fold()).getAllByTestId("cohort-exclusion")).toHaveLength(1);
+        });
+    });
+
     it("shows no raw token outside the fold", () => {
         const { container } = draw(meaning);
         const outside = container.cloneNode(true) as HTMLElement;

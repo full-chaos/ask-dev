@@ -167,7 +167,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     const singular = word("subject_kind", cohort.kind);
 
     const unranked = unrankedLabels(cohort.members);
-    const rationale = nonBlank(cohort.rationale);
+    const rationale = typeof cohort.rationale === "string" ? nonBlank(cohort.rationale) : undefined;
 
     // CHAOS-4415: the charts acr selected FOR THIS COHORT — the attention
     // score bars and the per-driver contribution stack that explains them.
