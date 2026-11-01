@@ -7,8 +7,6 @@
  * alongside the tone, so a reader can see the vocabulary, not just the color.
  */
 import type {
-    AnswerCompleteness,
-    CohortMemberDataCompleteness,
     CohortMemberOutcome,
     CoverageState,
     InvestigationStatus,
@@ -140,47 +138,6 @@ export function cohortOutcomeTone(outcome: CohortMemberOutcome): Tone {
             return "warn";
         case "insufficient_evidence":
         case "not_applicable":
-            return "neutral";
-    }
-}
-
-/**
- * Tone for one ranked `CohortMember.data_completeness` (CHAOS-4449).
- * Exhaustive over the closed enum. This describes the EVIDENCE behind a row,
- * never the team's health.
- */
-export function cohortDataCompletenessTone(completeness: CohortMemberDataCompleteness): Tone {
-    switch (completeness) {
-        case "complete":
-            return "ok";
-        case "partial":
-            return "warn";
-        case "degraded":
-            return "bad";
-    }
-}
-
-/**
- * Tone for `completeness.state` (CHAOS-5640/CHAOS-5109) -- what the derived
- * requirement outcomes add up to, DISTINCT from `terminal_status`'s own tone
- * (`statusTone` above): the two vocabularies answer different questions and
- * can legitimately disagree on the same result, so this switch never reads
- * `terminal_status`. Exhaustive over the closed enum.
- *
- * `not_derived` is `neutral`, never `ok`: it is a real, honest state (no
- * outcome rows exist to derive from) and must never read as "complete" —
- * the exact vacuous-success failure `AnswerCompleteness.state`'s own schema
- * doc comment exists to name.
- */
-export function completenessStateTone(state: AnswerCompleteness["state"]): Tone {
-    switch (state) {
-        case "complete":
-            return "ok";
-        case "partial":
-            return "warn";
-        case "degraded":
-            return "bad";
-        case "not_derived":
             return "neutral";
     }
 }

@@ -1,0 +1,121 @@
+// Scratch only (CHAOS-12417): ask-dev's served-word fixtures, from ACR's real encoder at the pin.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+const maxBytes = 65536
+
+func load(name string) contextfabric.InvestigationResult {
+	raw, err := os.ReadFile(filepath.Join("contracts/examples/v1", name))
+	must(err)
+	var result contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &result))
+	return result
+}
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func row(requirement, obligation string, outcome contractsv1.ContextFabricPlanRequirementOutcome, served, declared int) contextfabric.RequirementOutcomeRow {
+	return contextfabric.RequirementOutcomeRow{
+		Stage: contractsv1.ContextFabricOutcomeStageAssembledResult, Requirement: requirement, Obligation: obligation,
+		Outcome: outcome, Impact: impact(outcome), Served: served, Declared: declared,
+	}
+}
+
+func impact(outcome contractsv1.ContextFabricPlanRequirementOutcome) contractsv1.ContextFabricAnswerImpactKind {
+	if outcome == contractsv1.ContextFabricRequirementSatisfied {
+		return contractsv1.ContextFabricAnswerImpactNone
+	}
+	return contractsv1.ContextFabricAnswerImpactDepth
+}
+
+func withRows(result contextfabric.InvestigationResult, rows ...contextfabric.RequirementOutcomeRow) contextfabric.InvestigationResult {
+	result.Completeness.Outcomes = append(result.Completeness.Outcomes, rows...)
+	result.Completeness = contextfabric.ComputeAnswerCompleteness(result)
+	return result
+}
+
+func main() {
+	out := os.Args[1]
+	shapes := "context_fabric_investigation_result_render_shapes.v1.json"
+	satisfied := contractsv1.ContextFabricRequirementSatisfied
+	narrowed := contractsv1.ContextFabricRequirementNarrowed
+	unavailable := contractsv1.ContextFabricRequirementUnavailable
+
+	full := withRows(load(shapes), row("state/subject/team", "state", satisfied, 1, 1), row("health/subject/team", "health", satisfied, 1, 1))
+	notFullyCovered := withRows(load(shapes), row("health/subject/team", "health", narrowed, 1, 2))
+	notFullyCovered.Status = contractsv1.ContextFabricInvestigationComplete
+	notFullyCovered.Completeness = contextfabric.ComputeAnswerCompleteness(notFullyCovered)
+
+	corrected := withRows(load(shapes), row("health/subject/team", "health", narrowed, 1, 2))
+	corrected = contextfabric.ApplyServerCompletenessAuthority(corrected, true, true, contextfabric.DeriveCompletenessAuthority(corrected))
+
+	degraded := load(shapes)
+	degraded.Status = contractsv1.ContextFabricInvestigationDegraded
+	degraded = withRows(degraded, row("evidence/subject/team", "evidence", unavailable, 0, 1))
+
+	noMatch := load("context_fabric_investigation_result.v1.json")
+	noMatch.Status = contractsv1.ContextFabricInvestigationNoMatch
+	noMatch.Completeness = contextfabric.ComputeAnswerCompleteness(noMatch)
+
+	// Every served vocabulary in one result, on the fields the design's table names.
+	every := withRows(load(shapes), row("health/subject/repository", "health", narrowed, 1, 2))
+	every.Cohort.Kind = "repository"
+	for index := range every.Cohort.Members {
+		member := &every.Cohort.Members[index]
+		member.Subject.Kind = "repository"
+		for driver := range member.Drivers {
+			if member.Drivers[driver].Signal == "investment_mix" {
+				member.Drivers[driver].Window = contractsv1.ContextFabricCohortMemberDriverWindowCurrentVsPrior
+				member.Drivers[driver].ThresholdLabels = []string{"investment_mix.reactive_share_high"}
+			}
+		}
+	}
+	every.Cohort.Members[0].Outcome = contractsv1.ContextFabricCohortOutcomeProvisional
+	every.Cohort.Members[0].MissingSignals = []string{"workload.forecast_pressure"}
+	every.EffectiveEvidenceWindow = &contractsv1.ContextFabricEffectiveEvidenceWindow{
+		RelativeID: contractsv1.ContextFabricRelativeWindowTrailing30D,
+		Provenance: contractsv1.ContextFabricWindowQuestionStated,
+	}
+	every.SubjectResolution.PriorSubjectReceiptDispositions = []contractsv1.ContextFabricPriorSubjectReceiptEntry{{
+		PriorResultID: "result_prior_00000001", ReceiptID: "sbjr_prior_00000001",
+		Disposition: contractsv1.ContextFabricPriorSubjectReceiptSkippedStaleGraphEpoch,
+	}}
+	base := every.Coverage.Sources[0]
+	every.Coverage.Sources = nil
+	for _, state := range []string{"available", "stale", "unavailable", "no_data", "not_applicable"} {
+		source := base
+		source.State = contractsv1.ContextFabricSourceState(state)
+		every.Coverage.Sources = append(every.Coverage.Sources, source)
+	}
+
+	cases := map[string]contextfabric.InvestigationResult{
+		"every-vocabulary":  every,
+		"full-answer":       full,
+		"plain-answer":      load(shapes),
+		"not-fully-covered": notFullyCovered,
+		"corrected":         corrected,
+		"degraded":          degraded,
+		"no-match":          noMatch,
+		"clarification":     load("context_fabric_investigation_result.v2.json"),
+	}
+	for name, result := range cases {
+		served, tier := contextfabric.ServeVocabularyLabels(result, true, maxBytes)
+		encoded, err := json.Marshal(served)
+		must(err)
+		must(os.WriteFile(filepath.Join(out, name+".json"), encoded, 0o644))
+		fmt.Printf("%-22s status=%-24s state=%-12s tier=%-12s labels=%d bytes=%d\n", name, served.Status, served.Completeness.State, tier, len(served.VocabularyLabels), len(encoded))
+	}
+}

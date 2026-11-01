@@ -16,6 +16,7 @@ import type {
     SubjectRef,
 } from "../lib/contracts";
 import { formatConfidence, humanizeTerm } from "../lib/presentation";
+import { useVocabularyWord } from "./VocabularyWordContext";
 
 /**
  * A subject's identity for set/map membership: `(kind, canonical_id)`, never
@@ -91,6 +92,7 @@ function DriverCard({
     /** The answer's claimed facts: a cited owning-team roll-up claim is labelled (CHAOS-12178). */
     readonly claims: readonly ClaimedFact[];
 }) {
+    const word = useVocabularyWord();
     const rollups = rollupsOfClaims(claims, driver.claimed_fact_ids ?? []);
     const isPrincipal = driver.standing === "principal";
     const isWithheld =
@@ -101,8 +103,8 @@ function DriverCard({
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
             <div className="record__head">
                 <span className="record__title">{driver.title}</span>
-                <Badge tone={isPrincipal ? "warn" : "neutral"} title={driver.standing}>
-                    {humanizeTerm(driver.standing)}
+                <Badge tone={isPrincipal ? "warn" : "neutral"} data-value={driver.standing}>
+                    {word("driver_standing", driver.standing)}
                 </Badge>
             </div>
             {isWithheld ? (

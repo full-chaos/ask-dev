@@ -6,12 +6,8 @@ import { useId } from "react";
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "../lib/contracts";
-import {
-    CANNOT_REASK_HERE_COPY,
-    candidateStateTone,
-    formatConfidence,
-    humanizeTerm,
-} from "../lib/presentation";
+import { CANNOT_REASK_HERE_COPY, candidateStateTone, formatConfidence } from "../lib/presentation";
+import { useVocabularyWord } from "./VocabularyWordContext";
 
 export type ClarificationChoice = {
     readonly result_id: string;
@@ -81,13 +77,14 @@ function CandidateRecord({
     readonly onToggle: (() => void) | undefined;
     readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
+    const word = useVocabularyWord();
     return (
         <li className="record">
             <div className="record__head">
                 <span className="record__meta">#{rank}</span>
                 <span className="record__title">{candidate.subject.label}</span>
                 <Badge data-value={candidate.state} tone={candidateStateTone(candidate.state)}>
-                    {humanizeTerm(candidate.state)}
+                    {word("candidate_state", candidate.state)}
                 </Badge>
                 {selected ? (
                     <Badge tone="ok" title="selected">

@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import type { Cohort } from "../lib/contracts";
-import { humanizeTerm } from "../lib/presentation";
+import { useVocabularyWord } from "./VocabularyWordContext";
 
 export type CohortGroupsPanelProps = {
     readonly cohort: Cohort | undefined;
@@ -27,6 +27,7 @@ export type CohortGroupsPanelProps = {
  */
 export function CohortGroupsPanel({ cohort }: CohortGroupsPanelProps) {
     const idPrefix = useId();
+    const word = useVocabularyWord();
     const groups = cohort?.groups ?? [];
     if (groups.length === 0) return null;
     return (
@@ -44,7 +45,7 @@ export function CohortGroupsPanel({ cohort }: CohortGroupsPanelProps) {
                               ? "partly included"
                               : "may be incomplete"}{" "}
                         — {group.member_canonical_ids.length} of {group.total}{" "}
-                        {humanizeTerm(cohort?.kind ?? "member")}
+                        {word("subject_kind", cohort?.kind ?? "member")}
                         {group.total === 1 ? "" : "s"} shown
                     </li>
                 ))}

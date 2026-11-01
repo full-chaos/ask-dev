@@ -1,9 +1,10 @@
 import { Details } from "./Details";
+import { useVocabularyWord } from "./VocabularyWordContext";
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
 import type { EvidenceRefLabels, SubjectResolution } from "../lib/contracts";
-import { candidateStateTone, formatConfidence, humanizeTerm } from "../lib/presentation";
+import { candidateStateTone, formatConfidence } from "../lib/presentation";
 
 export type SubjectResolutionPanelProps = {
     readonly resolution: SubjectResolution;
@@ -32,6 +33,7 @@ export function SubjectResolutionPanel({
     resolution,
     evidenceRefLabels,
 }: SubjectResolutionPanelProps) {
+    const word = useVocabularyWord();
     const hasPriorReceiptDisclosure =
         resolution.prior_subject_receipt_dispositions !== undefined &&
         resolution.prior_subject_receipt_dispositions.length > 0;
@@ -68,7 +70,7 @@ export function SubjectResolutionPanel({
                                     tone={candidateStateTone(candidate.state)}
                                     data-value={candidate.state}
                                 >
-                                    {humanizeTerm(candidate.state)}
+                                    {word("candidate_state", candidate.state)}
                                 </Badge>
                                 <span className="record__meta">
                                     confidence {formatConfidence(candidate.confidence)}

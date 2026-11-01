@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { FactRowsPanels } from "@/components/FactRowsPanel";
@@ -83,6 +83,11 @@ describe("FactRowsPanels", () => {
         expect(panel.querySelector("svg")).not.toBeNull();
         expect(panel.querySelector("polyline")).toBeNull();
         expect(panel.textContent).toContain("team project ownership sum");
+        // CHAOS-12417: `rollup_basis` has no published vocabulary, so it sits in a closed fold.
+        const basis = within(panel).getByTestId("fact-rollup-basis");
+        expect(basis.closest("details")).not.toBeNull();
+        expect(basis.closest("details")).not.toHaveAttribute("open");
+        expect(panel.querySelector(".fact-panel__caption")?.textContent).not.toContain("ownership");
         // The fixture row carries BOTH team_id and team_name (real producer
         // shape, codex round 1). The CHART's own axis labels must be the
         // readable name, never the opaque id — the id can still legitimately

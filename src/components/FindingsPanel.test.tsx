@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { FindingsPanel } from "@/components/FindingsPanel";
+import { VocabularyLabelsContext } from "@/components/VocabularyWordContext";
 import type { DedupedFinding } from "@/lib/fact-dedup";
 
 const PRIMARY: DedupedFinding = {
@@ -55,6 +56,25 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
         // The full sentence never appears a second time.
         expect(screen.queryByText("Release acceptance remains incomplete.")).toBeNull();
         expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
+    });
+
+    it("a compact reference names the kind by its served word (CHAOS-12417)", () => {
+        const word = `«fact_kind:${DUPLICATE.finding.kind}»`;
+        render(
+            <VocabularyLabelsContext.Provider
+                value={{ [`fact_kind:${DUPLICATE.finding.kind}`]: word }}
+            >
+                <FindingsPanel
+                    evidenceRefLabels={undefined}
+                    title="Remaining work"
+                    findings={[DUPLICATE]}
+                    emptyMessage="No remaining work was reported."
+                />
+            </VocabularyLabelsContext.Provider>,
+        );
+        expect(screen.getByText(/also shown in full under Readiness gaps/iu)).toHaveTextContent(
+            word,
+        );
     });
 
     it("a mixed list shows one full record and one reference, never two full copies", () => {

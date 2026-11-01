@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { Badge } from "./Badge";
 import { Details } from "./Details";
+import { useVocabularyLabels, useVocabularyWord } from "./VocabularyWordContext";
 import type {
     AnswerCompleteness,
     PlanRequirementOutcomeRow,
@@ -91,16 +92,15 @@ function RefinementStep({
  * (AGENTS.md check 11: completeness is a public contract field, richer than the prose).
  * `terminal_reason` is a closed vocabulary naming WHY, never the engine's or a model's own raw
  * text (CHAOS-4413's own schema doc comment). It sits in a closed fold: a value can hold a state
- * word ("degraded_reason_disclosed"). (CHAOS-12417 moves the outcomes table.)
+ * word ("degraded_reason_disclosed").
  *
  * `outcomes` (CHAOS-5109) is the one authority for what this answer was
  * supposed to contain and what became of it — rendered one row per entry,
  * in the SERVER'S OWN ORDER, never re-sorted or de-duplicated (every stage
  * only appends to it, so wire order is itself part of what it discloses).
- * Absent or empty renders an explicit empty-state line instead of a table;
- * the contract guarantees that shape agrees with `state === "not_derived"`
- * (an empty outcome set is exactly what makes `state` `not_derived`), so
- * this view need not re-derive or assert that invariant itself.
+ * CHAOS-12417: the whole table sits in a closed fold, so `partial` and `degraded` show at most the
+ * one sentence above. Absent or empty renders nothing: an empty outcome set is exactly what makes
+ * `state` `not_derived`, and a line saying so would only restate that state (CHAOS-12245).
  *
  * Every field on a row is either a visible column or a disclosed one, never
  * silently absent (same "nothing is silently discarded" discipline as
@@ -121,10 +121,12 @@ function RefinementStep({
 export function CompletenessPanel({ completeness, rankingWithheld }: CompletenessPanelProps) {
     const withheld = rankingWithheld !== undefined;
     const idPrefix = useId();
+    const labels = useVocabularyLabels();
+    const word = useVocabularyWord();
     const outcomes = completeness.outcomes ?? [];
     // CHAOS-12245: the raw state is never shown; a partial or degraded answer adds this one
     // sentence at most. While parts are withheld, completeness is not stated at all.
-    const missingData = withheld ? null : missingDataSentence(completeness);
+    const missingData = withheld ? null : missingDataSentence(completeness, labels);
     return (
         <section
             role="group"
@@ -159,101 +161,95 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                 </p>
             )}
             {completeness.terminal_reason !== undefined ? (
-                // CHAOS-12245: a reason's value can hold a state word, so it stays in the closed
-                // fold CHAOS-12417 rules for it.
+                // CHAOS-12245: a reason's value can hold a state word, so it stays in this fold.
                 <Details summary="Why it stopped">
                     <p className="coverage__reason" data-testid="completeness-terminal-reason">
                         {humanizeTerm(completeness.terminal_reason)}
                     </p>
                 </Details>
             ) : null}
-            <h3 className="panel__title" style={{ marginTop: 14 }}>
-                Requirement outcomes
-            </h3>
-            {outcomes.length === 0 ? (
-                <p className="panel__empty" data-testid="completeness-outcomes-empty">
-                    No requirement outcomes were derived for this answer.
-                </p>
-            ) : (
-                <ScrollRegion label="Requirement outcomes">
-                    <table className="fact-table" data-testid="completeness-outcomes-table">
-                        <thead>
-                            <tr>
-                                <th scope="col">Requirement</th>
-                                <th scope="col">Outcome</th>
-                                <th scope="col">Impact</th>
-                                <th scope="col">Served / needed</th>
-                                <th scope="col">Reason</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {outcomes.map((row, index) => {
-                                const causes = outcomeCauses(row);
-                                const refinements = row.refinements ?? [];
-                                return (
-                                    // Index key: rows carry no unique id on the
-                                    // wire and this list is never reordered or
-                                    // filtered, only ever rendered in the
-                                    // server's own append-only order.
-                                    <tr data-testid="completeness-outcome-row" key={index}>
-                                        <td data-value={row.requirement}>
-                                            {row.requirement === undefined
-                                                ? "—"
-                                                : humanizeTerm(row.requirement)}
-                                            {row.obligation === undefined ? null : (
-                                                <>
-                                                    <br />
-                                                    <span
-                                                        className="record__meta"
-                                                        data-testid="completeness-outcome-obligation"
-                                                    >
-                                                        {`obligation: ${humanizeTerm(row.obligation)}`}
-                                                    </span>
-                                                </>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <Badge
-                                                tone={planRequirementOutcomeTone(row.outcome)}
-                                                data-value={`outcome: ${row.outcome}`}
-                                            >
-                                                {humanizeTerm(row.outcome)}
-                                            </Badge>
-                                        </td>
-                                        <td>{humanizeTerm(row.impact)}</td>
-                                        <td>{`${String(row.served)} / ${String(row.declared)}`}</td>
-                                        <td>
-                                            {causes.length === 0
-                                                ? "—"
-                                                : causes.map(humanizeTerm).join(" · ")}
-                                            {refinements.length === 0 ? null : (
-                                                <details className="disclosure">
-                                                    <summary>
-                                                        {refinements.length === 1
-                                                            ? "1 refinement step"
-                                                            : `${String(refinements.length)} refinement steps`}
-                                                    </summary>
-                                                    <ul className="stack stack--tight">
-                                                        {refinements.map((step, stepIndex) => (
-                                                            // Index key: steps carry no unique
-                                                            // id on the wire and this chain is
-                                                            // never reordered or filtered.
-                                                            <RefinementStep
-                                                                key={stepIndex}
-                                                                step={step}
-                                                                index={stepIndex}
-                                                            />
-                                                        ))}
-                                                    </ul>
-                                                </details>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </ScrollRegion>
+            {outcomes.length === 0 ? null : (
+                <Details summary="Requirement outcomes" data-testid="completeness-outcomes-fold">
+                    <ScrollRegion label="Requirement outcomes">
+                        <table className="fact-table" data-testid="completeness-outcomes-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Requirement</th>
+                                    <th scope="col">Outcome</th>
+                                    <th scope="col">Impact</th>
+                                    <th scope="col">Served / needed</th>
+                                    <th scope="col">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {outcomes.map((row, index) => {
+                                    const causes = outcomeCauses(row);
+                                    const refinements = row.refinements ?? [];
+                                    return (
+                                        // Index key: rows carry no unique id on the
+                                        // wire and this list is never reordered or
+                                        // filtered, only ever rendered in the
+                                        // server's own append-only order.
+                                        <tr data-testid="completeness-outcome-row" key={index}>
+                                            <td data-value={row.requirement}>
+                                                {row.requirement === undefined
+                                                    ? "—"
+                                                    : humanizeTerm(row.requirement)}
+                                                {row.obligation === undefined ? null : (
+                                                    <>
+                                                        <br />
+                                                        <span
+                                                            className="record__meta"
+                                                            data-testid="completeness-outcome-obligation"
+                                                        >
+                                                            {`obligation: ${humanizeTerm(row.obligation)}`}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <Badge
+                                                    tone={planRequirementOutcomeTone(row.outcome)}
+                                                    data-value={`outcome: ${row.outcome}`}
+                                                >
+                                                    {word("requirement_outcome", row.outcome)}
+                                                </Badge>
+                                            </td>
+                                            <td>{humanizeTerm(row.impact)}</td>
+                                            <td>{`${String(row.served)} / ${String(row.declared)}`}</td>
+                                            <td>
+                                                {causes.length === 0
+                                                    ? "—"
+                                                    : causes.map(humanizeTerm).join(" · ")}
+                                                {refinements.length === 0 ? null : (
+                                                    <details className="disclosure">
+                                                        <summary>
+                                                            {refinements.length === 1
+                                                                ? "1 refinement step"
+                                                                : `${String(refinements.length)} refinement steps`}
+                                                        </summary>
+                                                        <ul className="stack stack--tight">
+                                                            {refinements.map((step, stepIndex) => (
+                                                                // Index key: steps carry no unique
+                                                                // id on the wire and this chain is
+                                                                // never reordered or filtered.
+                                                                <RefinementStep
+                                                                    key={stepIndex}
+                                                                    step={step}
+                                                                    index={stepIndex}
+                                                                />
+                                                            ))}
+                                                        </ul>
+                                                    </details>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </ScrollRegion>
+                </Details>
             )}
         </section>
     );

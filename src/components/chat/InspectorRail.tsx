@@ -2,6 +2,7 @@ import { Badge } from "../Badge";
 import type { InvestigationResult } from "../../lib/contracts";
 import { evidenceWindowRange, formatDay } from "../../lib/evidence-window";
 import { coverageStateTone, humanizeTerm, nonBlank } from "../../lib/presentation";
+import { vocabularyWord } from "../../lib/vocabulary-labels";
 
 export type InspectorRailProps = {
     /** The latest ANSWERED result; undefined before the first answer. */
@@ -33,7 +34,7 @@ export function InspectorRail({ result }: InspectorRailProps) {
     }
     const sources = result.coverage.sources;
     const window = result.effective_evidence_window;
-    const windowRange = evidenceWindowRange(window);
+    const windowRange = evidenceWindowRange(window, result.vocabulary_labels);
     return (
         <aside aria-label="Latest answer sources" className="ask__rail ask__rail--right">
             <section className="rail__section">
@@ -72,7 +73,11 @@ export function InspectorRail({ result }: InspectorRailProps) {
                 )}
                 {window === undefined ? null : (
                     <p className="rail__note" data-value={window.provenance}>
-                        {humanizeTerm(window.provenance)}
+                        {vocabularyWord(
+                            result.vocabulary_labels,
+                            "window_provenance",
+                            window.provenance,
+                        )}
                     </p>
                 )}
             </section>

@@ -472,21 +472,19 @@ function outcomeRow(overrides: Partial<PlanRequirementOutcomeRow> = {}): PlanReq
  * in the server's OWN order, never re-sorted or de-duplicated.
  */
 describe("CompletenessPanel — requirement outcomes", () => {
-    it("shows an explicit empty-state line when outcomes is absent, agreeing with not_derived", () => {
+    it("says nothing about outcomes when they are absent: a line would restate not_derived", () => {
         const completeness: AnswerCompleteness = {
             terminal_status: "no_match",
             claimed_facts_count: 0,
             rows_count: 0,
             state: "not_derived",
         };
-        render(<CompletenessPanel completeness={completeness} />);
-        expect(screen.getByTestId("completeness-outcomes-empty")).toHaveTextContent(
-            "No requirement outcomes were derived",
-        );
+        const { container } = render(<CompletenessPanel completeness={completeness} />);
+        expect(container).not.toHaveTextContent(/requirement outcomes/iu);
         expect(screen.queryByTestId("completeness-outcomes-table")).not.toBeInTheDocument();
     });
 
-    it("shows an explicit empty-state line when outcomes is an empty array, agreeing with not_derived", () => {
+    it("says nothing about outcomes when the list is empty", () => {
         const completeness: AnswerCompleteness = {
             terminal_status: "no_match",
             claimed_facts_count: 0,
@@ -494,8 +492,8 @@ describe("CompletenessPanel — requirement outcomes", () => {
             state: "not_derived",
             outcomes: [],
         };
-        render(<CompletenessPanel completeness={completeness} />);
-        expect(screen.getByTestId("completeness-outcomes-empty")).toBeInTheDocument();
+        const { container } = render(<CompletenessPanel completeness={completeness} />);
+        expect(container).not.toHaveTextContent(/requirement outcomes/iu);
         expect(screen.queryByTestId("completeness-outcomes-table")).not.toBeInTheDocument();
     });
 

@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { Badge } from "./Badge";
 import { Details } from "./Details";
+import { useVocabularyLabels, useVocabularyWord } from "./VocabularyWordContext";
 import type { Coverage, CoverageDetail } from "../lib/contracts";
 import {
     GENERIC_DEGRADED_REASON_SENTENCE,
@@ -72,6 +73,8 @@ const GENERIC_SOURCE_LABEL = "Source";
  * drop a real `degraded_reasons[]` entry either.
  */
 export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) {
+    const labels = useVocabularyLabels();
+    const word = useVocabularyWord();
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
@@ -156,11 +159,11 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
             {/* CHAOS-12421: the rail hides at a narrow width and shows only the latest answer, so
                 the answer's own panel carries its window at every width. */}
             <p className="record__meta" data-testid="coverage-evidence-window">
-                Evidence window: {evidenceWindowRange(evidenceWindow) ?? "Not reported."}
+                Evidence window: {evidenceWindowRange(evidenceWindow, labels) ?? "Not reported."}
                 {evidenceWindow === undefined ? null : (
                     <span data-value={evidenceWindow.provenance}>
                         {" · "}
-                        {humanizeTerm(evidenceWindow.provenance)}
+                        {word("window_provenance", evidenceWindow.provenance)}
                     </span>
                 )}
             </p>
@@ -343,7 +346,7 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
                                 <li className="record" key={detail.detail_id}>
                                     <p className="record__body">
                                         {kind === undefined ? null : (
-                                            <strong>{humanizeTerm(kind)}: </strong>
+                                            <strong>{word("subject_kind", kind)}: </strong>
                                         )}
                                         {facts ?? GENERIC_DEGRADED_REASON_SENTENCE}
                                     </p>
