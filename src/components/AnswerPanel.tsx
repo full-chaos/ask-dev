@@ -39,6 +39,22 @@ export type AnswerPanelProps = {
  * the service sent them; `current_state` is the only field that still folds
  * behind "More detail".
  */
+/**
+ * CHAOS-12481: what an answer dropped, when it was made and whether it was reused. ACR serves no
+ * words for these yet, so each stays raw in one closed fold until it does. A field that is absent,
+ * zero or false shows nothing: missing is not healthy (check 12).
+ */
+function scopeFields(result: InvestigationResult): readonly (readonly [string, string])[] {
+    const fields: (readonly [string, string])[] = [["generated_at", result.generated_at]];
+    if (result.reused) fields.push(["reused", "true"]);
+    const displaced = result.limitations_displaced ?? 0;
+    if (displaced > 0) fields.push(["limitations_displaced", String(displaced)]);
+    if (result.subject_resolution?.retrieval_degraded === true) {
+        fields.push(["retrieval_degraded", "true"]);
+    }
+    return fields;
+}
+
 export function AnswerPanel({ result }: AnswerPanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
@@ -91,6 +107,16 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
                     </p>
                 </details>
             ) : null}
+            <details className="disclosure" data-testid="answer-scope-details">
+                <summary>Details</summary>
+                {scopeFields(result).map(([name, value]) => (
+                    <p className="record__meta" data-testid={`answer-scope-${name}`} key={name}>
+                        <code>
+                            {name}: {value}
+                        </code>
+                    </p>
+                ))}
+            </details>
         </section>
     );
 }
