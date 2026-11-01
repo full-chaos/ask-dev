@@ -92,6 +92,7 @@ export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
 
     return (
         <section
+            role="group"
             aria-labelledby={titleId}
             className="panel panel--card"
             data-testid="work-item-status-panel"

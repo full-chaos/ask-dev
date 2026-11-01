@@ -153,7 +153,7 @@ describe("EnrichmentView — a clarification never becomes a dead end", () => {
         );
 
         expect(
-            screen.getByRole("region", { name: "Which subject did you mean?" }),
+            screen.getByRole("group", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
         expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();

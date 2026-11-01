@@ -131,6 +131,7 @@ export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) 
     );
     return (
         <section
+            role="group"
             className="panel panel--card panel--compact"
             aria-labelledby={`${idPrefix}-coverage-title`}
             data-testid="coverage-panel"

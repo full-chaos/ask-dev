@@ -61,6 +61,7 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     const hasCurrentState = nonBlank(result.current_state) !== undefined;
     return (
         <section
+            role="group"
             className="panel"
             aria-labelledby={`${idPrefix}-answer-title`}
             data-testid="answer-panel"

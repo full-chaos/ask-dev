@@ -42,13 +42,13 @@ describe("clarification flow", () => {
         );
 
         expect(
-            screen.getByRole("region", { name: "Which subject did you mean?" }),
+            screen.getByRole("group", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
         // The judgment panels must NOT appear: a clarification is not a thin
         // answer, and showing empty driver/finding sections above the choice
         // would present it as one.
-        expect(screen.queryByRole("region", { name: "Answer" })).toBeNull();
-        expect(screen.queryByRole("region", { name: "Remaining work" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Remaining work" })).toBeNull();
     });
 
     it("shows the service's own prompt, never one of its own", () => {
@@ -74,7 +74,7 @@ describe("clarification flow", () => {
             />,
         );
 
-        const panel = screen.getByRole("region", { name: "Which subject did you mean?" });
+        const panel = screen.getByRole("group", { name: "Which subject did you mean?" });
         for (const candidate of clarification.subject_resolution.candidates) {
             expect(within(panel).getByText(candidate.receipt_id)).toBeInTheDocument();
             expect(within(panel).getByText(candidate.subject.label)).toBeInTheDocument();
@@ -243,8 +243,8 @@ describe("clarification flow", () => {
             />,
         );
 
-        expect(screen.getByRole("region", { name: "Coverage" })).toBeInTheDocument();
-        expect(screen.getByRole("region", { name: "Limitations" })).toBeInTheDocument();
+        expect(screen.getByRole("group", { name: "Coverage" })).toBeInTheDocument();
+        expect(screen.getByRole("group", { name: "Limitations" })).toBeInTheDocument();
     });
 
     /**
@@ -283,8 +283,8 @@ describe("clarification flow", () => {
         // The clarification content is present, under a DECLARATIVE heading:
         // asking "which did you mean?" of a reader who cannot answer is
         // promise-shaped text, and the heading is our chrome, so it adapts.
-        expect(screen.getByRole("region", { name: "Subject candidates" })).toBeInTheDocument();
-        expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
+        expect(screen.getByRole("group", { name: "Subject candidates" })).toBeInTheDocument();
+        expect(screen.queryByRole("group", { name: "Which subject did you mean?" })).toBeNull();
         for (const candidate of clarification.subject_resolution.candidates) {
             expect(screen.getByText(candidate.subject.label)).toBeInTheDocument();
         }
@@ -293,8 +293,8 @@ describe("clarification flow", () => {
         expect(screen.queryByRole("button", { name: /^Select / })).toBeNull();
         expect(screen.queryByRole("button", { name: /^Ask about (the selected|\d)/ })).toBeNull();
         // ...and the answer shape is absent.
-        expect(screen.queryByRole("region", { name: "Answer" })).toBeNull();
-        expect(screen.queryByRole("region", { name: "Remaining work" })).toBeNull();
-        expect(screen.queryByRole("region", { name: "Subjects" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Answer" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Remaining work" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Subjects" })).toBeNull();
     });
 });

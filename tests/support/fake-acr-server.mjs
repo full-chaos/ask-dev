@@ -128,6 +128,12 @@ export const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 // which overrides `shape` and nothing else, is the positive one.
 export const TRIGGER_COHORT = "e2e-cohort-me";
 
+// CHAOS-12429: a decisive cohort result from the committed render-shapes capture: a ranking table,
+// four series charts (the readiness trend among them) and fact tables that carry rows. It is the
+// widest answer the double serves, so a layout spec at phone width can prove nothing in it pushes
+// the conversation sideways.
+export const TRIGGER_SHAPES = "e2e-shapes-me";
+
 // CHAOS-12421: a decisive result that reports its evidence window (the canonical example has none).
 export const TRIGGER_WINDOW = "e2e-window-me";
 
@@ -137,6 +143,37 @@ const canonical = JSON.parse(
         "utf8",
     ),
 );
+
+const renderShapes = JSON.parse(
+    readFileSync(
+        join(
+            __dirname,
+            "../../src/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json",
+        ),
+        "utf8",
+    ),
+);
+
+/**
+ * The render-shapes capture, with ids and question replaced, and with display labels on its
+ * coverage sources. The engine sends a label per source (see `tests/fixtures/work-item-status-
+ * result.json`), and a real label is a phrase, not a token: the chip it makes is one unbroken
+ * line wider than a phone column unless the layout lets it wrap. Nothing else is overridden.
+ */
+function shapesResult(question) {
+    const result = structuredClone(renderShapes);
+    result.coverage.sources = result.coverage.sources.map((source) => ({
+        ...source,
+        label: `Canonical facts \u2014 ${source.source.split(":").pop()} for every repository a team owns, over the whole evidence window`,
+        state_label: "available",
+    }));
+    return {
+        ...result,
+        result_id: "result_e2e_shapes_0001",
+        request_id: "request_e2e_shapes_0001",
+        question,
+    };
+}
 
 function answeredResult(question) {
     return {
@@ -600,17 +637,19 @@ const server = createServer((request, response) => {
                             provenance: "question_stated",
                         },
                     }
-                  : question.includes(TRIGGER_COHORT)
-                    ? cohortResult(question)
-                    : hasChosenReceipt
-                      ? answeredResult(question)
-                      : question.includes(TRIGGER_STRUCTURE_NEEDS)
-                        ? structureNeedsResult(question)
-                        : question.includes(TRIGGER_CANDIDATE_NEEDS)
-                          ? candidateNeedsResult(question)
-                          : question.includes(TRIGGER_CLARIFICATION)
-                            ? clarificationResult(question)
-                            : answeredResult(question);
+                  : question.includes(TRIGGER_SHAPES)
+                    ? shapesResult(question)
+                    : question.includes(TRIGGER_COHORT)
+                      ? cohortResult(question)
+                      : hasChosenReceipt
+                        ? answeredResult(question)
+                        : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                          ? structureNeedsResult(question)
+                          : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                            ? candidateNeedsResult(question)
+                            : question.includes(TRIGGER_CLARIFICATION)
+                              ? clarificationResult(question)
+                              : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

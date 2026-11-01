@@ -8,12 +8,8 @@ import type {
     PlanRequirementOutcomeRow,
     RequirementRefinement,
 } from "../lib/contracts";
-import {
-    completenessStateTone,
-    humanizeTerm,
-    planRequirementOutcomeTone,
-    statusTone,
-} from "../lib/presentation";
+import { missingDataSentence } from "../lib/missing-data";
+import { humanizeTerm, planRequirementOutcomeTone } from "../lib/presentation";
 
 export type CompletenessPanelProps = {
     readonly completeness: AnswerCompleteness;
@@ -81,29 +77,20 @@ function RefinementStep({
  * CHAOS-4413/CHAOS-4642/CHAOS-5640/CHAOS-5109: shows how much of an answer is
  * here and why it stopped where it did.
  *
- * `terminal_status` reuses the exact same closed vocabulary as the result's
- * own `status` (`statusTone` is exhaustive over both), so its badge always
- * reads consistently with the rest of the page. `claimed_facts_count` and
- * `rows_count` are the engine's own UN-CLAMPED totals — independent of this
- * Workbench's own request-time budget (`options.max_*` in
- * `buildInvestigationRequest`) — so they can legitimately exceed what any
- * single panel actually renders; that is the point, not a bug (AGENTS.md
- * check 11: completeness is a public contract field, richer than the prose).
- * `terminal_reason` is a closed vocabulary naming WHY, never the engine's or
- * a model's own raw text (CHAOS-4413's own schema doc comment) — shown
- * verbatim, exactly like `CoveragePanel`'s degraded reasons.
+ * CHAOS-12245, chris's ruling: the raw completeness never shows. Neither `terminal_status` nor
+ * `state` is drawn as a badge or a word; both stay in `data-*` attributes on the panel for a
+ * program to read. `complete` and `not_derived` add nothing. `partial` and `degraded` add at most
+ * one "Missing data" sentence built from the requirement rows (`missingDataSentence`, CHAOS-12429),
+ * which carries no state word. The Withheld badge stays: a withheld part is unknown here, not
+ * complete, so the sentence is not shown then either.
  *
- * `state` (CHAOS-5640) is a SECOND, independent completeness signal, server-
- * derived from the requirement outcomes below it rather than authored —
- * never model text and never reconciled against `terminal_status`. The two
- * vocabularies answer different questions (disposition vs derived outcome)
- * and can legitimately disagree on the same result (e.g. a `complete`
- * disposition with a `partial` derived state); when they do, BOTH badges
- * stay visible side by side — this panel never picks a winner or collapses
- * one into the other. `not_derived` renders no badge (CHAOS-12245, chris's
- * ruling): it never gets the `complete` tone, and the outcomes section below
- * says that no outcomes were derived, so the gap stays an honest gap rather
- * than a vacuous success.
+ * `claimed_facts_count` and `rows_count` are the engine's own UN-CLAMPED totals -- independent of
+ * this Workbench's own request-time budget (`options.max_*` in `buildInvestigationRequest`) -- so
+ * they can legitimately exceed what any single panel actually renders; that is the point, not a bug
+ * (AGENTS.md check 11: completeness is a public contract field, richer than the prose).
+ * `terminal_reason` is a closed vocabulary naming WHY, never the engine's or a model's own raw
+ * text (CHAOS-4413's own schema doc comment) -- shown verbatim, exactly like `CoveragePanel`'s
+ * degraded reasons. (CHAOS-12417 moves the counts, the reason and the outcomes table.)
  *
  * `outcomes` (CHAOS-5109) is the one authority for what this answer was
  * supposed to contain and what became of it — rendered one row per entry,
@@ -134,52 +121,42 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
     const withheld = rankingWithheld !== undefined;
     const idPrefix = useId();
     const outcomes = completeness.outcomes ?? [];
+    // CHAOS-12245: the raw state is never shown; a partial or degraded answer adds this one
+    // sentence at most. While parts are withheld, completeness is not stated at all.
+    const missingData = withheld ? null : missingDataSentence(completeness);
     return (
         <section
+            role="group"
             className="panel panel--card panel--compact"
             aria-labelledby={`${idPrefix}-completeness-title`}
             data-testid="completeness-panel"
+            data-terminal-status={completeness.terminal_status}
+            data-completeness-state={completeness.state}
         >
             <h2 className="panel__title" id={`${idPrefix}-completeness-title`}>
                 Completeness
             </h2>
-            <div className="chip-row" data-testid="completeness-chip-row">
-                {withheld ? (
+            {withheld ? (
+                <div className="chip-row" data-testid="completeness-chip-row">
                     <Badge
                         tone="warn"
                         data-value={`withheld; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
                     >
                         Withheld
                     </Badge>
-                ) : (
-                    <>
-                        <Badge
-                            tone={statusTone(completeness.terminal_status)}
-                            data-value={`terminal_status: ${completeness.terminal_status}`}
-                        >
-                            {humanizeTerm(completeness.terminal_status)}
-                        </Badge>
-                        {
-                            // CHAOS-12245, chris's ruling: not derived renders nothing
-                            // about completeness.
-                            completeness.state === "not_derived" ? null : (
-                                <Badge
-                                    tone={completenessStateTone(completeness.state)}
-                                    data-value={`state: ${completeness.state}`}
-                                >
-                                    {humanizeTerm(completeness.state)}
-                                </Badge>
-                            )
-                        }
-                    </>
-                )}
-            </div>
+                </div>
+            ) : null}
             <p className="record__meta">{factCountText(completeness)}</p>
             {withheld ? (
                 <p className="coverage__reason" data-testid="completeness-withheld">
                     Parts of this answer were withheld, so completeness is not stated here.
                 </p>
             ) : null}
+            {missingData === null ? null : (
+                <p className="coverage__reason" data-testid="completeness-missing-data">
+                    {missingData}
+                </p>
+            )}
             {completeness.terminal_reason !== undefined ? (
                 <p className="coverage__reason" data-testid="completeness-terminal-reason">
                     {humanizeTerm(completeness.terminal_reason)}

@@ -11,7 +11,7 @@ import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.js
 import requestSchema from "@/contracts/schemas/context_fabric_investigation_request.v1.schema.json";
 import resultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import errorSchema from "@/contracts/schemas/error.v1.schema.json";
-import { RANKABLE_SUBJECT_KINDS } from "@/lib/cohort-ranking";
+import { RANKABLE_SUBJECT_KINDS, RANKED_COHORT_KINDS } from "@/lib/cohort-ranking";
 import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { candidateStateTone, coverageStateTone, type Tone } from "@/lib/presentation";
 import { TELEMETRY_VOCABULARIES } from "@/lib/telemetry/outcome";
@@ -121,6 +121,17 @@ describe("open vocabulary guard: subject kinds (rank allowlist)", () => {
         expect(sorted(RANKABLE_SUBJECT_KINDS)).toEqual(sorted(documented));
         expect(sorted(RANKABLE_SUBJECT_KINDS)).toEqual(
             sorted(decidedAt("/$defs/Cohort/properties/kind")),
+        );
+    });
+
+    it("the ranked kinds (G1, CHAOS-12429) are exactly team, project and repository, all documented", () => {
+        expect(sorted(RANKED_COHORT_KINDS)).toEqual(["project", "repository", "team"]);
+        for (const kind of RANKED_COHORT_KINDS) {
+            expect(documented).toContain(kind);
+            expect(RANKABLE_SUBJECT_KINDS).toContain(kind);
+        }
+        expect(RANKED_COHORT_KINDS.some((kind) => /person|user|people|human/i.test(kind))).toBe(
+            false,
         );
     });
 
@@ -238,6 +249,8 @@ describe("ranking withheld boundary guard", () => {
         });
     const ALLOWED_READERS = [
         "lib/cohort-ranking.ts",
+        // CHAOS-12429 E: the no-score caption counts the verified cohort's ranked members.
+        "lib/coverage-caption.ts",
         "lib/ranking-withheld.ts",
         "lib/render-shapes.ts",
         "components/CohortRankingPanel.tsx",

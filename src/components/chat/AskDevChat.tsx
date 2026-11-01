@@ -285,19 +285,45 @@ function ChatSurface({
     const composerHidden = snapshot.composerHidden === true;
     const offersStop =
         snapshot.stoppable && chat.stop !== undefined && threadNotShown === undefined;
+    // The list is read only while it is on screen (CHAOS-12429): a host's narrow panel hides the
+    // rail, and opening that panel sends nothing. The stylesheet alone knows the rail's width, so
+    // this reads what it did, not a second copy of the breakpoint.
+    const historyRail = useRef<HTMLElement>(null);
+    const [railOnScreen, setRailOnScreen] = useState(false);
+    const offersHistory = chat.history !== undefined;
+    useEffect(() => {
+        const rail = historyRail.current;
+        if (!offersHistory || rail === null) return;
+        const measure = () => {
+            setRailOnScreen(window.getComputedStyle(rail).display !== "none");
+        };
+        measure();
+        if (typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(measure);
+        observer.observe(rail.parentElement ?? rail);
+        return () => {
+            observer.disconnect();
+        };
+    }, [offersHistory]);
+    const historyOnScreen = railOnScreen || view === "history";
     // The first read of the list waits for the host's first history (see
     // `ChatHistorySource.load`). Here and not in `ChatHistory`: that component
     // is drawn in two places, and neither may read on its own.
     const historyPublished = snapshot.history !== undefined;
     const currentHistoryId = snapshot.history?.currentId ?? null;
     // Held in a ref, because Strict Mode runs a mount's effect twice and one
-    // surface reads a conversation's list once.
+    // surface reads a conversation's list once. A list that left the screen
+    // is read again when it comes back: it may have been hidden for hours.
     const historyReadFor = useRef<string | null | undefined>(undefined);
     useEffect(() => {
+        if (!historyOnScreen) {
+            historyReadFor.current = undefined;
+            return;
+        }
         if (!historyPublished || historyReadFor.current === currentHistoryId) return;
         historyReadFor.current = currentHistoryId;
         chat.history?.load();
-    }, [chat, historyPublished, currentHistoryId]);
+    }, [chat, historyOnScreen, historyPublished, currentHistoryId]);
     // Portable P2 hook (CHAOS-3927), consumed exactly as the Workbench
     // consumes it: one instance, reset on every fresh ask().
     const structureSelections = useStructureSelections();
@@ -814,7 +840,11 @@ function ChatSurface({
     return (
         <div className="ask-dev ask-frame">
             <div className="ask">
-                <aside aria-label="This conversation" className="ask__rail ask__rail--left">
+                <aside
+                    aria-label="This conversation"
+                    className="ask__rail ask__rail--left"
+                    ref={historyRail}
+                >
                     <button
                         className="rail__new"
                         disabled={isPending || turns.length === 0}

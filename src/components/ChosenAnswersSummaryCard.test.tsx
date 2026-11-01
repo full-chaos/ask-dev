@@ -29,7 +29,7 @@ const SUBJECT: SubjectRef = { kind: "project", canonical_id: "project:atlas", la
 /** The compact question/answer list only — excludes the collapsed "Selection details" record list, which repeats the member label as its own record title. */
 function compactList(): HTMLElement {
     return screen
-        .getByRole("region", { name: "Chosen answers" })
+        .getByRole("group", { name: "Chosen answers" })
         .querySelector<HTMLElement>(".chosen-answers__list")!;
 }
 

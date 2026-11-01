@@ -4,9 +4,12 @@ import { useId } from "react";
 
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
+import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { SafeAnswerText } from "./SafeAnswerText";
+import { rollupsOfClaims } from "../lib/investment-rollup";
 import { cohortRanking } from "../lib/cohort-ranking";
 import type {
+    ClaimedFact,
     DriverJudgment,
     EvidenceRefLabels,
     InvestigationResult,
@@ -80,11 +83,15 @@ function DriverCard({
     driver,
     membersWithFootnote,
     evidenceRefLabels,
+    claims,
 }: {
     readonly driver: DriverJudgment;
     readonly membersWithFootnote: ReadonlySet<string>;
     readonly evidenceRefLabels: EvidenceRefLabels;
+    /** The answer's claimed facts: a cited owning-team roll-up claim is labelled (CHAOS-12178). */
+    readonly claims: readonly ClaimedFact[];
 }) {
+    const rollups = rollupsOfClaims(claims, driver.claimed_fact_ids ?? []);
     const isPrincipal = driver.standing === "principal";
     const isWithheld =
         driver.standing === "withheld" &&
@@ -106,6 +113,17 @@ function DriverCard({
             ) : (
                 <p className="record__body">
                     <SafeAnswerText text={driver.summary} />
+                </p>
+            )}
+            {rollups.length === 0 ? null : (
+                <p className="record__meta" data-testid="driver-rollups">
+                    {rollups.map((rollup) => (
+                        <InvestmentRollupLabel
+                            key={rollup.subject.canonical_id}
+                            rollup={rollup}
+                            named={rollups.length > 1}
+                        />
+                    ))}
                 </p>
             )}
             <details className="disclosure">
@@ -173,6 +191,7 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
     );
     return (
         <section
+            role="group"
             className="panel panel--card"
             aria-labelledby={`${idPrefix}-drivers-title`}
             data-testid="drivers-panel"
@@ -202,6 +221,7 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
                     {result.drivers.map((driver) => (
                         <DriverCard
                             driver={driver}
+                            claims={result.claimed_facts}
                             evidenceRefLabels={result.evidence_ref_labels}
                             key={driver.driver_id}
                             membersWithFootnote={membersWithFootnote}

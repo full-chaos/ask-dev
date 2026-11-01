@@ -35,7 +35,7 @@ export function FindingsPanel({
 }: FindingsPanelProps) {
     const titleId = `findings-${title.toLowerCase().replaceAll(" ", "-")}`;
     return (
-        <section className="panel" aria-labelledby={titleId}>
+        <section role="group" className="panel" aria-labelledby={titleId}>
             <h2 className="panel__title" id={titleId}>
                 {title}
             </h2>

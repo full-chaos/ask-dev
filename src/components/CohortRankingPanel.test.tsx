@@ -66,7 +66,7 @@ describe("CohortRankingPanel", () => {
         expect(container).toBeEmptyDOMElement();
     });
 
-    it("renders the pinned example's ranked member with score, outcome, completeness and window", () => {
+    it("renders the pinned example's ranked member with score, outcome, served drivers and window", () => {
         // Red on the parent pin: the example carried no ranked cohort member,
         // and `CohortMember` had no `score`/`outcome`/`data_completeness` at all.
         render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
@@ -78,7 +78,9 @@ describe("CohortRankingPanel", () => {
         expect(row.getByText("CHAOS")).toBeInTheDocument();
         expect(row.getByText("43.5")).toBeInTheDocument();
         expect(row.getByText("qualified")).toBeInTheDocument();
-        expect(row.getByText("complete")).toBeInTheDocument();
+        // CHAOS-12245: the completeness enum is never shown; the served driver rows are.
+        expect(row.queryByText("complete")).not.toBeInTheDocument();
+        expect(row.getByText("5 of 5 drivers")).toBeInTheDocument();
         expect(row.getByText("current")).toBeInTheDocument();
     });
 

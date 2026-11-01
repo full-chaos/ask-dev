@@ -256,9 +256,11 @@ export type ChatHistorySnapshot = {
 export type ChatHistorySource = {
     /**
      * Reads the first page. `ChatSurface` calls this, once per surface, not per place the list is
-     * drawn: on mount, when `history.currentId` changes (a new conversation appears once it is
-     * admitted), and from "Try again". It waits for `ChatSnapshot.history`: a host that cannot read
-     * yet (no session) publishes none, and its first history starts the read.
+     * drawn, and only while the list is on screen, so a host's narrow panel reads nothing when it
+     * opens: when the list comes on screen (a wide frame on mount, or the History toggle), when
+     * `history.currentId` changes while it shows (a new conversation appears once it is admitted),
+     * and from "Try again". It waits for `ChatSnapshot.history`: a host that cannot read yet (no
+     * session) publishes none, and its first history starts the read.
      */
     load(): void;
     loadMore(): void;

@@ -412,7 +412,7 @@ export function StructureNeedsPanel({
     const candidateOptions = structureNeeds.candidate_options ?? [];
 
     return (
-        <section aria-labelledby={`${idPrefix}-needs-title`} className="panel">
+        <section role="group" aria-labelledby={`${idPrefix}-needs-title`} className="panel">
             <h2 className="panel__title" id={`${idPrefix}-needs-title`}>
                 More structure would narrow this
             </h2>
@@ -424,7 +424,7 @@ export function StructureNeedsPanel({
             </p>
 
             {structureNeeds.missing.includes("expected_kind") ? (
-                <section aria-labelledby={`${idPrefix}-kind-title`}>
+                <section role="group" aria-labelledby={`${idPrefix}-kind-title`}>
                     <h3 className="panel__title" id={`${idPrefix}-kind-title`}>
                         {PROMPT_TITLE.expected_kind}
                     </h3>
@@ -451,7 +451,7 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("subject_anchor") ? (
-                <section aria-labelledby={`${idPrefix}-anchor-title`}>
+                <section role="group" aria-labelledby={`${idPrefix}-anchor-title`}>
                     <h3 className="panel__title" id={`${idPrefix}-anchor-title`}>
                         {PROMPT_TITLE.subject_anchor}
                     </h3>
@@ -478,7 +478,7 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("subject_handle") ? (
-                <section aria-labelledby={`${idPrefix}-handle-title`}>
+                <section role="group" aria-labelledby={`${idPrefix}-handle-title`}>
                     <h3 className="panel__title" id={`${idPrefix}-handle-title`}>
                         {PROMPT_TITLE.subject_handle}
                     </h3>
@@ -505,7 +505,7 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("window") ? (
-                <section aria-labelledby={`${idPrefix}-window-title`}>
+                <section role="group" aria-labelledby={`${idPrefix}-window-title`}>
                     <h3 className="panel__title" id={`${idPrefix}-window-title`}>
                         {PROMPT_TITLE.window}
                     </h3>
@@ -532,7 +532,7 @@ export function StructureNeedsPanel({
             ) : null}
 
             {structureNeeds.missing.includes("subject_candidate") ? (
-                <section aria-labelledby={`${idPrefix}-candidate-title`}>
+                <section role="group" aria-labelledby={`${idPrefix}-candidate-title`}>
                     <h3 className="panel__title" id={`${idPrefix}-candidate-title`}>
                         {PROMPT_TITLE.subject_candidate}
                     </h3>
