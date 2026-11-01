@@ -178,7 +178,7 @@ describe("a fact with a place already is not shown twice", () => {
         expect(row("Method")).toHaveTextContent("owning_team");
     });
 
-    it("a dated fact a trend chart draws", () => {
+    it("a dated fact with no rows: no panel draws its chart, so its value is here", () => {
         const dated = s2.claimed_facts.find((fact) => fact.time_series_rows !== undefined)!;
         const { rows: _rows, ...noRows } = dated;
         const key = `fact_field:${dated.field}`;
@@ -187,7 +187,7 @@ describe("a fact with a place already is not shown twice", () => {
             { ...LABELS, [key]: "Dated" },
         );
         draw(result);
-        expect(within(panel()).queryByRole("row", { name: /Dated/u })).toBeNull();
+        expect(row("Dated")).toBeInTheDocument();
     });
 });
 
@@ -331,6 +331,17 @@ describe("a field with no served label", () => {
 });
 
 describe("a restored answer is not validated", () => {
+    it("a status claim on a result with no interpretation draws", () => {
+        const { interpretation: _interpretation, ...rest } = cohorts["work-items"];
+        const status = rest.claimed_facts.find((fact) => fact.kind === "status")!;
+        render(
+            <VocabularyLabelsContext.Provider value={{ "fact_field:status": "Status" }}>
+                <ScalarFactsPanel facts={[status]} result={rest as InvestigationResult} />
+            </VocabularyLabelsContext.Provider>,
+        );
+        expect(row("Status")).toHaveTextContent("open");
+    });
+
     it.each([
         ["no subject", { subject: undefined }],
         ["no field", { field: undefined }],

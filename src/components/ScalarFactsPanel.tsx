@@ -7,7 +7,6 @@ import { askedForCohort } from "../lib/cohort-ranking";
 import type { ClaimedFact, InvestigationResult } from "../lib/contracts";
 import { cellText, cellValue, factsWithRows, findRollupBasis, sameSubject } from "../lib/fact-rows";
 import { nonBlank } from "../lib/presentation";
-import { trendShapesForClaim } from "../lib/render-shapes";
 
 /** A restored answer is not validated, so a claim that lacks a part draws no row. */
 function readable(fact: ClaimedFact): boolean {
@@ -53,9 +52,10 @@ function isRollupBasis(
 
 /** `WorkItemStatusPanel` draws every status claim of the work items it lists. */
 function isInStatusTable(fact: ClaimedFact, result: InvestigationResult | undefined): boolean {
-    if (result === undefined || fact.kind !== "status") return false;
-    if (!askedForCohort(result.interpretation.shape, result)) return false;
-    return unrankedWorkItemMembers(result.cohort).some((member) =>
+    const shape = result?.interpretation?.shape;
+    if (shape === undefined || fact.kind !== "status") return false;
+    if (!askedForCohort(shape, result)) return false;
+    return unrankedWorkItemMembers(result?.cohort).some((member) =>
         sameSubject(member.subject, fact.subject),
     );
 }
@@ -80,7 +80,8 @@ export type ScalarFacts = {
 /**
  * CHAOS-12478: a claimed fact with a value and no `rows` had no render, so it reached the screen
  * only if the prose repeated it. These are the facts this panel draws: not one that a table, a tile,
- * a caption, a chart or the status table draws already.
+ * a caption or the status table draws already. A chart is drawn only by a panel with `rows`, so a
+ * fact with no `rows` has no chart to count on.
  */
 export function scalarFacts(
     claimed: readonly ClaimedFact[],
@@ -94,9 +95,6 @@ export function scalarFacts(
         if ((fact.rows?.length ?? 0) > 0) return false;
         if (isCell(fact, tables) || isRollupBasis(fact, tables, facts)) return false;
         if (isInStatusTable(fact, result)) return false;
-        if (result !== undefined && trendShapesForClaim(result, fact.claim_id).shapes.length > 0) {
-            return false;
-        }
         // The platform's boundary: no view lists people beside each other (AGENTS.md).
         if (fact.subject.kind === "person") {
             personHeld = true;
