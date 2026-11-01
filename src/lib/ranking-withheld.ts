@@ -13,8 +13,8 @@
  * Service prose (`deterministic_answer`, ...) is producer-owned and is not
  * rewritten here.
  */
-import { isRankableSubjectKind } from "@/lib/cohort-ranking";
-import type { InvestigationResult } from "@/lib/contracts";
+import { isRankableSubjectKind } from "./cohort-ranking";
+import type { InvestigationResult } from "./contracts";
 
 export type RankingWithheld = {
     readonly reason: "subject_kind_not_ranked";

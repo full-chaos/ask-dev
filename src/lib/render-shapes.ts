@@ -25,8 +25,8 @@ import type {
     InvestigationResult,
     RenderShape,
     ScalarValue,
-} from "@/lib/contracts";
-import { cellValue, parseIsoDate } from "@/lib/fact-rows";
+} from "./contracts";
+import { cellValue, parseIsoDate } from "./fact-rows";
 
 /** The selection rule that produced a shape (acr's closed vocabulary). */
 export type RenderShapeRule = RenderShape["selected_by"];

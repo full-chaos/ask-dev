@@ -1,5 +1,5 @@
-import type { ChoiceDisposition } from "@/lib/clarification";
-import type { SubjectRef } from "@/lib/contracts";
+import type { ChoiceDisposition } from "../lib/clarification";
+import type { SubjectRef } from "../lib/contracts";
 
 export type ChoiceNoticeProps = {
     readonly chosen: SubjectRef;

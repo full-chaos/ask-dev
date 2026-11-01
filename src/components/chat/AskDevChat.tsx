@@ -2,38 +2,38 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-import { ChatComposer, type ChatComposerHandle } from "@/components/chat/ChatComposer";
-import { ClarificationPopup } from "@/components/chat/ClarificationPopup";
-import { InspectorRail } from "@/components/chat/InspectorRail";
-import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
-import { FailurePanel } from "@/components/FailurePanel";
-import type { ClarificationChoice } from "@/components/ClarificationPanel";
-import type { WorkbenchFailure } from "@/lib/acr/errors";
-import { EMPTY_CANDIDATE_SELECTION_BATCH } from "@/lib/candidate-selections";
-import { subjectForReceipt } from "@/lib/clarification";
-import { buildClarificationPages, type PopupOptionSource } from "@/lib/clarification-popup";
+import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
+import { ClarificationPopup } from "./ClarificationPopup";
+import { InspectorRail } from "./InspectorRail";
+import { DeterministicAnswerView } from "../DeterministicAnswerView";
+import { FailurePanel } from "../FailurePanel";
+import type { ClarificationChoice } from "../ClarificationPanel";
+import type { WorkbenchFailure } from "../../lib/acr/errors";
+import { EMPTY_CANDIDATE_SELECTION_BATCH } from "../../lib/candidate-selections";
+import { subjectForReceipt } from "../../lib/clarification";
+import { buildClarificationPages, type PopupOptionSource } from "../../lib/clarification-popup";
 import {
     buildConversationTurns,
     deriveParentReference,
     type UnsentSubject,
-} from "@/lib/conversation";
-import { type RankingWithheld, withholdUnrankableRankings } from "@/lib/ranking-withheld";
+} from "../../lib/conversation";
+import { type RankingWithheld, withholdUnrankableRankings } from "../../lib/ranking-withheld";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
     InvestigationResult,
     SubjectHint,
     SubjectRef,
-} from "@/lib/contracts";
-import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
+} from "../../lib/contracts";
+import { literalKindNounsInQuestion } from "../../lib/kind-nouns";
 import {
     buildStructureReceiptFields,
     EMPTY_SELECTION_EVENTS,
     type PendingSelectionEvent,
     type StructureSelectionBatch,
-} from "@/lib/structure-selections";
-import { useCandidateSelections } from "@/lib/use-candidate-selections";
-import { useStructureSelections } from "@/lib/use-structure-selections";
+} from "../../lib/structure-selections";
+import { useCandidateSelections } from "../../lib/use-candidate-selections";
+import { useStructureSelections } from "../../lib/use-structure-selections";
 
 /**
  * Ask Dev — the chat surface (chat pivot, Phase 1), as one embeddable unit:

@@ -1,5 +1,5 @@
-import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import errorSchema from "@/contracts/schemas/error.v1.schema.json";
+import commonSchema from "../../contracts/schemas/context_fabric_common.v1.schema.json";
+import errorSchema from "../../contracts/schemas/error.v1.schema.json";
 
 /**
  * Bounded handling of the two upstream fields the Workbench still carries.

@@ -1,4 +1,4 @@
-import type { Tone } from "@/lib/presentation";
+import type { Tone } from "../lib/presentation";
 
 export type BadgeProps = {
     readonly tone: Tone;

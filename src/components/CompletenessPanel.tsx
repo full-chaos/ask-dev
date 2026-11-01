@@ -1,18 +1,18 @@
-import type { RankingWithheld } from "@/lib/ranking-withheld";
+import type { RankingWithheld } from "../lib/ranking-withheld";
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
+import { Badge } from "./Badge";
 import type {
     AnswerCompleteness,
     PlanRequirementOutcomeRow,
     RequirementRefinement,
-} from "@/lib/contracts";
+} from "../lib/contracts";
 import {
     completenessStateTone,
     humanizeTerm,
     planRequirementOutcomeTone,
     statusTone,
-} from "@/lib/presentation";
+} from "../lib/presentation";
 
 export type CompletenessPanelProps = {
     readonly completeness: AnswerCompleteness;

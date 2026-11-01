@@ -1,10 +1,10 @@
-import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.json";
-import { declaredVocabulary } from "@/lib/acr/upstream-vocabulary";
-import type { InvestigationResult, StructureNeedKind } from "@/lib/contracts";
-import { degradedReasonCount } from "@/lib/degraded-reasons";
-import type { WorkbenchFailureCode } from "@/lib/acr/errors";
-import type { EnrichmentPredicate } from "@/lib/enrichment/validate";
-import { trendChartSourceCounts } from "@/lib/render-shapes";
+import commonSchema from "../../contracts/schemas/context_fabric_common.v1.schema.json";
+import { declaredVocabulary } from "../acr/upstream-vocabulary";
+import type { InvestigationResult, StructureNeedKind } from "../contracts";
+import { degradedReasonCount } from "../degraded-reasons";
+import type { WorkbenchFailureCode } from "../acr/errors";
+import type { EnrichmentPredicate } from "../enrichment/validate";
+import { trendChartSourceCounts } from "../render-shapes";
 
 /**
  * Content-safe outcome telemetry (CHAOS-3738).

@@ -1,6 +1,6 @@
-import { Details } from "@/components/Details";
-import type { EvidenceRefLabels } from "@/lib/contracts";
-import { nonBlank } from "@/lib/presentation";
+import { Details } from "./Details";
+import type { EvidenceRefLabels } from "../lib/contracts";
+import { nonBlank } from "../lib/presentation";
 
 export type EvidenceReferencesProps = {
     readonly evidenceRefIds: readonly string[] | undefined;

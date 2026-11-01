@@ -4,9 +4,9 @@ import {
     type InvestigationResult,
     type StructureNeedKind,
     type StructureNeeds,
-} from "@/lib/contracts";
-import type { StructureSelectionBatch } from "@/lib/structure-selections";
-import { structureMemberLabel } from "@/lib/structure-disposition";
+} from "./contracts";
+import type { StructureSelectionBatch } from "./structure-selections";
+import { structureMemberLabel } from "./structure-disposition";
 
 /**
  * CHAOS-4671: the popup clarification flow (window/kind/anchor/handle offers

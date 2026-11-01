@@ -1,11 +1,11 @@
 import { useId } from "react";
 
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import { SafeAnswerText } from "@/components/SafeAnswerText";
-import type { ClaimedFact, CohortMember, InvestigationResult, SubjectRef } from "@/lib/contracts";
-import { cellText } from "@/lib/fact-rows";
-import { isCohortIntent } from "@/lib/cohort-ranking";
-import { nonBlank } from "@/lib/presentation";
+import { EvidenceReferences } from "./EvidenceReferences";
+import { SafeAnswerText } from "./SafeAnswerText";
+import type { ClaimedFact, CohortMember, InvestigationResult, SubjectRef } from "../lib/contracts";
+import { cellText } from "../lib/fact-rows";
+import { isCohortIntent } from "../lib/cohort-ranking";
+import { nonBlank } from "../lib/presentation";
 
 export type WorkItemStatusPanelProps = {
     readonly result: InvestigationResult;

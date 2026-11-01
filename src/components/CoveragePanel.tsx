@@ -1,15 +1,15 @@
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
-import { Details } from "@/components/Details";
-import type { Coverage, CoverageDetail } from "@/lib/contracts";
+import { Badge } from "./Badge";
+import { Details } from "./Details";
+import type { Coverage, CoverageDetail } from "../lib/contracts";
 import {
     GENERIC_DEGRADED_REASON_SENTENCE,
     degradedReasonDisplay,
     degradingDetails as degradingDetailsOf,
     uncoveredLegacyReasons,
-} from "@/lib/degraded-reasons";
-import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
+} from "../lib/degraded-reasons";
+import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
 
 /**
  * The deterministic floor for a read-origin-state row whose contract-required

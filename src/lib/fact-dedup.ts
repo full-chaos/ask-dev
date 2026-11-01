@@ -1,4 +1,4 @@
-import type { Finding } from "@/lib/contracts";
+import type { Finding } from "./contracts";
 
 /**
  * CHAOS-4669 defect 1: "one fact renders 3+ times per answer" — chris's UX

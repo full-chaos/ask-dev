@@ -1,8 +1,4 @@
-import type {
-    ConfirmedStructureEntry,
-    StructureDisposition,
-    StructureNeedKind,
-} from "@/lib/contracts";
+import type { ConfirmedStructureEntry, StructureDisposition, StructureNeedKind } from "./contracts";
 
 /**
  * Structure confirmation is wire-visible from day one (design brief §2.1):

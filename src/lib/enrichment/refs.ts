@@ -1,4 +1,4 @@
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult } from "../contracts";
 
 /**
  * Reference-only value resolution (CHAOS-3738).

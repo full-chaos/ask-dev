@@ -1,4 +1,4 @@
-import type { InvestigationResult } from "@/lib/contracts";
+import type { InvestigationResult } from "../lib/contracts";
 
 /**
  * CHAOS-5672: renders ACR's `semantic_reading` disclosure on a STORED

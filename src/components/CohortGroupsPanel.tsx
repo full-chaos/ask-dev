@@ -1,7 +1,7 @@
 import { useId } from "react";
 
-import type { Cohort } from "@/lib/contracts";
-import { humanizeTerm } from "@/lib/presentation";
+import type { Cohort } from "../lib/contracts";
+import { humanizeTerm } from "../lib/presentation";
 
 export type CohortGroupsPanelProps = {
     readonly cohort: Cohort | undefined;

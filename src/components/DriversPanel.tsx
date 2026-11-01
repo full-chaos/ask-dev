@@ -1,18 +1,18 @@
-import type { RankingWithheld } from "@/lib/ranking-withheld";
-import { WithheldPart } from "@/components/WithheldPart";
+import type { RankingWithheld } from "../lib/ranking-withheld";
+import { WithheldPart } from "./WithheldPart";
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import { SafeAnswerText } from "@/components/SafeAnswerText";
-import { cohortRanking } from "@/lib/cohort-ranking";
+import { Badge } from "./Badge";
+import { EvidenceReferences } from "./EvidenceReferences";
+import { SafeAnswerText } from "./SafeAnswerText";
+import { cohortRanking } from "../lib/cohort-ranking";
 import type {
     DriverJudgment,
     EvidenceRefLabels,
     InvestigationResult,
     SubjectRef,
-} from "@/lib/contracts";
-import { formatConfidence, humanizeTerm } from "@/lib/presentation";
+} from "../lib/contracts";
+import { formatConfidence, humanizeTerm } from "../lib/presentation";
 
 /**
  * A subject's identity for set/map membership: `(kind, canonical_id)`, never

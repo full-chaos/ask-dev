@@ -1,6 +1,6 @@
-import { Badge } from "@/components/Badge";
-import type { InvestigationResult } from "@/lib/contracts";
-import { coverageStateTone, humanizeTerm, nonBlank } from "@/lib/presentation";
+import { Badge } from "../Badge";
+import type { InvestigationResult } from "../../lib/contracts";
+import { coverageStateTone, humanizeTerm, nonBlank } from "../../lib/presentation";
 
 export type InspectorRailProps = {
     /** The latest ANSWERED result; undefined before the first answer. */

@@ -1,9 +1,9 @@
 import { createParser } from "@openuidev/react-lang";
 
-import type { InvestigationResult } from "@/lib/contracts";
-import { enrichmentLibrary } from "@/lib/enrichment/library";
-import { manifestComponent, type PresentationManifest } from "@/lib/enrichment/manifest";
-import { isRef, resolveRef } from "@/lib/enrichment/refs";
+import type { InvestigationResult } from "../contracts";
+import { enrichmentLibrary } from "./library";
+import { manifestComponent, type PresentationManifest } from "./manifest";
+import { isRef, resolveRef } from "./refs";
 
 /**
  * Fail-closed validation of a whole enrichment composition (CHAOS-3738).

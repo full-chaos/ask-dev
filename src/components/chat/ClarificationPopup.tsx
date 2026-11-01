@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { PopupOption, PopupOptionSource, PopupPage } from "@/lib/clarification-popup";
+import type { PopupOption, PopupOptionSource, PopupPage } from "../../lib/clarification-popup";
 
 /**
  * CHAOS-4671: the clarification/offer workflow as a floating popup anchored

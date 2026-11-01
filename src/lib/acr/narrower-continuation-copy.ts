@@ -1,4 +1,4 @@
-import type { NarrowingContinuationAxis } from "@/lib/acr/upstream-vocabulary";
+import type { NarrowingContinuationAxis } from "./upstream-vocabulary";
 
 /**
  * CHAOS-5107 (CHAOS-4735's client half). ACR's engine names WHICH structural

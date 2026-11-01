@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 
-import type { BoundStructureReceipt, StructureNeedKind } from "@/lib/contracts";
+import type { BoundStructureReceipt, StructureNeedKind } from "./contracts";
 import {
     EMPTY_SELECTION_EVENTS,
     EMPTY_STRUCTURE_SELECTION_BATCH,
@@ -10,7 +10,7 @@ import {
     toggleStructureOffer,
     type PendingSelectionEvent,
     type StructureSelectionBatch,
-} from "@/lib/structure-selections";
+} from "./structure-selections";
 
 export type UseStructureSelectionsResult = {
     readonly batch: StructureSelectionBatch;

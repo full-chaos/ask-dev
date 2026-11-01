@@ -2,15 +2,15 @@
 
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "@/lib/contracts";
+import { Badge } from "./Badge";
+import { EvidenceReferences } from "./EvidenceReferences";
+import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "../lib/contracts";
 import {
     CANNOT_REASK_HERE_COPY,
     candidateStateTone,
     formatConfidence,
     humanizeTerm,
-} from "@/lib/presentation";
+} from "../lib/presentation";
 
 export type ClarificationChoice = {
     readonly result_id: string;

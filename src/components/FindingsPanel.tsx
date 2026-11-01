@@ -1,10 +1,10 @@
-import { WithheldPart } from "@/components/WithheldPart";
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import { SafeAnswerText } from "@/components/SafeAnswerText";
-import type { EvidenceRefLabels } from "@/lib/contracts";
-import type { DedupedFinding } from "@/lib/fact-dedup";
-import { SURFACE_LABEL } from "@/lib/fact-dedup";
-import { humanizeTerm } from "@/lib/presentation";
+import { WithheldPart } from "./WithheldPart";
+import { EvidenceReferences } from "./EvidenceReferences";
+import { SafeAnswerText } from "./SafeAnswerText";
+import type { EvidenceRefLabels } from "../lib/contracts";
+import type { DedupedFinding } from "../lib/fact-dedup";
+import { SURFACE_LABEL } from "../lib/fact-dedup";
+import { humanizeTerm } from "../lib/presentation";
 
 export type FindingsPanelProps = {
     readonly title: string;

@@ -1,8 +1,8 @@
-import { Badge } from "@/components/Badge";
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
-import type { EvidenceRefLabels, SubjectResolution } from "@/lib/contracts";
-import { candidateStateTone, formatConfidence, humanizeTerm } from "@/lib/presentation";
+import { Badge } from "./Badge";
+import { EvidenceReferences } from "./EvidenceReferences";
+import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
+import type { EvidenceRefLabels, SubjectResolution } from "../lib/contracts";
+import { candidateStateTone, formatConfidence, humanizeTerm } from "../lib/presentation";
 
 export type SubjectResolutionPanelProps = {
     readonly resolution: SubjectResolution;

@@ -1,7 +1,7 @@
-import { NarrowerReask } from "@/components/NarrowerReask";
-import { SafeAnswerText } from "@/components/SafeAnswerText";
-import { isBlankQuestion } from "@/lib/acr/narrower-continuation-copy";
-import type { WorkbenchFailure } from "@/lib/acr/errors";
+import { NarrowerReask } from "./NarrowerReask";
+import { SafeAnswerText } from "./SafeAnswerText";
+import { isBlankQuestion } from "../lib/acr/narrower-continuation-copy";
+import type { WorkbenchFailure } from "../lib/acr/errors";
 
 export type FailurePanelProps = {
     readonly failure: WorkbenchFailure;

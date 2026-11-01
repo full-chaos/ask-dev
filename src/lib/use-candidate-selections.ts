@@ -6,12 +6,12 @@ import {
     EMPTY_CANDIDATE_SELECTION_BATCH,
     toggleCandidateSelection,
     type CandidateSelectionBatch,
-} from "@/lib/candidate-selections";
+} from "./candidate-selections";
 import {
     EMPTY_SELECTION_EVENTS,
     recordSelectionEvent,
     type PendingSelectionEvent,
-} from "@/lib/structure-selections";
+} from "./structure-selections";
 
 export type UseCandidateSelectionsResult = {
     readonly batch: CandidateSelectionBatch;
