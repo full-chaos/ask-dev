@@ -1,9 +1,20 @@
-# ALARM, not a gate (CHAOS-5553): fails when the vendored ACR contract pin has
-# drifted from acr main. Deliberately NOT a required check and NOT part of the
-# `test` aggregate in tests.yml, so ask-dev PRs stay green between pin bumps
-# while drift stays visible. Mirrors dev-health-web's "ACR pin drift" workflow.
-# The required pin-integrity check (`ci/run_checks.sh contracts`) is unchanged.
-# Exit 1 = drift, exit 2 = the check could not fetch (also red; never read as current).
+# ALARM, not a gate (CHAOS-5553): reports when the vendored ACR contract pin has drifted from acr
+# main. Deliberately NOT a required check and NOT part of the `test` aggregate in tests.yml, so
+# ask-dev PRs stay green between pin bumps while drift stays visible. Mirrors dev-health-web's
+# "ACR pin drift" workflow. The required pin-integrity check (`ci/run_checks.sh contracts`) is unchanged.
+#
+# Exit codes of scripts/check-acr-pin-drift.mjs:
+#   0 = current.
+#   1 = drift. Annotation title: "ACR contract pin drift".
+#   2 = the measurement did not happen (a tool failure: fetch failed 3 times in a row, or the
+#       manifest is broken). Annotation title: "ACR pin drift: tool failure, not drift". It is never
+#       read as current and never read as drift. A broken manifest is not retried.
+# The script also writes status=current|drift|error (plus pin, head) to GITHUB_OUTPUT.
+#
+# Scope (CHAOS-12443): main, schedule and manual runs are strict, so exit 1 and exit 2 turn the run
+# red. A PR run is strict only when the PR changes the vendored contracts or the generator that
+# writes them (scripts/acr-pin-scope.mjs lists the paths). For any other PR, drift AND a tool failure
+# are ::warning annotations and the job passes, so an acr main move never turns unrelated PRs red.
 name: ACR pin drift
 
 on:
@@ -22,10 +33,47 @@ jobs:
         name: ACR pin drift
         runs-on: ubuntu-latest
         timeout-minutes: 5
+        permissions:
+            contents: read
+            pull-requests: read
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
             - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
               with:
                   node-version-file: .nvmrc
+            - name: List the files this PR changes
+              id: files
+              if: github.event_name == 'pull_request'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  REPO: ${{ github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
+              run: |
+                  set -euo pipefail
+                  gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+                      --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/pr-files.txt"
+            # The token is not set on this step: it runs a script from the PR checkout.
+            - name: Decide whether drift is enforced
+              id: scope
+              env:
+                  EVENT: ${{ github.event_name }}
+              run: |
+                  set -euo pipefail
+                  if [ "$EVENT" != "pull_request" ]; then
+                      echo "enforce=true" >> "$GITHUB_OUTPUT"
+                      exit 0
+                  fi
+                  node scripts/acr-pin-scope.mjs < "$RUNNER_TEMP/pr-files.txt" >> "$GITHUB_OUTPUT"
+            # No token here either. ACR_PIN_ENFORCE only changes the annotation level (error or warning);
+            # the exit code is the same, and the next step decides whether the job fails.
             - name: Compare the vendored pin with acr main
+              id: check
+              continue-on-error: true
+              env:
+                  ACR_PIN_ENFORCE: ${{ steps.scope.outputs.enforce }}
               run: node scripts/check-acr-pin-drift.mjs
+            - name: Fail when drift is enforced
+              if: steps.check.outcome == 'failure' && steps.scope.outputs.enforce == 'true'
+              run: exit 1
