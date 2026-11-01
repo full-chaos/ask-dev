@@ -15,6 +15,7 @@ import type {
     InvestigationResult,
     SubjectRef,
 } from "../lib/contracts";
+import { cellText } from "../lib/fact-rows";
 import { formatConfidence, humanizeTerm, nonBlank } from "../lib/presentation";
 import { useVocabularyWord } from "./VocabularyWordContext";
 
@@ -80,6 +81,39 @@ export type DriversPanelProps = {
  * member of a DIFFERENT kind is not wrongly matched to that member's
  * footnote.
  */
+/**
+ * The facts a driver cites (CHAOS-12482). A `claim_id` names a fact on this answer, not an evidence
+ * ref, so it is never an evidence button: the read would come back not found. Each shows what it
+ * is, in the service's words. An id that names no fact on this answer shows nothing.
+ */
+function ClaimedFacts({
+    claimIds,
+    claims,
+}: {
+    readonly claimIds: readonly string[] | undefined;
+    readonly claims: readonly ClaimedFact[];
+}) {
+    const word = useVocabularyWord();
+    const cited = claims.filter((claim) => claimIds?.includes(claim.claim_id));
+    if (cited.length === 0) return null;
+    return (
+        <>
+            <p className="record__meta">Claimed facts</p>
+            <ul className="stack stack--tight">
+                {cited.map((claim, index) => (
+                    // Index key: the contract does not promise a unique claim id.
+                    <li className="record__meta" data-testid="driver-claimed-fact" key={index}>
+                        {word("fact_kind", claim.kind)} · {humanizeTerm(claim.field)}
+                        {claim.value === undefined
+                            ? " · shown in its table on this answer"
+                            : `: ${cellText(claim.value)}`}
+                    </li>
+                ))}
+            </ul>
+        </>
+    );
+}
+
 function DriverCard({
     driver,
     membersWithFootnote,
@@ -171,11 +205,7 @@ function DriverCard({
                     evidenceRefLabels={evidenceRefLabels}
                     label="Evidence"
                 />
-                <EvidenceReferences
-                    evidenceRefIds={driver.claimed_fact_ids}
-                    evidenceRefLabels={evidenceRefLabels}
-                    label="Claimed facts"
-                />
+                <ClaimedFacts claimIds={driver.claimed_fact_ids} claims={claims} />
             </details>
         </li>
     );
