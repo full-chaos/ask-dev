@@ -1,39 +1,12 @@
 import { useId } from "react";
 
-import { CohortMeaningDetails } from "./CohortMeaningDetails";
+import { CohortExclusions, CohortMeaningDetails, CohortMeaningLines } from "./CohortMeaningDetails";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
-import type { Cohort, InvestigationResult } from "../lib/contracts";
+import type { InvestigationResult } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-
-/**
- * Who the service left out of a cohort, and why, in its own words. A restored answer is not
- * validated, so a row that does not hold both draws nothing.
- */
-export function CohortExclusions({ cohort }: { readonly cohort: Cohort }) {
-    const exclusions = (Array.isArray(cohort.exclusions) ? cohort.exclusions : []).filter(
-        (exclusion: Partial<NonNullable<Cohort["exclusions"]>[number]> | null) =>
-            typeof exclusion?.subject?.label === "string" && typeof exclusion.reason === "string",
-    );
-    if (exclusions.length === 0) return null;
-    return (
-        <>
-            <h3 className="panel__title" style={{ marginTop: 14 }}>
-                Left out
-            </h3>
-            <ul className="stack stack--tight">
-                {exclusions.map((exclusion, index) => (
-                    // Index key: the contract does not promise a unique canonical id.
-                    <li className="record__meta" data-testid="cohort-exclusion" key={index}>
-                        {exclusion.subject.label}: {exclusion.reason}
-                    </li>
-                ))}
-            </ul>
-        </>
-    );
-}
 
 /**
  * A cohort chart ACR served that cannot be checked: over a list with no scores, or with no cohort at
@@ -92,6 +65,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </p>
             )}
             {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
+            <CohortMeaningLines cohort={cohort} ranked={false} />
             <ChartsWithheld result={result} />
             {cohort.members.length === 0 ? (
                 <p className="panel__empty">The service returned no members.</p>
@@ -107,7 +81,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </ul>
             )}
             <CohortExclusions cohort={cohort} />
-            <CohortMeaningDetails cohort={cohort} />
+            <CohortMeaningDetails cohort={cohort} ranked={false} />
         </section>
     );
 }

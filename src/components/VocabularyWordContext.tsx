@@ -3,6 +3,7 @@ import { createContext, useContext } from "react";
 import {
     type Vocabulary,
     type VocabularyLabels,
+    servedNote,
     servedWord,
     vocabularyWord,
 } from "../lib/vocabulary-labels";
@@ -22,6 +23,12 @@ export function useVocabularyLabels(): VocabularyLabels {
 export function useVocabularyWord(): (vocabulary: Vocabulary, value: string) => string {
     const labels = useVocabularyLabels();
     return (vocabulary, value) => vocabularyWord(labels, vocabulary, value);
+}
+
+/** `note("reused")`: the sentence ACR composes for one field of this answer, if it has one. */
+export function useServedNote(): (field: string) => string | undefined {
+    const labels = useVocabularyLabels();
+    return (field) => servedNote(labels, field);
 }
 
 /** `served("subject_kind_plural", value)`: only the served word, for a caller with its own floor. */

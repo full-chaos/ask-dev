@@ -20,9 +20,8 @@ import {
 import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-import { cohortOutcomeTone, nonBlank } from "../lib/presentation";
-import { CohortMeaningDetails } from "./CohortMeaningDetails";
-import { CohortExclusions } from "./CohortMembersPanel";
+import { cohortOutcomeTone } from "../lib/presentation";
+import { CohortMeaningDetails, CohortMeaningLines } from "./CohortMeaningDetails";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 
@@ -167,7 +166,6 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     const singular = word("subject_kind", cohort.kind);
 
     const unranked = unrankedLabels(cohort.members);
-    const rationale = typeof cohort.rationale === "string" ? nonBlank(cohort.rationale) : undefined;
 
     // CHAOS-4415: the charts acr selected FOR THIS COHORT — the attention
     // score bars and the per-driver contribution stack that explains them.
@@ -198,6 +196,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                         : `The service did not report this cohort as complete, so this ranking may not cover every ${singular}.`}
                 </p>
             )}
+            <CohortMeaningLines cohort={cohort} ranked />
             {
                 // Above the table: when the question asked for a ranking, the
                 // ranking IS the answer, and the score bars plus their
@@ -332,10 +331,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     Not ranked by the service: {unranked.join(", ")}.
                 </p>
             )}
-            <CohortMeaningDetails cohort={cohort}>
-                {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
-                <CohortExclusions cohort={cohort} />
-            </CohortMeaningDetails>
+            <CohortMeaningDetails cohort={cohort} ranked />
         </section>
     );
 }

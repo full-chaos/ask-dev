@@ -19,7 +19,7 @@ import type {
 } from "../lib/contracts";
 import { cellText } from "../lib/fact-rows";
 import { formatConfidence, humanizeTerm, nonBlank } from "../lib/presentation";
-import { useVocabularyWord } from "./VocabularyWordContext";
+import { useServedNote, useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 
 /**
  * A subject's identity for set/map membership: `(kind, canonical_id)`, never
@@ -132,6 +132,13 @@ function DriverCard({
     readonly paths: readonly RelationshipPath[];
 }) {
     const word = useVocabularyWord();
+    const served = useServedWord();
+    const note = useServedNote();
+    const sourceStateWord =
+        driver.source_state === undefined
+            ? undefined
+            : served("driver_source_state", driver.source_state);
+    const correctedNote = note("summary_corrected");
     const rollups = rollupsOfClaims(claims, driver.claimed_fact_ids ?? []);
     const isPrincipal = driver.standing === "principal";
     const isWithheld =
@@ -181,12 +188,12 @@ function DriverCard({
                 ) : null}
                 {driver.source_state === undefined ? null : (
                     <p className="record__meta" data-testid="driver-source-state">
-                        <code>source_state: {driver.source_state}</code>
+                        {sourceStateWord ?? <code>source_state: {driver.source_state}</code>}
                     </p>
                 )}
                 {driver.summary_corrected === true ? (
                     <p className="record__meta" data-testid="driver-summary-corrected">
-                        <code>summary_corrected: true</code>
+                        {correctedNote ?? <code>summary_corrected: true</code>}
                     </p>
                 ) : null}
                 <p className="record__meta">
