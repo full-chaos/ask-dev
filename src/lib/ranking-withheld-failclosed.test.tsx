@@ -19,6 +19,7 @@ import {
     WITHHELD_ANSWER,
     withholdUnrankableRankings,
 } from "@/lib/ranking-withheld";
+import { validateContract } from "@/lib/acr/validate";
 import { findRankReads, findRankReadsTyped } from "@/test/rank-read-scan";
 
 const teamResult = shapesExample as unknown as InvestigationResult;
@@ -221,6 +222,40 @@ describe("fail-closed withholding (allowlist)", () => {
         expect(after.result).toEqual(before);
         expect(after.result).toBe(teamResult);
         expect(after.rankingWithheld).toBeUndefined();
+    });
+
+    it("drops the whole vocabulary label map: a schema-valid label can carry ranking text", () => {
+        const leak = "Ada rank 1 score 43.5 driver weight 30";
+        const input = {
+            ...personResult(),
+            vocabulary_labels: { "answer_status:partial": leak },
+        } as unknown as InvestigationResult;
+        // The contract checks only the shape of a label, so this passes schema validation.
+        expect(
+            validateContract("context_fabric_investigation_result.v1.schema.json", input).valid,
+        ).toBe(true);
+        const withheld = withholdUnrankableRankings(input);
+        expect(withheld.rankingWithheld).toBeDefined();
+        const built = withheld.result as unknown as Record<string, unknown>;
+        expect(built.vocabulary_labels).toBeUndefined();
+        expect(JSON.stringify(withheld.result)).not.toContain("Ada rank");
+    });
+
+    it("a result with no cohort keeps its vocabulary label map, unchanged", () => {
+        // The boundary acts only on a cohort; a cohort-less result has no ranking for it to
+        // withhold, and a withheld result cannot hold the map, because it is rebuilt from the keep list.
+        const labels = { "answer_status:partial": "partial answer" };
+        const input = {
+            ...teamResult,
+            cohort: undefined,
+            vocabulary_labels: labels,
+        } as unknown as InvestigationResult;
+        const out = withholdUnrankableRankings(input);
+        expect(out.result).toBe(input);
+        expect((out.result as unknown as Record<string, unknown>).vocabulary_labels).toEqual(
+            labels,
+        );
+        expect(out.rankingWithheld).toBeUndefined();
     });
 
     it("is idempotent and drops a field a future producer adds", () => {
