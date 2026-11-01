@@ -1,7 +1,7 @@
-import { StructureConfirmationRecords } from "@/components/StructureConfirmationNotice";
-import type { ChoiceDisposition } from "@/lib/clarification";
-import { structureMemberLabel, summarizeConfirmedStructure } from "@/lib/structure-disposition";
-import type { ConfirmedStructureEntry, SubjectRef } from "@/lib/contracts";
+import { StructureConfirmationRecords } from "./StructureConfirmationNotice";
+import type { ChoiceDisposition } from "../lib/clarification";
+import { structureMemberLabel, summarizeConfirmedStructure } from "../lib/structure-disposition";
+import type { ConfirmedStructureEntry, SubjectRef } from "../lib/contracts";
 
 export type ChosenAnswersSummaryCardProps = {
     readonly confirmedStructure: readonly ConfirmedStructureEntry[] | undefined;

@@ -1,4 +1,4 @@
-import type { RenderShape } from "@/lib/contracts";
+import type { RenderShape } from "../lib/contracts";
 
 export type RenderShapeChartProps = {
     readonly shape: RenderShape;

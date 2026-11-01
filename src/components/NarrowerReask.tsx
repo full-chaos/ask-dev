@@ -2,9 +2,9 @@ import {
     describeBudgetOverrun,
     NARROWER_REASK_PENDING_LABEL,
     narrowerContinuationCopy,
-} from "@/lib/acr/narrower-continuation-copy";
-import type { WorkbenchFailure } from "@/lib/acr/errors";
-import { SafeAnswerText } from "@/components/SafeAnswerText";
+} from "../lib/acr/narrower-continuation-copy";
+import type { WorkbenchFailure } from "../lib/acr/errors";
+import { SafeAnswerText } from "./SafeAnswerText";
 
 export type NarrowerReaskProps = {
     readonly narrowerContinuation: NonNullable<WorkbenchFailure["narrowerContinuation"]>;

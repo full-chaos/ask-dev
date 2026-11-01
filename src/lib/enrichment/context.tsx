@@ -2,8 +2,8 @@
 
 import { createContext, useContext } from "react";
 
-import type { InvestigationResult } from "@/lib/contracts";
-import { resolveRef } from "@/lib/enrichment/refs";
+import type { InvestigationResult } from "../contracts";
+import { resolveRef } from "./refs";
 
 /**
  * Supplies the immutable result to the enrichment components.

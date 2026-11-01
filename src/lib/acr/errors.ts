@@ -1,4 +1,4 @@
-import type { ModelRefusalReason, NarrowingContinuationAxis } from "@/lib/acr/upstream-vocabulary";
+import type { ModelRefusalReason, NarrowingContinuationAxis } from "./upstream-vocabulary";
 
 /**
  * The failure vocabulary the Workbench shows a tester.

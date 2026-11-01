@@ -1,7 +1,7 @@
 import { useId } from "react";
 
-import type { AnswerPlan } from "@/lib/contracts";
-import { humanizeTerm } from "@/lib/presentation";
+import type { AnswerPlan } from "../lib/contracts";
+import { humanizeTerm } from "../lib/presentation";
 
 export type AnswerPlanPanelProps = {
     readonly answerPlan: AnswerPlan | undefined;

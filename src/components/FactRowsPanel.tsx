@@ -1,18 +1,18 @@
 import { useId } from "react";
 
-import { FactChart } from "@/components/FactChart";
-import { FactTable } from "@/components/FactTable";
-import { RenderShapeChart } from "@/components/RenderShapeChart";
-import type { ClaimedFact, InvestigationResult, RenderShape } from "@/lib/contracts";
+import { FactChart } from "./FactChart";
+import { FactTable } from "./FactTable";
+import { RenderShapeChart } from "./RenderShapeChart";
+import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
     factRowTiles,
     factsWithRows,
     findRollupBasis,
     groupFactsByTable,
     selectPresentation,
-} from "@/lib/fact-rows";
-import { trendShapesForClaim } from "@/lib/render-shapes";
-import { humanizeTerm } from "@/lib/presentation";
+} from "../lib/fact-rows";
+import { trendShapesForClaim } from "../lib/render-shapes";
+import { humanizeTerm } from "../lib/presentation";
 
 export type FactRowsPanelsProps = {
     readonly facts: readonly ClaimedFact[];

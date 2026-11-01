@@ -1,7 +1,12 @@
 {
-    "name": "ask-dev-workbench",
+    "name": "@full-chaos/ask-dev",
     "version": "0.0.0",
     "private": true,
+    "exports": {
+        "./render": "./src/render/index.ts",
+        "./ask-dev.css": "./src/app/ask-dev.css",
+        "./package.json": "./package.json"
+    },
     "packageManager": "pnpm@11.21.0",
     "engines": {
         "node": ">=22"

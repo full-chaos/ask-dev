@@ -1,8 +1,8 @@
 import { useId } from "react";
 
-import { SafeAnswerText } from "@/components/SafeAnswerText";
-import type { InvestigationResult } from "@/lib/contracts";
-import { nonBlank } from "@/lib/presentation";
+import { SafeAnswerText } from "./SafeAnswerText";
+import type { InvestigationResult } from "../lib/contracts";
+import { nonBlank } from "../lib/presentation";
 
 export type AnswerPanelProps = {
     readonly result: InvestigationResult;

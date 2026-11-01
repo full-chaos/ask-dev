@@ -1,17 +1,17 @@
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
-import { RenderShapeChart } from "@/components/RenderShapeChart";
+import { Badge } from "./Badge";
+import { RenderShapeChart } from "./RenderShapeChart";
 import type {
     Cohort,
     CohortMember,
     CohortMemberDriver,
     InterpretedShape,
     InvestigationResult,
-} from "@/lib/contracts";
-import { cohortRanking, formatCohortScore } from "@/lib/cohort-ranking";
-import { COHORT_SHAPE_RULES, renderShapesFor } from "@/lib/render-shapes";
-import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "@/lib/presentation";
+} from "../lib/contracts";
+import { cohortRanking, formatCohortScore } from "../lib/cohort-ranking";
+import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
+import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
 
 export type CohortRankingPanelProps = {
     /**

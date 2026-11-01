@@ -1,6 +1,6 @@
-import type { ConversationTurn, SubjectHint, SubjectRef } from "@/lib/contracts";
-import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
-import { nonBlank } from "@/lib/presentation";
+import type { ConversationTurn, SubjectHint, SubjectRef } from "./contracts";
+import { SUBJECT_KIND_VOCABULARY } from "./contracts";
+import { nonBlank } from "./presentation";
 
 /**
  * Conversation threading (chat-surface follow-up context).

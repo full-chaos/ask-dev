@@ -1,5 +1,5 @@
-import type { Coverage, CoverageDetail } from "@/lib/contracts";
-import { nonBlank } from "@/lib/presentation";
+import type { Coverage, CoverageDetail } from "./contracts";
+import { nonBlank } from "./presentation";
 
 /**
  * The deterministic fail-readable floor for a degraded reason with no usable

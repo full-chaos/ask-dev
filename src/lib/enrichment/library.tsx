@@ -3,7 +3,7 @@
 import { createLibrary, defineComponent } from "@openuidev/react-lang";
 import { z } from "zod";
 
-import { useResolvedRef } from "@/lib/enrichment/context";
+import { useResolvedRef } from "./context";
 
 /**
  * The CLOSED enrichment component library (CHAOS-3738).

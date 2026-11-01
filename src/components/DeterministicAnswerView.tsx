@@ -1,42 +1,42 @@
-import type { RankingWithheld } from "@/lib/ranking-withheld";
-import { WithheldPart } from "@/components/WithheldPart";
+import type { RankingWithheld } from "../lib/ranking-withheld";
+import { WithheldPart } from "./WithheldPart";
 import { useId } from "react";
 
-import { AnswerPanel } from "@/components/AnswerPanel";
-import { AnswerPlanPanel } from "@/components/AnswerPlanPanel";
-import { ChoiceNotice } from "@/components/ChoiceNotice";
-import { ChosenAnswersSummaryCard } from "@/components/ChosenAnswersSummaryCard";
-import { ClarificationPanel, type ClarificationChoice } from "@/components/ClarificationPanel";
-import { CohortGroupsPanel } from "@/components/CohortGroupsPanel";
-import { RankingWithheldNotice } from "@/components/RankingWithheldNotice";
-import { CohortRankingPanel } from "@/components/CohortRankingPanel";
-import { CompletenessPanel } from "@/components/CompletenessPanel";
-import { CoveragePanel } from "@/components/CoveragePanel";
-import { DriversPanel } from "@/components/DriversPanel";
-import { EvidenceReferences } from "@/components/EvidenceReferences";
-import { FactRowsPanels } from "@/components/FactRowsPanel";
-import { FindingsPanel } from "@/components/FindingsPanel";
-import { LimitationsPanel } from "@/components/LimitationsPanel";
-import { SemanticReadingNotice } from "@/components/SemanticReadingNotice";
-import { PriorSubjectReceiptDisclosure } from "@/components/PriorSubjectReceiptDisclosure";
-import { StructureConfirmationNotice } from "@/components/StructureConfirmationNotice";
-import { StructureNeedsPanel } from "@/components/StructureNeedsPanel";
-import { SubjectResolutionPanel } from "@/components/SubjectResolutionPanel";
-import { WorkItemStatusPanel } from "@/components/WorkItemStatusPanel";
-import { choiceDisposition } from "@/lib/clarification";
-import { cohortRanking } from "@/lib/cohort-ranking";
+import { AnswerPanel } from "./AnswerPanel";
+import { AnswerPlanPanel } from "./AnswerPlanPanel";
+import { ChoiceNotice } from "./ChoiceNotice";
+import { ChosenAnswersSummaryCard } from "./ChosenAnswersSummaryCard";
+import { ClarificationPanel, type ClarificationChoice } from "./ClarificationPanel";
+import { CohortGroupsPanel } from "./CohortGroupsPanel";
+import { RankingWithheldNotice } from "./RankingWithheldNotice";
+import { CohortRankingPanel } from "./CohortRankingPanel";
+import { CompletenessPanel } from "./CompletenessPanel";
+import { CoveragePanel } from "./CoveragePanel";
+import { DriversPanel } from "./DriversPanel";
+import { EvidenceReferences } from "./EvidenceReferences";
+import { FactRowsPanels } from "./FactRowsPanel";
+import { FindingsPanel } from "./FindingsPanel";
+import { LimitationsPanel } from "./LimitationsPanel";
+import { SemanticReadingNotice } from "./SemanticReadingNotice";
+import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
+import { StructureConfirmationNotice } from "./StructureConfirmationNotice";
+import { StructureNeedsPanel } from "./StructureNeedsPanel";
+import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
+import { WorkItemStatusPanel } from "./WorkItemStatusPanel";
+import { choiceDisposition } from "../lib/clarification";
+import { cohortRanking } from "../lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
     StructureNeedKind,
     SubjectRef,
-} from "@/lib/contracts";
-import { dedupeFindings, identityLimitations } from "@/lib/fact-dedup";
+} from "../lib/contracts";
+import { dedupeFindings, identityLimitations } from "../lib/fact-dedup";
 import {
     EMPTY_STRUCTURE_SELECTION_BATCH,
     type StructureSelectionBatch,
-} from "@/lib/structure-selections";
-import { hasVetoedStructureConfirmation, structureMemberLabel } from "@/lib/structure-disposition";
+} from "../lib/structure-selections";
+import { hasVetoedStructureConfirmation, structureMemberLabel } from "../lib/structure-disposition";
 
 export type DeterministicAnswerViewProps = {
     readonly result: InvestigationResult;

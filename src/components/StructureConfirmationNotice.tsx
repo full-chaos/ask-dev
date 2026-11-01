@@ -1,10 +1,10 @@
-import { Badge } from "@/components/Badge";
-import type { ConfirmedStructureEntry } from "@/lib/contracts";
-import { structureDispositionTone } from "@/lib/presentation";
+import { Badge } from "./Badge";
+import type { ConfirmedStructureEntry } from "../lib/contracts";
+import { structureDispositionTone } from "../lib/presentation";
 import {
     hasVetoedStructureConfirmation,
     summarizeConfirmedStructure,
-} from "@/lib/structure-disposition";
+} from "../lib/structure-disposition";
 
 export type StructureConfirmationNoticeProps = {
     readonly entries: readonly ConfirmedStructureEntry[] | undefined;

@@ -1,4 +1,4 @@
-import type { StructureSubjectKind } from "@/lib/contracts";
+import type { StructureSubjectKind } from "./contracts";
 
 /**
  * Literal kind-noun binding (CHAOS-4343 item 3).

@@ -19,7 +19,7 @@ import type {
     CohortMember,
     CohortMemberDriver,
     InterpretedShape,
-} from "@/lib/contracts";
+} from "./contracts";
 
 /**
  * The interpreted shapes a cohort ranking is an answer TO.

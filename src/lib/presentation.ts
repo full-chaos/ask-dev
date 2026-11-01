@@ -16,7 +16,7 @@ import type {
     PriorSubjectReceiptDisposition,
     StructureDisposition,
     SubjectCandidateState,
-} from "@/lib/contracts";
+} from "./contracts";
 
 export type Tone = "ok" | "warn" | "bad" | "neutral";
 

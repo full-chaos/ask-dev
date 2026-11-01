@@ -1,8 +1,8 @@
 import { useId } from "react";
 
-import { Badge } from "@/components/Badge";
-import type { PriorSubjectReceiptDispositionEntry } from "@/lib/contracts";
-import { humanizeTerm, priorSubjectReceiptDispositionTone } from "@/lib/presentation";
+import { Badge } from "./Badge";
+import type { PriorSubjectReceiptDispositionEntry } from "../lib/contracts";
+import { humanizeTerm, priorSubjectReceiptDispositionTone } from "../lib/presentation";
 
 export type PriorSubjectReceiptDisclosureProps = {
     readonly dispositions: readonly PriorSubjectReceiptDispositionEntry[] | undefined;

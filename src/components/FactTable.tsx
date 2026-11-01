@@ -1,6 +1,6 @@
-import type { ClaimedFactRow } from "@/lib/contracts";
-import { cellText, columnOrder } from "@/lib/fact-rows";
-import { humanizeTerm } from "@/lib/presentation";
+import type { ClaimedFactRow } from "../lib/contracts";
+import { cellText, columnOrder } from "../lib/fact-rows";
+import { humanizeTerm } from "../lib/presentation";
 
 export type FactTableProps = {
     readonly rows: readonly ClaimedFactRow[];

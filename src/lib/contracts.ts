@@ -14,7 +14,7 @@ import type {
     EffectiveEvidenceWindow,
     KindOption,
     PriorSubjectReceiptDispositionEntry,
-} from "@/contracts/generated/investigation-result";
+} from "../contracts/generated/investigation-result";
 
 /**
  * CHAOS-11906: an investigation result is v1 or v2. v2 is wire-identical to v1
@@ -99,7 +99,7 @@ export type {
     VersionSet,
     WindowClarification,
     WindowOption,
-} from "@/contracts/generated/investigation-result";
+} from "../contracts/generated/investigation-result";
 
 export type {
     ACRContextFabricInvestigationRequestV1 as InvestigationRequest,
@@ -110,9 +110,9 @@ export type {
     // CHAOS-5837: one caller-supplied hint into `requested_scope.subject_hints`.
     SubjectHint,
     WindowBoundReceipt,
-} from "@/contracts/generated/investigation-request";
+} from "../contracts/generated/investigation-request";
 
-export type { ACRErrorV1 as AcrError } from "@/contracts/generated/error";
+export type { ACRErrorV1 as AcrError } from "../contracts/generated/error";
 
 /**
  * CHAOS-3927 P2 (pivot-intent design brief §2.1/§2.3). THE SEAM landed: acr
@@ -217,15 +217,15 @@ export const STRUCTURE_NEED_KINDS_IN_PRIORITY_ORDER: readonly StructureNeedKind[
  * changes one has to be absorbed.
  */
 export type CohortMemberOutcome = NonNullable<
-    import("@/contracts/generated/investigation-result").CohortMember["outcome"]
+    import("../contracts/generated/investigation-result").CohortMember["outcome"]
 >;
 export type CohortMemberDataCompleteness = NonNullable<
-    import("@/contracts/generated/investigation-result").CohortMember["data_completeness"]
+    import("../contracts/generated/investigation-result").CohortMember["data_completeness"]
 >;
 export type CohortDriverSignal =
-    import("@/contracts/generated/investigation-result").CohortMemberDriver["signal"];
+    import("../contracts/generated/investigation-result").CohortMemberDriver["signal"];
 export type CohortDriverWindow =
-    import("@/contracts/generated/investigation-result").CohortMemberDriver["window"];
+    import("../contracts/generated/investigation-result").CohortMemberDriver["window"];
 
 /**
  * The closed `interpretation.shape` vocabulary — the intent axis a rich view
@@ -233,11 +233,11 @@ export type CohortDriverWindow =
  * same discipline as the vocabularies above.
  */
 export type InterpretedShape =
-    import("@/contracts/generated/investigation-result").InterpretedQuestion["shape"];
+    import("../contracts/generated/investigation-result").InterpretedQuestion["shape"];
 
 /** One entry of `coverage.sources`; the contract declares it inline. */
 export type CoverageSource =
-    import("@/contracts/generated/investigation-result").Coverage["sources"][number];
+    import("../contracts/generated/investigation-result").Coverage["sources"][number];
 
 /**
  * CHAOS-4690/CHAOS-4691: `InvestigationResult.evidence_ref_labels` — the
@@ -249,18 +249,18 @@ export type CoverageSource =
  * string>` here would silently disagree with the wire type.
  */
 export type EvidenceRefLabels =
-    import("@/contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1["evidence_ref_labels"];
+    import("../contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1["evidence_ref_labels"];
 
 /** The closed coverage-state vocabulary, as declared by the contract. */
 export type CoverageState = CoverageSource["state"];
 
 /** The closed result-status vocabulary, as declared by the contract. */
 export type InvestigationStatus =
-    import("@/contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1["status"];
+    import("../contracts/generated/investigation-result").ACRContextFabricInvestigationResultV1["status"];
 
 /** The closed subject-candidate state vocabulary, as declared by the contract. */
 export type SubjectCandidateState =
-    import("@/contracts/generated/investigation-result").SubjectCandidate["state"];
+    import("../contracts/generated/investigation-result").SubjectCandidate["state"];
 
 /**
  * The closed `ContextFabricSubjectKind` vocabulary as a runtime value

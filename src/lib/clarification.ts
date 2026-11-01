@@ -1,4 +1,4 @@
-import type { InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type { InvestigationResult, SubjectRef } from "./contracts";
 
 /**
  * Was the tester's clarification choice actually applied? (CHAOS-3738,

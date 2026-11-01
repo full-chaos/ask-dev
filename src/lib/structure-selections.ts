@@ -2,8 +2,8 @@ import {
     STRUCTURE_RECEIPT_PREFIX,
     type BoundStructureReceipt,
     type StructureNeedKind,
-} from "@/lib/contracts";
-import type { StructureOfferSelectionOutcome } from "@/lib/telemetry/outcome";
+} from "./contracts";
+import type { StructureOfferSelectionOutcome } from "./telemetry/outcome";
 
 /**
  * Accumulate-and-re-ask-ONCE (CHAOS-3927 P2, design brief §2.2).

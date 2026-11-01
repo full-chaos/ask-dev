@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 
-import { Badge } from "@/components/Badge";
+import { Badge } from "./Badge";
 import type {
     AnchorOption,
     BoundStructureReceipt,
@@ -12,14 +12,14 @@ import type {
     StructureNeedKind,
     StructureNeeds,
     WindowOption,
-} from "@/lib/contracts";
-import { CANNOT_REASK_HERE_COPY } from "@/lib/presentation";
+} from "../lib/contracts";
+import { CANNOT_REASK_HERE_COPY } from "../lib/presentation";
 import {
     structureReceiptHasExpectedNamespace,
     structureSelectionCount,
     type StructureSelectionBatch,
-} from "@/lib/structure-selections";
-import { structureMemberLabel } from "@/lib/structure-disposition";
+} from "../lib/structure-selections";
+import { structureMemberLabel } from "../lib/structure-disposition";
 
 /**
  * Guided structure-elicitation prompts (CHAOS-3927 P2, design brief §2.2).

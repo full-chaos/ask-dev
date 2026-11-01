@@ -8,7 +8,7 @@
  * `rollup_basis` sibling claim the producer emits alongside a rollup
  * (`devhealthfacts/metrics.go`'s project rollup), never computes one.
  */
-import type { ClaimedFact, ClaimedFactRow, ScalarValue, SubjectRef } from "@/lib/contracts";
+import type { ClaimedFact, ClaimedFactRow, ScalarValue, SubjectRef } from "./contracts";
 
 export type Cell = string | number | boolean | null;
 

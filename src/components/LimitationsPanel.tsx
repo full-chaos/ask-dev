@@ -1,8 +1,8 @@
 import { useId } from "react";
 
-import type { DedupedLimitation } from "@/lib/fact-dedup";
-import { SURFACE_LABEL } from "@/lib/fact-dedup";
-import type { InvestigationResult } from "@/lib/contracts";
+import type { DedupedLimitation } from "../lib/fact-dedup";
+import { SURFACE_LABEL } from "../lib/fact-dedup";
+import type { InvestigationResult } from "../lib/contracts";
 
 export type LimitationsPanelProps = {
     /**

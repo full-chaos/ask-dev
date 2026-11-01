@@ -1,4 +1,4 @@
-import type { RankingWithheld } from "@/lib/ranking-withheld";
+import type { RankingWithheld } from "../lib/ranking-withheld";
 
 /**
  * Neutral notice for the typed `rankingWithheld` marker the result boundary

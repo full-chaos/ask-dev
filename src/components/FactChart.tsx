@@ -1,6 +1,6 @@
-import type { ClaimedFactRow } from "@/lib/contracts";
-import { cellValue, type ChartAxis } from "@/lib/fact-rows";
-import { humanizeTerm } from "@/lib/presentation";
+import type { ClaimedFactRow } from "../lib/contracts";
+import { cellValue, type ChartAxis } from "../lib/fact-rows";
+import { humanizeTerm } from "../lib/presentation";
 
 export type FactChartProps = {
     readonly rows: readonly ClaimedFactRow[];
