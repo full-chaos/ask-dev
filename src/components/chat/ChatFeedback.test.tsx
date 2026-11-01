@@ -280,7 +280,9 @@ describe("ChatFeedback: a host that builds its entry on every read", () => {
             ...feedback,
             entryFor: (resultId: string) => {
                 const entry = read(resultId);
-                return entry === undefined ? undefined : { ...entry, desired: { ...entry.desired } };
+                return entry === undefined
+                    ? undefined
+                    : { ...entry, desired: { ...entry.desired } };
             },
         };
     }
@@ -319,4 +321,3 @@ describe("ChatFeedback: a host that builds its entry on every read", () => {
         expect(region().outerHTML).not.toBe(before);
     });
 });
-
