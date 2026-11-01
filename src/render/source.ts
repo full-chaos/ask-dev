@@ -433,6 +433,58 @@ export type BatchItem = {
     readonly selectionEvents: readonly PendingSelectionEvent[];
 };
 
+/**
+ * What one evidence reference names when a person opens it (CHAOS-12426). The render builds this
+ * and hands it to the host; it reads nothing.
+ */
+export type ChatEvidenceRef = {
+    readonly refId: string;
+    /** The answer the reference was cited in. Two answers may cite one ref, each with its own citation. */
+    readonly resultId: string;
+    /** The label shown on the button: served, or the floor "Evidence". */
+    readonly label: string;
+};
+
+/**
+ * Present only when the host can show one evidence reference. The HOST reads it, with its own
+ * credential, and keeps the state it reads; the render holds no token, URL or transport, never
+ * fetches, and gets only a `ChatEvidenceState` to draw (`ChatEvidenceBody`). The standalone source
+ * offers none, so its references stay plain text.
+ */
+export type ChatEvidenceSource = { open(ref: ChatEvidenceRef): void };
+
+/** What a host read of one evidence reference. `ChatEvidenceBody` draws each kind. */
+export type ChatEvidenceState =
+    | { readonly kind: "loading" }
+    | { readonly kind: "ready"; readonly detail: ChatEvidenceDetail }
+    | { readonly kind: "stale"; readonly detail: ChatEvidenceDetail }
+    | { readonly kind: "redacted"; readonly reason?: string; readonly detail?: ChatEvidenceDetail }
+    /**
+     * Deliberately says nothing of whether the evidence exists: the same state for a reference that
+     * is gone and one the viewer may not know of. The body shows no ref id for it.
+     */
+    | { readonly kind: "not_found" }
+    | { readonly kind: "denied" }
+    /**
+     * Its own state, never folded into `denied` or `unavailable`: ACR's 409 says the viewer has no
+     * repository, which is not a failure to reach anything.
+     */
+    | { readonly kind: "no_repository" }
+    | { readonly kind: "unavailable" }
+    | { readonly kind: "connect" };
+
+export type ChatEvidenceDetail = {
+    readonly refId: string;
+    /** Served text; shown as served. */
+    readonly citation: string;
+    /** Served text; shown as served. */
+    readonly excerpt?: string;
+    /** ISO timestamp. */
+    readonly observedAt?: string;
+    /** Raw values; shown only inside a closed fold. */
+    readonly structuredFields?: Readonly<Record<string, unknown>>;
+};
+
 export type ChatSource = {
     /** Calls `listener` after every snapshot change; returns the unsubscribe. Stable identity. */
     subscribe(listener: () => void): () => void;
@@ -496,6 +548,11 @@ export type ChatSource = {
     reloadThread?(): void;
     /** "Show earlier turns" on a `loaded` thread. Web's `loadEarlierTurns`. */
     loadEarlier?(): void;
+    /**
+     * Present only when the host can show an evidence reference. Absent: references stay plain
+     * text, with no button.
+     */
+    evidence?: ChatEvidenceSource;
 };
 
 /** A clarification or a no-match asks nothing to judge, so it takes no feedback. Web's rule. */

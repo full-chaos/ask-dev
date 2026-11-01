@@ -1,4 +1,7 @@
+import { useContext } from "react";
+
 import { Details } from "./Details";
+import { EvidenceOpenContext } from "./EvidenceOpenContext";
 import type { EvidenceRefLabels } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
 
@@ -45,6 +48,8 @@ export function EvidenceReferences({
     evidenceRefLabels,
     label,
 }: EvidenceReferencesProps) {
+    // CHAOS-12426: a host that can show one reference makes each entry a button. None: plain list.
+    const opener = useContext(EvidenceOpenContext);
     if (evidenceRefIds === undefined || evidenceRefIds.length === 0) return null;
     const mapped = evidenceRefIds.map((refId) => ({
         refId,
@@ -54,11 +59,25 @@ export function EvidenceReferences({
         <>
             {label !== undefined ? <p className="record__meta">{label}</p> : null}
             <ul className="evidence-list">
-                {mapped.map((entry) => (
-                    <li className="evidence-ref" key={entry.refId}>
-                        {entry.display}
-                    </li>
-                ))}
+                {mapped.map((entry) =>
+                    opener === null ? (
+                        <li className="evidence-ref" key={entry.refId}>
+                            {entry.display}
+                        </li>
+                    ) : (
+                        <li key={entry.refId}>
+                            <button
+                                className="evidence-ref evidence-ref--open"
+                                onClick={() => {
+                                    opener.open(entry.refId, entry.display);
+                                }}
+                                type="button"
+                            >
+                                {entry.display}
+                            </button>
+                        </li>
+                    ),
+                )}
             </ul>
             <Details data-testid="evidence-ref-raw-ids" summary="Raw evidence ids">
                 <ul className="evidence-list">

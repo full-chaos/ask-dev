@@ -148,6 +148,17 @@ export const CTA_LABELS = {
     tryAgain: "Try again",
 } as const;
 
+/** The words of an opened evidence reference (`ChatEvidenceBody`). Served text is never here. */
+export const EVIDENCE_COPY = {
+    loading: "Loading this evidence…",
+    stale: "This evidence may be out of date.",
+    observed: "Observed",
+    redacted: "Part of this evidence is withheld.",
+    notFound: "This evidence is not available.",
+    unavailable: "This evidence could not be read.",
+    details: "Details",
+} as const;
+
 /** The saved conversations. */
 export const HISTORY_COPY = {
     title: "Conversations",

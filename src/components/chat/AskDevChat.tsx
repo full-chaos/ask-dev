@@ -8,6 +8,7 @@ import {
     useRef,
     useState,
     useSyncExternalStore,
+    type ReactNode,
 } from "react";
 
 import { ChatComposer, type ChatComposerHandle } from "./ChatComposer";
@@ -25,6 +26,7 @@ import {
 import { ClarificationPopup } from "./ClarificationPopup";
 import { InspectorRail } from "./InspectorRail";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
+import { EvidenceOpenContext, type EvidenceOpen } from "../EvidenceOpenContext";
 import { FailurePanel } from "../FailurePanel";
 import type { ClarificationChoice } from "../ClarificationPanel";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "../../lib/candidate-selections";
@@ -42,6 +44,7 @@ import { CHAT_STATUS_COPY, CTA_LABELS, TRANSCRIPT_COPY } from "../../render/chat
 import {
     type AskIntent,
     type BatchItem,
+    type ChatEvidenceSource,
     type ChatHistorySnapshot,
     type ChatSource,
     type ChatTurn,
@@ -156,6 +159,34 @@ export function withheldTurn(turn: ChatTurn): ChatTurn {
             rankingWithheld: boundary.rankingWithheld,
         },
     };
+}
+
+/**
+ * CHAOS-12426: gives one answered turn's evidence buttons their opener. The value is memoized per
+ * turn, and `open` names this turn's own result id, so two answers citing one reference each open
+ * their own citation. Without `evidence` it is a pass-through and the references stay plain.
+ */
+function EvidenceOpenProvider({
+    evidence,
+    resultId,
+    children,
+}: {
+    readonly evidence: ChatEvidenceSource | undefined;
+    readonly resultId: string;
+    readonly children: ReactNode;
+}) {
+    const value = useMemo<EvidenceOpen | null>(
+        () =>
+            evidence === undefined
+                ? null
+                : {
+                      open: (refId, label) => {
+                          evidence.open({ refId, resultId, label });
+                      },
+                  },
+        [evidence, resultId],
+    );
+    return <EvidenceOpenContext.Provider value={value}>{children}</EvidenceOpenContext.Provider>;
 }
 
 export type AskDevChatProps = {
@@ -1098,56 +1129,67 @@ function ChatSurface({
                                                 />
                                             ) : null}
                                             {turn.outcome.kind === "answered" ? (
-                                                <DeterministicAnswerView
-                                                    chosenSubject={turn.chosenSubject}
-                                                    onConfirmCandidates={
-                                                        offersChoice ? chooseCandidates : undefined
-                                                    }
-                                                    onConfirmStructure={
-                                                        offersChoice ? chooseStructure : undefined
-                                                    }
-                                                    onRejectStructure={
-                                                        offersChoice
-                                                            ? structureSelections.reject
-                                                            : undefined
-                                                    }
-                                                    onToggleCandidate={
-                                                        offersChoice
-                                                            ? candidateSelections.toggle
-                                                            : undefined
-                                                    }
-                                                    onToggleStructure={
-                                                        offersChoice
-                                                            ? structureSelections.toggle
-                                                            : undefined
-                                                    }
-                                                    onToggleStructureCandidate={
-                                                        offersChoice
-                                                            ? structureCandidateSelections.toggle
-                                                            : undefined
-                                                    }
-                                                    rankingWithheld={turn.outcome.rankingWithheld}
-                                                    result={turn.outcome.result}
-                                                    selectedCandidateReceiptIds={
-                                                        offersChoice
-                                                            ? candidateSelections.batch
-                                                            : (turn.submittedCandidateReceiptIds ??
-                                                              EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                    }
-                                                    selectedStructureCandidateReceiptIds={
-                                                        offersChoice
-                                                            ? structureCandidateSelections.batch
-                                                            : (turn.submittedStructureCandidateReceiptIds ??
-                                                              EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                    }
-                                                    offersPresentation="popup"
-                                                    pending={isPending}
-                                                    structureBatch={
-                                                        offersChoice
-                                                            ? structureSelections.batch
-                                                            : turn.submittedStructureBatch
-                                                    }
-                                                />
+                                                <EvidenceOpenProvider
+                                                    evidence={chat.evidence}
+                                                    resultId={turn.outcome.result.result_id}
+                                                >
+                                                    <DeterministicAnswerView
+                                                        chosenSubject={turn.chosenSubject}
+                                                        onConfirmCandidates={
+                                                            offersChoice
+                                                                ? chooseCandidates
+                                                                : undefined
+                                                        }
+                                                        onConfirmStructure={
+                                                            offersChoice
+                                                                ? chooseStructure
+                                                                : undefined
+                                                        }
+                                                        onRejectStructure={
+                                                            offersChoice
+                                                                ? structureSelections.reject
+                                                                : undefined
+                                                        }
+                                                        onToggleCandidate={
+                                                            offersChoice
+                                                                ? candidateSelections.toggle
+                                                                : undefined
+                                                        }
+                                                        onToggleStructure={
+                                                            offersChoice
+                                                                ? structureSelections.toggle
+                                                                : undefined
+                                                        }
+                                                        onToggleStructureCandidate={
+                                                            offersChoice
+                                                                ? structureCandidateSelections.toggle
+                                                                : undefined
+                                                        }
+                                                        rankingWithheld={
+                                                            turn.outcome.rankingWithheld
+                                                        }
+                                                        result={turn.outcome.result}
+                                                        selectedCandidateReceiptIds={
+                                                            offersChoice
+                                                                ? candidateSelections.batch
+                                                                : (turn.submittedCandidateReceiptIds ??
+                                                                  EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                        }
+                                                        selectedStructureCandidateReceiptIds={
+                                                            offersChoice
+                                                                ? structureCandidateSelections.batch
+                                                                : (turn.submittedStructureCandidateReceiptIds ??
+                                                                  EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                        }
+                                                        offersPresentation="popup"
+                                                        pending={isPending}
+                                                        structureBatch={
+                                                            offersChoice
+                                                                ? structureSelections.batch
+                                                                : turn.submittedStructureBatch
+                                                        }
+                                                    />
+                                                </EvidenceOpenProvider>
                                             ) : null}
                                             {turn.outcome.kind === "answered" &&
                                             chat.feedback !== undefined &&
