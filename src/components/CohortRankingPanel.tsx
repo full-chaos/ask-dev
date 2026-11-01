@@ -66,12 +66,12 @@ function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
 /** CHAOS-12178: a member whose investment claim is the owning team's roll-up says so. */
 function MemberRollup({
     claims,
-    canonicalId,
+    subject,
 }: {
     readonly claims: readonly ClaimedFact[];
-    readonly canonicalId: string;
+    readonly subject: CohortMember["subject"];
 }) {
-    const rollup = rollupForSubject(claims, canonicalId);
+    const rollup = rollupForSubject(claims, subject);
     if (rollup === null) return null;
     return (
         <div>
@@ -232,7 +232,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                     {row.member.subject.label}
                                     <MemberRollup
                                         claims={result?.claimed_facts ?? []}
-                                        canonicalId={row.member.subject.canonical_id}
+                                        subject={row.member.subject}
                                     />
                                 </td>
                                 <td>

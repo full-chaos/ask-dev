@@ -7,7 +7,7 @@ import { DriversPanel } from "@/components/DriversPanel";
 import { FactRowsPanels } from "@/components/FactRowsPanel";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import type { ClaimedFact, Cohort, CohortMember, InvestigationResult } from "@/lib/contracts";
-import { investmentRollupOf } from "@/lib/investment-rollup";
+import { investmentRollupOf, rollupForSubject } from "@/lib/investment-rollup";
 import { visibleText } from "@/test/visible-text";
 
 /**
@@ -305,6 +305,16 @@ describe("F: the owning-team roll-up label (CHAOS-12178)", () => {
             "data-subject",
             "project_ask_dev",
         );
+    });
+
+    it("the ranking: a team row sharing a project claim's id carries no label (codex r2)", () => {
+        const claim = rollupClaim("owning_team_rollup");
+        const team = { kind: "team", canonical_id: claim.subject.canonical_id, label: "Team" };
+        expect(rollupForSubject([claim], team)).toBeNull();
+        expect(rollupForSubject([claim], claim.subject)).not.toBeNull();
+        expect(
+            rollupForSubject([claim], { kind: "project", canonical_id: "project_other" }),
+        ).toBeNull();
     });
 
     it("the ranking: a ranked project member whose claim is a roll-up carries the label", () => {

@@ -96,10 +96,15 @@ export function rollupsOfClaims(
 /** The roll-up of a subject (a ranked member) among the answer's claims, or `null`. */
 export function rollupForSubject(
     claims: readonly ClaimedFact[],
-    canonicalId: string,
+    subject: Pick<ClaimedFact["subject"], "kind" | "canonical_id">,
 ): InvestmentRollup | null {
     for (const claim of claims) {
-        if (claim.subject.canonical_id !== canonicalId) continue;
+        if (
+            claim.subject.canonical_id !== subject.canonical_id ||
+            claim.subject.kind !== subject.kind
+        ) {
+            continue;
+        }
         const rollup = investmentRollupOf(claim);
         if (rollup !== null) return rollup;
     }

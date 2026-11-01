@@ -17,8 +17,8 @@ import { humanizeTerm } from "./presentation";
  */
 export const MISSING_DATA_LEAD = "Missing data";
 
-/** The state words are never said, not even as an obligation's name (codex r3 on web #1650). */
-const STATE_WORDS = new Set(["complete", "partial", "degraded", "not_derived"]);
+/** The state words are never said, not even inside an obligation's name (codex r3 on web #1650). */
+const STATE_WORD = /\b(?:complete|partial|degraded|not[ _]derived)\b/iu;
 
 /** Each requirement's last row: a later stage supersedes an earlier one. Rows naming no requirement are skipped. */
 function lastRows(
@@ -40,9 +40,10 @@ function neededOf(row: PlanRequirementOutcomeRow, requirement: string): string {
 function gapOf(row: PlanRequirementOutcomeRow, requirement: string): string | null {
     if (row.impact === "none") return null;
     const needed = neededOf(row, requirement);
-    if (needed === "" || STATE_WORDS.has(needed.toLowerCase())) return null;
+    if (needed === "") return null;
     const what = humanizeTerm(needed).toLowerCase();
     const how = humanizeTerm(row.outcome);
+    if (STATE_WORD.test(what) || STATE_WORD.test(how)) return null;
     return row.declared > 0 && row.served < row.declared
         ? `${what} ${how} (${String(row.served)} of ${String(row.declared)})`
         : `${what} ${how}`;

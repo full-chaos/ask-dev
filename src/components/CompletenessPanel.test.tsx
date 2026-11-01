@@ -311,6 +311,27 @@ describe("CompletenessPanel — the Missing data sentence (CHAOS-12429)", () => 
         expect(sentence()).toBeNull();
     });
 
+    it("never says a state word inside a longer obligation either (codex r2)", () => {
+        const completeness: AnswerCompleteness = {
+            terminal_status: "partial",
+            claimed_facts_count: 1,
+            rows_count: 1,
+            state: "partial",
+            outcomes: [
+                {
+                    requirement: "status/items",
+                    obligation: "partial status",
+                    outcome: "unavailable",
+                    impact: "section_missing",
+                    served: 0,
+                    declared: 1,
+                } as unknown as PlanRequirementOutcomeRow,
+            ],
+        };
+        render(<CompletenessPanel completeness={completeness} />);
+        expect(screen.queryByTestId("completeness-missing-data")).toBeNull();
+    });
+
     it("never says a state word as an obligation's name", () => {
         render(
             <CompletenessPanel
