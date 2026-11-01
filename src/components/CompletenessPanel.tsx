@@ -13,6 +13,19 @@ import {
     planRequirementOutcomeTone,
     statusTone,
 } from "../lib/presentation";
+import {
+    COMPLETENESS_STATE_WORDS,
+    factCountText,
+    IMPACT_WORDS,
+    labelFor,
+    NARROWING_BASIS_WORDS,
+    OVERRUN_WORDS,
+    REFINEMENT_STAGE_WORDS,
+    REQUIREMENT_OUTCOME_WORDS,
+    requirementLabel,
+    statusLabel,
+    TERMINAL_REASON_WORDS,
+} from "../render/answer-copy";
 
 export type CompletenessPanelProps = {
     readonly completeness: AnswerCompleteness;
@@ -33,9 +46,13 @@ export type CompletenessPanelProps = {
  * appended so a defaulted cause is never mistaken for an observed one.
  */
 function outcomeCauses(row: PlanRequirementOutcomeRow): readonly string[] {
-    const causes = [row.cause_coverage, row.cause_narrowing, row.cause_overrun].filter(
-        (value): value is string => value !== undefined,
-    );
+    const causes = [
+        row.cause_coverage === undefined ? undefined : humanizeTerm(row.cause_coverage),
+        row.cause_narrowing === undefined
+            ? undefined
+            : labelFor(NARROWING_BASIS_WORDS, row.cause_narrowing).toLowerCase(),
+        row.cause_overrun === undefined ? undefined : OVERRUN_WORDS[row.cause_overrun],
+    ].filter((value): value is string => value !== undefined);
     if (causes.length === 0) return [];
     return row.cause_observed ? causes : causes.map((cause) => `${cause} (defaulted)`);
 }
@@ -54,13 +71,13 @@ function RefinementStep({
     readonly index: number;
 }) {
     const causes = [
-        step.basis === undefined ? null : `basis: ${humanizeTerm(step.basis)}`,
-        step.overrun === undefined ? null : `overrun: ${humanizeTerm(step.overrun)}`,
-        step.coverage === undefined ? null : `coverage: ${humanizeTerm(step.coverage)}`,
+        step.basis === undefined ? null : NARROWING_BASIS_WORDS[step.basis],
+        step.overrun === undefined ? null : OVERRUN_WORDS[step.overrun],
+        step.coverage === undefined ? null : humanizeTerm(step.coverage),
     ].filter((entry): entry is string => entry !== null);
     return (
         <li className="record__meta" data-testid="completeness-outcome-refinement-step">
-            {`${String(index + 1)}. ${humanizeTerm(step.stage)} — ${String(step.before)} → ${String(step.after)}${causes.length === 0 ? "" : ` (${causes.join(", ")})`}`}
+            {`${String(index + 1)}. ${REFINEMENT_STAGE_WORDS[step.stage]} — ${String(step.before)} → ${String(step.after)}${causes.length === 0 ? "" : ` (${causes.join(", ")})`}`}
         </li>
     );
 }
@@ -69,17 +86,21 @@ function RefinementStep({
  * CHAOS-4413/CHAOS-4642/CHAOS-5640/CHAOS-5109: shows how much of an answer is
  * here and why it stopped where it did.
  *
+ * CHAOS-12406: every state reads in product words (`@/render/answer-copy`),
+ * and the raw value stays in `data-*`. A user never reads a raw state.
+ *
  * `terminal_status` reuses the exact same closed vocabulary as the result's
  * own `status` (`statusTone` is exhaustive over both), so its badge always
- * reads consistently with the rest of the page. `claimed_facts_count` and
+ * reads consistently with the rest of the page. It reads through `statusLabel`,
+ * web's one labelling function: "Full answer" only when `state` is complete too. `claimed_facts_count` and
  * `rows_count` are the engine's own UN-CLAMPED totals — independent of this
  * Workbench's own request-time budget (`options.max_*` in
  * `buildInvestigationRequest`) — so they can legitimately exceed what any
  * single panel actually renders; that is the point, not a bug (AGENTS.md
  * check 11: completeness is a public contract field, richer than the prose).
  * `terminal_reason` is a closed vocabulary naming WHY, never the engine's or
- * a model's own raw text (CHAOS-4413's own schema doc comment) — shown
- * verbatim, exactly like `CoveragePanel`'s degraded reasons.
+ * a model's own raw text (CHAOS-4413's own schema doc comment), so it has words
+ * of its own.
  *
  * `state` (CHAOS-5640) is a SECOND, independent completeness signal, server-
  * derived from the requirement outcomes below it rather than authored —
@@ -105,9 +126,9 @@ function RefinementStep({
  *
  * Every field on a row is either a visible column or a disclosed one, never
  * silently absent (same "nothing is silently discarded" discipline as
- * `CohortRankingPanel`/`CoveragePanel`): `obligation` renders beside the
- * `requirement` identity (present exactly when `requirement` is, per the
- * schema); `impact` is its own column, since "what the reader loses" is a
+ * `CohortRankingPanel`/`CoveragePanel`): the row reads by what it needed, its
+ * `obligation`, in web's words (`requirement`, its machine identity, stays in
+ * `data-requirement`); `impact` is its own column, since "what the reader loses" is a
  * different fact than the outcome that caused it; `served`/`declared` are
  * their own column; the `refinements` step-by-step trail, when the row
  * carries one, sits behind a per-row `<details>` (same pattern as
@@ -135,40 +156,37 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
             <div className="chip-row" data-testid="completeness-chip-row">
                 {withheld ? (
                     <Badge
+                        data-value={`withheld; terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
                         tone="warn"
-                        title={`withheld by the Workbench; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
                     >
                         Withheld
                     </Badge>
                 ) : (
                     <>
                         <Badge
+                            data-value={`terminal_status: ${completeness.terminal_status}`}
                             tone={statusTone(completeness.terminal_status)}
-                            title={`terminal_status: ${completeness.terminal_status}`}
                         >
-                            {humanizeTerm(completeness.terminal_status)}
+                            {statusLabel(completeness.terminal_status, completeness)}
                         </Badge>
                         <Badge
+                            data-value={`state: ${completeness.state}`}
                             tone={completenessStateTone(completeness.state)}
-                            title={`state: ${completeness.state}`}
                         >
-                            {humanizeTerm(completeness.state)}
+                            {COMPLETENESS_STATE_WORDS[completeness.state]}
                         </Badge>
                     </>
                 )}
             </div>
-            <p className="record__meta">
-                {`${String(completeness.claimed_facts_count)} claimed fact${completeness.claimed_facts_count === 1 ? "" : "s"} · ${String(completeness.rows_count)} row${completeness.rows_count === 1 ? "" : "s"}`}
-            </p>
+            <p className="record__meta">{factCountText(completeness)}</p>
             {withheld ? (
                 <p className="coverage__reason" data-testid="completeness-withheld">
-                    Parts of this answer were withheld by the Workbench, so completeness is not
-                    stated here.
+                    Parts of this answer were withheld, so completeness is not stated here.
                 </p>
             ) : null}
             {completeness.terminal_reason !== undefined ? (
                 <p className="coverage__reason" data-testid="completeness-terminal-reason">
-                    {humanizeTerm(completeness.terminal_reason)}
+                    {labelFor(TERMINAL_REASON_WORDS, completeness.terminal_reason)}
                 </p>
             ) : null}
             <h3 className="panel__title" style={{ marginTop: 14 }}>
@@ -186,7 +204,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                 <th scope="col">Requirement</th>
                                 <th scope="col">Outcome</th>
                                 <th scope="col">Impact</th>
-                                <th scope="col">Served / declared</th>
+                                <th scope="col">Read / needed</th>
                                 <th scope="col">Reason</th>
                             </tr>
                         </thead>
@@ -200,36 +218,28 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                     // filtered, only ever rendered in the
                                     // server's own append-only order.
                                     <tr data-testid="completeness-outcome-row" key={index}>
-                                        <td title={row.requirement}>
-                                            {row.requirement === undefined
-                                                ? "—"
-                                                : humanizeTerm(row.requirement)}
-                                            {row.obligation === undefined ? null : (
-                                                <>
-                                                    <br />
-                                                    <span
-                                                        className="record__meta"
-                                                        data-testid="completeness-outcome-obligation"
-                                                    >
-                                                        {`obligation: ${humanizeTerm(row.obligation)}`}
-                                                    </span>
-                                                </>
-                                            )}
+                                        <td
+                                            data-requirement={row.requirement}
+                                            data-testid={
+                                                row.obligation === undefined
+                                                    ? undefined
+                                                    : "completeness-outcome-obligation"
+                                            }
+                                        >
+                                            {requirementLabel(row) ?? "—"}
                                         </td>
                                         <td>
                                             <Badge
+                                                data-value={`outcome: ${row.outcome}`}
                                                 tone={planRequirementOutcomeTone(row.outcome)}
-                                                title={`outcome: ${row.outcome}`}
                                             >
-                                                {humanizeTerm(row.outcome)}
+                                                {REQUIREMENT_OUTCOME_WORDS[row.outcome]}
                                             </Badge>
                                         </td>
-                                        <td>{humanizeTerm(row.impact)}</td>
+                                        <td>{IMPACT_WORDS[row.impact]}</td>
                                         <td>{`${String(row.served)} / ${String(row.declared)}`}</td>
                                         <td>
-                                            {causes.length === 0
-                                                ? "—"
-                                                : causes.map(humanizeTerm).join(" · ")}
+                                            {causes.length === 0 ? "—" : causes.join(" · ")}
                                             {refinements.length === 0 ? null : (
                                                 <details className="disclosure">
                                                     <summary>

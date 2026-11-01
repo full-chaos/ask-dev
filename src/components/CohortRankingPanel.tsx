@@ -9,9 +9,10 @@ import type {
     InterpretedShape,
     InvestigationResult,
 } from "../lib/contracts";
-import { cohortRanking, formatCohortScore } from "../lib/cohort-ranking";
+import { cohortRanking, formatCohortScore, memberDriversText } from "../lib/cohort-ranking";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
+import { cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
+import { cohortKindPlural, COHORT_OUTCOME_WORDS, subjectKindNoun } from "../render/answer-copy";
 
 export type CohortRankingPanelProps = {
     /**
@@ -144,13 +145,13 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
             data-testid="cohort-ranking-panel"
         >
             <h2 className="panel__title" id={`${idPrefix}-cohort-ranking-title`}>
-                Ranked {humanizeTerm(cohort.kind)}s
+                Ranked {cohortKindPlural(cohort.kind)}
             </h2>
             {cohort.complete && !cohort.truncated ? null : (
                 <p className="record__meta" data-testid="cohort-incomplete-notice">
                     {cohort.truncated
-                        ? `This ranking covers only the ${humanizeTerm(cohort.kind)}s the service returned — the cohort was truncated, so it is not every ${humanizeTerm(cohort.kind)}.`
-                        : `The service did not report this cohort as complete, so this ranking may not cover every ${humanizeTerm(cohort.kind)}.`}
+                        ? `This ranking covers only the ${cohortKindPlural(cohort.kind)} the service returned — the cohort was truncated, so it is not every ${subjectKindNoun(cohort.kind)}.`
+                        : `The service did not report this cohort as complete, so this ranking may not cover every ${subjectKindNoun(cohort.kind)}.`}
                 </p>
             )}
             {
@@ -174,7 +175,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     <thead>
                         <tr>
                             <th scope="col">Rank</th>
-                            <th scope="col">{humanizeTerm(cohort.kind)}</th>
+                            <th scope="col">{subjectKindNoun(cohort.kind)}</th>
                             <th scope="col">Score</th>
                             <th scope="col">Outcome</th>
                             <th scope="col">Data completeness</th>
@@ -186,7 +187,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                         {rows.map((row) => (
                             <tr data-testid="ranking-row" key={row.member.subject.canonical_id}>
                                 <td>{row.attentionRank}</td>
-                                <td title={row.member.subject.canonical_id}>
+                                <td data-subject-id={row.member.subject.canonical_id}>
                                     {row.member.subject.label}
                                 </td>
                                 <td>
@@ -217,26 +218,19 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                         "—"
                                     ) : (
                                         <Badge
+                                            data-value={row.member.outcome}
                                             tone={cohortOutcomeTone(row.member.outcome)}
-                                            title={row.member.outcome}
                                         >
-                                            {humanizeTerm(row.member.outcome)}
+                                            {COHORT_OUTCOME_WORDS[row.member.outcome]}
                                         </Badge>
                                     )}
                                 </td>
                                 <td>
-                                    {row.member.data_completeness === undefined ? (
-                                        "—"
-                                    ) : (
-                                        <Badge
-                                            tone={cohortDataCompletenessTone(
-                                                row.member.data_completeness,
-                                            )}
-                                            title={row.member.data_completeness}
-                                        >
-                                            {humanizeTerm(row.member.data_completeness)}
-                                        </Badge>
-                                    )}
+                                    {
+                                        // Web's rule (CHAOS-12245): the served driver rows in
+                                        // words, never the completeness word.
+                                        memberDriversText(row.member) ?? "—"
+                                    }
                                 </td>
                                 <td>{humanizeTerm(row.window)}</td>
                                 <td>

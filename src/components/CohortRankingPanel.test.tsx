@@ -77,9 +77,22 @@ describe("CohortRankingPanel", () => {
 
         expect(row.getByText("CHAOS")).toBeInTheDocument();
         expect(row.getByText("43.5")).toBeInTheDocument();
-        expect(row.getByText("qualified")).toBeInTheDocument();
-        expect(row.getByText("complete")).toBeInTheDocument();
+        expect(row.getByText("Qualified")).toBeInTheDocument();
+        // Web's rule: the served driver rows in words, never the completeness word.
+        expect(
+            row.getByText(`${String(cohort.members[0]!.drivers!.length)} of 5 drivers`),
+        ).toBeInTheDocument();
+        expect(row.queryByText("complete")).toBeNull();
         expect(row.getByText("current")).toBeInTheDocument();
+    });
+
+    it("shows no canonical id in a tooltip", () => {
+        render(<CohortRankingPanel cohort={cohort} result={undefined} shape="discovered_cohort" />);
+
+        const row = screen.getAllByTestId("ranking-row")[0]!;
+        const canonicalId = cohort.members[0]!.subject.canonical_id;
+        expect(row.querySelector("[title]")).toBeNull();
+        expect(row.querySelector(`[data-subject-id="${canonicalId}"]`)).not.toBeNull();
     });
 
     it("rounds a raw float score to one decimal place, matching the narration layer (CHAOS-4533)", () => {
@@ -225,7 +238,7 @@ describe("CohortRankingPanel", () => {
         // Withheld, not dropped: the row and its outcome still render, so the
         // member is not silently omitted either.
         expect(screen.getAllByTestId("ranking-row")).toHaveLength(1);
-        expect(screen.getByText("qualified")).toBeInTheDocument();
+        expect(screen.getByText("Qualified")).toBeInTheDocument();
     });
 
     it("says nothing about completeness for a complete, untruncated cohort", () => {

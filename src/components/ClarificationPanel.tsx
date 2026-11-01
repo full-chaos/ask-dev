@@ -5,12 +5,8 @@ import { useId } from "react";
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "../lib/contracts";
-import {
-    CANNOT_REASK_HERE_COPY,
-    candidateStateTone,
-    formatConfidence,
-    humanizeTerm,
-} from "../lib/presentation";
+import { CANNOT_REASK_HERE_COPY, candidateStateTone, formatConfidence } from "../lib/presentation";
+import { CANDIDATE_STATE_WORDS, labelFor, subjectKindNoun } from "../render/answer-copy";
 
 export type ClarificationChoice = {
     readonly result_id: string;
@@ -81,20 +77,16 @@ function CandidateRecord({
     readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
     return (
-        <li className="record">
+        <li className="record" data-receipt-id={candidate.receipt_id}>
             <div className="record__head">
                 <span className="record__meta">#{rank}</span>
                 <span className="record__title">{candidate.subject.label}</span>
-                <Badge tone={candidateStateTone(candidate.state)} title={candidate.state}>
-                    {humanizeTerm(candidate.state)}
+                <Badge data-value={candidate.state} tone={candidateStateTone(candidate.state)}>
+                    {labelFor(CANDIDATE_STATE_WORDS, candidate.state)}
                 </Badge>
-                {selected ? (
-                    <Badge tone="ok" title="selected">
-                        selected
-                    </Badge>
-                ) : null}
+                {selected ? <Badge tone="ok">selected</Badge> : null}
                 <span className="record__meta">
-                    {candidate.subject.kind} · {candidate.subject.canonical_id} · confidence{" "}
+                    {subjectKindNoun(candidate.subject.kind)} · confidence{" "}
                     {formatConfidence(candidate.confidence)}
                 </span>
             </div>
@@ -110,9 +102,6 @@ function CandidateRecord({
                 evidenceRefLabels={evidenceRefLabels}
                 label="Evidence"
             />
-            <p className="record__meta">
-                receipt <code>{candidate.receipt_id}</code>
-            </p>
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}
@@ -161,7 +150,7 @@ export function ClarificationPanel({
             </h2>
             {prompt === undefined ? (
                 <p className="answer__body">
-                    ACR could not commit to a subject and asked for a choice.
+                    Ask Dev could not settle on a subject and asked for a choice.
                 </p>
             ) : (
                 // The service's own wording. The Workbench never writes a

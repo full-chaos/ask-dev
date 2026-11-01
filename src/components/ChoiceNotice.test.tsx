@@ -59,6 +59,22 @@ describe("choiceDisposition", () => {
  * normal output — the first would read as an answer about the chosen subject,
  * the second as an ordinary second clarification.
  */
+describe("what a dishonoured choice says", () => {
+    it("names the subject and its kind in words, with no canonical id and no ticket", () => {
+        const subject: SubjectRef = {
+            ...chosen,
+            kind: "work_item",
+            canonical_id: "work_item:9001",
+        };
+        render(<DeterministicAnswerView chosenSubject={subject} result={clarification} />);
+
+        const notice = screen.getByRole("alert", { name: "Choice not applied" });
+        expect(notice).toHaveTextContent(`chosen: ${subject.label} · work item`);
+        expect(notice.textContent).not.toContain("work_item");
+        expect(notice.textContent).not.toMatch(/receipt|CHAOS-|principal/u);
+    });
+});
+
 describe("a dishonoured choice is never presented as normal", () => {
     it("SHAPE 1 — an answer about a different subject says so, loudly", () => {
         const aboutSomethingElse: InvestigationResult = {
@@ -99,7 +115,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         );
 
         const notice = screen.getByRole("alert", { name: "Choice not applied" });
-        expect(notice.textContent).toContain(`ACR did not commit ${chosen.label}`);
+        expect(notice.textContent).toContain(`Ask Dev did not settle on ${chosen.label}`);
         expect(notice.textContent).toContain("Choosing the same candidate is likely to repeat");
         // The choice UI is still offered; the tester is simply told the truth
         // about what happened to the last one.

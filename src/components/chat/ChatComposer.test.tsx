@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act, createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -79,5 +79,41 @@ describe("ChatComposer's lock", () => {
         Object.defineProperty(box(), "scrollHeight", { configurable: true, value: 44 });
         await user.type(box(), "x");
         expect((box() as HTMLTextAreaElement).style.height).toBe("44px");
+    });
+});
+
+/** CHAOS-12406: Enter that commits an IME candidate is not a send. Web's `AskDevComposer`. */
+describe("ChatComposer and an IME", () => {
+    it("does not send, and leaves the key to the IME, during composition", async () => {
+        const user = userEvent.setup();
+        const { onAsk } = setup();
+        await user.type(box(), "にほんご");
+
+        const leftToTheIme = fireEvent.keyDown(box(), { key: "Enter", isComposing: true });
+
+        expect(leftToTheIme).toBe(true);
+        expect(onAsk).not.toHaveBeenCalled();
+        expect(box()).toHaveValue("にほんご");
+    });
+
+    it("sends on the Enter after composition ended", async () => {
+        const user = userEvent.setup();
+        const { onAsk } = setup();
+        await user.type(box(), "にほんご");
+
+        fireEvent.keyDown(box(), { key: "Enter", isComposing: false });
+
+        expect(onAsk).toHaveBeenCalledWith("にほんご");
+    });
+});
+
+describe("ChatComposer's words", () => {
+    it("the hint names no internal service", () => {
+        setup();
+        expect(
+            screen.getByText(
+                "Every answer comes from a real investigation — Ask Dev never renders a mock result.",
+            ),
+        ).toBeInTheDocument();
     });
 });

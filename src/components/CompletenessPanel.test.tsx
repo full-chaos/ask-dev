@@ -6,6 +6,13 @@ import { describe, expect, it } from "vitest";
 import { CompletenessPanel } from "@/components/CompletenessPanel";
 import type { AnswerCompleteness, PlanRequirementOutcomeRow } from "@/lib/contracts";
 
+/** A badge by its raw value: the value stays in `data-value`, and a user reads the word. */
+function badge(root: HTMLElement, value: string): HTMLElement {
+    const found = root.querySelector<HTMLElement>(`[data-value="${value}"]`);
+    if (found === null) throw new Error(`no badge for ${value}`);
+    return found;
+}
+
 /**
  * CHAOS-4413/CHAOS-4642: `completeness` is a REQUIRED field on the pinned
  * `context_fabric_investigation_result.v1` contract from this pin onward —
@@ -23,7 +30,8 @@ describe("CompletenessPanel", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
-        expect(within(panel).getByTestId("completeness-chip-row")).toHaveTextContent("complete");
+        // Web's rule: "Full answer" needs complete completeness too.
+        expect(within(panel).getByTestId("completeness-chip-row")).toHaveTextContent("Answer");
     });
 
     it("shows the claimed-facts and row counts", () => {
@@ -35,8 +43,7 @@ describe("CompletenessPanel", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
-        expect(panel).toHaveTextContent("4 claimed facts");
-        expect(panel).toHaveTextContent("2 rows");
+        expect(panel).toHaveTextContent("4 facts from 2 source rows.");
     });
 
     it("singularizes a count of exactly one", () => {
@@ -48,9 +55,9 @@ describe("CompletenessPanel", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
-        expect(panel).toHaveTextContent("1 claimed fact · 1 row");
-        expect(panel).not.toHaveTextContent("1 claimed facts");
-        expect(panel).not.toHaveTextContent("1 rows");
+        expect(panel).toHaveTextContent("1 fact from 1 source row.");
+        expect(panel).not.toHaveTextContent("1 facts");
+        expect(panel).not.toHaveTextContent("1 source rows");
     });
 
     /**
@@ -74,7 +81,7 @@ describe("CompletenessPanel", () => {
      * never the engine's or a model's own raw text (schema doc comment on
      * `AnswerCompleteness.terminal_reason`).
      */
-    it("shows the terminal reason verbatim when the answer stopped short", () => {
+    it("words the terminal reason when the answer stopped short", () => {
         const completeness: AnswerCompleteness = {
             terminal_status: "partial",
             terminal_reason: "limitation_disclosed",
@@ -84,7 +91,7 @@ describe("CompletenessPanel", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         expect(screen.getByTestId("completeness-terminal-reason")).toHaveTextContent(
-            "limitation disclosed",
+            "Ask Dev named a limitation of this answer.",
         );
     });
 });
@@ -102,9 +109,15 @@ describe("CompletenessPanel — completeness.state badge", () => {
         partial: "badge--warn",
         degraded: "badge--bad",
     };
+    const EXPECTED_WORDS: Record<AnswerCompleteness["state"], string> = {
+        not_derived: "Coverage not known",
+        complete: "Read in full",
+        partial: "Read in part",
+        degraded: "Some data not available",
+    };
 
     for (const state of ["not_derived", "complete", "partial", "degraded"] as const) {
-        it(`renders the "${state}" state with its own title and tone`, () => {
+        it(`renders the "${state}" state with its own words and tone`, () => {
             const completeness: AnswerCompleteness = {
                 terminal_status: "no_match",
                 claimed_facts_count: 0,
@@ -113,9 +126,10 @@ describe("CompletenessPanel — completeness.state badge", () => {
             };
             const { unmount } = render(<CompletenessPanel completeness={completeness} />);
 
-            const badge = screen.getByTitle(`state: ${state}`);
-            expect(badge).toHaveTextContent(state.replaceAll("_", " "));
-            expect(badge).toHaveClass(EXPECTED_TONE[state]);
+            const stateBadge = badge(document.body, `state: ${state}`);
+            expect(stateBadge.textContent).toBe(EXPECTED_WORDS[state]);
+            expect(stateBadge).toHaveClass(EXPECTED_TONE[state]);
+            expect(stateBadge).not.toHaveAttribute("title");
 
             unmount();
         });
@@ -125,7 +139,8 @@ describe("CompletenessPanel — completeness.state badge", () => {
      * D25/B2 (chris 2026-09-13): `terminal_status` (disposition) and `state`
      * (derived outcome) answer different questions and can legitimately
      * disagree on the same result. This panel never reconciles them — both
-     * badges stay visible, unedited.
+     * badges stay visible, each in its own words. Web's rule (CHAOS-12245) only
+     * keeps the first from saying "Full answer" beside a partial state.
      */
     it("shows BOTH badges, unreconciled, when terminal_status and state disagree", () => {
         const completeness: AnswerCompleteness = {
@@ -136,8 +151,10 @@ describe("CompletenessPanel — completeness.state badge", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         const row = screen.getByTestId("completeness-chip-row");
-        expect(within(row).getByTitle("terminal_status: complete")).toHaveTextContent("complete");
-        expect(within(row).getByTitle("state: partial")).toHaveTextContent("partial");
+        expect(badge(row, "terminal_status: complete").textContent).toBe(
+            "Answer, not fully covered",
+        );
+        expect(badge(row, "state: partial").textContent).toBe("Read in part");
     });
 });
 
@@ -156,6 +173,14 @@ describe("CompletenessPanel — outcome badge tone", () => {
         unavailable: "badge--bad",
     };
 
+    const EXPECTED_WORDS: Record<PlanRequirementOutcomeRow["outcome"], string> = {
+        satisfied: "read in full",
+        narrowed: "read in part",
+        unavailable: "not available: not known",
+        not_applicable: "does not apply",
+        not_attempted: "not read: not known",
+    };
+
     for (const outcome of [
         "satisfied",
         "narrowed",
@@ -163,7 +188,7 @@ describe("CompletenessPanel — outcome badge tone", () => {
         "not_applicable",
         "not_attempted",
     ] as const) {
-        it(`renders the "${outcome}" outcome with its own title and tone`, () => {
+        it(`renders the "${outcome}" outcome with its own words and tone`, () => {
             const completeness: AnswerCompleteness = {
                 terminal_status: "partial",
                 claimed_facts_count: 1,
@@ -173,9 +198,10 @@ describe("CompletenessPanel — outcome badge tone", () => {
             };
             const { unmount } = render(<CompletenessPanel completeness={completeness} />);
 
-            const badge = screen.getByTitle(`outcome: ${outcome}`);
-            expect(badge).toHaveTextContent(outcome.replaceAll("_", " "));
-            expect(badge).toHaveClass(EXPECTED_TONE[outcome]);
+            const outcomeBadge = badge(document.body, `outcome: ${outcome}`);
+            expect(outcomeBadge.textContent).toBe(EXPECTED_WORDS[outcome]);
+            expect(outcomeBadge).toHaveClass(EXPECTED_TONE[outcome]);
+            expect(outcomeBadge).not.toHaveAttribute("title");
 
             unmount();
         });
@@ -217,7 +243,7 @@ describe("CompletenessPanel — requirement outcomes", () => {
             "No requirement outcomes were derived",
         );
         expect(screen.queryByTestId("completeness-outcomes-table")).not.toBeInTheDocument();
-        expect(screen.getByTitle("state: not_derived")).toBeInTheDocument();
+        expect(badge(document.body, "state: not_derived")).toBeInTheDocument();
     });
 
     it("shows an explicit empty-state line when outcomes is an empty array, agreeing with not_derived", () => {
@@ -252,13 +278,15 @@ describe("CompletenessPanel — requirement outcomes", () => {
         const rows = screen.getAllByTestId("completeness-outcome-row");
         expect(rows).toHaveLength(3);
         // Wire order, never re-sorted: row i shows outcome i's own fields.
+        const OUTCOME_WORDS = ["read in full", "read in part", "not available: not known"];
         outcomes.forEach((outcome, index) => {
-            const row = within(rows[index]!);
-            expect(row.getByTitle(outcome.requirement!)).toHaveTextContent(
-                outcome.requirement!.replaceAll("_", " "),
-            );
-            expect(row.getByTitle(`outcome: ${outcome.outcome}`)).toHaveTextContent(
-                outcome.outcome.replaceAll("_", " "),
+            const row = rows[index]!;
+            // The identity stays on the cell for a test; a user reads what it needed.
+            const cell = row.querySelector(`[data-requirement="${outcome.requirement!}"]`);
+            expect(cell).toHaveTextContent("Read");
+            expect(row.textContent).not.toContain(outcome.requirement!);
+            expect(badge(row, `outcome: ${outcome.outcome}`).textContent).toBe(
+                OUTCOME_WORDS[index],
             );
         });
     });
@@ -305,7 +333,7 @@ describe("CompletenessPanel — requirement outcomes", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         expect(screen.getByTestId("completeness-outcome-row")).toHaveTextContent(
-            "items (defaulted)",
+            "too many items (defaulted)",
         );
     });
 
@@ -345,9 +373,7 @@ describe("CompletenessPanel — requirement outcomes", () => {
             outcomes,
         };
         render(<CompletenessPanel completeness={completeness} />);
-        expect(screen.getByTestId("completeness-outcome-obligation")).toHaveTextContent(
-            "obligation: read",
-        );
+        expect(screen.getByTestId("completeness-outcome-obligation").textContent).toBe("Read");
     });
 
     it("omits the obligation line when the row carries no obligation", () => {
@@ -385,7 +411,7 @@ describe("CompletenessPanel — requirement outcomes", () => {
                 }}
             />,
         );
-        expect(screen.getByTestId("completeness-outcome-row")).toHaveTextContent("scope");
+        expect(screen.getByTestId("completeness-outcome-row")).toHaveTextContent("Narrower scope");
     });
 
     /** `served`/`declared` are their own column, alongside outcome and impact. */
@@ -436,12 +462,12 @@ describe("CompletenessPanel — requirement outcomes", () => {
         expect(within(row).getByText("2 refinement steps")).toBeInTheDocument();
         const steps = within(row).getAllByTestId("completeness-outcome-refinement-step");
         expect(steps).toHaveLength(2);
-        expect(steps[0]).toHaveTextContent("planning");
+        expect(steps[0]).toHaveTextContent("while planning");
         expect(steps[0]).toHaveTextContent("10");
         expect(steps[0]).toHaveTextContent("5");
-        expect(steps[0]).toHaveTextContent("attention rank");
-        expect(steps[1]).toHaveTextContent("projection");
-        expect(steps[1]).toHaveTextContent("items");
+        expect(steps[0]).toHaveTextContent("by attention rank");
+        expect(steps[1]).toHaveTextContent("while shaping the answer");
+        expect(steps[1]).toHaveTextContent("too many items");
     });
 
     it("shows no refinement disclosure when the row carries no refinements", () => {

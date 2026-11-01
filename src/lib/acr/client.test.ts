@@ -13,6 +13,10 @@ import {
 } from "@/lib/acr/upstream-vocabulary";
 import { validateContract } from "@/lib/acr/validate";
 import type { StructureSubjectKind } from "@/lib/contracts";
+import {
+    REFUSAL_BYTES_EVIDENCE_WINDOW,
+    REFUSAL_ITEMS_NO_AXIS,
+} from "@/test/fixtures/budget-refusal";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 
@@ -607,6 +611,80 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
         expect(failure.retryable).toBe(false);
     });
 
+    /** CHAOS-12406: the rest of the same 413 details, from an encoder capture. */
+    it("reads the byte overrun and nothing_left_to_cut off a captured 413", async () => {
+        respondWith(REFUSAL_BYTES_EVIDENCE_WINDOW, 413);
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+
+        expect(failure).toMatchObject({
+            overrun: "bytes",
+            measuredBytes: 301_877,
+            maxBytes: 262_144,
+            nothingLeftToCut: true,
+            upstreamCode: "budget_refusal",
+            httpStatus: 413,
+            retryable: false,
+        });
+    });
+
+    it("words a 413 as an answer too large to send, never as a rejected request", async () => {
+        respondWith(REFUSAL_ITEMS_NO_AXIS, 413);
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+
+        expect(failure.message).toBe("The answer to this question was too large to send.");
+    });
+
+    it("leaves nothingLeftToCut absent unless ACR says true", async () => {
+        respondWith(budgetRefusalPayload({ overrun: "items", nothing_left_to_cut: false }), 413);
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+
+        expect(failure).not.toHaveProperty("nothingLeftToCut");
+    });
+
+    it("drops a byte count that is not a count", async () => {
+        respondWith(
+            budgetRefusalPayload({
+                overrun: "bytes",
+                measured_bytes: "a lot",
+                max_serialized_bytes: -1,
+            }),
+            413,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+
+        expect(failure).not.toHaveProperty("measuredBytes");
+        expect(failure).not.toHaveProperty("maxBytes");
+    });
+
+    it("carries none of the byte fields on a status that is not 413", async () => {
+        respondWith(
+            {
+                schema_version: "error.v1",
+                request_id: "req_1",
+                error: {
+                    code: "upstream_unavailable",
+                    http_status: 503,
+                    details: {
+                        measured_bytes: 1,
+                        max_serialized_bytes: 2,
+                        nothing_left_to_cut: true,
+                    },
+                },
+            },
+            503,
+        );
+
+        const failure = await failureOf(investigate(config, { question: "q" }));
+
+        expect(failure).not.toHaveProperty("measuredBytes");
+        expect(failure).not.toHaveProperty("maxBytes");
+        expect(failure).not.toHaveProperty("nothingLeftToCut");
+    });
+
     it("omits narrower_continuation entirely when ACR named no axis (the OMITTED discipline)", async () => {
         // ACR omits the key rather than sending {"axis":"none"} when nothing
         // could be named (chaos4636_answer_plan.go's comment on this exact
@@ -879,7 +957,7 @@ describe("investigate", () => {
                 expect(failure.httpStatus).toBe(status);
                 expect(failure.retryable).toBe(retryable);
                 expect(failure.message).not.toMatch(
-                    /temporarily unavailable|dependency it needs|unexpected status|Workbench credential/i,
+                    /temporarily unavailable|something it needs|unexpected response|server credential/i,
                 );
                 expect(failure.message).not.toContain("upstream free text");
             });
@@ -916,7 +994,7 @@ describe("investigate", () => {
         expect(namedDependencyCount).toBeGreaterThanOrEqual(2);
         expect(failure.message).not.toMatch(/needs graph reads enabled/i);
         expect(failure.message).not.toMatch(/needs a configured model runtime/i);
-        expect(failure.message).toMatch(/request id/i);
+        expect(failure.message).toMatch(/the reference/i);
         expect(failure.retryable).toBe(true);
     });
 
@@ -1254,13 +1332,16 @@ describe("investigate", () => {
      */
     it("reports a missing repository scope as misconfiguration, not an unreachable service", async () => {
         const spy = vi.spyOn(globalThis, "fetch");
+        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
         const failure = await failureOf(
             investigate({ ...config, repositoryScopes: [] }, { question: "q" }),
         );
 
         expect(failure.code).toBe("workbench_misconfigured");
-        expect(failure.message).toMatch(/empty repository_scopes/);
+        // The cause reaches the operator's log, and the page says no repo word.
+        expect(String(logged.mock.calls[0]?.[1])).toMatch(/empty repository_scopes/);
+        expect(failure.message).not.toMatch(/repository_scopes/);
         expect(failure.retryable).toBe(false);
         expect(spy).not.toHaveBeenCalled();
     });

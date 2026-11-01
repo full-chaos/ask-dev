@@ -2,7 +2,8 @@ import { useId } from "react";
 
 import { Badge } from "./Badge";
 import type { PriorSubjectReceiptDispositionEntry } from "../lib/contracts";
-import { humanizeTerm, priorSubjectReceiptDispositionTone } from "../lib/presentation";
+import { priorSubjectReceiptDispositionTone } from "../lib/presentation";
+import { RECEIPT_DISPOSITION_WORDS } from "../render/answer-copy";
 
 export type PriorSubjectReceiptDisclosureProps = {
     readonly dispositions: readonly PriorSubjectReceiptDispositionEntry[] | undefined;
@@ -41,7 +42,7 @@ export function PriorSubjectReceiptDisclosure({
     return (
         <section aria-labelledby={`${idPrefix}-prior-subject-receipts-title`}>
             <h3 className="panel__title" id={`${idPrefix}-prior-subject-receipts-title`}>
-                Prior-turn subject receipts
+                Earlier subject choices
             </h3>
             <ul className="stack stack--tight">
                 {dispositions.map((entry, index) => (
@@ -57,14 +58,15 @@ export function PriorSubjectReceiptDisclosure({
                     // gap the join alone cannot.
                     <li
                         className="record__meta"
+                        data-receipt-id={entry.receipt_id}
                         key={`${index}:${entry.prior_result_id}:${entry.receipt_id}`}
                     >
-                        <code>{entry.receipt_id}</code> from <code>{entry.prior_result_id}</code>:{" "}
+                        Choice {index + 1}:{" "}
                         <Badge
+                            data-value={entry.disposition}
                             tone={priorSubjectReceiptDispositionTone(entry.disposition)}
-                            title={entry.disposition}
                         >
-                            {humanizeTerm(entry.disposition)}
+                            {RECEIPT_DISPOSITION_WORDS[entry.disposition]}
                         </Badge>
                     </li>
                 ))}

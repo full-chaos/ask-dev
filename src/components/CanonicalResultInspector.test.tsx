@@ -35,19 +35,21 @@ describe("CanonicalResultInspector: prior-subject-receipt disclosure", () => {
     }
 
     it("renders the disclosure in the raw inspector's own subject-resolution section", () => {
-        render(<CanonicalResultInspector result={resultWithDroppedReceipt()} />);
+        const { container } = render(
+            <CanonicalResultInspector result={resultWithDroppedReceipt()} />,
+        );
 
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
-        expect(screen.getByText("subr_0001")).toBeInTheDocument();
-        expect(screen.getByText("skipped no match")).toBeInTheDocument();
+        expect(container.querySelector('[data-receipt-id="subr_0001"]')).not.toBeNull();
+        expect(screen.getByText("Not applied: it matched no option")).toBeInTheDocument();
     });
 
     it("renders nothing extra when the result carries no prior-receipt dispositions", () => {
         const base = structureMockScenarios().find((s) => s.id === "structure-kind")!.result;
         render(<CanonicalResultInspector result={base} />);
 
-        expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
+        expect(screen.queryByRole("heading", { name: "Earlier subject choices" })).toBeNull();
     });
 });

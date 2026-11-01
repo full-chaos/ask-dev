@@ -70,6 +70,20 @@ describe("buildConversationTurns", () => {
         ]);
     });
 
+    /** CHAOS-12406: a question ACR did not record is never sent again (web's rule). */
+    it("excludes a user turn whose question was not recorded, and keeps the rest", () => {
+        const turns: readonly ConversationSourceTurn[] = [
+            { role: "user", id: 0, question: null, createdAt: "2026-01-01T00:00:00.000Z" },
+            answeredAssistantTurn(1, "It is on track."),
+            userTurn(2, "And next week?"),
+        ];
+
+        expect(buildConversationTurns(turns).map((turn) => turn.turn_id)).toEqual([
+            "turn_1",
+            "turn_2",
+        ]);
+    });
+
     it("excludes a pending assistant turn — it has no content yet", () => {
         const turns: readonly ConversationSourceTurn[] = [
             userTurn(0, "What is the status of dev-health-ops?"),

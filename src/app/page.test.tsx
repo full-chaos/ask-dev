@@ -86,7 +86,7 @@ describe("the chat surface's empty state", () => {
         render(<ChatPage />);
 
         expect(screen.getByText("Ask a question to start an investigation.")).toBeInTheDocument();
-        expect(screen.queryByRole("article", { name: "Deterministic answer" })).toBeNull();
+        expect(screen.queryByRole("article", { name: "Answer" })).toBeNull();
     });
 });
 
@@ -100,9 +100,7 @@ describe("asking a question appends a user turn and an assistant turn", () => {
         expect(
             await screen.findByText("What is the status of dev-health-ops?"),
         ).toBeInTheDocument();
-        expect(
-            await screen.findByRole("article", { name: "Deterministic answer" }),
-        ).toBeInTheDocument();
+        expect(await screen.findByRole("article", { name: "Answer" })).toBeInTheDocument();
         expect(
             screen.queryByText("Ask a question to start an investigation."),
         ).not.toBeInTheDocument();
@@ -126,13 +124,13 @@ describe("asking a question appends a user turn and an assistant turn", () => {
         render(<ChatPage />);
 
         await ask("First question?");
-        await screen.findByRole("article", { name: "Deterministic answer" });
+        await screen.findByRole("article", { name: "Answer" });
         await ask("Second question?");
 
         expect(fetchSpy).toHaveBeenCalledTimes(2);
         expect(screen.getByText("First question?")).toBeInTheDocument();
         expect(await screen.findByText("Second question?")).toBeInTheDocument();
-        expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(2);
+        expect(screen.getAllByRole("article", { name: "Answer" })).toHaveLength(2);
     });
 });
 
@@ -150,7 +148,7 @@ describe("a failure renders as a failure, in its own turn", () => {
         await ask("What is the status of dev-health-ops?");
 
         expect(await screen.findByRole("alert", { name: "No answer" })).toBeInTheDocument();
-        expect(screen.queryByRole("article", { name: "Deterministic answer" })).toBeNull();
+        expect(screen.queryByRole("article", { name: "Answer" })).toBeNull();
     });
 });
 
@@ -296,7 +294,7 @@ describe("the clarification popup is live only on the most recent assistant turn
         // Discriminating, not just "an article rendered": both turns share
         // the same `aria-label`, so `data-state` is what actually proves the
         // FIRST turn stayed a clarification and the SECOND turn is decisive.
-        const turns = screen.getAllByRole("article", { name: "Deterministic answer" });
+        const turns = screen.getAllByRole("article", { name: "Answer" });
         expect(turns).toHaveLength(2);
         expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
         expect(turns[1]).toHaveAttribute("data-state", answered.status);
@@ -335,9 +333,7 @@ describe("the clarification popup is live only on the most recent assistant turn
         await user.click(popupOptionButton(second!.subject.label));
         await user.click(continueButton());
 
-        expect(
-            await screen.findAllByRole("article", { name: "Deterministic answer" }),
-        ).toHaveLength(3);
+        expect(await screen.findAllByRole("article", { name: "Answer" })).toHaveLength(3);
         expect(fetchSpy).toHaveBeenCalledTimes(3);
 
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -374,7 +370,7 @@ describe("the clarification popup is live only on the most recent assistant turn
         ).toBeInTheDocument();
 
         // Only the LATEST of the 3 turns is live; the first two are frozen.
-        const turns = screen.getAllByRole("article", { name: "Deterministic answer" });
+        const turns = screen.getAllByRole("article", { name: "Answer" });
         expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
         expect(turns[1]).toHaveAttribute("data-state", answered.status);
         expect(turns[2]).toHaveAttribute("data-state", answered.status);
@@ -421,7 +417,7 @@ describe("the clarification popup is live only on the most recent assistant turn
         // on the successful one), and the successful one still shows its own
         // answer article alongside it rather than being replaced or hidden.
         expect(await screen.findByRole("alert", { name: "No answer" })).toBeInTheDocument();
-        const articles = screen.getAllByRole("article", { name: "Deterministic answer" });
+        const articles = screen.getAllByRole("article", { name: "Answer" });
         // The original clarification turn, plus the one candidate that
         // answered successfully — the failed candidate has no article at all.
         expect(articles).toHaveLength(2);
@@ -609,9 +605,7 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
         await pickPopupOption(user, option.label);
 
         await waitFor(() =>
-            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
-                2,
-            ),
+            expect(screen.getAllByRole("article", { name: "Answer" })).toHaveLength(2),
         );
         expect(container.querySelectorAll(".chat__turn--user")).toHaveLength(1);
         expect(screen.getAllByText("How's the pipeline doing?")).toHaveLength(1);
@@ -644,9 +638,7 @@ describe("CHAOS-4670: a panel-selection re-ask does not render a second question
         await user.click(continueButton());
 
         await waitFor(() =>
-            expect(screen.getAllByRole("article", { name: "Deterministic answer" })).toHaveLength(
-                3,
-            ),
+            expect(screen.getAllByRole("article", { name: "Answer" })).toHaveLength(3),
         );
         expect(container.querySelectorAll(".chat__turn--user")).toHaveLength(1);
     });
@@ -740,9 +732,7 @@ describe("structure-needs offers (CHAOS-3927 P2, now popup-only per CHAOS-4671)"
         await user.click(popupOptionButton(second!.label));
         await user.click(continueButton());
 
-        expect(
-            await screen.findAllByRole("article", { name: "Deterministic answer" }),
-        ).toHaveLength(3);
+        expect(await screen.findAllByRole("article", { name: "Answer" })).toHaveLength(3);
         expect(fetchSpy).toHaveBeenCalledTimes(3);
 
         const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
@@ -763,7 +753,7 @@ describe("structure-needs offers (CHAOS-3927 P2, now popup-only per CHAOS-4671)"
         expect(secondCallBody.question).toBe(structureCandidate.question);
         expect(thirdCallBody.question).toBe(structureCandidate.question);
 
-        const turns = screen.getAllByRole("article", { name: "Deterministic answer" });
+        const turns = screen.getAllByRole("article", { name: "Answer" });
         expect(turns[0]).toHaveAttribute("data-state", "clarification_required");
         expect(turns[1]).toHaveAttribute("data-state", answered.status);
         expect(turns[2]).toHaveAttribute("data-state", answered.status);
@@ -1076,9 +1066,7 @@ describe("fan-out correctness (codex review)", () => {
         await pickPopupOption(user, candidate.subject.label);
         await user.click(continueButton());
 
-        expect(
-            await screen.findAllByRole("article", { name: "Deterministic answer" }),
-        ).toHaveLength(2);
+        expect(await screen.findAllByRole("article", { name: "Answer" })).toHaveLength(2);
         expect(screen.queryByRole("dialog")).toBeNull();
         expect(screen.getByTestId("frozen-offers-disclosure")).toBeInTheDocument();
         expect(screen.queryByRole("button", { name: candidate.subject.label })).toBeNull();
@@ -1163,9 +1151,7 @@ describe("fan-out correctness (codex review)", () => {
         await user.click(popupOptionButton(subjectCandidate.subject.label));
         await user.click(continueButton());
 
-        expect(
-            await screen.findAllByRole("article", { name: "Deterministic answer" }),
-        ).toHaveLength(2);
+        expect(await screen.findAllByRole("article", { name: "Answer" })).toHaveLength(2);
         // One confirm click = one request: a second one would be sequential
         // against the same result and always return a stale-receipt no_match.
         expect(fetchSpy).toHaveBeenCalledTimes(2);

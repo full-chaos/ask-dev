@@ -1199,6 +1199,12 @@
         overflow-wrap: anywhere;
     }
 
+    .chat__bubble--not-recorded {
+        color: var(--text-muted);
+        font-style: italic;
+        font-weight: 400;
+    }
+
     .chat__turn--assistant {
         display: flex;
         flex-direction: column;

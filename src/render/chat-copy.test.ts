@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { CHAT_STATUS_COPY, formatElapsed, NOT_RUN_COPY, STOPPED_COPY } from "./index";
+import {
+    CHAT_PROGRESS_COPY,
+    CHAT_STATUS_COPY,
+    formatElapsed,
+    NOT_RUN_COPY,
+    STOPPED_COPY,
+} from "./index";
 
 /** CHAOS-12382: what the entry exports for the C adapter. Web's words, written out. */
 describe("the copy the render entry exports", () => {
@@ -8,6 +14,11 @@ describe("the copy the render entry exports", () => {
         expect(CHAT_STATUS_COPY.questionNotRecorded).toBe("Question not recorded");
         expect(CHAT_STATUS_COPY.reference).toBe("Reference");
         expect(CHAT_STATUS_COPY.loadAgain).toBe("Load again");
+    });
+
+    it("holds the words of a batch a host runs in sequence", () => {
+        expect(CHAT_PROGRESS_COPY.queued).toBe("Waiting for the question before it to finish.");
+        expect(CHAT_PROGRESS_COPY.batchPosition(2, 3)).toBe("Question 2 of 3");
     });
 
     it("exports the not_run and stopped tables, with every reason", () => {

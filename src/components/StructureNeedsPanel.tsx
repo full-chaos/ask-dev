@@ -124,23 +124,15 @@ function OfferButton({
     // Offer VALUES stay structural (§ chris 2026-08-24 10:04): `label` is what
     // is actually bound to `receiptId`. `phrasing` is presentation-only text
     // for the same offer, so it is what's DISPLAYED — but `label` is always
-    // shown too (same rule `@/lib/presentation.ts` holds for tone maps: the
-    // raw contract term is never hidden behind generated wording).
+    // shown too: the value is never hidden behind generated wording.
     const displayText = phrasing ?? label;
     return (
-        <li className="record" key={optionId}>
+        <li className="record" data-receipt-id={receiptId} key={optionId}>
             <div className="record__head">
                 <span className="record__title">{displayText}</span>
-                {selected ? (
-                    <Badge tone="ok" title="selected">
-                        selected
-                    </Badge>
-                ) : null}
+                {selected ? <Badge tone="ok">selected</Badge> : null}
             </div>
-            {phrasing === undefined ? null : <p className="record__meta">structural: {label}</p>}
-            <p className="record__meta">
-                receipt <code>{receiptId}</code>
-            </p>
+            {phrasing === undefined ? null : <p className="record__meta">Offered: {label}</p>}
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}
@@ -390,7 +382,7 @@ export function StructureNeedsPanel({
      */
     function toggle(member: StructureNeedKind, receipt: BoundStructureReceipt) {
         if (!structureReceiptHasExpectedNamespace(member, receipt)) {
-            const message = `That offer's receipt is not valid for ${structureMemberLabel(member)} and could not be selected. This is a Workbench bug, not something you did — please report it.`;
+            const message = `That option is not valid for ${structureMemberLabel(member)} and could not be selected. This is an Ask Dev bug, not something you did — please report it.`;
             console.error(
                 `StructureNeedsPanel: receipt ${receipt.receipt_id} is not in the ${member} namespace; ignoring the selection.`,
             );
@@ -414,7 +406,7 @@ export function StructureNeedsPanel({
                 More structure would narrow this
             </h2>
             <p className="record__meta">
-                ACR named {structureNeeds.missing.length}{" "}
+                Ask Dev named {structureNeeds.missing.length}{" "}
                 {structureNeeds.missing.length === 1 ? "thing" : "things"} it needs to answer
                 decisively:{" "}
                 {structureNeeds.missing.map((member) => structureMemberLabel(member)).join(", ")}.

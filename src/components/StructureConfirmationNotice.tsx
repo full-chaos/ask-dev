@@ -2,6 +2,12 @@ import { Badge } from "./Badge";
 import type { ConfirmedStructureEntry } from "../lib/contracts";
 import { structureDispositionTone } from "../lib/presentation";
 import {
+    labelFor,
+    STRUCTURE_DISPOSITION_WORDS,
+    STRUCTURE_PROVENANCE_WORDS,
+    STRUCTURE_SOURCE_WORDS,
+} from "../render/answer-copy";
+import {
     hasVetoedStructureConfirmation,
     summarizeConfirmedStructure,
 } from "../lib/structure-disposition";
@@ -32,16 +38,17 @@ export function StructureConfirmationRecords({
                     <div className="record__head">
                         <span className="record__title">{summary.label}</span>
                         <Badge
-                            title={summary.entry.disposition}
+                            data-value={summary.entry.disposition}
                             tone={structureDispositionTone(summary.entry.disposition)}
                         >
-                            {summary.entry.disposition.replaceAll("_", " ")}
+                            {STRUCTURE_DISPOSITION_WORDS[summary.entry.disposition]}
                         </Badge>
                     </div>
                     <p className="answer__body">{summary.sentence}</p>
                     <p className="record__meta">
-                        applied value <code>{summary.entry.applied_value}</code> · source{" "}
-                        {summary.entry.source} · provenance {summary.entry.provenance}
+                        applied value <code>{summary.entry.applied_value}</code> · source:{" "}
+                        {labelFor(STRUCTURE_SOURCE_WORDS, summary.entry.source)} ·{" "}
+                        {labelFor(STRUCTURE_PROVENANCE_WORDS, summary.entry.provenance)}
                     </p>
                 </li>
             ))}

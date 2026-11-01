@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { signWebAssertion } from "@/lib/acr/assertion";
 import type { AcrRuntimeConfig } from "@/lib/acr/config";
 import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import { REFUSAL_COPY } from "@/lib/acr/narrower-continuation-copy";
 import {
     boundedBudgetOverrun,
     boundedModelRefusalReason,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/acr/upstream-vocabulary";
 import { validateContract, type ContractSchemaName } from "@/lib/acr/validate";
 import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
+import { CHAT_STATUS_COPY, NOT_RUN_COPY } from "@/render/chat-copy";
 import type {
     BoundStructureReceipt,
     ConversationTurn,
@@ -335,6 +337,9 @@ type UpstreamError = {
     readonly overrun?: string;
     readonly measuredItems?: number;
     readonly maxItems?: number;
+    readonly measuredBytes?: number;
+    readonly maxBytes?: number;
+    readonly nothingLeftToCut?: true;
     /** CHAOS-10343: `details.reason`, kept only when it is a documented model-refusal member. */
     readonly refusalReason?: ModelRefusalReason;
 };
@@ -373,7 +378,14 @@ function parseUpstreamErrorDetails(
     details: unknown,
 ): Pick<
     UpstreamError,
-    "maxItems" | "measuredItems" | "narrowerContinuation" | "overrun" | "refusalReason"
+    | "maxBytes"
+    | "maxItems"
+    | "measuredBytes"
+    | "measuredItems"
+    | "narrowerContinuation"
+    | "nothingLeftToCut"
+    | "overrun"
+    | "refusalReason"
 > {
     if (typeof details !== "object" || details === null) return {};
     const record = details as Record<string, unknown>;
@@ -382,6 +394,8 @@ function parseUpstreamErrorDetails(
     );
     const measuredItems = boundedNonNegativeInteger(record.measured_items);
     const maxItems = boundedNonNegativeInteger(record.max_items);
+    const measuredBytes = boundedNonNegativeInteger(record.measured_bytes);
+    const maxBytes = boundedNonNegativeInteger(record.max_serialized_bytes);
     const narrowerContinuation = parseNarrowerContinuation(record.narrower_continuation);
     const refusalReason = boundedModelRefusalReason(record.reason);
     return {
@@ -389,6 +403,9 @@ function parseUpstreamErrorDetails(
         ...(overrun === undefined ? {} : { overrun }),
         ...(measuredItems === undefined ? {} : { measuredItems }),
         ...(maxItems === undefined ? {} : { maxItems }),
+        ...(measuredBytes === undefined ? {} : { measuredBytes }),
+        ...(maxBytes === undefined ? {} : { maxBytes }),
+        ...(record.nothing_left_to_cut === true ? { nothingLeftToCut: true } : {}),
         ...(narrowerContinuation === undefined ? {} : { narrowerContinuation }),
     };
 }
@@ -462,6 +479,13 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
                       ? {}
                       : { measuredItems: upstream.measuredItems }),
                   ...(upstream.maxItems === undefined ? {} : { maxItems: upstream.maxItems }),
+                  ...(upstream.measuredBytes === undefined
+                      ? {}
+                      : { measuredBytes: upstream.measuredBytes }),
+                  ...(upstream.maxBytes === undefined ? {} : { maxBytes: upstream.maxBytes }),
+                  ...(upstream.nothingLeftToCut === undefined
+                      ? {}
+                      : { nothingLeftToCut: upstream.nothingLeftToCut }),
               }
             : {};
     const upstreamFields = {
@@ -492,8 +516,8 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_access_denied",
-            message:
-                "ACR refused this call for the user: not a member of the organization, impersonating, a session that is no longer live, or an unknown organization or user. ACR does not say which.",
+            // One code for every reason, so the words name none of them.
+            message: NOT_RUN_COPY.access_denied,
             retryable: false,
         };
     }
@@ -501,8 +525,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_no_repository",
-            message:
-                "ACR found no repository this credential may read in the organization's synced repositories. A repository that is not synced yet is not readable until it is.",
+            message: `${NOT_RUN_COPY.no_repository} A repository that is not synced yet cannot be read until it is.`,
             retryable: false,
         };
     }
@@ -518,8 +541,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_budget_exhausted",
-            message:
-                "ACR refused the investigation before it started: too little of the request's wait budget was left. Nothing ran. Retry.",
+            message: CHAT_STATUS_COPY.deadline.budget_exhausted,
             retryable: true,
         };
     }
@@ -527,7 +549,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_unauthorized",
-            message: "ACR rejected the Workbench credential for this organization.",
+            message: "Ask Dev's server credential was rejected for this organization.",
             retryable: false,
         };
     }
@@ -543,7 +565,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             ...upstreamFields,
             code: "acr_answer_rejected",
             message:
-                "ACR derived an answer and its own validator rejected it. No answer was asserted.",
+                "Ask Dev derived an answer and its own check rejected it. No answer was asserted.",
             retryable: upstream.retryable ?? true,
         };
     }
@@ -551,7 +573,8 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_rejected_request",
-            message: "ACR rejected the investigation request.",
+            message:
+                status === 413 ? REFUSAL_COPY.lead : "Ask Dev rejected the investigation request.",
             retryable: false,
         };
     }
@@ -572,7 +595,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             ...upstreamFields,
             code: "acr_runtime_unavailable",
             message:
-                "ACR is reachable, but a dependency it needs (its graph store, model runtime, or its own persistence) is currently unavailable. Match the ACR request id below against ACR's logs for which one and why.",
+                "Ask Dev is reachable, but something it needs (its graph data, its model, or its own storage) is unavailable right now. Quote the reference below to find out which and why.",
             retryable: true,
         };
     }
@@ -580,7 +603,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_rate_limited",
-            message: "ACR is rate limiting the Workbench. Back off and retry later.",
+            message: NOT_RUN_COPY.rate_limited,
             retryable: true,
         };
     }
@@ -594,7 +617,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             ...upstreamFields,
             code: "acr_timeout",
             message:
-                "ACR accepted the investigation but did not finish it within its request budget.",
+                "Ask Dev accepted the investigation but did not finish it within its time budget.",
             retryable: true,
         };
     }
@@ -607,14 +630,14 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
             ...upstreamFields,
             code: "acr_investigation_failed",
             message:
-                "ACR ran the investigation and it failed inside the engine. Match the ACR request id below against ACR's logs for the reason.",
+                "Ask Dev ran the investigation and it failed before an answer. Quote the reference below to find out why.",
             retryable: upstream.retryable ?? false,
         };
     }
     return {
         ...upstreamFields,
         code: "acr_unreachable",
-        message: `ACR returned an unexpected status (${String(status)}).`,
+        message: "Ask Dev returned an unexpected response.",
         retryable: upstream.retryable ?? false,
     };
 }
@@ -649,7 +672,7 @@ export async function investigate(
     if (!requestValidation.valid) {
         throw new AcrRequestError({
             code: "acr_rejected_request",
-            message: "The Workbench built an investigation request that violates the contract.",
+            message: "This app built an investigation request in the wrong format.",
             details: requestValidation.errors,
             retryable: false,
         });
@@ -681,12 +704,11 @@ export async function investigate(
             subject: config.subject,
         });
     } catch (error) {
+        // The cause is the operator's, so it goes to the log, never to the page.
+        console.error("the server could not sign the ACR assertion", error);
         throw new AcrRequestError({
             code: "workbench_misconfigured",
-            message:
-                error instanceof Error
-                    ? `The server could not sign the ACR assertion: ${error.message}`
-                    : "The server could not sign the ACR assertion.",
+            message: "Ask Dev's server could not sign this request.",
             retryable: false,
         });
     }
@@ -727,13 +749,13 @@ export async function investigate(
         if (timeout.aborted) {
             throw new AcrRequestError({
                 code: "acr_timeout",
-                message: `ACR did not answer within the Workbench's ${String(config.timeoutMs)}ms budget (waited ${String(Date.now() - fetchStartedAt)}ms).`,
+                message: `Ask Dev did not answer within this app's ${String(config.timeoutMs)}ms budget (waited ${String(Date.now() - fetchStartedAt)}ms).`,
                 retryable: true,
             });
         }
         throw new AcrRequestError({
             code: "acr_unreachable",
-            message: "ACR could not be reached.",
+            message: "Ask Dev could not be reached.",
             retryable: true,
         });
     }
@@ -742,7 +764,7 @@ export async function investigate(
     if (exceedsResponseCap(text)) {
         throw new AcrRequestError({
             code: "acr_contract_violation",
-            message: "ACR returned a response larger than the Workbench accepts.",
+            message: "Ask Dev returned a response larger than this app accepts.",
             httpStatus: response.status,
             retryable: false,
         });
@@ -754,7 +776,7 @@ export async function investigate(
     } catch {
         throw new AcrRequestError({
             code: "acr_contract_violation",
-            message: "ACR returned a response that is not JSON.",
+            message: "Ask Dev returned a response this app could not read.",
             httpStatus: response.status,
             retryable: false,
         });
@@ -775,7 +797,7 @@ export async function investigate(
         });
         throw new AcrRequestError({
             code: "acr_contract_violation",
-            message: "ACR returned a result with a schema version the Workbench does not accept.",
+            message: "Ask Dev returned a result in a version this app does not accept.",
             httpStatus: response.status,
             retryable: false,
         });
@@ -784,7 +806,7 @@ export async function investigate(
     if (!validation.valid) {
         throw new AcrRequestError({
             code: "acr_contract_violation",
-            message: "ACR returned a result that does not satisfy the investigation contract.",
+            message: "Ask Dev returned a result that does not meet the required format.",
             httpStatus: response.status,
             details: validation.errors,
             retryable: false,

@@ -38,9 +38,7 @@ describe("AnswerPlanPanel", () => {
 
     it("shows the resolved question family in the summary", () => {
         render(<AnswerPlanPanel answerPlan={BASE_PLAN} />);
-        expect(screen.getByTestId("answer-plan-panel")).toHaveTextContent(
-            "discovered cohort ranking",
-        );
+        expect(screen.getByTestId("answer-plan-panel")).toHaveTextContent("Plan — A ranking");
     });
 
     it("shows the budget the plan was built against", () => {
@@ -69,7 +67,7 @@ describe("AnswerPlanPanel", () => {
         render(<AnswerPlanPanel answerPlan={plan} />);
         const narrowing = screen.getByTestId("answer-plan-narrowing");
         expect(narrowing).toHaveTextContent("Showing 8 of 12");
-        expect(narrowing).toHaveTextContent("canonical id lexical");
+        expect(narrowing).toHaveTextContent("before reading facts (in a fixed order)");
     });
 
     it("names the overrun axis when a step recorded one", () => {
@@ -86,6 +84,8 @@ describe("AnswerPlanPanel", () => {
             ],
         };
         render(<AnswerPlanPanel answerPlan={plan} />);
-        expect(screen.getByTestId("answer-plan-narrowing")).toHaveTextContent("items");
+        expect(screen.getByTestId("answer-plan-narrowing")).toHaveTextContent(
+            "after assembling the answer (by attention rank) — too many items",
+        );
     });
 });

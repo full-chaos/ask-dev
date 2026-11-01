@@ -79,7 +79,7 @@ lim = Limitations([])`}
         );
 
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
-        const deterministic = screen.getByRole("article", { name: "Deterministic answer" });
+        const deterministic = screen.getByRole("article", { name: "Answer" });
         expect(within(deterministic).getByText(result.deterministic_answer)).toBeInTheDocument();
 
         // And the invented headline appears NOWHERE — not in the fallback, not
@@ -115,7 +115,7 @@ lim = Limitations([])`}
         // OpenUI on its own would have dropped `bad` and rendered `prose`.
         // Nothing enriched may reach the screen.
         expect(screen.queryByRole("article", { name: "Enriched answer" })).toBeNull();
-        expect(screen.getByRole("article", { name: "Deterministic answer" })).toBeInTheDocument();
+        expect(screen.getByRole("article", { name: "Answer" })).toBeInTheDocument();
     });
 
     it("falls back on a Query(), and never executes it", () => {

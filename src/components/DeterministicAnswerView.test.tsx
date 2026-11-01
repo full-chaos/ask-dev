@@ -17,6 +17,18 @@ import { visibleText } from "@/test/visible-text";
  * the fresh question is itself still ambiguous. Fixed by rendering
  * `PriorSubjectReceiptDisclosure` directly in both branches.
  */
+describe("DeterministicAnswerView: its accessible name", () => {
+    it.each(["clarification", "complete"])("reads Answer on a %s result", (id) => {
+        const result = mockScenarios().find((scenario) => scenario.id === id)!.result;
+        render(<DeterministicAnswerView result={result} />);
+
+        expect(screen.getByRole("article", { name: "Answer" })).toHaveAttribute(
+            "data-state",
+            result.status,
+        );
+    });
+});
+
 describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clarification path", () => {
     function clarificationResultWithDroppedReceipt(): InvestigationResult {
         const base = structureMockScenarios().find((s) => s.id === "structure-kind")!.result;
@@ -39,13 +51,13 @@ describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clari
         const result = clarificationResultWithDroppedReceipt();
         expect(result.status).toBe("clarification_required");
 
-        render(<DeterministicAnswerView result={result} />);
+        const { container } = render(<DeterministicAnswerView result={result} />);
 
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
-        expect(screen.getByText("subr_0001")).toBeInTheDocument();
-        expect(screen.getByText("skipped stale graph epoch")).toBeInTheDocument();
+        expect(container.querySelector('[data-receipt-id="subr_0001"]')).not.toBeNull();
+        expect(screen.getByText("Not applied: the data has changed since")).toBeInTheDocument();
         // The candidate list itself still comes from ClarificationPanel, not
         // a duplicated SubjectResolutionPanel (no `onChooseCandidate` here,
         // so ClarificationPanel's own read-only heading applies).
@@ -56,7 +68,7 @@ describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clari
         const base = structureMockScenarios().find((s) => s.id === "structure-kind")!.result;
         render(<DeterministicAnswerView result={base} />);
 
-        expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
+        expect(screen.queryByRole("heading", { name: "Earlier subject choices" })).toBeNull();
     });
 });
 
@@ -95,7 +107,7 @@ describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAO
         const result = mockScenarios().find((s) => s.id === "rows")!.result;
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const order = panelOrder(article);
         expect(order.answer).toBe(0);
         expect(order.firstFactRows).toBeGreaterThan(order.answer);
@@ -124,7 +136,7 @@ describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAO
         };
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const order = panelOrder(article);
         expect(order.answer).toBe(0);
         expect(order.cohort).toBeGreaterThan(order.answer);
@@ -156,7 +168,7 @@ describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAO
         };
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const sections = Array.from(article.querySelectorAll("section.panel"));
         const cohortIndex = sections.findIndex(
             (s) => s.getAttribute("data-testid") === "cohort-ranking-panel",
@@ -182,7 +194,7 @@ describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAO
         };
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const chipRowHeading = screen.getByRole("heading", {
             name: "Your selections were applied",
         });
@@ -212,7 +224,7 @@ describe("DeterministicAnswerView: answer leads into the charts (CHAOS-4581/CHAO
         };
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         // Scoped to the fact-rows panels by their own heading ids (CHAOS-4449):
         // `.fact-table-wrap` is a shared table style, and the cohort ranking
         // panel reuses it, so querying the class alone would make this assert
@@ -281,13 +293,13 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         expect(visibleText(limitations)).toContain(result.limitations[0]!);
 
         const coverage = screen.getByTestId("coverage-panel");
-        expect(visibleText(coverage)).toContain("Degraded reasons");
+        expect(visibleText(coverage)).toContain("What limits this answer");
         // The headline must not claim completeness while the only source is
         // `unavailable` -- acr's example is `partial: false`, so before the
         // sibling fix in CoveragePanel this panel said "Complete - every
         // source contributed." beside its own degraded-reason list.
-        expect(visibleText(coverage)).toContain("Partial — some sources did not contribute.");
-        expect(visibleText(coverage)).not.toContain("Complete — every source contributed.");
+        expect(visibleText(coverage)).toContain("Some sources did not contribute.");
+        expect(visibleText(coverage)).not.toContain("Every source contributed.");
         // The non-contributing source and its state ARE on screen, on the chip.
         expect(visibleText(coverage)).toContain("unavailable");
     });
@@ -324,14 +336,14 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         const result = unsupportedExample as unknown as InvestigationResult;
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const visible = visibleText(article);
         expect(visible).toContain("The service returned no direct judgment.");
-        expect(visible).toContain("Partial — some sources did not contribute.");
+        expect(visible).toContain("Some sources did not contribute.");
         expect(visible).toContain("unavailable");
         expect(visible).toContain(unsupportedExample.coverage.degraded_reasons[0]!);
         expect(visible).toContain(result.limitations[0]!);
-        expect(visible).not.toContain("Complete — every source contributed.");
+        expect(visible).not.toContain("Every source contributed.");
     });
 });
 
@@ -358,7 +370,7 @@ describe("DeterministicAnswerView: a refused continuation still shows the servic
         const result = refusedContinuation();
         render(<DeterministicAnswerView result={result} />);
 
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         expect(visibleText(article)).toContain(result.limitations[0]!);
         expect(screen.getByRole("heading", { name: "Limitations" })).toBeInTheDocument();
     });
@@ -369,16 +381,12 @@ describe("DeterministicAnswerView: a refused continuation still shows the servic
         delete withoutBasis.refusal_basis;
 
         const a = render(<DeterministicAnswerView result={withBasis} />);
-        const withText = visibleText(
-            a.container.querySelector('article[aria-label="Deterministic answer"]')!,
-        );
+        const withText = visibleText(a.container.querySelector('article[aria-label="Answer"]')!);
         a.unmount();
         const b = render(
             <DeterministicAnswerView result={withoutBasis as unknown as InvestigationResult} />,
         );
-        const withoutText = visibleText(
-            b.container.querySelector('article[aria-label="Deterministic answer"]')!,
-        );
+        const withoutText = visibleText(b.container.querySelector('article[aria-label="Answer"]')!);
         expect(withText).toBe(withoutText);
     });
 });
@@ -407,7 +415,7 @@ describe("DeterministicAnswerView: an organization-scope refusal shows what is a
 
     it("renders the sentence as visible text, including what IS supported", () => {
         render(<DeterministicAnswerView result={refusedOrganizationQuestion()} />);
-        const article = screen.getByRole("article", { name: "Deterministic answer" });
+        const article = screen.getByRole("article", { name: "Answer" });
         const text = visibleText(article);
         expect(text).toContain(SENTENCE);
         expect(text).toContain("organization-wide counts");

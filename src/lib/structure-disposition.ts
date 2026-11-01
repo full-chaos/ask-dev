@@ -34,7 +34,7 @@ function dispositionSentence(disposition: StructureDisposition, member: Structur
         case "applied":
             return `Your ${label} selection was applied.`;
         case "vetoed_unresolved":
-            return `Your ${label} selection could not be resolved (the prior result may be unloadable, or the receipt matched no offer) and was NOT applied. Fresh offers are shown below — try again.`;
+            return `Your ${label} selection could not be resolved (the earlier answer may be unreadable, or the choice matched no offer) and was NOT applied. Fresh offers are shown below — try again.`;
         case "vetoed_conflict":
             return `Your ${label} selection conflicted with another value in the same request and was NOT applied. Fresh offers are shown below — try again.`;
         case "vetoed_stale":

@@ -62,9 +62,9 @@ describe("CohortGroupsPanel", () => {
         render(<CohortGroupsPanel cohort={cohortWithGroups([GROUP_A, GROUP_B])} />);
         const panel = screen.getByTestId("cohort-groups-panel");
         expect(panel).toHaveTextContent("Team Alpha");
-        expect(panel).toHaveTextContent("complete");
+        expect(panel).toHaveTextContent("Team Alpha: read in full");
         expect(panel).toHaveTextContent("Team Beta");
-        expect(panel).toHaveTextContent("truncated");
+        expect(panel).toHaveTextContent("Team Beta: partly included");
     });
 
     it("shows the shown-vs-total count per group", () => {

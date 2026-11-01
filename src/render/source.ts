@@ -44,10 +44,13 @@ export type ChatProgress = {
         readonly stage: InvestigationStage;
         readonly state: "started" | "completed";
     }[];
-    readonly phase?: "running" | "recovering" | "observing" | "restoring";
+    /** `queued`: an item of a batch that has not started, because earlier items hold its place. */
+    readonly phase?: "queued" | "running" | "recovering" | "observing" | "restoring";
     /** ISO timestamp of when this run began: the elapsed line counts from it. */
     readonly startedAt?: string;
     readonly stop?: "idle" | "requested" | "canceling" | "not_leased";
+    /** This turn's place in a batch, 1-based. A `total` of 1 shows no line. */
+    readonly batch?: { readonly position: number; readonly total: number };
 };
 
 /** Why ACR refused a question before anything ran. Each reason has its own guidance. */
@@ -140,7 +143,12 @@ export type AssistantOutcome = PendingOutcome | AnsweredOutcome | FailedOutcome 
 export type ChatUserTurn = {
     readonly role: "user";
     readonly id: number;
-    readonly question: string;
+    /**
+     * `null`: ACR admitted this turn before it recorded questions (a host's restored turn). The
+     * render says so, offers no choice and no re-ask of the turn, and never sends it again. The
+     * standalone source always has the question.
+     */
+    readonly question: string | null;
     /** ISO timestamp, threaded into a later re-ask's `conversation` (see `buildConversationTurns`). */
     readonly createdAt: string;
     /**
@@ -430,6 +438,11 @@ export type ChatSource = {
      * The parallel confirm: one silent user turn holding `hiddenQuestion`, then one assistant turn
      * and one request per item, each settling on its own. `supersedes` is recorded as in
      * `AskIntent.supersedes`.
+     *
+     * A host may run the items in sequence (ACR allows 2 running per principal). It then publishes
+     * each item that waits as a pending turn with `phase: "queued"` and its `batch` place, so the
+     * composer holds and a batch never stalls silently. The render does not depend on the order: it
+     * draws each turn from its own outcome.
      */
     askBatch(
         items: readonly BatchItem[],

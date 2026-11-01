@@ -34,6 +34,18 @@ describe("the render entry (CHAOS-12381)", () => {
         expect(files).not.toContain("src/components/shell/AppHeader.tsx");
     });
 
+    it("names the files a host loads at run time: a type edge alone loads nothing", () => {
+        const root = tree({
+            [ENTRY]:
+                'import { a } from "../a";\nimport type { B } from "../b";\nexport const x = a;\n',
+            "src/a.ts": "export const a = 1;\n",
+            "src/b.ts": "export type B = string;\n",
+        });
+        const { files, runtimeFiles } = checkRenderGraph({ root, minFiles: 1 });
+        expect(files).toContain("src/b.ts");
+        expect(runtimeFiles).toEqual([ENTRY, "src/a.ts"].sort());
+    });
+
     it("package.json exports the entry and the stylesheet under the package name", async () => {
         const { readFileSync } = await import("node:fs");
         const manifest = JSON.parse(readFileSync(join(repositoryRoot, "package.json"), "utf8"));

@@ -9,13 +9,40 @@ const BASE_RESOLUTION: SubjectResolution = {
     committed: [{ kind: "repository", canonical_id: "repository:repo_atlas", label: "atlas" }],
 };
 
+describe("SubjectResolutionPanel words", () => {
+    it("words a candidate's state and kind, with no canonical id", () => {
+        const resolution: SubjectResolution = {
+            committed: [{ kind: "work_item", canonical_id: "work_item:1", label: "One" }],
+            candidates: [
+                {
+                    subject: { kind: "pull_request", canonical_id: "pull_request:2", label: "Two" },
+                    state: "committed",
+                    confidence: 0.5,
+                    match_reasons: [],
+                    evidence_ref_ids: [],
+                    receipt_id: "subr_0002",
+                },
+            ],
+        } as unknown as SubjectResolution;
+
+        const { container } = render(
+            <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />,
+        );
+
+        expect(screen.getByText("Settled on: One (work item)")).toBeInTheDocument();
+        expect(screen.getByText("Settled on")).toBeInTheDocument();
+        expect(container).toHaveTextContent("pull request · confidence 50%");
+        expect(container.textContent).not.toContain("pull_request:2");
+    });
+});
+
 describe("SubjectResolutionPanel", () => {
     it("renders no prior-receipt section when the result carries none", () => {
         render(
             <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
         );
 
-        expect(screen.queryByRole("heading", { name: "Prior-turn subject receipts" })).toBeNull();
+        expect(screen.queryByRole("heading", { name: "Earlier subject choices" })).toBeNull();
     });
 
     /**
@@ -43,18 +70,22 @@ describe("SubjectResolutionPanel", () => {
             ],
         };
 
-        render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
+        const { container } = render(
+            <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />,
+        );
 
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
-        expect(screen.getByText("subr_0001")).toBeInTheDocument();
-        expect(screen.getByText("result_prior_0001")).toBeInTheDocument();
-        expect(screen.getByText("applied")).toBeInTheDocument();
-        expect(screen.getByText("subr_0002")).toBeInTheDocument();
-        // The raw contract term is shown, not just a badge color
-        // (`@/lib/presentation.ts`'s own rule: the tone never hides the term).
-        expect(screen.getByText("skipped stale graph epoch")).toBeInTheDocument();
+        expect(container.querySelector('[data-receipt-id="subr_0001"]')).toHaveTextContent(
+            "Choice 1: Applied",
+        );
+        // The state in words, not just a badge color.
+        expect(container.querySelector('[data-receipt-id="subr_0002"]')).toHaveTextContent(
+            "Choice 2: Not applied: the data has changed since",
+        );
+        // A receipt or a result id is never read by a user.
+        expect(container.textContent).not.toMatch(/subr_|result_prior/u);
     });
 });
 
@@ -79,7 +110,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
             <SubjectResolutionPanel evidenceRefLabels={undefined} resolution={BASE_RESOLUTION} />,
         );
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
-        expect(screen.getByText(/Committed: atlas/)).toBeInTheDocument();
+        expect(screen.getByText(/Settled on: atlas/)).toBeInTheDocument();
     });
 
     it("still renders when the ONLY content is a prior-receipt disclosure", () => {
@@ -97,7 +128,7 @@ describe("SubjectResolutionPanel — CHAOS-4669 contentless suppression", () => 
         render(<SubjectResolutionPanel evidenceRefLabels={undefined} resolution={resolution} />);
         expect(screen.getByRole("heading", { name: "Subjects" })).toBeInTheDocument();
         expect(
-            screen.getByRole("heading", { name: "Prior-turn subject receipts" }),
+            screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
     });
 

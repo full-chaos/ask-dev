@@ -38,7 +38,7 @@ import {
 } from "../../lib/structure-selections";
 import { useCandidateSelections } from "../../lib/use-candidate-selections";
 import { useStructureSelections } from "../../lib/use-structure-selections";
-import { CTA_LABELS, TRANSCRIPT_COPY } from "../../render/chat-copy";
+import { CHAT_STATUS_COPY, CTA_LABELS, TRANSCRIPT_COPY } from "../../render/chat-copy";
 import {
     type AskIntent,
     type BatchItem,
@@ -181,6 +181,21 @@ const HISTORY_NOT_READ: ChatHistorySnapshot = {
 
 const NO_TURNS: readonly ChatTurn[] = [];
 
+/**
+ * The assistant turns under a user turn whose question was not recorded. A batch's turns share one
+ * user turn, so each reads the nearest one before it. Web's rule: such a question is never sent
+ * again, so its turn offers no choice and no re-ask, and its answer still renders.
+ */
+function turnsOfUnrecordedQuestions(turns: readonly ChatTurn[]): ReadonlySet<number> {
+    const ids = new Set<number>();
+    let recorded = true;
+    for (const turn of turns) {
+        if (turn.role === "user") recorded = turn.question !== null;
+        else if (!recorded) ids.add(turn.id);
+    }
+    return ids;
+}
+
 export function AskDevChat({ source }: AskDevChatProps = {}) {
     const [standaloneSource] = useState(() => createStandaloneSource());
     const chat = source ?? standaloneSource;
@@ -234,6 +249,7 @@ function ChatSurface({
     const threadNotShown = isNotShownThread(thread) ? thread : undefined;
     const turnsToShow = threadNotShown === undefined ? snapshot.turns : NO_TURNS;
     const turns = useMemo(() => turnsToShow.map(withheldTurn), [turnsToShow]);
+    const unrecorded = useMemo(() => turnsOfUnrecordedQuestions(turns), [turns]);
     const composerLock = composerLockOf(snapshot);
     // The first read of the list waits for the host's first history (see
     // `ChatHistorySource.load`). Here and not in `ChatHistory`: that component
@@ -698,7 +714,8 @@ function ChatSurface({
         composerLock === undefined &&
         latestAssistantTurn?.role === "assistant" &&
         latestAssistantTurn.outcome.kind === "answered" &&
-        latestAssistantTurn.id !== dismissedPopupTurnId
+        latestAssistantTurn.id !== dismissedPopupTurnId &&
+        !unrecorded.has(latestAssistantTurn.id)
             ? buildClarificationPages(
                   latestAssistantTurn.outcome.result,
                   structureSelections.batch,
@@ -805,7 +822,11 @@ function ChatSurface({
                                             type="button"
                                         >
                                             <span className="sr-only">Show the question </span>
-                                            {`“${turn.question}”`}
+                                            {turn.question === null ? (
+                                                <em>{CHAT_STATUS_COPY.questionNotRecorded}</em>
+                                            ) : (
+                                                `“${turn.question}”`
+                                            )}
                                             <span className="rail__item-meta">
                                                 {formatTurnTime(turn.createdAt)}
                                             </span>
@@ -920,7 +941,16 @@ function ChatSurface({
                                                 <p className="chat__meta chat__meta--user">
                                                     You · {formatTurnTime(turn.createdAt)}
                                                 </p>
-                                                <p className="chat__bubble">{turn.question}</p>
+                                                {turn.question === null ? (
+                                                    <p
+                                                        className="chat__bubble chat__bubble--not-recorded"
+                                                        data-testid="ask-dev-turn-question-not-recorded"
+                                                    >
+                                                        {CHAT_STATUS_COPY.questionNotRecorded}
+                                                    </p>
+                                                ) : (
+                                                    <p className="chat__bubble">{turn.question}</p>
+                                                )}
                                             </div>
                                         );
                                     }
@@ -931,6 +961,10 @@ function ChatSurface({
                                     const isLatest =
                                         composerLock === undefined &&
                                         turn.id === latestAssistantTurn?.id;
+                                    // Web's rule: a question that was not recorded
+                                    // cannot be sent again, so its turn reads like an
+                                    // earlier one: no choice and no re-ask.
+                                    const offersChoice = isLatest && !unrecorded.has(turn.id);
                                     // The turns BEFORE this assistant turn's own user
                                     // turn are what this follow-up derived its carry
                                     // from; say so when a subject could not ride along.
@@ -1033,7 +1067,7 @@ function ChatSurface({
                                                         // refusal is never retryable, yet is exactly
                                                         // when this fires. Through the same composer
                                                         // submit path as retry, for the same reason.
-                                                        isLatest &&
+                                                        offersChoice &&
                                                         turn.rootQuestion !== undefined &&
                                                         turn.outcome.failure
                                                             .narrowerContinuation !== undefined
@@ -1062,41 +1096,41 @@ function ChatSurface({
                                                 <DeterministicAnswerView
                                                     chosenSubject={turn.chosenSubject}
                                                     onConfirmCandidates={
-                                                        isLatest ? chooseCandidates : undefined
+                                                        offersChoice ? chooseCandidates : undefined
                                                     }
                                                     onConfirmStructure={
-                                                        isLatest ? chooseStructure : undefined
+                                                        offersChoice ? chooseStructure : undefined
                                                     }
                                                     onRejectStructure={
-                                                        isLatest
+                                                        offersChoice
                                                             ? structureSelections.reject
                                                             : undefined
                                                     }
                                                     onToggleCandidate={
-                                                        isLatest
+                                                        offersChoice
                                                             ? candidateSelections.toggle
                                                             : undefined
                                                     }
                                                     onToggleStructure={
-                                                        isLatest
+                                                        offersChoice
                                                             ? structureSelections.toggle
                                                             : undefined
                                                     }
                                                     onToggleStructureCandidate={
-                                                        isLatest
+                                                        offersChoice
                                                             ? structureCandidateSelections.toggle
                                                             : undefined
                                                     }
                                                     rankingWithheld={turn.outcome.rankingWithheld}
                                                     result={turn.outcome.result}
                                                     selectedCandidateReceiptIds={
-                                                        isLatest
+                                                        offersChoice
                                                             ? candidateSelections.batch
                                                             : (turn.submittedCandidateReceiptIds ??
                                                               EMPTY_CANDIDATE_SELECTION_BATCH)
                                                     }
                                                     selectedStructureCandidateReceiptIds={
-                                                        isLatest
+                                                        offersChoice
                                                             ? structureCandidateSelections.batch
                                                             : (turn.submittedStructureCandidateReceiptIds ??
                                                               EMPTY_CANDIDATE_SELECTION_BATCH)
@@ -1104,7 +1138,7 @@ function ChatSurface({
                                                     offersPresentation="popup"
                                                     pending={isPending}
                                                     structureBatch={
-                                                        isLatest
+                                                        offersChoice
                                                             ? structureSelections.batch
                                                             : turn.submittedStructureBatch
                                                     }

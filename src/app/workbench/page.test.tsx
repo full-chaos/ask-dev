@@ -69,7 +69,7 @@ describe("the clarification choice is reachable from every view", () => {
         respondWith({ result: answered });
         await ask("What is the status of dev-health-ops?");
 
-        expect(await screen.findByRole("article", { name: "Deterministic answer" })).toBeVisible();
+        expect(await screen.findByRole("article", { name: "Answer" })).toBeVisible();
         expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
     });
 });
@@ -208,7 +208,7 @@ describe("a failure is shown as a failure", () => {
         await ask("What is the status of dev-health-ops?");
 
         expect(await screen.findByRole("alert", { name: "No answer" })).toBeInTheDocument();
-        expect(screen.queryByRole("article", { name: "Deterministic answer" })).toBeNull();
+        expect(screen.queryByRole("article", { name: "Answer" })).toBeNull();
         expect(screen.queryByRole("tab", { name: "Canonical result" })).toBeNull();
     });
 });

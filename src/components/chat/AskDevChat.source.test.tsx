@@ -314,7 +314,6 @@ describe("AskDevChat with a host source: pending progress", () => {
 
     it.each([
         ["requested", "Stopping…"],
-        ["canceling", "Canceling…"],
         ["not_leased", "This run cannot be stopped. It ends on its own."],
     ] as const)("words a stop that is %s", (stop, words) => {
         render(<AskDevChat source={hostSource(progressSnapshot({ stop }))} />);

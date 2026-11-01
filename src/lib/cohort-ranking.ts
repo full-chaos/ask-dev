@@ -97,6 +97,23 @@ export function rowWindow(drivers: readonly CohortMemberDriver[]): CohortDriverW
         : "current";
 }
 
+/** The most driver rows ACR serves for one cohort member. */
+const MEMBER_DRIVER_MAX = 5;
+
+/**
+ * A member's data completeness in plain words, from its SERVED driver rows only: "3 of 5 drivers"
+ * (web's `memberDriversText`, CHAOS-12245: the completeness word is never shown). `null` when the
+ * member serves none. The enum is never mapped back to a number: partial is 3 or 4 drivers, so
+ * that would invent one.
+ */
+export function memberDriversText(member: {
+    readonly drivers?: readonly unknown[] | undefined;
+}): string | null {
+    const { drivers } = member;
+    if (drivers === undefined || drivers.length === 0) return null;
+    return `${String(drivers.length)} of ${String(MEMBER_DRIVER_MAX)} drivers`;
+}
+
 /**
  * The strongest `limit` drivers by `weight_contributed` descending, ties
  * broken by `signal` ascending so the order is stable across renders. This

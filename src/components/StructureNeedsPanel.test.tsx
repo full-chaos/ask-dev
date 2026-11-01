@@ -109,6 +109,15 @@ function Harness({
     );
 }
 
+/** A receipt stays on its record for a test; a user never reads it. */
+function expectReceiptsOnRecords(options: readonly { readonly receipt_id: string }[]) {
+    for (const option of options) {
+        const record = document.querySelector(`[data-receipt-id="${option.receipt_id}"]`);
+        expect(record).not.toBeNull();
+        expect(document.body.textContent).not.toContain(option.receipt_id);
+    }
+}
+
 describe("StructureNeedsPanel", () => {
     it("renders exactly the offers the result carries, in the result's own order", () => {
         render(
@@ -124,9 +133,7 @@ describe("StructureNeedsPanel", () => {
             .getAllByRole("button", { name: /^Select / })
             .map((button) => button.textContent);
         expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
-        for (const option of options) {
-            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
-        }
+        expectReceiptsOnRecords(options);
     });
 
     /**
@@ -152,9 +159,7 @@ describe("StructureNeedsPanel", () => {
             .getAllByRole("button", { name: /^Select / })
             .map((button) => button.textContent);
         expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
-        for (const option of options) {
-            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
-        }
+        expectReceiptsOnRecords(options);
 
         const first = options[0]!;
         await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
@@ -224,12 +229,12 @@ describe("StructureNeedsPanel", () => {
             screen.getByRole("button", { name: `Select ${phrased!.phrasing}` }),
         ).toBeInTheDocument();
         // ...but the structural label is still shown, for inspection.
-        expect(screen.getByText(`structural: ${phrased!.label}`)).toBeInTheDocument();
+        expect(screen.getByText(`Offered: ${phrased!.label}`)).toBeInTheDocument();
         // The unphrased sibling: no change from the pre-phrasing behavior.
         expect(
             screen.getByRole("button", { name: `Select ${unphrased!.label}` }),
         ).toBeInTheDocument();
-        expect(screen.queryByText(`structural: ${unphrased!.label}`)).toBeNull();
+        expect(screen.queryByText(`Offered: ${unphrased!.label}`)).toBeNull();
     });
 
     /**
@@ -287,7 +292,7 @@ describe("StructureNeedsPanel", () => {
             expect(
                 screen.getByRole("button", { name: `Select ${option.phrasing}` }),
             ).toBeInTheDocument();
-            expect(screen.getByText(`structural: ${option.label}`)).toBeInTheDocument();
+            expect(screen.getByText(`Offered: ${option.label}`)).toBeInTheDocument();
         }
     });
 
@@ -482,7 +487,7 @@ describe("StructureNeedsPanel", () => {
         // codex round 2: a rejected click must not look like nothing
         // happened — it is surfaced as a visible alert, not left as a
         // silently-disabled confirm button with no explanation.
-        expect(screen.getByRole("alert")).toHaveTextContent("This is a Workbench bug");
+        expect(screen.getByRole("alert")).toHaveTextContent("This is an Ask Dev bug");
         expect(
             screen.getByRole("button", { name: "Ask again with these selections" }),
         ).toBeDisabled();

@@ -28,10 +28,10 @@ test.describe("Context Fabric Workbench smoke", () => {
         // role="alert", so a bare getByRole("alert") is ambiguous.
         const failure = page.getByRole("alert", { name: "No answer" });
         await expect(failure).toBeVisible();
-        await expect(failure.getByText(/workbench_misconfigured/)).toBeVisible();
+        await expect(failure).toHaveAttribute("data-failure-code", "workbench_misconfigured");
 
         // The crucial negative: no answer surface appears.
-        await expect(page.getByRole("article", { name: "Deterministic answer" })).toHaveCount(0);
+        await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(0);
         await expect(page.getByRole("article", { name: "Canonical result inspector" })).toHaveCount(
             0,
         );

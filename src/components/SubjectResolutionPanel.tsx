@@ -2,7 +2,8 @@ import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
 import type { EvidenceRefLabels, SubjectResolution } from "../lib/contracts";
-import { candidateStateTone, formatConfidence, humanizeTerm } from "../lib/presentation";
+import { candidateStateTone, formatConfidence } from "../lib/presentation";
+import { CANDIDATE_STATE_WORDS, labelFor, subjectKindNoun } from "../render/answer-copy";
 
 export type SubjectResolutionPanelProps = {
     readonly resolution: SubjectResolution;
@@ -50,9 +51,9 @@ export function SubjectResolutionPanel({
             ) : null}
             <p className="record__meta">
                 {resolution.committed.length === 0
-                    ? "Nothing committed."
-                    : `Committed: ${resolution.committed
-                          .map((subject) => `${subject.label} (${subject.kind})`)
+                    ? "No subject settled on."
+                    : `Settled on: ${resolution.committed
+                          .map((subject) => `${subject.label} (${subjectKindNoun(subject.kind)})`)
                           .join(", ")}`}
             </p>
             {resolution.candidates.length === 0 ? (
@@ -64,14 +65,14 @@ export function SubjectResolutionPanel({
                             <div className="record__head">
                                 <span className="record__title">{candidate.subject.label}</span>
                                 <Badge
+                                    data-value={candidate.state}
                                     tone={candidateStateTone(candidate.state)}
-                                    title={candidate.state}
                                 >
-                                    {humanizeTerm(candidate.state)}
+                                    {labelFor(CANDIDATE_STATE_WORDS, candidate.state)}
                                 </Badge>
                                 <span className="record__meta">
-                                    {candidate.subject.kind} · {candidate.subject.canonical_id} ·
-                                    confidence {formatConfidence(candidate.confidence)}
+                                    {subjectKindNoun(candidate.subject.kind)} · confidence{" "}
+                                    {formatConfidence(candidate.confidence)}
                                 </span>
                             </div>
                             <ul className="stack stack--tight record__body">

@@ -9,7 +9,8 @@ import {
     degradingDetails as degradingDetailsOf,
     uncoveredLegacyReasons,
 } from "../lib/degraded-reasons";
-import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
+import { coverageStateTone, nonBlank } from "../lib/presentation";
+import { COVERAGE_COPY, coverageStateText, subjectKindNoun } from "../render/answer-copy";
 
 /**
  * The deterministic floor for a read-origin-state row whose contract-required
@@ -17,7 +18,7 @@ import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
  * nothing, never a state or a kind reconstructed from another field.
  */
 const GENERIC_READ_ORIGIN_STATE_SENTENCE =
-    "A read reported its origin state, but said nothing readable about it.";
+    "A read reported its state, but said nothing readable about it.";
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
@@ -46,7 +47,9 @@ const GENERIC_SOURCE_LABEL = "Source";
  * strike-three ruling: consumer phrasing tables cease to exist). The chip
  * text now renders the engine's own contract-carried `source.label`/
  * `.state_label` (a totality-tested display-label registry, not a
- * consumer-side guess); the degraded-reason sentences render the engine's
+ * consumer-side guess; CHAOS-12406: a documented `state` now reads in web's
+ * words, `COVERAGE_STATE_WORDS`, and `.state_label` stands only for a state no
+ * table knows); the degraded-reason sentences render the engine's
  * own `coverage.details[]` — synthesis-phrased (`.phrasing`) when the model
  * chose to phrase it, the deterministic `.label` floor otherwise (never
  * both blank — `.label` is contract-required on every detail).
@@ -139,8 +142,8 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                 {!hasSources
                     ? "No sources were recorded."
                     : coverage.partial || !everySourceContributed
-                      ? "Partial — some sources did not contribute."
-                      : "Complete — every source contributed."}
+                      ? "Some sources did not contribute."
+                      : "Every source contributed."}
             </p>
             {!hasSources ? null : (
                 <>
@@ -163,15 +166,13 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             // identifier — that stays in "Source details"
                             // below, inside the closed disclosure.
                             const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
-                            const stateText =
-                                nonBlank(source.state_label) ?? humanizeTerm(source.state);
                             return (
                                 <Badge
+                                    data-value={source.state}
                                     key={`${source.source}:${source.state}`}
                                     tone={coverageStateTone(source.state)}
-                                    title={`${name}: ${source.state}`}
                                 >
-                                    {name} · {stateText}
+                                    {name} · {coverageStateText(source)}
                                 </Badge>
                             );
                         })}
@@ -181,8 +182,6 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         <div className="coverage">
                             {coverage.sources.map((source) => {
                                 const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
-                                const stateText =
-                                    nonBlank(source.state_label) ?? humanizeTerm(source.state);
                                 return (
                                     <div
                                         className="coverage__source"
@@ -190,10 +189,10 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     >
                                         <span className="coverage__name">{name}</span>
                                         <Badge
+                                            data-value={source.state}
                                             tone={coverageStateTone(source.state)}
-                                            title={source.state}
                                         >
-                                            {stateText}
+                                            {coverageStateText(source)}
                                         </Badge>
                                         {source.observed_at !== undefined ? (
                                             <p className="coverage__reason">
@@ -232,7 +231,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         label, so a row reading `available` cannot be mistaken
                         for a statement about the source it belongs to. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Per-kind read states
+                        What each read found
                     </h3>
                     <ul className="stack stack--tight">
                         {readOriginStates.map((detail) => {
@@ -267,7 +266,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         degraded-reasons list: a cut kind census is its own
                         cause, with its own numbers, not a fold over sources. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Kind census
+                        Counts by kind
                     </h3>
                     <ul className="stack stack--tight">
                         {kindCensusTruncated.map((detail) => {
@@ -278,7 +277,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                 <li className="record" key={detail.detail_id}>
                                     <p className="record__body">
                                         {kind === undefined ? null : (
-                                            <strong>{humanizeTerm(kind)}: </strong>
+                                            <strong>{subjectKindNoun(kind)}: </strong>
                                         )}
                                         {facts ?? GENERIC_DEGRADED_REASON_SENTENCE}
                                     </p>
@@ -288,8 +287,8 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     {detail.declared === undefined ||
                                     detail.served === undefined ? null : (
                                         <p className="record__meta">
-                                            declared {detail.declared} (floor) · served{" "}
-                                            {detail.served}
+                                            at least {detail.declared} found · {detail.served}{" "}
+                                            included
                                         </p>
                                     )}
                                 </li>
@@ -304,7 +303,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         disclosure, and a response carrying both shapes must not
                         render "Degraded reasons" twice. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Degraded reasons
+                        {COVERAGE_COPY.limitsTitle}
                     </h3>
                     <ul className="stack stack--tight">
                         {genericDegradingDetails.map((detail) => {

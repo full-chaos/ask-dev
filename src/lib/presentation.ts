@@ -3,12 +3,12 @@
  *
  * These map contract vocabulary to a display tone. They never re-judge, never
  * derive a health state, and never gate anything — the workbench renders what
- * the service said (CHAOS-3738 boundary). The raw contract term is always shown
- * alongside the tone, so a reader can see the vocabulary, not just the color.
+ * the service said (CHAOS-3738 boundary). A state's product word
+ * (`@/render/answer-copy`) is always shown alongside the tone, so a reader never
+ * depends on the color alone.
  */
 import type {
     AnswerCompleteness,
-    CohortMemberDataCompleteness,
     CohortMemberOutcome,
     CoverageState,
     InvestigationStatus,
@@ -25,7 +25,7 @@ export type Tone = "ok" | "warn" | "bad" | "neutral";
  * open vocabulary (`x-documented-values`, "a client must tolerate values it
  * does not know"): every documented member is mapped, and a value acr adds
  * later reads `neutral` — the presentation layer does not guess a judgment
- * (North Star check 12), and the raw term is still shown beside the tone.
+ * (North Star check 12), and the state's word is still shown beside the tone.
  */
 export function coverageStateTone(state: CoverageState): Tone {
     switch (state) {
@@ -145,22 +145,6 @@ export function cohortOutcomeTone(outcome: CohortMemberOutcome): Tone {
 }
 
 /**
- * Tone for one ranked `CohortMember.data_completeness` (CHAOS-4449).
- * Exhaustive over the closed enum. This describes the EVIDENCE behind a row,
- * never the team's health.
- */
-export function cohortDataCompletenessTone(completeness: CohortMemberDataCompleteness): Tone {
-    switch (completeness) {
-        case "complete":
-            return "ok";
-        case "partial":
-            return "warn";
-        case "degraded":
-            return "bad";
-    }
-}
-
-/**
  * Tone for `completeness.state` (CHAOS-5640/CHAOS-5109) -- what the derived
  * requirement outcomes add up to, DISTINCT from `terminal_status`'s own tone
  * (`statusTone` above): the two vocabularies answer different questions and
@@ -207,8 +191,8 @@ export function planRequirementOutcomeTone(outcome: PlanRequirementOutcomeRow["o
 }
 
 /**
- * Renders a `snake_case` contract term for reading, without losing it: callers
- * show this next to (or as the title of) the raw term.
+ * Renders a `snake_case` served name for reading: a field, a column, a signal.
+ * A state has a product word in `@/render/answer-copy`, never this.
  */
 export function humanizeTerm(term: string): string {
     return term.replaceAll("_", " ");

@@ -123,9 +123,7 @@ export function WorkItemStatusPanel({ result }: WorkItemStatusPanelProps) {
                                     data-testid="work-item-status-row"
                                     key={`${key}-${index}`}
                                 >
-                                    <th scope="row" title={member.subject.canonical_id}>
-                                        {member.subject.label}
-                                    </th>
+                                    <th scope="row">{member.subject.label}</th>
                                     <td data-testid="work-item-status-value">
                                         <StatusCell facts={statusFacts} />
                                     </td>
