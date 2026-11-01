@@ -388,6 +388,15 @@ describe("the members' fold", () => {
         );
     });
 
+    it("draws nothing for refs that are not a list: a restored answer is not validated", () => {
+        const member = { ...base.cohort!.members[0]!, evidence_ref_ids: "evidence_probe" };
+        draw({
+            ...base,
+            cohort: { ...base.cohort!, members: [member] },
+        } as unknown as InvestigationResult);
+        expect(screen.queryByTestId("cohort-member-evidence")).toBeNull();
+    });
+
     it("keeps the fold for evidence alone: a restored member has no reasons", () => {
         const member = {
             ...base.cohort!.members[0]!,
@@ -414,6 +423,9 @@ describe("the members' fold", () => {
         } as CohortMember;
         draw({ ...base, cohort: { ...base.cohort!, kind: "work_item", members: [member] } });
         expect(screen.queryByTestId("cohort-member-evidence")).toBeNull();
+        expect(
+            within(screen.getByTestId("work-item-status-row")).getByText("Evidence"),
+        ).toBeVisible();
     });
 
     it("does not repeat the rationale or the exclusions in the fold", () => {

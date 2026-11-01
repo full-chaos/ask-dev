@@ -125,7 +125,10 @@ export function CohortMeaningDetails({
     );
     const members = cohort.members.filter((member) => Array.isArray(member.inclusion_reasons));
     const cited = cohort.members.filter(
-        (member) => (member.evidence_ref_ids?.length ?? 0) > 0 && !evidenceElsewhere?.has(member),
+        (member) =>
+            Array.isArray(member.evidence_ref_ids) &&
+            member.evidence_ref_ids.length > 0 &&
+            !evidenceElsewhere?.has(member),
     );
     const rationale =
         ranked && typeof cohort.rationale === "string" ? nonBlank(cohort.rationale) : undefined;
