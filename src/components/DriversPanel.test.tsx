@@ -71,16 +71,18 @@ describe("DriversPanel — narrated driver judgments", () => {
         );
     });
 
-    it("cites the claimed facts a judgment rests on, verbatim", () => {
+    it("names the claimed facts a judgment rests on, never their raw ids", () => {
         const [driver] = cohortDrivers;
         const claimId = driver!.claimed_fact_ids![0]!;
+        // The cited claim really is one the result carries.
+        const fact = result.claimed_facts.find((claim) => claim.claim_id === claimId)!;
 
         render(<DriversPanel result={result} />);
         const record = screen.getByText(driver!.title).closest("li")!;
-        expect(within(record).getByText(claimId)).toBeInTheDocument();
-        // The cited claim really is one the result carries — a citation to a
-        // claim that is not in the payload would be a dangling reference.
-        expect(result.claimed_facts.some((fact) => fact.claim_id === claimId)).toBe(true);
+        expect(within(record).getByTestId("driver-claimed-fact")).toHaveTextContent(
+            fact.field.replaceAll("_", " "),
+        );
+        expect(within(record).queryByText(claimId)).toBeNull();
     });
 });
 
