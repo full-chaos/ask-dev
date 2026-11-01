@@ -22,6 +22,7 @@ import type {
     ClaimedFact,
     ClaimedFactRow,
     Cohort,
+    CohortMember,
     InvestigationResult,
     RenderShape,
     ScalarValue,
@@ -228,6 +229,65 @@ function everyLabelIsADate(shape: RenderShape): boolean {
     return true;
 }
 
+/**
+ * Every axis position in the shape.
+ *
+ * Deliberately derived from the SERIES rather than assumed: a series with no point at a label has a
+ * real gap there (acr never emits a zero for an unmeasured member or family), so the axis is the
+ * union of what the series actually carry, in the order acr sent them.
+ *
+ * Given the cohort, a label that cites a member takes that member's served `attention_rank`
+ * (CHAOS-11986 problem 4). First-seen order alone moves a member down the axis when the first driver
+ * family has no point for it. A label with no served rank keeps its place after the ranked ones. A
+ * time axis cites no member, so it stays in the order acr proved.
+ */
+export function axisLabels(shape: RenderShape, cohort?: Cohort): readonly string[] {
+    const ranks = new Map(
+        (cohort?.members ?? []).map((member) => [
+            member.subject.canonical_id,
+            member.attention_rank,
+        ]),
+    );
+    const rankOfLabel = new Map<string, number>();
+    for (const series of shape.series) {
+        for (const point of series.points) {
+            if (rankOfLabel.has(point.label)) continue;
+            const rank = ranks.get(point.source.subject_canonical_id ?? "");
+            rankOfLabel.set(point.label, rank ?? Number.MAX_SAFE_INTEGER);
+        }
+    }
+    return [...rankOfLabel.keys()].sort(
+        (left, right) => rankOfLabel.get(left)! - rankOfLabel.get(right)!,
+    );
+}
+
+/**
+ * True when a score bar stands on a ranking row: the member was ranked, has an outcome, and has at
+ * least one driver to explain the score (check 8: never a bare score). The table withholds a score
+ * with no driver, so the chart must not draw it (CHAOS-11986 problem 2). The score itself is
+ * `resolvePointSource`'s check. ACR's validator refuses a score with no driver, so this guards an
+ * answer ACR would never serve: a restored one, which is not validated.
+ */
+function standsOnRankingRow(member: CohortMember | undefined): boolean {
+    return (
+        member?.ranking_computed === true &&
+        member.outcome !== undefined &&
+        (member.drivers?.length ?? 0) > 0
+    );
+}
+
+function everyScoreStandsOnARankingRow(shape: RenderShape, cohort: Cohort | undefined): boolean {
+    return shape.series.every((series) =>
+        series.points.every((point) =>
+            standsOnRankingRow(
+                cohort?.members.find(
+                    (member) => member.subject.canonical_id === point.source.subject_canonical_id,
+                ),
+            ),
+        ),
+    );
+}
+
 function resolvePointSource(
     source: RenderShape["series"][number]["points"][number]["source"],
     cohort: Cohort | undefined,
@@ -296,6 +356,9 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // response to one arriving is "withheld", not a blank space. When a
     // renderer lands, its kind joins this list in the same change.
     if (shape.kind !== "series") return false;
+    // The renderer's own "nothing to draw": with no point there is no chart, so the shape cannot be
+    // admitted as drawn.
+    if (axisLabels(shape).length === 0) return false;
     // A time axis is drawn by elapsed time only on a line; every other
     // presentation routes through category (index) spacing, which would place
     // a January and a December point one band apart. acr only ever emits
@@ -324,6 +387,12 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // so a document that violates it is malformed, and quietly reordering
     // would hide a producer bug exactly the way drawing it hides a data one.
     if (shape.axis_kind === "time" && !everySeriesAscendsInTime(shape)) return false;
+    if (
+        shape.selected_by === "cohort_attention_score" &&
+        !everyScoreStandsOnARankingRow(shape, result.cohort)
+    ) {
+        return false;
+    }
 
     if (hasDuplicate(shape.series.map((series) => series.key))) return false;
     for (const series of shape.series) {
@@ -419,7 +488,7 @@ export function trendShapesForClaim(result: InvestigationResult, claimId: string
 }
 
 /** True when ANY point of `shape` cites `claimId` — candidacy, not ownership. */
-function shapeMentionsClaim(shape: RenderShape, claimId: string): boolean {
+export function shapeMentionsClaim(shape: RenderShape, claimId: string): boolean {
     return shape.series.some((series) =>
         series.points.some((point) => point.source.claim_id === claimId),
     );

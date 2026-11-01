@@ -20,6 +20,7 @@ import { FactRowsPanels } from "./FactRowsPanel";
 import { FindingsPanel } from "./FindingsPanel";
 import { LimitationsPanel } from "./LimitationsPanel";
 import { SemanticReadingNotice } from "./SemanticReadingNotice";
+import { ShapesNotDrawn } from "./ShapesNotDrawn";
 import { PriorSubjectReceiptDisclosure } from "./PriorSubjectReceiptDisclosure";
 import { OtherPathsPanel } from "./RelationshipPaths";
 import { StructureConfirmationNotice } from "./StructureConfirmationNotice";
@@ -498,6 +499,7 @@ function AnswerView({
                 </>
             )}
             <OtherPathsPanel result={result} />
+            <ShapesNotDrawn result={result} />
             {
                 // Everything below here is the COLLAPSED EVIDENCE tier
                 // (CHAOS-4669): coverage/completeness/limitations as a

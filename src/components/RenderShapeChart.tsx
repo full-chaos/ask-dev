@@ -1,7 +1,11 @@
-import type { RenderShape } from "../lib/contracts";
+import type { Cohort, RenderShape } from "../lib/contracts";
+import { parseIsoDate } from "../lib/fact-rows";
+import { axisLabels } from "../lib/render-shapes";
 
 export type RenderShapeChartProps = {
     readonly shape: RenderShape;
+    /** The cohort a cohort chart plots: its axis follows the served rank (`axisLabels`). */
+    readonly cohort?: Cohort;
 };
 
 const WIDTH = 640;
@@ -80,27 +84,6 @@ function labelIndices(count: number, maxLabels: number): Set<number> {
     const indices = new Set<number>();
     for (let i = 0; i < maxLabels; i++) indices.add(Math.round(i * step));
     return indices;
-}
-
-/**
- * Every axis position in the shape, in the order acr sent them.
- *
- * Deliberately derived from the SERIES rather than assumed: a series with no
- * point at a label has a real gap there (acr never emits a zero for an
- * unmeasured member or family), so the axis is the union of what the series
- * actually carry, first-seen order preserved.
- */
-function axisLabels(shape: RenderShape): string[] {
-    const seen = new Set<string>();
-    const order: string[] = [];
-    for (const series of shape.series) {
-        for (const point of series.points) {
-            if (seen.has(point.label)) continue;
-            seen.add(point.label);
-            order.push(point.label);
-        }
-    }
-    return order;
 }
 
 function valueAt(shape: RenderShape, seriesIndex: number, label: string): number | undefined {
@@ -375,13 +358,13 @@ function TimeLines({
     readonly shape: RenderShape;
     readonly labels: readonly string[];
 }) {
-    const times = labels.map((label) => Date.parse(label));
+    const times = labels.map((label) => parseIsoDate(label) ?? Number.NaN);
     const usable = times.every((time) => !Number.isNaN(time));
     const minTime = usable ? Math.min(...times) : 0;
     const span = usable ? Math.max(...times) - minTime || 1 : 1;
-    const xFor = (label: string, index: number) =>
+    const xFor = (index: number) =>
         usable
-            ? MARGIN.left + ((Date.parse(label) - minTime) / span) * PLOT_WIDTH
+            ? MARGIN.left + ((times[index]! - minTime) / span) * PLOT_WIDTH
             : MARGIN.left + (PLOT_WIDTH / Math.max(labels.length - 1, 1)) * index;
 
     const values = shape.series.flatMap((series) => series.points.map((point) => point.value));
@@ -418,7 +401,7 @@ function TimeLines({
                         const value = valueAt(shape, seriesIndex, label);
                         return value === undefined
                             ? null
-                            : { x: xFor(label, index), y: yFor(value), value, label, index };
+                            : { x: xFor(index), y: yFor(value), value, label, index };
                     })
                     .filter((point): point is NonNullable<typeof point> => point !== null);
                 // A line never bridges a gap it does not cover: a break in
@@ -481,7 +464,7 @@ function TimeLines({
                         className="fact-chart__axis-label"
                         key={label}
                         textAnchor="middle"
-                        x={xFor(label, index)}
+                        x={xFor(index)}
                         y={HEIGHT - 10}
                     >
                         <title>{label}</title>
@@ -512,9 +495,9 @@ function TimeLines({
  * component has never seen is how a chart starts claiming something the
  * answer does not.
  */
-export function RenderShapeChart({ shape }: RenderShapeChartProps) {
+export function RenderShapeChart({ shape, cohort }: RenderShapeChartProps) {
     if (shape.kind !== "series") return null;
-    const labels = axisLabels(shape);
+    const labels = axisLabels(shape, cohort);
     if (labels.length === 0) return null;
     return (
         <figure className="render-shape">
