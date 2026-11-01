@@ -9,6 +9,7 @@
 // A tool failure is its own named state (`status=error`, its own annotation title): never drift, and
 // never "current". A fetch failure retries MAX_ATTEMPTS-1 more times (a transient network error should
 // not page anyone); a broken manifest (ManifestError) is exit 2 at once, since a retry cannot fix it.
+// Any failure that is not a broken input (EIO on the manifest, a failed git read) is a tool failure and is retried.
 // A git READ that fails is a tool failure (retried), never "path missing" and never drift.
 // Removing the temp dir is cleanup: a failed removal is a warning and never changes the result.
 // Env: ACR_REMOTE, ACR_MANIFEST, GITHUB_OUTPUT (status/pin/head are appended when set), and
@@ -40,16 +41,26 @@ function git(cwd, args) {
     });
 }
 
+// Only a truly broken input is a ManifestError: file absent, invalid JSON, bad shape. Any other read
+// error (EIO, EMFILE, ...) is a tool failure and is retried by withRetries.
 function readManifest(manifestPath) {
+    let text;
     try {
-        return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+        text = fs.readFileSync(manifestPath, "utf8");
     } catch (error) {
-        throw new ManifestError(`manifest unreadable: ${firstLine(error)}`);
+        if (error?.code === "ENOENT")
+            throw new ManifestError(`manifest absent: ${firstLine(error)}`);
+        throw error;
+    }
+    try {
+        return JSON.parse(text);
+    } catch (error) {
+        throw new ManifestError(`manifest is not valid JSON: ${firstLine(error)}`);
     }
 }
 
-export function readPin(manifestPath) {
-    const sha = readManifest(manifestPath)?.source_commit;
+function pinOf(manifest) {
+    const sha = manifest?.source_commit;
     if (typeof sha !== "string" || !SHA_RE.test(sha)) {
         throw new ManifestError(`manifest source_commit is not a 40-char SHA: ${String(sha)}`);
     }
@@ -57,8 +68,8 @@ export function readPin(manifestPath) {
 }
 
 // Manifest path -> acr source path (inverse of artifactPath in sync-acr-contracts.mjs).
-export function sourcePathsFromManifest(manifestPath) {
-    const files = readManifest(manifestPath)?.files;
+function pathsOf(manifest) {
+    const files = manifest?.files;
     if (!Array.isArray(files) || files.length === 0)
         throw new ManifestError("manifest lists no files");
     return files.map((entry) => {
@@ -72,6 +83,31 @@ export function sourcePathsFromManifest(manifestPath) {
     });
 }
 
+export const readPin = (manifestPath) => pinOf(readManifest(manifestPath));
+export const sourcePathsFromManifest = (manifestPath) => pathsOf(readManifest(manifestPath));
+
+// The one retry loop (manifest read and measurement). A ManifestError is rethrown at once. Any other
+// error is retried up to maxAttempts; the last error carries `attempts`, the number really made.
+function withRetries(fn, { sleep = sleepSync, maxAttempts = MAX_ATTEMPTS } = {}) {
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return fn();
+        } catch (error) {
+            if (error instanceof ManifestError) throw error;
+            lastError = error instanceof Error ? error : new Error(String(error));
+            lastError.attempts = attempt;
+            if (attempt < maxAttempts) {
+                process.stderr.write(
+                    `attempt ${attempt}/${maxAttempts} failed, retrying: ${oneLine(firstLine(error))}\n`,
+                );
+                sleep(BACKOFF_MS[attempt - 1] ?? BACKOFF_MS.at(-1));
+            }
+        }
+    }
+    throw lastError;
+}
+
 // One measurement in its own temp dir. Cleanup never replaces its result or its error.
 function measureOnce({ remote, branch, pin, paths }) {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "acr-pin-drift-"));
@@ -83,12 +119,13 @@ function measureOnce({ remote, branch, pin, paths }) {
         if (head !== pin) git(tmp, ["fetch", "-q", "--depth", "1", remote, pin]);
         // Compare BLOB ids per path, not `git diff`: a mode-only change is not a content change, and a
         // path that exists at neither commit is a broken manifest, never a silent green.
-        // `ls-tree` exits 0 with empty output when the path is absent; a non-zero exit is a git failure
-        // and throws (retryable). It is never turned into "missing", or one failed side would read as drift.
+        // `ls-tree -z` exits 0 with empty output when the path is absent; a non-zero exit is a git
+        // failure and throws (retryable). It is never turned into "missing", or one failed side would
+        // read as drift. -z (NUL-terminated, unquoted) so a path git would C-quote still compares raw.
         const blob = (rev, file) => {
-            const line = git(tmp, ["ls-tree", rev, "--", file]).split("\n")[0];
-            if (line === "") return null;
-            const m = /^(\d+) (\w+) ([0-9a-f]{40})\t(.*)$/.exec(line);
+            const entry = git(tmp, ["ls-tree", "-z", rev, "--", file]).split("\0")[0];
+            if (entry === "") return null;
+            const m = /^(\d+) (\w+) ([0-9a-f]{40})\t([^]*)$/.exec(entry);
             if (!m) throw new Error(`unexpected ls-tree output for ${rev}:${file}`);
             // Only a real file counts: a directory/tree entry is never a vendored artifact.
             return m[2] === "blob" && m[4] === file ? m[3] : null;
@@ -129,23 +166,7 @@ export function checkDrift({
 }) {
     if (!Array.isArray(paths) || paths.length === 0)
         throw new ManifestError("no vendored paths to compare");
-    let lastError;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            return measureOnce({ remote, branch, pin, paths });
-        } catch (error) {
-            if (error instanceof ManifestError) throw error;
-            lastError = error instanceof Error ? error : new Error(String(error));
-            lastError.attempts = attempt;
-            if (attempt < maxAttempts) {
-                process.stderr.write(
-                    `attempt ${attempt}/${maxAttempts} failed, retrying: ${oneLine(firstLine(error))}\n`,
-                );
-                sleep(BACKOFF_MS[attempt - 1] ?? BACKOFF_MS.at(-1));
-            }
-        }
-    }
-    throw lastError;
+    return withRetries(() => measureOnce({ remote, branch, pin, paths }), { sleep, maxAttempts });
 }
 
 // Text from outside (manifest, remote, git) is printed on ONE line, so it cannot start a `::` command.
@@ -185,13 +206,9 @@ export function main(env = process.env, deps = {}) {
     const level = env.ACR_PIN_ENFORCE === "false" ? "warning" : "error";
     let pin = "";
     try {
-        pin = readPin(manifest);
-        const result = checkDrift({
-            remote,
-            pin,
-            paths: sourcePathsFromManifest(manifest),
-            ...deps,
-        });
+        const parsed = withRetries(() => readManifest(manifest), deps);
+        pin = pinOf(parsed);
+        const result = checkDrift({ remote, pin, paths: pathsOf(parsed), ...deps });
         writeOutputs(env, { status: result.status, pin, head: result.head });
         if (result.status === "current") {
             process.stdout.write(

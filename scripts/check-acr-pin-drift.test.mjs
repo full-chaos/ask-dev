@@ -572,6 +572,84 @@ describe("git read failures and output hygiene", () => {
     });
 });
 
+describe("manifest read failures and raw paths", () => {
+    // Fail the first `times` reads of a manifest file with the given errno; every other read is real.
+    const failManifestReads = (code, times, fn) => {
+        const real = fs.readFileSync;
+        let failed = 0;
+        const spy = vi.spyOn(fs, "readFileSync").mockImplementation((p, ...rest) => {
+            if (String(p).endsWith(`${path.sep}manifest.json`) && failed < times) {
+                failed++;
+                throw Object.assign(new Error(`${code}: simulated manifest read failure`), {
+                    code,
+                });
+            }
+            return real(p, ...rest);
+        });
+        try {
+            return fn(() => failed);
+        } finally {
+            spy.mockRestore();
+        }
+    };
+
+    it("a first manifest read that throws EIO is retried once and gives the true result", () => {
+        const { repo, base } = fakeAcr();
+        const sleeps = [];
+        const r = failManifestReads("EIO", 1, () =>
+            runMain({ remote: repo, pin: base }, { sleep: (m) => sleeps.push(m) }),
+        );
+        expect(r.code).toBe(0);
+        expect(r.output).toContain("status=current");
+        expect(sleeps).toHaveLength(1);
+    });
+    it("a manifest read that keeps throwing EIO is a tool failure after the real attempts", () => {
+        const { repo, base } = fakeAcr();
+        const sleeps = [];
+        const r = failManifestReads("EIO", 99, () =>
+            runMain({ remote: repo, pin: base }, { sleep: (m) => sleeps.push(m) }),
+        );
+        expect(r.code).toBe(2);
+        expect(r.output).toContain("status=error");
+        expect(sleeps).toHaveLength(2);
+        expect(r.stderr).toContain("after 3 attempts");
+        expect(r.stderr).not.toContain("not retried");
+    });
+    it("an absent manifest (ENOENT) is a ManifestError and is not retried", () => {
+        const sleeps = [];
+        const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        let code;
+        let text;
+        try {
+            code = main(
+                {
+                    ACR_REMOTE: "/nonexistent/acr.git",
+                    ACR_MANIFEST: "/nonexistent/dir/manifest.json",
+                },
+                { sleep: (m) => sleeps.push(m) },
+            );
+            text = err.mock.calls.map((c) => String(c[0])).join("");
+        } finally {
+            err.mockRestore();
+        }
+        expect(code).toBe(2);
+        expect(sleeps).toHaveLength(0);
+        expect(text).toContain("broken manifest or pin; not retried");
+    });
+
+    it("a path with a newline or a non-ASCII byte is read raw (not C-quoted by git)", () => {
+        const odd = ["contracts/openapi/we\nird.json", "contracts/openapi/caf\u00e9.json"];
+        const { repo, base: first } = fakeAcr();
+        const pin = commit(repo, Object.fromEntries(odd.map((f) => [f, "1"])), "add odd paths");
+        expect(first).not.toBe(pin);
+        expect(checkDrift({ remote: repo, pin, paths: odd }).status).toBe("current");
+        commit(repo, { [odd[0]]: "2" }, "change the newline path");
+        const r = checkDrift({ remote: repo, pin, paths: odd });
+        expect(r.status).toBe("drift");
+        expect(r.changed).toEqual([odd[0]]);
+    });
+});
+
 describe("workflow contract", () => {
     const wf = fs.readFileSync(
         path.resolve(path.dirname(SCRIPT), "../.github/workflows/acr-pin-drift.yml"),
