@@ -174,6 +174,63 @@ describe("the guard names each break (a plant per rule)", () => {
         ).toEqual(["too_few_files"]);
     });
 
+    // The edges an import declaration does not show (from a void codex round on #116, reproduced).
+    it("require(), import = require(), a JSX import-source pragma and triple-slash references are edges", () => {
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": 'const fs = require("node:fs");\nexport const A = fs;\n',
+                }),
+            ),
+        ).toEqual(["server"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": 'import fs = require("node:fs");\nexport const A = fs;\n',
+                }),
+            ),
+        ).toEqual(["server"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": "/** @jsxImportSource next */\nexport const A = 1;\n",
+                }),
+            ),
+        ).toEqual(["framework"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": '/// <reference path="./app/page.tsx" />\nexport const A = 1;\n',
+                    "src/app/page.tsx": "export const P = 1;\n",
+                }),
+            ),
+        ).toEqual(["outside"]);
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": '/// <reference types="node" />\nexport const A = 1;\n',
+                }),
+            ),
+        ).toEqual(["server"]);
+    });
+
+    it("css: a stylesheet import in the render (a host imports ask-dev.css once, from the export)", () => {
+        expect(
+            rules(
+                tree({
+                    ...clean,
+                    "src/a.tsx": 'import "./a.css";\nexport const A = 1;\n',
+                    "src/a.css": ".a{}\n",
+                }),
+            ),
+        ).toEqual(["css"]);
+    });
+
     it("reads type-only imports and exports, side-effect imports and dynamic imports", () => {
         const found = importsOf(
             "x.ts",

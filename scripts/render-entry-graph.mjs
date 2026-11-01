@@ -12,7 +12,14 @@
  * - `workbench`: `@openuidev/react-lang` reached at run time (a type-only edge is erased by the
  *   compiler and loads nothing). It belongs to the Workbench, not to the render.
  * - `outside`: a reached file outside `src/`, or under `src/app/` (routes and server code).
+ * - `css`: a stylesheet import. The stylesheet is exported on its own (`./ask-dev.css`) and a host
+ *   imports it once; a component that imports CSS would put a stylesheet into the host's graph.
  * - `unresolved`: a relative import that names no file.
+ *
+ * Edges are read from import and export declarations (`export *` included), `import x =
+ * require()`, `require()` and `import()` calls, `import("x")` types, the `@jsxImportSource`
+ * pragma (an edge to its `jsx-runtime`), and triple-slash references (`path` to a file, `types`
+ * to a package; `types="node"` is a server break).
  *
  * A walk that cannot measure fails: a missing entry, or one that reaches fewer files than
  * `minFiles`, is a break too.
@@ -32,6 +39,21 @@ const WORKBENCH = new Set(["@openuidev/react-lang"]);
 export function importsOf(fileName, text) {
     const source = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true);
     const found = [];
+    // The JSX runtime a pragma names is imported by the compiler.
+    for (const match of text.matchAll(/@jsxImportSource\s+([^\s*]+)/gu)) {
+        found.push({ specifier: `${match[1]}/jsx-runtime`, typeOnly: false });
+    }
+    for (const reference of source.referencedFiles) {
+        found.push({
+            specifier: reference.fileName.startsWith(".")
+                ? reference.fileName
+                : `./${reference.fileName}`,
+            typeOnly: true,
+        });
+    }
+    for (const reference of source.typeReferenceDirectives) {
+        found.push({ specifier: reference.fileName, typeOnly: true, typesReference: true });
+    }
     const visit = (node) => {
         if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
             // Only `import type …` is erased whole. `import { type A } from "x"` can keep a bare
@@ -44,6 +66,23 @@ export function importsOf(fileName, text) {
             ts.isStringLiteral(node.moduleSpecifier)
         ) {
             found.push({ specifier: node.moduleSpecifier.text, typeOnly: node.isTypeOnly });
+        } else if (
+            ts.isImportEqualsDeclaration(node) &&
+            ts.isExternalModuleReference(node.moduleReference) &&
+            ts.isStringLiteral(node.moduleReference.expression)
+        ) {
+            found.push({
+                specifier: node.moduleReference.expression.text,
+                typeOnly: node.isTypeOnly,
+            });
+        } else if (
+            ts.isCallExpression(node) &&
+            ts.isIdentifier(node.expression) &&
+            node.expression.text === "require" &&
+            node.arguments.length === 1 &&
+            ts.isStringLiteralLike(node.arguments[0])
+        ) {
+            found.push({ specifier: node.arguments[0].text, typeOnly: false });
         } else if (
             ts.isCallExpression(node) &&
             node.expression.kind === ts.SyntaxKind.ImportKeyword &&
@@ -103,9 +142,21 @@ export function checkRenderGraph({ root, entry = "src/render/index.ts", minFiles
         if (!file.startsWith(src) || file.startsWith(app))
             breaks.push({ rule: "outside", file: name });
         if (file.endsWith(".json")) continue;
-        for (const { specifier, typeOnly } of importsOf(file, readFileSync(file, "utf8"))) {
+        for (const { specifier, typeOnly, typesReference } of importsOf(
+            file,
+            readFileSync(file, "utf8"),
+        )) {
             const reachesAtRuntime = live && !typeOnly;
-            if (specifier.endsWith(".css")) continue;
+            if (typesReference) {
+                if (specifier === "node" || NODE_BUILTINS.has(specifier)) {
+                    breaks.push({ rule: "server", file: name, specifier: `types:${specifier}` });
+                }
+                continue;
+            }
+            if (/\.(css|scss|sass|less)$/u.test(specifier)) {
+                breaks.push({ rule: "css", file: name, specifier });
+                continue;
+            }
             if (specifier.startsWith("@/")) {
                 breaks.push({ rule: "alias", file: name, specifier });
                 // Walk on, so that one alias does not hide the files behind it.
