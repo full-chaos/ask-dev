@@ -445,3 +445,26 @@ describe("the conversation key", () => {
         expect(composerBox()).toHaveValue("A draft");
     });
 });
+
+describe("AskDevChat: Stop on a conversation that cannot be shown", () => {
+    const stoppableIn = (thread: ChatThreadAccess): ChatSnapshot => ({
+        ...snapshotOf(),
+        stoppable: true,
+        thread,
+    });
+
+    it.each<ChatThreadAccess>([
+        { kind: "unavailable" },
+        { kind: "read_failed" },
+        { kind: "connect" },
+    ])("offers no Stop on $kind", (thread) => {
+        render(<AskDevChat source={hostSource(stoppableIn(thread), { stop: vi.fn() })} />);
+        expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    });
+
+    it("offers Stop on a loaded conversation", () => {
+        const thread: ChatThreadAccess = { kind: "loaded", earlier: "none" };
+        render(<AskDevChat source={hostSource(stoppableIn(thread), { stop: vi.fn() })} />);
+        expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    });
+});

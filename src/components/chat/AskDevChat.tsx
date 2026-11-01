@@ -1165,7 +1165,9 @@ function ChatSurface({
                                 pending={isPending}
                             />
                         )}
-                        {snapshot.stoppable && chat.stop !== undefined ? (
+                        {snapshot.stoppable &&
+                        chat.stop !== undefined &&
+                        threadNotShown === undefined ? (
                             <div className="chat__stop-row">
                                 <button
                                     className="chat__stop"

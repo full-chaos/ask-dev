@@ -253,6 +253,29 @@ describe("History: delete", () => {
         }
     });
 
+    it("moves focus to Cancel when the confirm opens, and back to Delete on Cancel", async () => {
+        const user = userEvent.setup();
+        setup({ rows: [rowA, rowB] });
+        const row = rowOf(THREAD_A);
+        await user.click(within(row).getByTestId("ask-dev-history-delete"));
+        expect(within(row).getByTestId("ask-dev-history-confirm-cancel")).toHaveFocus();
+
+        await user.click(within(row).getByTestId("ask-dev-history-confirm-cancel"));
+
+        expect(within(row).getByTestId("ask-dev-history-delete")).toHaveFocus();
+    });
+
+    it("keeps focus in the list when a delete is confirmed", async () => {
+        const user = userEvent.setup();
+        setup({ rows: [rowA, rowB] });
+        const row = rowOf(THREAD_A);
+        await user.click(within(row).getByTestId("ask-dev-history-delete"));
+
+        await user.click(within(row).getByTestId("ask-dev-history-confirm-delete"));
+
+        expect(screen.getByTestId("ask-dev-history")).toHaveFocus();
+    });
+
     it("disables Delete on the rows being deleted only", () => {
         setup({ rows: [rowA, rowB], deleting: [THREAD_A] });
         expect(within(rowOf(THREAD_A)).getByTestId("ask-dev-history-delete")).toBeDisabled();

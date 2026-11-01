@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {
     CTA_LABELS,
@@ -27,8 +27,26 @@ function HistoryRow({
     row,
     source,
     onOpen,
-}: Pick<ChatHistoryProps, "history" | "source" | "onOpen"> & { readonly row: ChatHistoryRow }) {
+    focusList,
+}: Pick<ChatHistoryProps, "history" | "source" | "onOpen"> & {
+    readonly row: ChatHistoryRow;
+    readonly focusList: () => void;
+}) {
     const [confirming, setConfirming] = useState(false);
+    // The confirm replaces the focused Delete button, and a confirmed delete
+    // removes the row: focus moves with them, so a keyboard user is not sent
+    // back to the top of the page. Cancel gets it first: a delete cannot be undone.
+    const deleteRef = useRef<HTMLButtonElement>(null);
+    const cancelRef = useRef<HTMLButtonElement>(null);
+    const backToDelete = useRef(false);
+    useEffect(() => {
+        if (confirming) {
+            cancelRef.current?.focus();
+        } else if (backToDelete.current) {
+            backToDelete.current = false;
+            deleteRef.current?.focus();
+        }
+    }, [confirming]);
     const current = row.id === history.currentId;
     const title = historyRowTitle(row);
     const currentMark = current ? (
@@ -82,6 +100,7 @@ function HistoryRow({
                         onClick={() => {
                             setConfirming(true);
                         }}
+                        ref={deleteRef}
                         title={CTA_LABELS.askDevDeleteConversation}
                         type="button"
                     >
@@ -115,6 +134,7 @@ function HistoryRow({
                             data-testid="ask-dev-history-confirm-delete"
                             onClick={() => {
                                 setConfirming(false);
+                                focusList();
                                 source.remove(row.id);
                             }}
                             type="button"
@@ -125,8 +145,10 @@ function HistoryRow({
                             className="rail__button"
                             data-testid="ask-dev-history-confirm-cancel"
                             onClick={() => {
+                                backToDelete.current = true;
                                 setConfirming(false);
                             }}
+                            ref={cancelRef}
                             type="button"
                         >
                             {CTA_LABELS.cancel}
@@ -150,8 +172,14 @@ function HistoryRow({
  * and test ids.
  */
 export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: ChatHistoryProps) {
+    const sectionRef = useRef<HTMLElement>(null);
     return (
-        <section className="rail__section" data-testid="ask-dev-history">
+        <section
+            className="rail__section"
+            data-testid="ask-dev-history"
+            ref={sectionRef}
+            tabIndex={-1}
+        >
             <div className="rail__history-head">
                 <h2 className="rail__label">{HISTORY_COPY.title}</h2>
                 {onNew === undefined ? null : (
@@ -200,6 +228,7 @@ export function ChatHistory({ history, source, onOpen, renderConnect, onNew }: C
                 <ul className="rail__list" data-testid="ask-dev-history-list">
                     {history.rows.map((row) => (
                         <HistoryRow
+                            focusList={() => sectionRef.current?.focus()}
                             history={history}
                             key={row.id}
                             onOpen={onOpen}

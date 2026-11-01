@@ -889,6 +889,11 @@
 
     /* The saved conversations (CHAOS-12387): `ChatHistory`, in this rail or,
        where the rail is hidden, in `.chat__history`. */
+    /* Takes focus only from script, after a confirmed delete (ChatHistory). */
+    .rail__section:focus {
+        outline: none;
+    }
+
     .rail__history-head {
         display: flex;
         align-items: center;
