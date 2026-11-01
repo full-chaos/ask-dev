@@ -4,7 +4,9 @@
  * dependency pinned to an ask-dev commit) and never copies or redraws it.
  *
  * `AskDevChat` takes an optional `source` (CHAOS-12382): a host passes its own `ChatSource`; with
- * none it runs on `createStandaloneSource()`.
+ * none it runs on `createStandaloneSource()`. What only a host offers (saved conversations,
+ * feedback, page context, a conversation's own states; CHAOS-12387) renders from that source and
+ * never in the standalone app.
  *
  * What this entry may reach is held by `render-entry.test.ts`: no `@/` import (a host resolves
  * `@/` against its own tree), no `next`, no `server-only`, no Node built-in, and no Workbench
@@ -19,22 +21,36 @@ export {
 } from "../components/DeterministicAnswerView";
 export { createStandaloneSource } from "./standalone-source";
 export {
+    composerLockOf,
+    FEEDBACK_QUESTIONS,
     INVESTIGATION_STAGES,
+    isNonAnswer,
     type AnsweredOutcome,
     type AskIntent,
     type AssistantOutcome,
     type BatchItem,
     type ChatAssistantTurn,
+    type ChatContextRef,
+    type ChatFeedbackEntry,
+    type ChatFeedbackSource,
+    type ChatHistoryRow,
+    type ChatHistorySnapshot,
+    type ChatHistorySource,
     type ChatProgress,
     type ChatSnapshot,
     type ChatSource,
     type ChatStatus,
+    type ChatThreadAccess,
     type ChatTurn,
     type ChatUserTurn,
+    type ComposerLock,
     type FailedOutcome,
+    type FeedbackQuestion,
+    type FeedbackValue,
     type InvestigationStage,
     type NotRunReason,
     type PendingOutcome,
+    type ScopeKind,
     type StatusOutcome,
     type StoppedReason,
     type SubmittedSelections,
@@ -44,8 +60,20 @@ export {
     CHAT_STAGE_COPY,
     CHAT_STATUS_COPY,
     chatStatusWords,
+    COMPOSER_COPY,
+    COMPOSER_LOCK_WORDS,
+    CONTEXT_CHIPS_COPY,
+    CTA_LABELS,
+    FEEDBACK_COPY,
     formatElapsed,
+    HISTORY_COPY,
+    historyRowLabel,
+    historyRowMeta,
+    historyRowTitle,
     NOT_RUN_COPY,
+    removeLabel,
     retryAfterText,
+    SCOPE_KIND_LABEL,
     STOPPED_COPY,
+    TRANSCRIPT_COPY,
 } from "./chat-copy";

@@ -2,8 +2,16 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
+import { COMPOSER_LOCK_WORDS } from "../../render/chat-copy";
+import type { ComposerLock } from "../../render/source";
+
 export type ChatComposerProps = {
     readonly pending: boolean;
+    /**
+     * Why the conversation takes no question now (CHAOS-12387): the composer says so, sends
+     * nothing, and keeps the draft. Absent: it takes a question.
+     */
+    readonly lock?: ComposerLock | undefined;
     /**
      * Returns whether the ask settled as an answer (`true`) or a failure
      * (`false`). The composer uses this ONLY to decide whether to clear the
@@ -58,20 +66,23 @@ export type ChatComposerHandle = {
  * escape hatch into that logic from outside — see its own doc comment.
  */
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-    { pending, onAsk, onDraftCleared },
+    { pending, lock, onAsk, onDraftCleared },
     ref,
 ) {
     const [question, setQuestion] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const wasPending = useRef(pending);
+    const locked = lock !== undefined;
 
     // Autosize: grows with content, capped by the stylesheet's max-height
-    // (which then scrolls) — never taller than that on its own.
+    // (which then scrolls) — never taller than that on its own. A hidden box
+    // (the history view holds the composer mounted) measures 0, and a height
+    // of 0 would outlast the hiding, so that measure is left alone.
     useEffect(() => {
         const el = textareaRef.current;
         if (el === null) return;
         el.style.height = "auto";
-        el.style.height = `${el.scrollHeight}px`;
+        if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
     }, [question]);
 
     // Focus the composer on first mount — the primary entry point of a
@@ -99,7 +110,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     // updates don't apply synchronously, so reading the state variable
     // right after `setQuestion(x)` would still see the OLD value.
     async function submitQuestion(trimmed: string) {
-        if (trimmed === "" || pending) return;
+        if (trimmed === "" || pending || locked) return;
         const answered = await onAsk(trimmed);
         // Draft preserved on error: a failed ask leaves the question in
         // the box, selected, so editing and resending never means
@@ -116,6 +127,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
 
     useImperativeHandle(ref, () => ({
         retry: (retryQuestion: string) => {
+            if (locked) return; // A lock takes nothing from the draft.
             setQuestion(retryQuestion);
             void submitQuestion(retryQuestion);
         },
@@ -143,7 +155,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                     ref={textareaRef}
                     rows={1}
                     autoComplete="off"
-                    disabled={pending}
+                    disabled={pending || locked}
                     value={question}
                     placeholder="Ask about a project, a repository, a team…"
                     onChange={(event) => setQuestion(event.target.value)}
@@ -157,7 +169,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                 <button
                     className="chat-composer__submit"
                     type="submit"
-                    disabled={pending || question.trim() === ""}
+                    disabled={pending || locked || question.trim() === ""}
                     aria-label="Send"
                 >
                     <svg
@@ -175,6 +187,14 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
                     <span className="sr-only">{pending ? "Asking…" : "Ask"}</span>
                 </button>
             </div>
+            {lock === undefined ? null : (
+                <p
+                    className="chat-composer__locked"
+                    data-testid={lock === "signed_out" ? undefined : "ask-dev-composer-locked"}
+                >
+                    {COMPOSER_LOCK_WORDS[lock]}
+                </p>
+            )}
             <p className="chat-composer__hint">
                 Every answer comes from a real ACR investigation — Ask Dev never renders a mock
                 result.
