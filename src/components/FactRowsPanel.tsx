@@ -133,6 +133,9 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // instance-unique, same pattern as every other panel touched here.
     const idPrefix = useId();
     const word = useVocabularyWord();
+    // A derived claim's field is free text, even when it matches a declared name (ACR's rule).
+    const fieldWord = ({ field, derived_from }: ClaimedFact): string =>
+        (derived_from?.length ?? 0) === 0 ? word("fact_field", field) : humanizeTerm(field);
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
     const rollups = rollupsOfClaims(allFacts, [
@@ -142,7 +145,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     return (
         <section role="group" aria-labelledby={titleId} className="panel panel--card">
             <h2 className="panel__title" id={titleId}>
-                {word("fact_kind", fact.kind)} · {humanizeTerm(fact.field)}
+                {word("fact_kind", fact.kind)} · {fieldWord(fact)}
             </h2>
             <p className="fact-panel__caption">
                 {fact.subject.label}
@@ -173,8 +176,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 // OTHER claims are referenced here, not re-plotted as their
                 // own duplicate chart group — see `groupFactsByTable`.
                 <p className="fact-panel__caption" data-testid="fact-also-referenced">
-                    Also referenced by{" "}
-                    {alsoClaims.map((claim) => humanizeTerm(claim.field)).join(", ")}.
+                    Also referenced by {alsoClaims.map(fieldWord).join(", ")}.
                 </p>
             ) : null}
             {tiles.length > 0 ? (
@@ -185,7 +187,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                     {tiles.map((tile) => (
                         <div className="tile" key={tile.label}>
                             <span className="tile__value">{String(tile.value ?? "—")}</span>
-                            <span className="tile__label">{humanizeTerm(tile.label)}</span>
+                            <span className="tile__label">{word("fact_field", tile.label)}</span>
                         </div>
                     ))}
                 </div>
