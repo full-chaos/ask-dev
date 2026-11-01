@@ -723,6 +723,22 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             expect(weights).toEqual([...weights].sort((a, b) => b - a));
         });
 
+        it("shows an odd restored value as it came, and does not throw", () => {
+            const odd = drivers.map((driver, index) =>
+                index === drivers.length - 1
+                    ? { ...driver, value: { unexpected: 1 }, weight_contributed: -1 }
+                    : driver,
+            );
+            const restored = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: odd }],
+            } as unknown as Cohort;
+            render(
+                <CohortRankingPanel cohort={restored} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(other()).toHaveTextContent('value {"unexpected":1}');
+        });
+
         it("draws no fold for a member with two drivers or fewer", () => {
             const two = {
                 ...ranked,

@@ -20,7 +20,7 @@ import {
 import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-import { cohortOutcomeTone } from "../lib/presentation";
+import { cohortOutcomeTone, rawText } from "../lib/presentation";
 import { CohortMeaningDetails, CohortMeaningLines } from "./CohortMeaningDetails";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -50,7 +50,8 @@ function DriverCell({ driver }: { readonly driver: CohortMemberDriver }) {
         <li className="ranking__driver">
             <span className="ranking__driver-signal">{word("ranking_signal", driver.signal)}</span>{" "}
             <span className="record__meta">
-                value {driver.value} · contributed {driver.weight_contributed} of {driver.weight}
+                value {rawText(driver.value)} · contributed {rawText(driver.weight_contributed)} of{" "}
+                {rawText(driver.weight)}
                 {thresholdLabel === undefined ? null : (
                     <> · {word("threshold_label", thresholdLabel)}</>
                 )}
