@@ -111,7 +111,7 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         for (const source of degradedCoverage.sources) {
             expect(details).toHaveTextContent(source.source);
             if (source.observed_at !== undefined) {
-                expect(details).toHaveTextContent(`observed at ${source.observed_at}`);
+                expect(details).toHaveTextContent(source.observed_at);
             }
         }
     });
@@ -1401,5 +1401,113 @@ describe("CoveragePanel — a per-kind row always names its kind and its state",
         );
         expect(validation.valid).toBe(false);
         expect(validation.errors.join("; ")).toMatch(/phrasing must be string/);
+    });
+});
+
+/**
+ * CHAOS-12421: the rail hides at a narrow width (a host's panel, a phone), and the window and the
+ * Observed date lived only there. The answer's own Coverage panel carries both at every width. The
+ * width itself is proven in a browser (tests/chat.spec.ts); these are the rules.
+ */
+describe("the evidence window and the Observed date do not need the rail", () => {
+    const BOUNDED = {
+        start: "2026-10-01T12:00:00Z",
+        end: "2026-10-30T12:00:00Z",
+        provenance: "question_stated",
+    } as const;
+    const withObserved = {
+        sources: [
+            {
+                source: "dev-health-ops:status",
+                state: "available",
+                label: "Status",
+                state_label: "available",
+                observed_at: "2026-10-30T12:00:00Z",
+            },
+            { source: "dev-health-ops:readiness", state: "no_data" },
+        ],
+        partial: false,
+        degraded_reasons: [],
+    } as unknown as typeof degradedCoverage;
+
+    const line = () => screen.getByTestId("coverage-evidence-window");
+
+    function dayOf(timestamp: string): string {
+        return new Date(timestamp).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+    }
+
+    it("shows a bounded window, always on screen", () => {
+        render(<CoveragePanel coverage={degradedCoverage} evidenceWindow={BOUNDED} />);
+        expect(visibleText(screen.getByTestId("coverage-panel"))).toContain("Evidence window");
+        expect(
+            isVisibleText(
+                screen.getByTestId("coverage-panel"),
+                `${dayOf(BOUNDED.start)} – ${dayOf(BOUNDED.end)}`,
+            ),
+        ).toBe(true);
+        expect(line()).toHaveTextContent("question stated");
+    });
+
+    it("shows a relative window, and a snapshot window by its as_of date", () => {
+        const { unmount } = render(
+            <CoveragePanel
+                coverage={degradedCoverage}
+                evidenceWindow={{ relative_id: "trailing_30d", provenance: "server_default" }}
+            />,
+        );
+        expect(line()).toHaveTextContent("trailing 30d");
+        unmount();
+        render(
+            <CoveragePanel
+                coverage={degradedCoverage}
+                evidenceWindow={{ as_of: BOUNDED.end, provenance: "server_default" }}
+            />,
+        );
+        expect(line()).toHaveTextContent(`As of ${dayOf(BOUNDED.end)}`);
+    });
+
+    it("says Not reported when the result has no window: missing never reads as complete", () => {
+        render(<CoveragePanel coverage={degradedCoverage} />);
+        expect(line()).toHaveTextContent("Not reported.");
+        expect(screen.queryByTestId("coverage-evidence-window-raw")).toBeNull();
+    });
+
+    it("shows the window on an answer that read no source", () => {
+        render(
+            <CoveragePanel
+                coverage={{ sources: [], partial: true, degraded_reasons: [] }}
+                evidenceWindow={BOUNDED}
+            />,
+        );
+        expect(screen.getByText("No sources were recorded.")).toBeInTheDocument();
+        expect(line()).toHaveTextContent(dayOf(BOUNDED.start));
+        expect(screen.getByTestId("coverage-evidence-window-raw")).toHaveTextContent(BOUNDED.start);
+    });
+
+    it("keeps the raw window values in a closed fold, not on screen", () => {
+        render(<CoveragePanel coverage={degradedCoverage} evidenceWindow={BOUNDED} />);
+        const panel = screen.getByTestId("coverage-panel");
+        const fold = screen.getByTestId("coverage-evidence-window-raw");
+        expect(fold).not.toHaveAttribute("open");
+        expect(fold).toHaveTextContent("question_stated");
+        expect(fold).toHaveTextContent(BOUNDED.start);
+        expect(visibleText(panel)).not.toContain("question_stated");
+    });
+
+    it("gives each source a readable Observed date in the fold, with the exact time beside it", () => {
+        render(<CoveragePanel coverage={withObserved} evidenceWindow={BOUNDED} />);
+        const details = screen.getByText("Source details").closest("details")!;
+        expect(details).toHaveTextContent(`Observed ${dayOf(BOUNDED.end)}`);
+        expect(details).toHaveTextContent(BOUNDED.end);
+    });
+
+    it("shows no Observed line for a source with no observed_at", () => {
+        render(<CoveragePanel coverage={withObserved} evidenceWindow={BOUNDED} />);
+        const details = screen.getByText("Source details").closest("details")!;
+        expect(details.textContent?.match(/Observed /gu)).toHaveLength(1);
     });
 });

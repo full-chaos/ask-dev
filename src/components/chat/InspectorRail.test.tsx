@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { InspectorRail } from "@/components/chat/InspectorRail";
+import { CoveragePanel } from "@/components/CoveragePanel";
 import { validateContract } from "@/lib/acr/validate";
 import type { InvestigationResult } from "@/lib/contracts";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
@@ -12,6 +13,28 @@ function resultWithWindow(window: unknown): InvestigationResult {
     const result = structuredClone(canonicalResult) as unknown as InvestigationResult;
     return { ...result, effective_evidence_window: window } as InvestigationResult;
 }
+
+/** CHAOS-12421: the rail and the Coverage panel read one window the same way. */
+describe("the rail and the Coverage panel agree", () => {
+    it.each([
+        [
+            {
+                start: "2026-10-01T12:00:00Z",
+                end: "2026-10-30T12:00:00Z",
+                provenance: "question_stated",
+            },
+        ],
+        [{ relative_id: "trailing_90d", provenance: "server_default" }],
+        [{ as_of: "2026-10-30T12:00:00Z", provenance: "server_default" }],
+    ])("for %j", (window) => {
+        const result = resultWithWindow(window);
+        render(<InspectorRail result={result} />);
+        render(<CoveragePanel coverage={result.coverage} evidenceWindow={window as never} />);
+        const shown = evidenceWindowSection().querySelector(".rail__value")?.textContent ?? "";
+        expect(shown).not.toBe("");
+        expect(screen.getByTestId("coverage-evidence-window")).toHaveTextContent(shown);
+    });
+});
 
 function evidenceWindowSection(): HTMLElement {
     const heading = screen.getByRole("heading", { name: "Evidence window" });

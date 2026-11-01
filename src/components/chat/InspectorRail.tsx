@@ -1,5 +1,6 @@
 import { Badge } from "../Badge";
 import type { InvestigationResult } from "../../lib/contracts";
+import { evidenceWindowRange, formatDay } from "../../lib/evidence-window";
 import { coverageStateTone, humanizeTerm, nonBlank } from "../../lib/presentation";
 
 export type InspectorRailProps = {
@@ -10,18 +11,12 @@ export type InspectorRailProps = {
 /** Same floor `CoveragePanel` uses for a source with no readable label. */
 const GENERIC_SOURCE_LABEL = "Source";
 
-function formatDay(timestamp: string): string {
-    const date = new Date(timestamp);
-    return Number.isNaN(date.getTime())
-        ? timestamp
-        : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 /**
  * Right rail: what the latest answer read and over which window. A summary
  * of fields the result already carries (`coverage.sources`,
  * `effective_evidence_window`), both kept by the ranking-withheld boundary;
- * the answer's own CoveragePanel stays the full account. Every source is
+ * the answer's own CoveragePanel stays the full account, and carries both at
+ * every width: this rail hides at a narrow one (CHAOS-12421). Every source is
  * listed with its own state, and an absent window reads "Not reported" —
  * missing is never shown as fresh or complete.
  */
@@ -38,15 +33,7 @@ export function InspectorRail({ result }: InspectorRailProps) {
     }
     const sources = result.coverage.sources;
     const window = result.effective_evidence_window;
-    const windowRange =
-        window?.start !== undefined && window.end !== undefined
-            ? `${formatDay(window.start)} – ${formatDay(window.end)}`
-            : window?.relative_id !== undefined
-              ? humanizeTerm(window.relative_id)
-              : // A current-state snapshot window (acr #1791) carries only `as_of`.
-                window?.as_of !== undefined
-                ? `As of ${formatDay(window.as_of)}`
-                : undefined;
+    const windowRange = evidenceWindowRange(window);
     return (
         <aside aria-label="Latest answer sources" className="ask__rail ask__rail--right">
             <section className="rail__section">
