@@ -1,11 +1,16 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import childProcess, { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
-import { checkDrift, main, sourcePathsFromManifest } from "./check-acr-pin-drift.mjs";
+import {
+    checkDrift,
+    main,
+    ManifestError,
+    sourcePathsFromManifest,
+} from "./check-acr-pin-drift.mjs";
 
 const SCRIPT = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
@@ -191,37 +196,38 @@ describe("cli exit codes", () => {
     });
 });
 
+const manifestFor = (pin, files = [{ path: "openapi/a.json" }]) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-"));
+    tmpDirs.push(dir);
+    const manifest = path.join(dir, "manifest.json");
+    fs.writeFileSync(manifest, JSON.stringify({ source_commit: pin, files }));
+    return { manifest, out: path.join(dir, "github-output.txt") };
+};
+// Runs main() with stdout/stderr captured; returns the code, the text and the GITHUB_OUTPUT file.
+const runMain = ({ remote, pin, files, enforce }, deps = {}) => {
+    const { manifest, out } = manifestFor(pin, files);
+    fs.writeFileSync(out, "");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const outw = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+        const env = { ACR_REMOTE: remote, ACR_MANIFEST: manifest, GITHUB_OUTPUT: out };
+        if (enforce !== undefined) env.ACR_PIN_ENFORCE = enforce;
+        const code = main(env, deps);
+        return {
+            code,
+            stderr: err.mock.calls.map((c) => String(c[0])).join(""),
+            stdout: outw.mock.calls.map((c) => String(c[0])).join(""),
+            output: fs.readFileSync(out, "utf8"),
+        };
+    } finally {
+        err.mockRestore();
+        outw.mockRestore();
+    }
+};
+
 // CHAOS-12443: outcome naming. Real local git remotes; the only injected faults are a failing
 // temp-dir removal and a sleep hook that heals the remote between attempts.
 describe("outcome", () => {
-    const manifestFor = (pin, files = [{ path: "openapi/a.json" }]) => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-"));
-        tmpDirs.push(dir);
-        const manifest = path.join(dir, "manifest.json");
-        fs.writeFileSync(manifest, JSON.stringify({ source_commit: pin, files }));
-        return { manifest, out: path.join(dir, "github-output.txt") };
-    };
-    // Runs main() with stdout/stderr captured; returns the code, the text and the GITHUB_OUTPUT file.
-    const runMain = ({ remote, pin, files, enforce }, deps = {}) => {
-        const { manifest, out } = manifestFor(pin, files);
-        fs.writeFileSync(out, "");
-        const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-        const outw = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
-        try {
-            const env = { ACR_REMOTE: remote, ACR_MANIFEST: manifest, GITHUB_OUTPUT: out };
-            if (enforce !== undefined) env.ACR_PIN_ENFORCE = enforce;
-            const code = main(env, deps);
-            return {
-                code,
-                stderr: err.mock.calls.map((c) => String(c[0])).join(""),
-                stdout: outw.mock.calls.map((c) => String(c[0])).join(""),
-                output: fs.readFileSync(out, "utf8"),
-            };
-        } finally {
-            err.mockRestore();
-            outw.mockRestore();
-        }
-    };
     // The real fault seen on runners (ENOTEMPTY from rmSync), injected where it happens: fs.rmSync.
     // The spy removes the dir for real first, so tests leave nothing behind, then throws.
     const withFailingRemove = (fn) => {
@@ -349,6 +355,220 @@ describe("outcome", () => {
         expect(tool.code).toBe(2);
         expect(tool.stderr).toContain("::warning title=ACR pin drift: tool failure, not drift::");
         expect(tool.stderr).not.toContain("::error");
+    });
+});
+
+describe("git read failures and output hygiene", () => {
+    // Fail the per-path git reads (`ls-tree`, or `cat-file` in older code) (the per-path blob read) for revs where `match(rev)` is true, for
+    // the first `times` calls. Every other git call is the real git.
+    const failReads = (match, times, fn) => {
+        const real = childProcess.execFileSync;
+        let failed = 0;
+        const spy = vi.spyOn(childProcess, "execFileSync").mockImplementation((cmd, args, o) => {
+            if (
+                cmd === "git" &&
+                (args.includes("ls-tree") || args.includes("cat-file")) &&
+                match(args) &&
+                failed < times
+            ) {
+                failed++;
+                throw new Error("fatal: simulated git read failure");
+            }
+            return real(cmd, args, o);
+        });
+        try {
+            return fn(() => failed);
+        } finally {
+            spy.mockRestore();
+        }
+    };
+    const quiet = () => vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const catchErr = (fn) => {
+        try {
+            fn();
+        } catch (e) {
+            return e;
+        }
+        return undefined;
+    };
+
+    it("a failed read on ONE side is retried and never reads as drift", () => {
+        const { repo, base } = fakeAcr();
+        const head = commit(repo, { "README.md": "y" }, "docs only"); // contracts identical: truly current
+        const err = quiet();
+        try {
+            const sleeps = [];
+            const r = failReads(
+                (a) => a.some((x) => String(x).startsWith(base)),
+                1,
+                () =>
+                    checkDrift({
+                        remote: repo,
+                        pin: base,
+                        paths: PATHS,
+                        sleep: (m) => sleeps.push(m),
+                    }),
+            );
+            expect(r.status).toBe("current");
+            expect(r.head).toBe(head);
+            expect(sleeps).toHaveLength(1);
+        } finally {
+            err.mockRestore();
+        }
+    });
+    it("a persistent failed read on one side exits 2, never drift", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "README.md": "y" }, "docs only");
+        const sleeps = [];
+        const r = failReads(
+            (a) => a.some((x) => String(x).startsWith(base)),
+            99,
+            () => runMain({ remote: repo, pin: base }, { sleep: (m) => sleeps.push(m) }),
+        );
+        expect(r.code).toBe(2);
+        expect(r.output).toContain("status=error");
+        expect(r.output).not.toContain("status=drift");
+        expect(sleeps).toHaveLength(2);
+        expect(r.stderr).toContain("after 3 attempts");
+    });
+    it("failed reads on BOTH sides are retried and are not a ManifestError", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/a.json": "2" }, "change");
+        const err = quiet();
+        try {
+            const sleeps = [];
+            const e = failReads(
+                () => true,
+                99,
+                () =>
+                    catchErr(() =>
+                        checkDrift({
+                            remote: repo,
+                            pin: base,
+                            paths: PATHS,
+                            sleep: (m) => sleeps.push(m),
+                        }),
+                    ),
+            );
+            expect(e).toBeInstanceOf(Error);
+            expect(e).not.toBeInstanceOf(ManifestError);
+            expect(sleeps).toHaveLength(2);
+        } finally {
+            err.mockRestore();
+        }
+    });
+    it("a missing path is still told apart from a failed read (neither side has it)", () => {
+        const { repo, base } = fakeAcr();
+        const sleeps = [];
+        const e = catchErr(() =>
+            checkDrift({
+                remote: repo,
+                pin: base,
+                paths: ["contracts/nope.json"],
+                sleep: (m) => sleeps.push(m),
+            }),
+        );
+        expect(e).toBeInstanceOf(ManifestError);
+        expect(sleeps).toHaveLength(0);
+    });
+    it("a path present only at acr main is drift, not a failure", () => {
+        const { repo, base } = fakeAcr();
+        commit(repo, { "contracts/openapi/new.json": "1" }, "add");
+        const r = checkDrift({ remote: repo, pin: base, paths: ["contracts/openapi/new.json"] });
+        expect(r.status).toBe("drift");
+    });
+
+    it("a manifest path holding a newline cannot forge a workflow command", () => {
+        const { repo, base } = fakeAcr();
+        const evil = "openapi/x\n::error title=forged::pwned";
+        for (const enforce of [undefined, "false"]) {
+            const r = runMain({ remote: repo, pin: base, files: [{ path: evil }], enforce });
+            expect(r.code).toBe(2);
+            const lines = r.stderr.split("\n").filter((l) => l.startsWith("::"));
+            expect(lines).toHaveLength(1);
+            expect(lines[0]).toMatch(
+                /^::(error|warning) title=ACR pin drift: tool failure, not drift::/,
+            );
+        }
+    });
+    it("a remote holding a newline cannot forge a workflow command", () => {
+        const sleeps = [];
+        const r = runMain(
+            { remote: "/nonexistent/x\n::error title=forged::pwned", pin: "a".repeat(40) },
+            { sleep: (m) => sleeps.push(m) },
+        );
+        expect(r.code).toBe(2);
+        expect(r.stderr.split("\n").filter((l) => l.startsWith("::"))).toHaveLength(1);
+        expect(r.stderr.split("\n").some((l) => l.startsWith("::error title=forged"))).toBe(false);
+    });
+    it("the cleanup warning cannot forge a workflow command", () => {
+        const { repo, base } = fakeAcr();
+        const real = fs.rmSync;
+        const spy = vi.spyOn(fs, "rmSync").mockImplementation((p, o) => {
+            real(p, o);
+            throw new Error("boom\n::error title=forged::pwned");
+        });
+        let r;
+        try {
+            r = runMain({ remote: repo, pin: base });
+        } finally {
+            spy.mockRestore();
+        }
+        expect(r.code).toBe(0);
+        expect(r.stderr).toContain("could not remove temp dir");
+        expect(r.stderr.split("\n").filter((l) => l.startsWith("::"))).toHaveLength(0);
+    });
+
+    it("a null manifest path is a ManifestError: exit 2, one attempt, no retry text", () => {
+        const { repo, base } = fakeAcr();
+        const sleeps = [];
+        for (const files of [[{ path: null }], [null], [{ path: 5 }], [{}]]) {
+            const r = runMain({ remote: repo, pin: base, files }, { sleep: (m) => sleeps.push(m) });
+            expect(r.code).toBe(2);
+            expect(r.output).toContain("status=error");
+            expect(r.stderr).not.toMatch(/after \d+ attempts/);
+            expect(r.stderr).toContain("broken manifest or pin; not retried");
+        }
+        expect(sleeps).toHaveLength(0);
+    });
+    it("an unparsable manifest is a ManifestError, not 'after 3 attempts'", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-"));
+        tmpDirs.push(dir);
+        const manifest = path.join(dir, "manifest.json");
+        fs.writeFileSync(manifest, "{ not json");
+        const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        let code;
+        let text;
+        try {
+            code = main({ ACR_REMOTE: "/nonexistent/acr.git", ACR_MANIFEST: manifest }, {});
+            text = err.mock.calls.map((c) => String(c[0])).join("");
+        } finally {
+            err.mockRestore();
+        }
+        expect(code).toBe(2);
+        expect(text).not.toMatch(/after \d+ attempts/);
+    });
+    it("the attempts text follows the attempts really made, not the default", () => {
+        const sleeps = [];
+        const r = runMain(
+            { remote: "/nonexistent/acr.git", pin: "a".repeat(40) },
+            { sleep: (m) => sleeps.push(m), maxAttempts: 2 },
+        );
+        expect(r.code).toBe(2);
+        expect(sleeps).toHaveLength(1);
+        expect(r.stderr).toContain("after 2 attempts");
+        expect(r.stderr).not.toContain("after 3 attempts");
+    });
+    it("the attempts text states the attempts really made", () => {
+        const r = runMain(
+            { remote: "/nonexistent/acr.git", pin: "a".repeat(40) },
+            { sleep: () => {} },
+        );
+        expect(r.stderr).toContain("after 3 attempts");
+        // the recovered-after-retry path logs the attempt that failed, with its real number
+        expect(r.stderr).toContain("attempt 1/3 failed");
+        expect(r.stderr).toContain("attempt 2/3 failed");
+        expect(r.stderr).not.toContain("attempt 3/3 failed");
     });
 });
 

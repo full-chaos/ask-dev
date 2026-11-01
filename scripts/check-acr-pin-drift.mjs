@@ -9,10 +9,11 @@
 // A tool failure is its own named state (`status=error`, its own annotation title): never drift, and
 // never "current". A fetch failure retries MAX_ATTEMPTS-1 more times (a transient network error should
 // not page anyone); a broken manifest (ManifestError) is exit 2 at once, since a retry cannot fix it.
+// A git READ that fails is a tool failure (retried), never "path missing" and never drift.
 // Removing the temp dir is cleanup: a failed removal is a warning and never changes the result.
 // Env: ACR_REMOTE, ACR_MANIFEST, GITHUB_OUTPUT (status/pin/head are appended when set), and
 // ACR_PIN_ENFORCE=false (annotations become ::warning; the exit code is unchanged).
-import { execFileSync } from "node:child_process";
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -32,11 +33,23 @@ function sleepSync(ms) {
 }
 
 function git(cwd, args) {
-    return execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+    return childProcess.execFileSync("git", args, {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+}
+
+function readManifest(manifestPath) {
+    try {
+        return JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch (error) {
+        throw new ManifestError(`manifest unreadable: ${firstLine(error)}`);
+    }
 }
 
 export function readPin(manifestPath) {
-    const sha = JSON.parse(fs.readFileSync(manifestPath, "utf8")).source_commit;
+    const sha = readManifest(manifestPath)?.source_commit;
     if (typeof sha !== "string" || !SHA_RE.test(sha)) {
         throw new ManifestError(`manifest source_commit is not a 40-char SHA: ${String(sha)}`);
     }
@@ -45,10 +58,13 @@ export function readPin(manifestPath) {
 
 // Manifest path -> acr source path (inverse of artifactPath in sync-acr-contracts.mjs).
 export function sourcePathsFromManifest(manifestPath) {
-    const { files } = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const files = readManifest(manifestPath)?.files;
     if (!Array.isArray(files) || files.length === 0)
         throw new ManifestError("manifest lists no files");
-    return files.map(({ path: p }) => {
+    return files.map((entry) => {
+        const p = entry?.path;
+        if (typeof p !== "string" || p === "")
+            throw new ManifestError(`manifest entry has no string path: ${JSON.stringify(entry)}`);
         if (p.startsWith("openapi/")) return `contracts/${p}`;
         if (p.startsWith("schemas/")) return `contracts/jsonschema/v1/${p.slice(8)}`;
         if (p.startsWith("examples/")) return `contracts/examples/v1/${p.slice(9)}`;
@@ -67,14 +83,15 @@ function measureOnce({ remote, branch, pin, paths }) {
         if (head !== pin) git(tmp, ["fetch", "-q", "--depth", "1", remote, pin]);
         // Compare BLOB ids per path, not `git diff`: a mode-only change is not a content change, and a
         // path that exists at neither commit is a broken manifest, never a silent green.
+        // `ls-tree` exits 0 with empty output when the path is absent; a non-zero exit is a git failure
+        // and throws (retryable). It is never turned into "missing", or one failed side would read as drift.
         const blob = (rev, file) => {
-            try {
-                // Only a real file counts: a directory/tree entry is never a vendored artifact.
-                if (git(tmp, ["cat-file", "-t", `${rev}:${file}`]).trim() !== "blob") return null;
-                return git(tmp, ["rev-parse", "--verify", "-q", `${rev}:${file}`]).trim();
-            } catch {
-                return null;
-            }
+            const line = git(tmp, ["ls-tree", rev, "--", file]).split("\n")[0];
+            if (line === "") return null;
+            const m = /^(\d+) (\w+) ([0-9a-f]{40})\t(.*)$/.exec(line);
+            if (!m) throw new Error(`unexpected ls-tree output for ${rev}:${file}`);
+            // Only a real file counts: a directory/tree entry is never a vendored artifact.
+            return m[2] === "blob" && m[4] === file ? m[3] : null;
         };
         const changed = [];
         for (const file of paths) {
@@ -95,32 +112,45 @@ function measureOnce({ remote, branch, pin, paths }) {
             fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
         } catch (error) {
             process.stderr.write(
-                `warning: could not remove temp dir ${tmp} (result unchanged): ${error instanceof Error ? error.message : String(error)}\n`,
+                `warning: could not remove temp dir ${oneLine(tmp)} (result unchanged): ${oneLine(error instanceof Error ? error.message : String(error))}\n`,
             );
         }
     }
 }
 
 // `sleep` is the backoff hook (tests pass a fast one).
-export function checkDrift({ remote, branch = "main", pin, paths, sleep = sleepSync }) {
+export function checkDrift({
+    remote,
+    branch = "main",
+    pin,
+    paths,
+    sleep = sleepSync,
+    maxAttempts = MAX_ATTEMPTS,
+}) {
     if (!Array.isArray(paths) || paths.length === 0)
         throw new ManifestError("no vendored paths to compare");
     let lastError;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             return measureOnce({ remote, branch, pin, paths });
         } catch (error) {
             if (error instanceof ManifestError) throw error;
-            lastError = error;
-            if (attempt < MAX_ATTEMPTS) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            lastError.attempts = attempt;
+            if (attempt < maxAttempts) {
                 process.stderr.write(
-                    `attempt ${attempt}/${MAX_ATTEMPTS} failed, retrying: ${firstLine(error)}\n`,
+                    `attempt ${attempt}/${maxAttempts} failed, retrying: ${oneLine(firstLine(error))}\n`,
                 );
                 sleep(BACKOFF_MS[attempt - 1] ?? BACKOFF_MS.at(-1));
             }
         }
     }
     throw lastError;
+}
+
+// Text from outside (manifest, remote, git) is printed on ONE line, so it cannot start a `::` command.
+function oneLine(v) {
+    return String(v).replace(/[\r\n]+/g, " ");
 }
 
 function firstLine(error) {
@@ -143,7 +173,9 @@ function writeOutputs(env, fields) {
                 .join(""),
         );
     } catch (error) {
-        process.stderr.write(`warning: could not write GITHUB_OUTPUT: ${firstLine(error)}\n`);
+        process.stderr.write(
+            `warning: could not write GITHUB_OUTPUT: ${oneLine(firstLine(error))}\n`,
+        );
     }
 }
 
@@ -167,7 +199,7 @@ export function main(env = process.env, deps = {}) {
             );
             return 0;
         }
-        const files = result.changed.map((f) => `  ${f}`).join("\n");
+        const files = result.changed.map((f) => `  ${oneLine(f)}`).join("\n");
         process.stderr.write(
             `ACR contract pin DRIFT: pin ${pin} vs acr main ${result.head}.\nChanged among vendored files:\n${files}\nBump: pnpm acr:contracts:generate --source <acr worktree at the new SHA>, and update SOURCE_COMMIT.\n` +
                 annotate(
@@ -178,14 +210,15 @@ export function main(env = process.env, deps = {}) {
         );
         return 1;
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = oneLine(error instanceof Error ? error.message : String(error));
+        const made = error?.attempts;
         writeOutputs(env, { status: "error", pin });
         process.stderr.write(
-            `ACR pin drift check could NOT run (tool failure, not drift) (remote=${remote}): ${message}\n` +
+            `ACR pin drift check could NOT run (tool failure, not drift) (remote=${oneLine(remote)}): ${message}\n` +
                 annotate(
                     level,
                     "ACR pin drift: tool failure, not drift",
-                    `The check could not measure drift${error instanceof ManifestError ? " (broken manifest or pin; not retried)" : ` after ${MAX_ATTEMPTS} attempts`}: ${firstLine(error)}`,
+                    `The check could not measure drift${error instanceof ManifestError ? " (broken manifest or pin; not retried)" : made ? ` after ${made} attempt${made === 1 ? "" : "s"}` : " (before any measurement attempt)"}: ${firstLine(error)}`,
                 ),
         );
         return 2;
