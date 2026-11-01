@@ -5,6 +5,7 @@ import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { cohortRanking } from "../lib/cohort-ranking";
 import type { InvestigationResult } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
+import { servesCohortShape } from "../lib/render-shapes";
 
 /**
  * A cohort with nothing ranked: "who owns this", "which pull requests are open" (lead's ruling on
@@ -20,7 +21,8 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
     const word = useVocabularyWord();
     const served = useServedWord();
     const { cohort } = result;
-    if (cohortRanking(result.interpretation.shape, cohort).state !== "not_computed") return null;
+    const ranking = cohortRanking(result.interpretation.shape, cohort, servesCohortShape(result));
+    if (ranking.state !== "not_computed") return null;
     if (cohort === undefined) return null;
 
     const drawnByStatusTable = new Set(unrankedWorkItemMembers(cohort));

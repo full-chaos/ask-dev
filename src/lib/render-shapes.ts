@@ -37,6 +37,18 @@ export const COHORT_SHAPE_RULES: readonly RenderShapeRule[] = [
     "cohort_driver_contribution",
 ];
 
+/**
+ * True when ACR selected a cohort chart for this answer. ACR selects on the question's frame, which
+ * is not on the wire, so a real cohort answer can read `open` (CHAOS-11986 problem 1). A served
+ * shape is ACR's own statement that a ranking is the answer, so it counts as intent. A shape that
+ * then fails its check still counts: the panel says it was withheld, never a silent absence.
+ */
+export function servesCohortShape(result: InvestigationResult | undefined): boolean {
+    return (result?.render_shapes ?? []).some((shape) =>
+        COHORT_SHAPE_RULES.includes(shape.selected_by),
+    );
+}
+
 export type VerifiedShapes = {
     /** Shapes whose every number resolved to the value its source names. */
     readonly shapes: readonly RenderShape[];

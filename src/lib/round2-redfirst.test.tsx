@@ -81,10 +81,10 @@ describe("P3: kind gate precedes ranking_computed", () => {
             ...p.cohort!,
             members: p.cohort!.members.map((m) => ({ ...m, ranking_computed: false })),
         };
-        expect(cohortRanking("explicit_cohort", cohort).state).toBe("kind_not_ranked");
+        expect(cohortRanking("explicit_cohort", cohort, false).state).toBe("kind_not_ranked");
     });
     it("a person cohort with ranked members is kind_not_ranked", () => {
-        expect(cohortRanking("explicit_cohort", personResult().cohort).state).toBe(
+        expect(cohortRanking("explicit_cohort", personResult().cohort, false).state).toBe(
             "kind_not_ranked",
         );
     });

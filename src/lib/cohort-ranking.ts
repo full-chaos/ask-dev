@@ -260,7 +260,7 @@ function isRanked({ member, score }: RankedCohortRow): boolean {
 /**
  * The single gate every ranking consumer goes through (lead's ruling on CHAOS-3748, gap 1).
  *
- * 1. Intent.
+ * 1. Intent: the interpreted shape, or a cohort chart ACR served (`servesCohortShape`, gap 2).
  * 2. The guardrail: a kind off `RANKABLE_SUBJECT_KINDS` (`person`, or one no pin documents) is
  *    never listed and never ranked, whether or not ACR ranked it.
  * 3. Nothing ranked: the members are the answer, for every other kind.
@@ -270,8 +270,10 @@ function isRanked({ member, score }: RankedCohortRow): boolean {
 export function cohortRanking(
     shape: InterpretedShape,
     cohort: Cohort | undefined,
+    servedCohortShape: boolean,
 ): CohortRankingState {
-    if (!isCohortIntent(shape) || cohort === undefined) return { state: "not_requested" };
+    const asked = isCohortIntent(shape) || servedCohortShape;
+    if (!asked || cohort === undefined) return { state: "not_requested" };
     const kinds = [cohort.kind, ...cohort.members.map((member) => member.subject.kind)];
     if (!kinds.every(isRankableSubjectKind)) return { state: "kind_not_ranked" };
     const rows = rankingTable(cohort.members);

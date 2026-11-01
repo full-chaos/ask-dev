@@ -16,6 +16,7 @@ import type {
     SubjectRef,
 } from "../lib/contracts";
 import { formatConfidence, humanizeTerm } from "../lib/presentation";
+import { servesCohortShape } from "../lib/render-shapes";
 import { useVocabularyWord } from "./VocabularyWordContext";
 
 /**
@@ -184,7 +185,11 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
     // (named only in "Not ranked by the service: ...") gets no footnote at
     // all, so a withheld driver about one has nothing to point at even
     // though the table itself is on screen.
-    const ranking = cohortRanking(result.interpretation.shape, result.cohort);
+    const ranking = cohortRanking(
+        result.interpretation.shape,
+        result.cohort,
+        servesCohortShape(result),
+    );
     const rows = ranking.state === "rows" ? ranking.rows : null;
     // G1 (CHAOS-12429): a cohort of a kind the render does not rank keeps its subjects out of the
     // drivers as well, the same way the result boundary withholds a person cohort. The answer

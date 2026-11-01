@@ -14,7 +14,7 @@ import type {
 import { cohortRanking, formatCohortScore, memberDriversText } from "../lib/cohort-ranking";
 import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
-import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
+import { COHORT_SHAPE_RULES, renderShapesFor, servesCohortShape } from "../lib/render-shapes";
 import { cohortOutcomeTone } from "../lib/presentation";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -129,7 +129,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
     const idPrefix = useId();
     const word = useVocabularyWord();
     const served = useServedWord();
-    const ranking = cohortRanking(shape, cohort);
+    const ranking = cohortRanking(shape, cohort, servesCohortShape(result));
     if (ranking.state === "not_requested" || ranking.state === "not_computed") return null;
     if (ranking.state === "kind_not_ranked") {
         // The cohort's kind (or a member's) is outside the closed allowlist --

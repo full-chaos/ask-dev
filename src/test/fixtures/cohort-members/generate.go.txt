@@ -1,4 +1,4 @@
-// Scratch only (gap 1, CHAOS-3748): ask-dev's unranked cohort fixtures, from ACR's real encoder at
+// Scratch only (gaps 1 and 2, CHAOS-3748): ask-dev's unranked cohort fixtures, from ACR's real encoder at
 // the pin, with ACR_CONTEXT_FABRIC_VOCABULARY_LABELS_ENABLED on. Inputs: acr's contract example, and
 // a real kiac capture of a pull request cohort (web tests/fixtures/ask-dev/captures).
 package main
@@ -63,7 +63,19 @@ func main() {
 	zero.Cohort.Rationale = "No pull request reached from the subject the question names holds the status asked for now; that is a count of matches, not a statement about health."
 	zero.Completeness = contextfabric.ComputeAnswerCompleteness(zero)
 
+	// Gap 2: ACR selects on the frame, ask-dev read the interpreted shape. A real question reads
+	// `open` here, so the shapes come from the real selection with a cohort frame.
+	open := load(shapes)
+	open.RenderShapes = nil
+	open.Interpretation.Shape = "open"
+	frame := &contextfabric.QuestionFrame{SubjectExpression: contextfabric.SubjectExpression{
+		Kind:       contextfabric.SubjectExpressionDiscoveredKind,
+		Discovered: &contextfabric.DiscoveredSetExpression{MemberKind: contextfabric.SubjectTeam},
+	}}
+	open.RenderShapes, _ = contextfabric.SelectRenderShapes(open, frame)
+
 	cases := map[string]contextfabric.InvestigationResult{
+		"served-shape-open":     open,
 		"unranked-repositories": repositories,
 		"zero-match":            zero,
 		"pull-requests":         load(capture),

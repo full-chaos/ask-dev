@@ -134,14 +134,14 @@ describe("the gate keeps what it must keep", () => {
         const [first, ...others] = ranked.cohort!.members;
         const { score: _score, ...noScore } = first!;
         const cohort = { ...ranked.cohort!, members: [noScore, ...others] };
-        expect(cohortRanking("discovered_cohort", cohort).state).toBe("rows");
+        expect(cohortRanking("discovered_cohort", cohort, false).state).toBe("rows");
     });
 
     it("a member with a score and no driver is a ranking", () => {
         const [first, ...others] = ranked.cohort!.members;
         const { drivers: _drivers, ...noDrivers } = first!;
         const cohort = { ...ranked.cohort!, members: [noDrivers, ...others] };
-        expect(cohortRanking("discovered_cohort", cohort).state).toBe("rows");
+        expect(cohortRanking("discovered_cohort", cohort, false).state).toBe("rows");
     });
 
     it("the person guardrail stays: no person list, computed or not", () => {
@@ -157,7 +157,9 @@ describe("the gate keeps what it must keep", () => {
                 })),
             },
         } as InvestigationResult;
-        expect(cohortRanking("discovered_cohort", person.cohort).state).toBe("kind_not_ranked");
+        expect(cohortRanking("discovered_cohort", person.cohort, false).state).toBe(
+            "kind_not_ranked",
+        );
         draw(person);
         expect(screen.queryByTestId("cohort-members-panel")).toBeNull();
         expect(screen.getByTestId("cohort-ranking-withheld")).toBeVisible();
@@ -173,7 +175,7 @@ describe("the gate keeps what it must keep", () => {
         const [first, ...others] = source.cohort!.members;
         const members = [{ ...first!, subject: { ...first!.subject, kind: "person" } }, ...others];
         const cohort = { ...source.cohort!, members };
-        expect(cohortRanking("discovered_cohort", cohort).state).toBe("kind_not_ranked");
+        expect(cohortRanking("discovered_cohort", cohort, false).state).toBe("kind_not_ranked");
     });
 
     it("no intent, no list", () => {
