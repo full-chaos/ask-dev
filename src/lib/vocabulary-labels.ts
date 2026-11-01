@@ -13,6 +13,8 @@ export type VocabularyLabels = InvestigationResult["vocabulary_labels"];
 export type Vocabulary =
     | "answer_status"
     | "candidate_state"
+    | "cohort_score_meaning"
+    | "driver_source_state"
     | "driver_standing"
     | "driver_window"
     | "fact_kind"
@@ -34,6 +36,15 @@ export function servedWord(
     value: string,
 ): string | undefined {
     return nonBlank(labels?.[`${vocabulary}:${value}`]);
+}
+
+/**
+ * The sentence ACR composes for one field of this result (CHAOS-12487). There is no generic path:
+ * no key, no line, and the raw field stays in its fold. The map holds a key only for a field that
+ * says something, and near the size bound ACR sheds most of them.
+ */
+export function servedNote(labels: VocabularyLabels, field: string): string | undefined {
+    return nonBlank(labels?.[`${field}:note`]);
 }
 
 /** The word a reader sees: the served one, else the generic path. */

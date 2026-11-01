@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import renderShapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
@@ -529,6 +530,74 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             const { subject: _subject, ...noSubject } = whole;
             draw(odd({ exclusions: [noReason, noSubject, null, whole] }));
             expect(within(fold()).getAllByTestId("cohort-exclusion")).toHaveLength(1);
+        });
+    });
+
+    describe("with ACR's words", () => {
+        const WORDS = {
+            "cohort_score_meaning:attention": "Attention score: higher means more attention.",
+            "judgment_mismatch:note": "This ranking does not support the judgment you asked for.",
+            "population:note": "The full list has at least 40 members.",
+        };
+        const worded = (value: Cohort, words: Record<string, string> = WORDS) =>
+            render(
+                <VocabularyLabelsContext.Provider value={words}>
+                    <CohortRankingPanel cohort={value} result={undefined} shape="explicit_cohort" />
+                </VocabularyLabelsContext.Provider>,
+            );
+        const line = (name: string) => screen.queryByTestId(`cohort-line-${name}`);
+        const raw = (name: string) => screen.queryByTestId(`cohort-raw-${name}`);
+
+        it("shows each on the page, beside the ranking, outside any fold", () => {
+            worded(meaning);
+            expect(line("score_meaning")).toHaveTextContent(
+                WORDS["cohort_score_meaning:attention"],
+            );
+            expect(line("judgment_mismatch")).toHaveTextContent(WORDS["judgment_mismatch:note"]);
+            expect(line("population")).toHaveTextContent(WORDS["population:note"]);
+            for (const name of ["score_meaning", "judgment_mismatch", "population"]) {
+                expect(line(name)!.closest("details")).toBeNull();
+            }
+        });
+
+        it("takes those fields out of the fold, the bound with its population", () => {
+            worded(meaning);
+            expect(line("population_lower_bound")).toBeNull();
+            expect(screen.getAllByText(WORDS["population:note"])).toHaveLength(1);
+            for (const name of [
+                "score_meaning",
+                "judgment_mismatch",
+                "population",
+                "population_lower_bound",
+            ]) {
+                expect(raw(name)).toBeNull();
+            }
+        });
+
+        it("keeps a field with no word raw in the fold", () => {
+            const { "population:note": _word, ...rest } = WORDS;
+            worded(meaning, rest);
+            expect(line("population")).toBeNull();
+            expect(raw("population")).toHaveTextContent("population: 40");
+            expect(raw("population_lower_bound")).toHaveTextContent("population_lower_bound: true");
+            expect(raw("score_meaning")).toBeNull();
+        });
+
+        it("shows no line for a false flag, even with a word in the map", () => {
+            worded({ ...meaning, judgment_mismatch: false });
+            expect(line("judgment_mismatch")).toBeNull();
+        });
+
+        it("shows no line for a field the cohort does not hold", () => {
+            const {
+                population: _p,
+                population_lower_bound: _b,
+                score_meaning: _s,
+                ...rest
+            } = meaning;
+            worded(rest);
+            expect(line("population")).toBeNull();
+            expect(line("score_meaning")).toBeNull();
         });
     });
 

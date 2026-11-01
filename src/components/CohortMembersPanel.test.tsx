@@ -339,6 +339,26 @@ describe("the members' fold", () => {
         expect(fold().textContent).toContain(member.inclusion_reasons[0]);
     });
 
+    it("shows the population on the page with ACR's sentence, and leaves the score raw", () => {
+        const sentence = "The full list has at least 12 members.";
+        const scored = { ...withMeaning.cohort!, score_meaning: "attention" as const };
+        draw({
+            ...withMeaning,
+            cohort: scored,
+            vocabulary_labels: {
+                "population:note": sentence,
+                "cohort_score_meaning:attention": "Attention score.",
+            },
+        });
+        const line = screen.getByTestId("cohort-line-population");
+        expect(line).toHaveTextContent(sentence);
+        expect(line.closest("details")).toBeNull();
+        expect(screen.queryByTestId("cohort-raw-population")).toBeNull();
+        // Nothing here is scored, so there is no score to explain.
+        expect(screen.queryByTestId("cohort-line-score_meaning")).toBeNull();
+        expect(screen.getByTestId("cohort-raw-score_meaning")).toBeInTheDocument();
+    });
+
     it("does not repeat the rationale or the exclusions in the fold", () => {
         draw(withMeaning);
         const rationale = base.cohort!.rationale;

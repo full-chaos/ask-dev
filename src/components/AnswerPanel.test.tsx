@@ -148,6 +148,80 @@ describe("AnswerPanel — codex round 3/4 close-out: blank-content decisions rou
  * words for these fields yet, so each stays raw in one collapsed fold. Absent, zero and false show
  * nothing: missing is not healthy (check 12).
  */
+/** CHAOS-12488: a field with ACR's words is one line on the page, and leaves the fold. */
+describe("AnswerPanel — the scope fields ACR serves words for", () => {
+    const WORDS = {
+        "generated_at:note": "Answered",
+        "reused:note": "This is a stored answer, not a new investigation.",
+        "limitations_displaced:note": "3 limitations were left out of this answer.",
+        "retrieval_degraded:note": "Subject matching ran with one method unavailable.",
+    };
+    const line = (name: string) => screen.queryByTestId(`answer-line-${name}`);
+    const raw = (name: string) => screen.queryByTestId(`answer-scope-${name}`);
+    const served: InvestigationResult = {
+        ...base,
+        generated_at: "2026-11-01T10:00:00Z",
+        reused: true,
+        limitations_displaced: 3,
+        subject_resolution: { ...base.subject_resolution, retrieval_degraded: true },
+        vocabulary_labels: WORDS,
+    };
+
+    it("shows each sentence on the page, outside any fold", () => {
+        render(<AnswerPanel result={served} />);
+        for (const name of ["reused", "limitations_displaced", "retrieval_degraded"]) {
+            expect(line(name)).toHaveTextContent(WORDS[`${name}:note` as keyof typeof WORDS]);
+            expect(line(name)!.closest("details")).toBeNull();
+        }
+    });
+
+    it("leads the date with ACR's word, in the reader's format, never the raw stamp", () => {
+        render(<AnswerPanel result={served} />);
+        const date = new Intl.DateTimeFormat(undefined, {
+            dateStyle: "medium",
+            timeStyle: "short",
+        }).format(new Date(served.generated_at));
+        expect(line("generated_at")).toHaveTextContent(`Answered ${date}`);
+        expect(line("generated_at")).not.toHaveTextContent("2026-11-01T10:00:00Z");
+    });
+
+    it("takes each field out of the fold, and draws no empty fold", () => {
+        render(<AnswerPanel result={served} />);
+        expect(screen.queryByTestId("answer-scope-details")).toBeNull();
+    });
+
+    it("keeps in the fold the one field with no word", () => {
+        const { "reused:note": _word, ...rest } = WORDS;
+        render(<AnswerPanel result={{ ...served, vocabulary_labels: rest }} />);
+        expect(line("reused")).toBeNull();
+        expect(raw("reused")).toHaveTextContent("reused: true");
+        expect(raw("generated_at")).toBeNull();
+    });
+
+    it("keeps a date it cannot read in the fold", () => {
+        render(<AnswerPanel result={{ ...served, generated_at: "not a date" }} />);
+        expect(line("generated_at")).toBeNull();
+        expect(raw("generated_at")).toHaveTextContent("generated_at: not a date");
+    });
+
+    it("shows nothing for a false flag or a zero, even with a word in the map", () => {
+        render(
+            <AnswerPanel
+                result={{
+                    ...served,
+                    reused: false,
+                    limitations_displaced: 0,
+                    subject_resolution: { ...base.subject_resolution, retrieval_degraded: false },
+                }}
+            />,
+        );
+        for (const name of ["reused", "limitations_displaced", "retrieval_degraded"]) {
+            expect(line(name)).toBeNull();
+            expect(raw(name)).toBeNull();
+        }
+    });
+});
+
 describe("AnswerPanel — the scope fields ACR serves no words for", () => {
     const fold = () => screen.getByTestId("answer-scope-details");
     const raw = (name: string) => within(fold()).queryByTestId(`answer-scope-${name}`);

@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { DriversPanel } from "@/components/DriversPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { CohortMember, DriverJudgment, InvestigationResult } from "@/lib/contracts";
@@ -337,6 +338,24 @@ describe("DriversPanel — a driver's source state", () => {
         expect(state.closest("details")).not.toHaveAttribute("open");
         expect(within(shown).getByTestId("driver-summary-corrected")).toHaveTextContent(
             "summary_corrected: true",
+        );
+    });
+
+    it("reads ACR's words in the fold, with no raw token", () => {
+        render(
+            <VocabularyLabelsContext.Provider
+                value={{
+                    "driver_source_state:stale": "Stale",
+                    "summary_corrected:note": "The service corrected this driver's source state.",
+                }}
+            >
+                <DriversPanel result={{ ...result, drivers: [stale] }} />
+            </VocabularyLabelsContext.Provider>,
+        );
+        const shown = screen.getByText(stale.title).closest("li")!;
+        expect(within(shown).getByTestId("driver-source-state")).toHaveTextContent(/^Stale$/u);
+        expect(within(shown).getByTestId("driver-summary-corrected")).toHaveTextContent(
+            /^The service corrected this driver's source state\.$/u,
         );
     });
 

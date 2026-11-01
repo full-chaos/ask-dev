@@ -3,6 +3,7 @@ import { useId } from "react";
 import { SafeAnswerText } from "./SafeAnswerText";
 import type { InvestigationResult } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
+import { servedNote } from "../lib/vocabulary-labels";
 
 export type AnswerPanelProps = {
     readonly result: InvestigationResult;
@@ -39,18 +40,42 @@ export type AnswerPanelProps = {
  * the service sent them; `current_state` is the only field that still folds
  * behind "More detail".
  */
+type ScopeField = {
+    readonly name: string;
+    readonly raw: string;
+    /** ACR's words for this field. With none, the raw value stays in the closed fold. */
+    readonly line: string | undefined;
+};
+
+/** ACR's lead word, then the date in the reader's format. A stamp that is no date stays raw. */
+function answeredLine(result: InvestigationResult): string | undefined {
+    const lead = servedNote(result.vocabulary_labels, "generated_at");
+    const date = new Date(result.generated_at);
+    if (lead === undefined || Number.isNaN(date.getTime())) return undefined;
+    const when = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+    return `${lead} ${when.format(date)}`;
+}
+
 /**
- * CHAOS-12481: what an answer dropped, when it was made and whether it was reused. ACR serves no
- * words for these yet, so each stays raw in one closed fold until it does. A field that is absent,
- * zero or false shows nothing: missing is not healthy (check 12).
+ * CHAOS-12481, CHAOS-12488: what an answer dropped, when it was made and whether it was reused. A
+ * field with ACR's words is one line on the page. Any other stays raw in one closed fold. A field
+ * that is absent, zero or false shows nothing: missing is not healthy (check 12).
  */
-function scopeFields(result: InvestigationResult): readonly (readonly [string, string])[] {
-    const fields: (readonly [string, string])[] = [["generated_at", result.generated_at]];
-    if (result.reused) fields.push(["reused", "true"]);
+function scopeFields(result: InvestigationResult): readonly ScopeField[] {
+    const labels = result.vocabulary_labels;
+    const field = (name: string, raw: string) => ({
+        name,
+        raw,
+        line: servedNote(labels, name),
+    });
+    const fields: ScopeField[] = [
+        { name: "generated_at", raw: result.generated_at, line: answeredLine(result) },
+    ];
+    if (result.reused) fields.push(field("reused", "true"));
     const displaced = result.limitations_displaced ?? 0;
-    if (displaced !== 0) fields.push(["limitations_displaced", String(displaced)]);
+    if (displaced !== 0) fields.push(field("limitations_displaced", String(displaced)));
     if (result.subject_resolution?.retrieval_degraded === true) {
-        fields.push(["retrieval_degraded", "true"]);
+        fields.push(field("retrieval_degraded", "true"));
     }
     return fields;
 }
@@ -61,6 +86,8 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     // hardcoded heading id collided across turns and every later turn's
     // `aria-labelledby` resolved to the FIRST turn's heading.
     const idPrefix = useId();
+    const scope = scopeFields(result);
+    const raw = scope.filter(({ line }) => line === undefined);
     // Displayed text is COSMETICALLY trimmed (leading/trailing ASCII
     // whitespace only, matching the field's own pre-4691 display
     // convention) — a purely visual tidy-up, independent of the render
@@ -107,16 +134,25 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
                     </p>
                 </details>
             ) : null}
-            <details className="disclosure" data-testid="answer-scope-details">
-                <summary>Details</summary>
-                {scopeFields(result).map(([name, value]) => (
-                    <p className="record__meta" data-testid={`answer-scope-${name}`} key={name}>
-                        <code>
-                            {name}: {value}
-                        </code>
+            {scope.map(({ name, line }) =>
+                line === undefined ? null : (
+                    <p className="record__meta" data-testid={`answer-line-${name}`} key={name}>
+                        {line}
                     </p>
-                ))}
-            </details>
+                ),
+            )}
+            {raw.length === 0 ? null : (
+                <details className="disclosure" data-testid="answer-scope-details">
+                    <summary>Details</summary>
+                    {raw.map(({ name, raw: value }) => (
+                        <p className="record__meta" data-testid={`answer-scope-${name}`} key={name}>
+                            <code>
+                                {name}: {value}
+                            </code>
+                        </p>
+                    ))}
+                </details>
+            )}
         </section>
     );
 }

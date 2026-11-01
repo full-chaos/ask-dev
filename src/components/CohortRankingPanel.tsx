@@ -21,7 +21,7 @@ import { coverageCaption } from "../lib/coverage-caption";
 import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
 import { cohortOutcomeTone, nonBlank } from "../lib/presentation";
-import { CohortMeaningDetails } from "./CohortMeaningDetails";
+import { CohortMeaningDetails, CohortMeaningLines } from "./CohortMeaningDetails";
 import { CohortExclusions } from "./CohortMembersPanel";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -198,6 +198,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                         : `The service did not report this cohort as complete, so this ranking may not cover every ${singular}.`}
                 </p>
             )}
+            <CohortMeaningLines cohort={cohort} ranked />
             {
                 // Above the table: when the question asked for a ranking, the
                 // ranking IS the answer, and the score bars plus their
@@ -332,7 +333,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     Not ranked by the service: {unranked.join(", ")}.
                 </p>
             )}
-            <CohortMeaningDetails cohort={cohort}>
+            <CohortMeaningDetails cohort={cohort} ranked>
                 {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
                 <CohortExclusions cohort={cohort} />
             </CohortMeaningDetails>

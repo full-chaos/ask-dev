@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-import { CohortMeaningDetails } from "./CohortMeaningDetails";
+import { CohortMeaningDetails, CohortMeaningLines } from "./CohortMeaningDetails";
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
@@ -92,6 +92,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </p>
             )}
             {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
+            <CohortMeaningLines cohort={cohort} ranked={false} />
             <ChartsWithheld result={result} />
             {cohort.members.length === 0 ? (
                 <p className="panel__empty">The service returned no members.</p>
@@ -107,7 +108,7 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </ul>
             )}
             <CohortExclusions cohort={cohort} />
-            <CohortMeaningDetails cohort={cohort} />
+            <CohortMeaningDetails cohort={cohort} ranked={false} />
         </section>
     );
 }
