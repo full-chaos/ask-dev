@@ -68,7 +68,11 @@ function meaningFields(
         },
         { name: "score_meaning", value: score_meaning, line: scoreLine },
         { name: "population", value: population, line: populationLine },
-        { name: "population_lower_bound", value: population_lower_bound, line: populationLine },
+        {
+            name: "population_lower_bound",
+            value: population_lower_bound,
+            line: population_lower_bound === true ? populationLine : undefined,
+        },
     ];
     return fields.filter(({ value }) => value !== undefined && value !== null && value !== false);
 }

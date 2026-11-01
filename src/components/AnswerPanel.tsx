@@ -74,7 +74,8 @@ function scopeFields(result: InvestigationResult): readonly ScopeField[] {
     if (result.reused) fields.push(field("reused", rawText(result.reused), result.reused === true));
     const displaced = result.limitations_displaced ?? 0;
     if (displaced !== 0) {
-        fields.push(field("limitations_displaced", String(displaced), displaced > 0));
+        const counted = typeof displaced === "number" && displaced > 0;
+        fields.push(field("limitations_displaced", rawText(displaced), counted));
     }
     const degraded: unknown = result.subject_resolution?.retrieval_degraded;
     if (degraded) fields.push(field("retrieval_degraded", rawText(degraded), degraded === true));

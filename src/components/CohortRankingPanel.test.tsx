@@ -600,6 +600,12 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             },
         );
 
+        it("an odd bound stays raw, though the population has its sentence", () => {
+            worded({ ...meaning, population_lower_bound: "yes" } as unknown as Cohort);
+            expect(line("population")).toHaveTextContent(WORDS["population:note"]);
+            expect(raw("population_lower_bound")).toHaveTextContent("population_lower_bound: yes");
+        });
+
         it("a bound with no population stays raw, not lost between the two", () => {
             const { population: _population, ...rest } = meaning;
             worded(rest);

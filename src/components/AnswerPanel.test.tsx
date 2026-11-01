@@ -204,6 +204,12 @@ describe("AnswerPanel — the scope fields ACR serves words for", () => {
     });
 
     it("keeps an odd value raw: a stray word must not hide it", () => {
+        const text = { ...served, limitations_displaced: "3" } as unknown;
+        const first = render(<AnswerPanel result={text as InvestigationResult} />);
+        expect(line("limitations_displaced")).toBeNull();
+        expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: 3");
+        first.unmount();
+
         const odd = {
             ...served,
             reused: "yes",
