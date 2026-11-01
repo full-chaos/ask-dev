@@ -28,6 +28,7 @@ import {
 } from "@/lib/structure-selections";
 import { useCandidateSelections } from "@/lib/use-candidate-selections";
 import { useStructureSelections } from "@/lib/use-structure-selections";
+import { answerStatusWord } from "@/lib/vocabulary-labels";
 
 /**
  * Context Fabric Workbench (CHAOS-3738).
@@ -50,6 +51,12 @@ type Outcome =
 
 // `enriched` joins this list in M3, behind its fail-closed validator.
 const AVAILABLE_VIEWS: readonly WorkbenchView[] = ["raw", "deterministic"];
+
+/** The word the panel's pill reads: served, never a raw status (CHAOS-12489). */
+function HeaderStatus({ result }: { readonly result: InvestigationResult }) {
+    const word = answerStatusWord(result);
+    return word === undefined ? null : <span className="badge">{word}</span>;
+}
 
 function isFailure(value: unknown): value is WorkbenchFailure {
     return (
@@ -380,13 +387,11 @@ export default function WorkbenchPage() {
                         <div className="result__head">
                             <h2 className="result__question">{outcome.result.question}</h2>
                             {outcome.rankingWithheld === undefined ? (
-                                <span className="badge" title={outcome.result.status}>
-                                    {outcome.result.status.replaceAll("_", " ")}
-                                </span>
+                                <HeaderStatus result={outcome.result} />
                             ) : (
                                 <span
                                     className="badge badge--warn"
-                                    title={`withheld by the Workbench; service status: ${outcome.result.status}`}
+                                    title="Withheld by the Workbench"
                                 >
                                     withheld
                                 </span>
