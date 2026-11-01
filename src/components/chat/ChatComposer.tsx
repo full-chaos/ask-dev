@@ -20,6 +20,8 @@ export type ChatComposerProps = {
     readonly onAsk: (question: string) => Promise<boolean>;
     /** Called in the same update that clears the draft, after an ask answered. */
     readonly onDraftCleared?: (() => void) | undefined;
+    /** Hidden, not unmounted: the draft and a run's `await` outlive it (`composerHidden`). */
+    readonly hidden?: boolean | undefined;
 };
 
 export type ChatComposerHandle = {
@@ -66,7 +68,7 @@ export type ChatComposerHandle = {
  * escape hatch into that logic from outside — see its own doc comment.
  */
 export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(function ChatComposer(
-    { pending, lock, onAsk, onDraftCleared },
+    { pending, lock, onAsk, onDraftCleared, hidden },
     ref,
 ) {
     const [question, setQuestion] = useState("");
@@ -139,6 +141,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(fu
     return (
         <form
             className="chat-composer"
+            hidden={hidden}
             onSubmit={(event) => {
                 event.preventDefault();
                 void submitQuestion(question.trim());

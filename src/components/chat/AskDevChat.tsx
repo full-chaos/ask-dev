@@ -251,6 +251,9 @@ function ChatSurface({
     const turns = useMemo(() => turnsToShow.map(withheldTurn), [turnsToShow]);
     const unrecorded = useMemo(() => turnsOfUnrecordedQuestions(turns), [turns]);
     const composerLock = composerLockOf(snapshot);
+    const composerHidden = snapshot.composerHidden === true;
+    const offersStop =
+        snapshot.stoppable && chat.stop !== undefined && threadNotShown === undefined;
     // The first read of the list waits for the host's first history (see
     // `ChatHistorySource.load`). Here and not in `ChatHistory`: that component
     // is drawn in two places, and neither may read on its own.
@@ -712,6 +715,7 @@ function ChatSurface({
 
     const popupPages =
         composerLock === undefined &&
+        !composerHidden &&
         latestAssistantTurn?.role === "assistant" &&
         latestAssistantTurn.outcome.kind === "answered" &&
         latestAssistantTurn.id !== dismissedPopupTurnId &&
@@ -964,7 +968,8 @@ function ChatSurface({
                                     // Web's rule: a question that was not recorded
                                     // cannot be sent again, so its turn reads like an
                                     // earlier one: no choice and no re-ask.
-                                    const offersChoice = isLatest && !unrecorded.has(turn.id);
+                                    const offersChoice =
+                                        isLatest && !unrecorded.has(turn.id) && !composerHidden;
                                     // The turns BEFORE this assistant turn's own user
                                     // turn are what this follow-up derived its carry
                                     // from; say so when a subject could not ride along.
@@ -1168,79 +1173,79 @@ function ChatSurface({
                         ) : null}
                     </div>
 
-                    {snapshot.composerHidden === true ? null : (
-                        <div className="chat__composer-bar" hidden={view === "history"}>
-                            {popupPages.length === 0 ? null : (
-                                // Floats above the composer via CSS (`.clarification-popup`
-                                // is `position: absolute`, this wrapper `position:
-                                // relative`) — a DOM SIBLING of `ChatComposer`, never a
-                                // wrapper around it, so the composer stays fully
-                                // interactive underneath exactly as the ticket requires
-                                // ("typing a normal reply is always allowed").
-                                <ClarificationPopup
-                                    key={latestAssistantTurn?.id}
-                                    onComplete={() => {
-                                        if (latestAssistantTurn !== undefined) {
-                                            popupAutoConfirmRef.current = latestAssistantTurn.id;
-                                            setPopupAutoConfirmTick((tick) => tick + 1);
-                                        }
-                                    }}
-                                    onDismiss={() => {
-                                        // codex round 3: move focus BEFORE the popup
-                                        // unmounts (same synchronous handler that
-                                        // removes it) — see `ChatComposerHandle.focus`'s
-                                        // own doc comment for why a later effect is too
-                                        // late.
-                                        composerRef.current?.focus();
-                                        setDismissedPopupTurnId(latestAssistantTurn?.id);
-                                    }}
-                                    onFreeText={(text) => void ask(text)}
-                                    onSelect={applyPopupSelection}
-                                    pages={popupPages}
-                                    pending={isPending}
-                                />
-                            )}
-                            {snapshot.stoppable &&
-                            chat.stop !== undefined &&
-                            threadNotShown === undefined ? (
-                                <div className="chat__stop-row">
-                                    <button
-                                        className="chat__stop"
-                                        onClick={() => chat.stop?.()}
-                                        type="button"
-                                    >
-                                        <svg
-                                            aria-hidden="true"
-                                            fill="currentColor"
-                                            height="10"
-                                            viewBox="0 0 10 10"
-                                            width="10"
-                                        >
-                                            <rect height="10" rx="2" width="10" />
-                                        </svg>
-                                        Stop
-                                    </button>
-                                </div>
-                            ) : null}
-                            {chat.pageContext === undefined ? null : (
-                                <ChatContextChips
-                                    onRemove={(ref) => {
-                                        chat.pageContext?.remove(ref);
-                                    }}
-                                    refs={snapshot.pageContext ?? []}
-                                />
-                            )}
-                            <ChatComposer
-                                lock={composerLock}
-                                onAsk={ask}
-                                onDraftCleared={() => {
-                                    setDraftClears((count) => count + 1);
+                    <div
+                        className="chat__composer-bar"
+                        hidden={view === "history" || (composerHidden && !offersStop)}
+                    >
+                        {popupPages.length === 0 ? null : (
+                            // Floats above the composer via CSS (`.clarification-popup`
+                            // is `position: absolute`, this wrapper `position:
+                            // relative`) — a DOM SIBLING of `ChatComposer`, never a
+                            // wrapper around it, so the composer stays fully
+                            // interactive underneath exactly as the ticket requires
+                            // ("typing a normal reply is always allowed").
+                            <ClarificationPopup
+                                key={latestAssistantTurn?.id}
+                                onComplete={() => {
+                                    if (latestAssistantTurn !== undefined) {
+                                        popupAutoConfirmRef.current = latestAssistantTurn.id;
+                                        setPopupAutoConfirmTick((tick) => tick + 1);
+                                    }
                                 }}
+                                onDismiss={() => {
+                                    // codex round 3: move focus BEFORE the popup
+                                    // unmounts (same synchronous handler that
+                                    // removes it) — see `ChatComposerHandle.focus`'s
+                                    // own doc comment for why a later effect is too
+                                    // late.
+                                    composerRef.current?.focus();
+                                    setDismissedPopupTurnId(latestAssistantTurn?.id);
+                                }}
+                                onFreeText={(text) => void ask(text)}
+                                onSelect={applyPopupSelection}
+                                pages={popupPages}
                                 pending={isPending}
-                                ref={composerRef}
                             />
-                        </div>
-                    )}
+                        )}
+                        {offersStop ? (
+                            <div className="chat__stop-row">
+                                <button
+                                    className="chat__stop"
+                                    onClick={() => chat.stop?.()}
+                                    type="button"
+                                >
+                                    <svg
+                                        aria-hidden="true"
+                                        fill="currentColor"
+                                        height="10"
+                                        viewBox="0 0 10 10"
+                                        width="10"
+                                    >
+                                        <rect height="10" rx="2" width="10" />
+                                    </svg>
+                                    Stop
+                                </button>
+                            </div>
+                        ) : null}
+                        {chat.pageContext === undefined || composerHidden ? null : (
+                            <ChatContextChips
+                                onRemove={(ref) => {
+                                    chat.pageContext?.remove(ref);
+                                }}
+                                refs={snapshot.pageContext ?? []}
+                            />
+                        )}
+                        <ChatComposer
+                            hidden={composerHidden}
+                            lock={composerHidden ? undefined : composerLock}
+                            onAsk={ask}
+                            onDraftCleared={() => {
+                                setDraftClears((count) => count + 1);
+                            }}
+                            pending={isPending}
+                            ref={composerRef}
+                        />
+                    </div>
                 </section>
 
                 <InspectorRail result={latestAnswered} />

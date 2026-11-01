@@ -5,6 +5,8 @@ import { humanizeTerm } from "../lib/presentation";
 
 export type FactTableProps = {
     readonly rows: readonly ClaimedFactRow[];
+    /** False for the table a chart keeps for screen readers: see `ScrollRegion`. */
+    readonly focusable?: boolean;
 };
 
 /**
@@ -13,10 +15,10 @@ export type FactTableProps = {
  * order. A row missing a column another row has renders an em dash for that
  * cell — the workbench never fills a gap with an inferred value.
  */
-export function FactTable({ rows }: FactTableProps) {
+export function FactTable({ rows, focusable }: FactTableProps) {
     const columns = columnOrder(rows);
     return (
-        <ScrollRegion label="Facts">
+        <ScrollRegion focusable={focusable} label="Facts">
             <table className="fact-table">
                 <thead>
                     <tr>

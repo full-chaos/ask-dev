@@ -35,6 +35,16 @@ describe("ScrollRegion", () => {
         );
     });
 
+    it("takes no focus where its table is hidden from sight", () => {
+        render(
+            <ScrollRegion label="Facts" focusable={false}>
+                table
+            </ScrollRegion>,
+        );
+
+        expect(screen.getByRole("group", { name: "Facts" })).not.toHaveAttribute("tabindex");
+    });
+
     it("is the only place that sets the scrolling class", () => {
         const sources = readdirSync(components, { recursive: true, encoding: "utf8" }).filter(
             (name) => name.endsWith(".tsx") && !name.endsWith(".test.tsx"),

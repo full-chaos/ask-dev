@@ -385,6 +385,120 @@ describe("AskDevChat: composerHidden", () => {
         expect(screen.getByText("Who owns this?")).toBeInTheDocument();
     });
 
+    const failedTurn = (retryable: boolean) =>
+        snapshotOf(
+            userTurn(0, "Who owns this?"),
+            assistantTurn(
+                1,
+                {
+                    kind: "failed",
+                    failure: { code: "acr_timeout", message: "Timed out.", retryable },
+                },
+                "Who owns this?",
+            ),
+        );
+
+    it("hides the bar itself, so no empty strip stays on the page", () => {
+        render(<AskDevChat source={hostSource({ ...snapshotOf(), composerHidden: true })} />);
+
+        expect(document.querySelector(".chat__composer-bar")).toHaveAttribute("hidden");
+    });
+
+    it("shows no popup and no chips: nothing can send a choice", () => {
+        const source = hostSource(
+            {
+                ...snapshotOf(
+                    userTurn(0, clarification.question),
+                    assistantTurn(1, { kind: "answered", result: clarification }),
+                ),
+                composerHidden: true,
+                pageContext: [{ kind: "team", id: "team_1", label: "Platform" }],
+            },
+            { pageContext: { remove: vi.fn() } },
+        );
+        render(<AskDevChat source={source} />);
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(screen.queryByTestId("ask-dev-context")).toBeNull();
+    });
+
+    it("shows no popup while Stop keeps the bar on the page", () => {
+        const source = hostSource(
+            {
+                ...snapshotOf(
+                    userTurn(0, clarification.question),
+                    assistantTurn(1, { kind: "answered", result: clarification }),
+                ),
+                composerHidden: true,
+                stoppable: true,
+            },
+            { stop: vi.fn() },
+        );
+        render(<AskDevChat source={source} />);
+
+        expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("the same turn and chips show with the composer: the control", () => {
+        const source = hostSource(
+            {
+                ...snapshotOf(
+                    userTurn(0, clarification.question),
+                    assistantTurn(1, { kind: "answered", result: clarification }),
+                ),
+                pageContext: [{ kind: "team", id: "team_1", label: "Platform" }],
+            },
+            { pageContext: { remove: vi.fn() } },
+        );
+        render(<AskDevChat source={source} />);
+
+        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        expect(screen.getByTestId("ask-dev-context")).toBeInTheDocument();
+    });
+
+    it("offers no Retry: nothing can send it", () => {
+        const source = hostSource({ ...failedTurn(true), composerHidden: true });
+        render(<AskDevChat source={source} />);
+
+        expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+    });
+
+    it("keeps a draft when the host hides the composer and shows it again", async () => {
+        const user = userEvent.setup();
+        const source = hostSource(snapshotOf());
+        render(<AskDevChat source={source} />);
+        await user.type(screen.getByRole("textbox"), "Keep this draft");
+
+        source.publish({ ...snapshotOf(), composerHidden: true });
+        expect(screen.queryByRole("textbox")).toBeNull();
+        source.publish(snapshotOf());
+
+        expect(screen.getByRole("textbox")).toHaveValue("Keep this draft");
+    });
+
+    it("keeps Stop: a host that can stop a run still needs it", async () => {
+        const user = userEvent.setup();
+        const stop = vi.fn();
+        const source = hostSource(
+            {
+                ...snapshotOf(
+                    userTurn(0, "Who owns this?"),
+                    assistantTurn(1, { kind: "pending", progress: { phase: "running" } }),
+                ),
+                composerHidden: true,
+                stoppable: true,
+            },
+            { stop },
+        );
+        render(<AskDevChat source={source} />);
+
+        await user.click(screen.getByRole("button", { name: "Stop" }));
+
+        expect(stop).toHaveBeenCalledOnce();
+        expect(screen.queryByRole("textbox")).toBeNull();
+    });
+
     it.each([false, undefined])("keeps the composer when it is %s", (composerHidden) => {
         const snapshot = snapshotOf();
         render(
