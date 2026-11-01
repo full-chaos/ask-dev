@@ -4,7 +4,7 @@ import { FactChart } from "./FactChart";
 import { FactTable } from "./FactTable";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { RenderShapeChart } from "./RenderShapeChart";
-import { ScalarFactsPanel } from "./ScalarFactsPanel";
+import { aboutNoPerson, ScalarFactsPanel } from "./ScalarFactsPanel";
 import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
     factRowTiles,
@@ -44,7 +44,7 @@ export type FactRowsPanelsProps = {
  * the others as references rather than re-plotting their identical rows.
  */
 export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
-    const groups = groupFactsByTable(factsWithRows(facts));
+    const groups = groupFactsByTable(factsWithRows(facts).filter(aboutNoPerson));
     return (
         <>
             {groups.map((group) => (

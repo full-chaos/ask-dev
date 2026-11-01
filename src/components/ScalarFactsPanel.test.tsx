@@ -113,6 +113,12 @@ describe("a fact with a place already is not shown twice", () => {
         expect(screen.queryByTestId("scalar-facts-panel")).toBeNull();
     });
 
+    it("a field named like an object's own method is not a cell of every table", () => {
+        const labels = { "fact_field:toString": "To string" };
+        draw(withClaims([table(), claim("toString", { null: true })], labels));
+        expect(row("To string")).toBeInTheDocument();
+    });
+
     it("the same field with another value is a fact of its own", () => {
         draw(withClaims([table(), claim("severity", { string: "low" })], LABELS));
         expect(row("Severity")).toHaveTextContent("low");
@@ -276,6 +282,25 @@ describe("a person subject", () => {
         expect(within(panel()).queryByRole("table")).toBeNull();
     });
 
+    it("a person's table shows no name and no value either", () => {
+        const rows = [{ fields: { severity: { string: "critical" } } }];
+        const { container } = render(
+            <DeterministicAnswerView
+                offersPresentation="popup"
+                result={withClaims(
+                    [
+                        claim("incident_rollup", { string: "x" }, { rows, subject: person }),
+                        claim("severity", { string: "critical" }, { subject: person }),
+                    ],
+                    LABELS,
+                )}
+            />,
+        );
+        expect(container).not.toHaveTextContent("A Person");
+        expect(container).not.toHaveTextContent("critical");
+        expect(screen.getByTestId("scalar-facts-person")).toBeInTheDocument();
+    });
+
     it("keeps the facts of the other subjects", () => {
         const claims = [
             claim("severity", { string: "critical" }, { subject: person }),
@@ -362,15 +387,26 @@ describe("a restored answer is not validated", () => {
     });
 });
 
-/** Acceptance 7: with no prose to lean on, every scalar claim of every served shape has a place. */
+/**
+ * Acceptance 7: with no prose and no other section to lean on, every scalar claim of every served
+ * shape has a place: a table of its own, or this panel.
+ */
 describe("every scalar fact has a place on screen", () => {
-    const quiet = (result: InvestigationResult): InvestigationResult => ({
+    const quiet = ({
+        cohort: _cohort,
+        render_shapes: _shapes,
+        ...result
+    }: InvestigationResult): InvestigationResult => ({
         ...result,
         deterministic_answer: "Answer.",
         direct_judgment: "Answer.",
         current_state: "",
         strongest_pressures: [],
         drivers: [],
+        remaining_work: [],
+        readiness_gaps: [],
+        paths: [],
+        conflicts: [],
     });
     const results: readonly (readonly [string, InvestigationResult])[] = [
         ["the plain example", plain as unknown as InvestigationResult],

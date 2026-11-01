@@ -8,6 +8,9 @@ import type { ClaimedFact, InvestigationResult } from "../lib/contracts";
 import { cellText, cellValue, factsWithRows, findRollupBasis, sameSubject } from "../lib/fact-rows";
 import { nonBlank } from "../lib/presentation";
 
+/** No table draws a fact on a person, and `ScalarFactsPanel` says one is held. */
+export const aboutNoPerson = (fact: ClaimedFact): boolean => fact.subject.kind !== "person";
+
 /** A restored answer is not validated, so a claim that lacks a part draws no row. */
 function readable(fact: ClaimedFact): boolean {
     const { subject, field, value } = fact as Partial<ClaimedFact> & { value?: unknown };
@@ -26,10 +29,11 @@ function isCell(fact: ClaimedFact, tables: readonly ClaimedFact[]): boolean {
         (table) =>
             table.kind === fact.kind &&
             sameSubject(table.subject, fact.subject) &&
-            table.rows?.some((row) => {
-                const cell = row.fields[fact.field];
-                return cell !== undefined && cellValue(cell) === value;
-            }),
+            table.rows?.some(
+                (row) =>
+                    Object.hasOwn(row.fields, fact.field) &&
+                    cellValue(row.fields[fact.field]!) === value,
+            ),
     );
 }
 
@@ -92,14 +96,14 @@ export function scalarFacts(
     const seen = new Set<string>();
     let personHeld = false;
     const shown = facts.filter((fact) => {
-        if ((fact.rows?.length ?? 0) > 0) return false;
-        if (isCell(fact, tables) || isRollupBasis(fact, tables, facts)) return false;
-        if (isInStatusTable(fact, result)) return false;
         // The platform's boundary: no view lists people beside each other (AGENTS.md).
-        if (fact.subject.kind === "person") {
+        if (!aboutNoPerson(fact)) {
             personHeld = true;
             return false;
         }
+        if ((fact.rows?.length ?? 0) > 0) return false;
+        if (isCell(fact, tables) || isRollupBasis(fact, tables, facts)) return false;
+        if (isInStatusTable(fact, result)) return false;
         const identity = factIdentity(fact);
         if (seen.has(identity)) return false;
         seen.add(identity);
