@@ -19,7 +19,9 @@ export {
     DeterministicAnswerView,
     type DeterministicAnswerViewProps,
 } from "../components/DeterministicAnswerView";
+export type { ShapeSlot } from "../components/ShapeSlotContext";
 export type { WorkbenchFailure } from "../lib/acr/errors";
+export type { RenderShape } from "../lib/contracts";
 export {
     isBudgetRefusal,
     narrowerContinuationCopy,

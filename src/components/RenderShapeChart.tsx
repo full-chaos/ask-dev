@@ -99,15 +99,18 @@ function valueAt(shape: RenderShape, seriesIndex: number, label: string): number
  * the same accessible-data fallback FactRowsPanel already renders beside its
  * charts.
  */
-function ShapeDataTable({
+export function ShapeDataTable({
     shape,
     labels,
+    visible = false,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
+    readonly visible?: boolean;
 }) {
     return (
-        <div className="sr-only">
+        <div className={visible ? undefined : "sr-only"}>
             <table>
                 <caption>{shape.title}</caption>
                 <thead>
