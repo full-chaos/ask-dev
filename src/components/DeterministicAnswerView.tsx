@@ -27,7 +27,7 @@ import { SubjectResolutionPanel } from "./SubjectResolutionPanel";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { WorkItemStatusPanel } from "./WorkItemStatusPanel";
 import { choiceDisposition } from "../lib/clarification";
-import { cohortRanking } from "../lib/cohort-ranking";
+import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
 import type {
     BoundStructureReceipt,
     InvestigationResult,
@@ -484,7 +484,8 @@ function AnswerView({
             <CohortMembersPanel result={result} />
             <CohortGroupsPanel cohort={result.cohort} />
             <WorkItemStatusPanel result={result} />
-            {cohortRanking(result.interpretation.shape, result.cohort).state === "rows" ? (
+            {cohortRanking(askedForCohort(result.interpretation.shape, result), result.cohort)
+                .state === "rows" ? (
                 <>
                     <DriversPanel rankingWithheld={rankingWithheld} result={result} />
                     <FactRowsPanels facts={result.claimed_facts} result={result} />

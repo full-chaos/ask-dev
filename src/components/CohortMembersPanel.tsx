@@ -2,9 +2,30 @@ import { useId } from "react";
 
 import { useServedWord, useVocabularyWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
-import { cohortRanking } from "../lib/cohort-ranking";
-import type { InvestigationResult } from "../lib/contracts";
+import { askedForCohort, cohortRanking } from "../lib/cohort-ranking";
+import type { Cohort, InvestigationResult } from "../lib/contracts";
 import { nonBlank } from "../lib/presentation";
+
+/** Who the service left out of a cohort, and why, in its own words. */
+export function CohortExclusions({ cohort }: { readonly cohort: Cohort }) {
+    const exclusions = cohort.exclusions ?? [];
+    if (exclusions.length === 0) return null;
+    return (
+        <>
+            <h3 className="panel__title" style={{ marginTop: 14 }}>
+                Left out
+            </h3>
+            <ul className="stack stack--tight">
+                {exclusions.map((exclusion, index) => (
+                    // Index key: the contract does not promise a unique canonical id.
+                    <li className="record__meta" data-testid="cohort-exclusion" key={index}>
+                        {exclusion.subject.label}: {exclusion.reason}
+                    </li>
+                ))}
+            </ul>
+        </>
+    );
+}
 
 /**
  * A cohort with nothing ranked: "who owns this", "which pull requests are open" (lead's ruling on
@@ -20,12 +41,12 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
     const word = useVocabularyWord();
     const served = useServedWord();
     const { cohort } = result;
-    if (cohortRanking(result.interpretation.shape, cohort).state !== "not_computed") return null;
+    const asked = askedForCohort(result.interpretation.shape, result);
+    if (cohortRanking(asked, cohort).state !== "not_computed") return null;
     if (cohort === undefined) return null;
 
     const drawnByStatusTable = new Set(unrankedWorkItemMembers(cohort));
     const members = cohort.members.filter((member) => !drawnByStatusTable.has(member));
-    const exclusions = cohort.exclusions ?? [];
     const plural = served("subject_kind_plural", cohort.kind);
     const singular = word("subject_kind", cohort.kind);
     const rationale = nonBlank(cohort.rationale);
@@ -52,31 +73,16 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 <p className="panel__empty">The service returned no members.</p>
             ) : members.length === 0 ? null : (
                 <ul className="stack stack--tight">
-                    {members.map((member) => (
-                        <li className="record__title" key={member.subject.canonical_id}>
+                    {members.map((member, index) => (
+                        // Index key: the contract does not promise a unique canonical id, and this
+                        // list is never reordered.
+                        <li className="record__title" key={index}>
                             {member.subject.label}
                         </li>
                     ))}
                 </ul>
             )}
-            {exclusions.length === 0 ? null : (
-                <>
-                    <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        Left out
-                    </h3>
-                    <ul className="stack stack--tight">
-                        {exclusions.map((exclusion) => (
-                            <li
-                                className="record__meta"
-                                data-testid="cohort-exclusion"
-                                key={exclusion.subject.canonical_id}
-                            >
-                                {exclusion.subject.label}: {exclusion.reason}
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            )}
+            <CohortExclusions cohort={cohort} />
         </section>
     );
 }

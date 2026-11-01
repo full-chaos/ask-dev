@@ -1,4 +1,4 @@
-// Scratch only (gap 1, CHAOS-3748): ask-dev's unranked cohort fixtures, from ACR's real encoder at
+// Scratch only (gaps 1 and 2, CHAOS-3748): ask-dev's unranked cohort fixtures, from ACR's real encoder at
 // the pin, with ACR_CONTEXT_FABRIC_VOCABULARY_LABELS_ENABLED on. Inputs: acr's contract example, and
 // a real kiac capture of a pull request cohort (web tests/fixtures/ask-dev/captures).
 package main
@@ -12,7 +12,7 @@ import (
 	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
 )
 
-const maxBytes = 65536
+const maxBytes = 262144
 
 func must(err error) {
 	if err != nil {
@@ -49,7 +49,7 @@ func unranked(result contextfabric.InvestigationResult, kind contextfabric.Subje
 }
 
 func main() {
-	out, capture := os.Args[1], os.Args[2]
+	out, capture, subjectCapture := os.Args[1], os.Args[2], os.Args[3]
 	shapes := "contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json"
 
 	repositories := unranked(load(shapes), "repository")
@@ -63,7 +63,34 @@ func main() {
 	zero.Cohort.Rationale = "No pull request reached from the subject the question names holds the status asked for now; that is a count of matches, not a statement about health."
 	zero.Completeness = contextfabric.ComputeAnswerCompleteness(zero)
 
+	// Gap 2: ACR selects on the frame, ask-dev read the interpreted shape. A real question reads
+	// `open` here, so the shapes come from the real selection with a cohort frame.
+	open := load(shapes)
+	open.RenderShapes = nil
+	open.Interpretation.Shape = "open"
+	frame := &contextfabric.QuestionFrame{SubjectExpression: contextfabric.SubjectExpression{
+		Kind:       contextfabric.SubjectExpressionDiscoveredKind,
+		Discovered: &contextfabric.DiscoveredSetExpression{MemberKind: contextfabric.SubjectTeam},
+	}}
+	open.RenderShapes, _ = contextfabric.SelectRenderShapes(open, frame)
+
+	// CHAOS-12477's two sides of the family gate, each with a real answer plan from a capture. A
+	// list on an `open` answer draws because its family is a cohort family. A single-subject answer
+	// that carries a cohort as context does not (check 10).
+	openList := unranked(load(shapes), "repository")
+	openList.Interpretation.Shape = "open"
+	openList.AnswerPlan = load(capture).AnswerPlan
+	openList.Completeness = contextfabric.ComputeAnswerCompleteness(openList)
+
+	contextCohort := unranked(load(shapes), "repository")
+	contextCohort.Interpretation.Shape = "single_subject"
+	contextCohort.AnswerPlan = load(subjectCapture).AnswerPlan
+	contextCohort.Completeness = contextfabric.ComputeAnswerCompleteness(contextCohort)
+
 	cases := map[string]contextfabric.InvestigationResult{
+		"open-cohort-family":    openList,
+		"subject-with-cohort":   contextCohort,
+		"served-shape-open":     open,
 		"unranked-repositories": repositories,
 		"zero-match":            zero,
 		"pull-requests":         load(capture),
