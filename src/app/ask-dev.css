@@ -207,6 +207,10 @@
     }
 
     .panel {
+        /* CHAOS-12429: a panel is a flex or grid child in a turn and in `.strip`; without this a
+           wide child sets its width and the answer scrolls sideways. */
+        min-width: 0;
+        max-width: 100%;
         margin-top: var(--gap);
         padding: 20px 22px;
         border: 1px solid var(--border);
@@ -423,7 +427,7 @@
 
     .versions {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
         gap: 6px 16px;
         margin: 0;
         color: var(--text-muted);
@@ -576,12 +580,15 @@
     .strip {
         display: flex;
         flex-wrap: wrap;
+        min-width: 0;
+        max-width: 100%;
         gap: var(--gap);
         margin-top: var(--gap);
     }
 
     .strip > .panel {
-        flex: 1 1 260px;
+        flex: 1 1 min(260px, 100%);
+        min-width: 0;
         margin-top: 0;
     }
 
@@ -633,6 +640,15 @@
         margin-top: 6px;
     }
 
+    /* A chip holds a source's display label, which is a phrase. It wraps inside its row and
+       never sets the row's width (CHAOS-12429: 805 px over 334 px on a phone sheet). */
+    .chip-row > .badge,
+    .chip-row > .chip {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
     .chip {
         display: inline-flex;
         align-items: center;
@@ -658,12 +674,13 @@
        `factRowTiles` derives nothing new). */
     .tiles {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(140px, 100%), 1fr));
         gap: 12px;
         margin: 12px 0;
     }
 
     .tile {
+        min-width: 0;
         display: flex;
         flex-direction: column-reverse;
         justify-content: flex-end;
@@ -681,12 +698,15 @@
         line-height: 1.15;
         letter-spacing: -0.02em;
         font-variant-numeric: tabular-nums;
+        /* A tile can hold a phrase or a date: its text must not set the answer's width. */
+        overflow-wrap: anywhere;
     }
 
     .tile__label {
         color: var(--text-muted);
         font-size: 12px;
         font-weight: 500;
+        overflow-wrap: anywhere;
     }
 
     /* A driver card gets the same elevated treatment as its panel; a principal
@@ -1178,6 +1198,7 @@
 
     .chat__timeline {
         flex: 1 1 auto;
+        min-width: 0;
         min-height: 0;
         overflow-y: auto;
         overscroll-behavior: contain;
@@ -1261,6 +1282,14 @@
         display: flex;
         flex-direction: column;
         gap: var(--gap);
+        min-width: 0;
+    }
+
+    /* An answer fits its turn at any width. What is wider than the room scrolls inside its own
+       region (`.fact-table-wrap`), never the turn or the conversation. */
+    .chat__turn--assistant > * {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .chat__turn--assistant .panel:first-child {
@@ -2057,7 +2086,15 @@
     }
 
     .fact-table-wrap {
+        min-width: 0;
+        max-width: 100%;
         overflow-x: auto;
+    }
+
+    /* The table a chart keeps for a screen reader is 1px: it must not be a scroll region, or axe
+       asks for a keyboard stop on a thing no one sees (scrollable-region-focusable). */
+    .sr-only .fact-table-wrap {
+        overflow: visible;
     }
 
     .fact-table {
@@ -2128,8 +2165,13 @@
        responsive grid instead. */
     .fact-chart--grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
         gap: 16px;
+    }
+
+    .fact-chart {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .fact-chart__cell {
@@ -2328,6 +2370,8 @@
        no border or surface of its own — nesting a second bordered box inside a
        panel is the visual noise the dark theme exists to avoid. */
     .render-shape {
+        min-width: 0;
+        max-width: 100%;
         margin: 0 0 12px;
     }
 
@@ -2350,5 +2394,18 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
+    }
+
+    /* CHAOS-12178: the owning-team roll-up label of a project investment claim. */
+    .rollup-label {
+        display: inline-flex;
+        max-width: 100%;
+        align-items: center;
+        padding: 2px 8px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        color: var(--text-muted);
+        font-size: 12px;
+        overflow-wrap: anywhere;
     }
 }

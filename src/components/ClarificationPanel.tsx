@@ -153,7 +153,7 @@ export function ClarificationPanel({
     ).length;
 
     return (
-        <section className="panel" aria-labelledby={`${idPrefix}-clarification-title`}>
+        <section role="group" className="panel" aria-labelledby={`${idPrefix}-clarification-title`}>
             {/* Callback-aware, like the wrapper copy. An interrogative heading
                 over candidates the reader cannot choose is promise-shaped text,
                 and it is OUR chrome — so it adapts. ACR's clarification_prompt

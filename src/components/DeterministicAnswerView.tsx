@@ -157,6 +157,34 @@ function FrozenOffersDisclosure({
     );
 }
 
+/** The words the render writes about AI output. */
+const AI_COPY = {
+    label: "AI-written",
+    note: "A model wrote this analysis from the facts read for this question. It suggests why; check the evidence before you act on it.",
+} as const;
+
+/**
+ * True when a model wrote the analysis of this answer. The service names the synthesis in
+ * `versions.synthesis_version`; `not_synthesized` is its one value for an answer no model wrote.
+ * Anything else, or a missing value, reads as model-written: a label too many is safer than one
+ * too few (AGENTS.md: label AI output). Web's old render used the same condition.
+ */
+export function isModelWritten(result: InvestigationResult): boolean {
+    return result.versions.synthesis_version !== "not_synthesized";
+}
+
+function AiLabel({ result }: { readonly result: InvestigationResult }) {
+    if (!isModelWritten(result)) return null;
+    return (
+        <p className="answer__ai" data-testid="answer-ai-note">
+            <span className="badge" data-testid="answer-ai-label">
+                {AI_COPY.label}
+            </span>{" "}
+            <span className="answer__ai-note">{AI_COPY.note}</span>
+        </p>
+    );
+}
+
 /**
  * The deterministic answer view — the REFERENCE answer and the fallback
  * (CHAOS-3738).
@@ -311,6 +339,7 @@ export function DeterministicAnswerView({
             // regression pass vacuously — see tests/chat.spec.ts's positive
             // clarification-chip control.
             <article aria-label="Answer" data-state={result.status}>
+                <AiLabel result={result} />
                 {notice}
                 <RankingWithheldNotice rankingWithheld={rankingWithheld} />
                 {
@@ -390,6 +419,7 @@ export function DeterministicAnswerView({
 
     return (
         <article aria-label="Answer" data-state={result.status}>
+            <AiLabel result={result} />
             {
                 // `notice` (a dishonoured prior choice) and `structureNeedsPanel`
                 // (a fresh ask for more input) both change how everything BELOW
@@ -503,7 +533,7 @@ export function DeterministicAnswerView({
                 emptyMessage="No conflicting evidence was reported."
             />
 
-            <section className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
+            <section role="group" className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
                 <h2 className="panel__title" id={`${idPrefix}-evidence-title`}>
                     Evidence references
                 </h2>

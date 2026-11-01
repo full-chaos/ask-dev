@@ -59,8 +59,11 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     const hasDeterministicAnswer = nonBlank(result.deterministic_answer) !== undefined;
     const hasJudgment = nonBlank(result.direct_judgment) !== undefined;
     const hasCurrentState = nonBlank(result.current_state) !== undefined;
+    // The same words in both fields read once (a withheld answer's fixed sentence is one such).
+    const judgmentRepeatsAnswer = hasDeterministicAnswer && directJudgment === deterministicAnswer;
     return (
         <section
+            role="group"
             className="panel"
             aria-labelledby={`${idPrefix}-answer-title`}
             data-testid="answer-panel"
@@ -73,7 +76,7 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
                     <SafeAnswerText text={deterministicAnswer} />
                 </p>
             ) : null}
-            {hasJudgment ? (
+            {judgmentRepeatsAnswer ? null : hasJudgment ? (
                 <p className="answer__body">
                     <SafeAnswerText text={directJudgment} />
                 </p>

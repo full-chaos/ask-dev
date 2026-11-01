@@ -90,7 +90,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         expect(notice).toBeInTheDocument();
         expect(notice.textContent).toContain(`This answer is NOT about ${chosen.label}`);
         // The answer still renders — this is detection, not suppression.
-        expect(screen.getByRole("region", { name: "Answer" })).toBeInTheDocument();
+        expect(screen.getByRole("group", { name: "Answer" })).toBeInTheDocument();
     });
 
     /**
@@ -113,7 +113,7 @@ describe("a dishonoured choice is never presented as normal", () => {
         // The choice UI is still offered; the tester is simply told the truth
         // about what happened to the last one.
         expect(
-            screen.getByRole("region", { name: "Which subject did you mean?" }),
+            screen.getByRole("group", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
     });
 

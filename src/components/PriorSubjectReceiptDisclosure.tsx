@@ -40,7 +40,7 @@ export function PriorSubjectReceiptDisclosure({
     const idPrefix = useId();
     if (dispositions === undefined || dispositions.length === 0) return null;
     return (
-        <section aria-labelledby={`${idPrefix}-prior-subject-receipts-title`}>
+        <section role="group" aria-labelledby={`${idPrefix}-prior-subject-receipts-title`}>
             <h3 className="panel__title" id={`${idPrefix}-prior-subject-receipts-title`}>
                 Earlier subject choices
             </h3>

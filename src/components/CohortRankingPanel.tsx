@@ -4,15 +4,19 @@ import { useId } from "react";
 import { Badge } from "./Badge";
 import { RenderShapeChart } from "./RenderShapeChart";
 import type {
+    ClaimedFact,
     Cohort,
     CohortMember,
     CohortMemberDriver,
     InterpretedShape,
     InvestigationResult,
 } from "../lib/contracts";
-import { cohortRanking, formatCohortScore } from "../lib/cohort-ranking";
+import { cohortRanking, formatCohortScore, memberDriversText } from "../lib/cohort-ranking";
+import { coverageCaption } from "../lib/coverage-caption";
+import { rollupForSubject } from "../lib/investment-rollup";
 import { COHORT_SHAPE_RULES, renderShapesFor } from "../lib/render-shapes";
-import { cohortDataCompletenessTone, cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
+import { cohortOutcomeTone, humanizeTerm } from "../lib/presentation";
+import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 
 export type CohortRankingPanelProps = {
     /**
@@ -45,11 +49,35 @@ function DriverCell({ driver }: { readonly driver: CohortMemberDriver }) {
     );
 }
 
-/** The labels of members the cohort carries but acr did not rank. */
+/**
+ * The members the cohort carries but acr did not rank, by name, each with its served driver rows
+ * when it has any (they often say why it was not ranked). The same `memberDriversText` as the
+ * ranking table, so the two never disagree (CHAOS-12245, CHAOS-12429).
+ */
 function unrankedLabels(members: readonly CohortMember[]): readonly string[] {
     return members
         .filter((member) => member.ranking_computed !== true)
-        .map((member) => member.subject.label);
+        .map((member) => {
+            const drivers = memberDriversText(member);
+            return drivers === null ? member.subject.label : `${member.subject.label} (${drivers})`;
+        });
+}
+
+/** CHAOS-12178: a member whose investment claim is the owning team's roll-up says so. */
+function MemberRollup({
+    claims,
+    subject,
+}: {
+    readonly claims: readonly ClaimedFact[];
+    readonly subject: CohortMember["subject"];
+}) {
+    const rollup = rollupForSubject(claims, subject);
+    if (rollup === null) return null;
+    return (
+        <div>
+            <InvestmentRollupLabel rollup={rollup} />
+        </div>
+    );
 }
 
 /**
@@ -107,6 +135,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
         // member name is rendered; the raw cohort stays in the inspector.
         return (
             <section
+                role="group"
                 className="panel"
                 aria-labelledby={`${idPrefix}-cohort-ranking-title`}
                 data-testid="cohort-ranking-withheld"
@@ -140,6 +169,7 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
 
     return (
         <section
+            role="group"
             className="panel"
             aria-labelledby={`${idPrefix}-cohort-ranking-title`}
             data-testid="cohort-ranking-panel"
@@ -161,9 +191,21 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                 // directly below, carrying every value the chart shows plus
                 // the ones it does not.
             }
-            {cohortShapes.map((cohortShape) => (
-                <RenderShapeChart key={cohortShape.shape_id} shape={cohortShape} />
-            ))}
+            {cohortShapes.map((cohortShape) => {
+                // CHAOS-12429 E: which ranked members this chart does not show, counted from the
+                // verified cohort, never from the chart's numbers.
+                const caption = coverageCaption(cohortShape, cohort);
+                return (
+                    <div key={cohortShape.shape_id}>
+                        <RenderShapeChart shape={cohortShape} />
+                        {caption.sentences.length === 0 ? null : (
+                            <p className="record__meta" data-testid="cohort-chart-caption">
+                                {caption.sentences.join(" ")}
+                            </p>
+                        )}
+                    </div>
+                );
+            })}
             {withheldShapes > 0 ? (
                 <p className="record__meta" data-testid="render-shapes-withheld">
                     {withheldShapes === 1 ? "A chart was" : `${withheldShapes} charts were`}{" "}
@@ -178,7 +220,6 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                             <th scope="col">{humanizeTerm(cohort.kind)}</th>
                             <th scope="col">Score</th>
                             <th scope="col">Outcome</th>
-                            <th scope="col">Data completeness</th>
                             <th scope="col">Window</th>
                             <th scope="col">Top drivers</th>
                         </tr>
@@ -189,6 +230,10 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                 <td>{row.attentionRank}</td>
                                 <td data-subject-id={row.member.subject.canonical_id}>
                                     {row.member.subject.label}
+                                    <MemberRollup
+                                        claims={result?.claimed_facts ?? []}
+                                        subject={row.member.subject}
+                                    />
                                 </td>
                                 <td>
                                     {
@@ -225,22 +270,20 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                         </Badge>
                                     )}
                                 </td>
-                                <td>
-                                    {row.member.data_completeness === undefined ? (
-                                        "—"
-                                    ) : (
-                                        <Badge
-                                            tone={cohortDataCompletenessTone(
-                                                row.member.data_completeness,
-                                            )}
-                                            title={row.member.data_completeness}
-                                        >
-                                            {humanizeTerm(row.member.data_completeness)}
-                                        </Badge>
-                                    )}
-                                </td>
                                 <td>{humanizeTerm(row.window)}</td>
                                 <td>
+                                    {
+                                        // The member's served driver rows, from the one shared
+                                        // `memberDriversText`; nothing when it serves none.
+                                        memberDriversText(row.member) === null ? null : (
+                                            <p
+                                                className="record__meta"
+                                                data-testid="ranking-drivers-count"
+                                            >
+                                                {memberDriversText(row.member)}
+                                            </p>
+                                        )
+                                    }
                                     {row.topDrivers.length === 0 ? (
                                         <span className="panel__empty">
                                             {row.scoreWithheld

@@ -45,7 +45,7 @@ describe("the clarification choice is reachable from every view", () => {
         await ask();
 
         expect(
-            await screen.findByRole("region", { name: "Which subject did you mean?" }),
+            await screen.findByRole("group", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
     });
 
@@ -60,7 +60,7 @@ describe("the clarification choice is reachable from every view", () => {
         ).toBeInTheDocument();
         // The choice survives the view switch.
         expect(
-            screen.getByRole("region", { name: "Which subject did you mean?" }),
+            screen.getByRole("group", { name: "Which subject did you mean?" }),
         ).toBeInTheDocument();
         expect(screen.getAllByRole("button", { name: /^Select / }).length).toBeGreaterThan(0);
     });
@@ -70,7 +70,7 @@ describe("the clarification choice is reachable from every view", () => {
         await ask("What is the status of dev-health-ops?");
 
         expect(await screen.findByRole("article", { name: "Answer" })).toBeVisible();
-        expect(screen.queryByRole("region", { name: "Which subject did you mean?" })).toBeNull();
+        expect(screen.queryByRole("group", { name: "Which subject did you mean?" })).toBeNull();
     });
 });
 

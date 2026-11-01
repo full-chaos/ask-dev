@@ -10,8 +10,12 @@
  * the withheld form by construction. The removal is recorded in a typed
  * marker (`rankingWithheld`, beside the result) that panels read; it is never silent.
  *
- * Service prose (`deterministic_answer`, ...) is producer-owned and is not
- * rewritten here.
+ * Service prose (`deterministic_answer`, `direct_judgment`, `current_state`) is replaced here too
+ * (lead's ruling on CHAOS-12429, which supersedes the note from CHAOS-9616): no person ranking is a
+ * platform hard rule, prose can name and score a member, and a render cannot parse names out of it.
+ * The service serves no person ranks, so this is reachable only by a contract break. Determinism
+ * here is a safety property, which CHAOS-4690 allows. A kind ON the list keeps its prose:
+ * organization and pull-request cohorts do not reach this path.
  */
 import { isRankableSubjectKind } from "./cohort-ranking";
 import type { InvestigationResult } from "./contracts";
@@ -44,9 +48,7 @@ export type WithheldBoundary = {
  * member-keyed ranking points: envelope ids, status and completeness,
  * interpretation, coverage/versions/limitations/warnings, subject
  * resolution (candidate offers, no scores), temporal and window fields,
- * refusal/correction/semantic-reading notices. The answer prose
- * (`deterministic_answer`, `direct_judgment`, `current_state`) is
- * producer-owned and is not rewritten here.
+ * refusal/correction/semantic-reading notices.
  */
 export const RESULT_FIELDS_KEPT = [
     "schema_version",
@@ -57,13 +59,10 @@ export const RESULT_FIELDS_KEPT = [
     "question",
     "interpretation",
     "subject_resolution",
-    "direct_judgment",
-    "current_state",
     "limitations",
     "limitations_displaced",
     "coverage",
     "versions",
-    "deterministic_answer",
     "warnings",
     "reused",
     "temporal",
@@ -74,6 +73,21 @@ export const RESULT_FIELDS_KEPT = [
     "status_correction",
     "semantic_reading",
 ] as const;
+
+/** What a withheld answer says instead of the service's prose. No member, no count. */
+export const WITHHELD_ANSWER =
+    "This answer is not shown, because it ranks subjects of a kind this view does not rank.";
+
+/**
+ * The service's prose fields: required strings, so each is replaced, never dropped. The contract
+ * requires a decisive result's answer and judgment to be non-empty; `AnswerPanel` shows one line
+ * when they are equal.
+ */
+export const RESULT_FIELDS_REPLACED = {
+    deterministic_answer: WITHHELD_ANSWER,
+    direct_judgment: WITHHELD_ANSWER,
+    current_state: "",
+} as const;
 
 /** Required arrays the contract needs present; withheld to `[]`. */
 export const RESULT_FIELDS_DROPPED_TO_EMPTY = [
@@ -122,6 +136,7 @@ export function withholdUnrankableRankings(result: InvestigationResult): Withhel
         if (source[field] !== undefined) built[field] = source[field];
     }
     for (const field of RESULT_FIELDS_DROPPED_TO_EMPTY) built[field] = [];
+    Object.assign(built, RESULT_FIELDS_REPLACED);
     return {
         result: built as unknown as InvestigationResult,
         rankingWithheld: {

@@ -15,8 +15,7 @@ export function RankingWithheldNotice({
     return (
         <p className="record__meta" data-testid="ranking-withheld-notice" role="note">
             Ranking not shown. This answer covers subjects of a kind this view does not rank, so
-            their rank, score and ranking drivers were removed before display. Prose from the
-            service is shown as the service wrote it.
+            their rank, score and ranking drivers were removed before display.
         </p>
     );
 }

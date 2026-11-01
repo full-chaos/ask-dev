@@ -1,4 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+import { expect, test, type Page } from "@playwright/test";
 
 import { configuredBaseURL } from "../playwright.config";
 
@@ -25,6 +27,8 @@ const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 const TRIGGER_PARENT_REFERENCE_ECHO = "e2e-parent-reference-echo";
 // Kept in sync by hand with `TRIGGER_WINDOW` for the same reason.
 const TRIGGER_WINDOW = "e2e-window-me";
+// Kept in sync by hand with `TRIGGER_SHAPES` for the same reason.
+const TRIGGER_SHAPES = "e2e-shapes-me";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -375,7 +379,7 @@ test.describe("clarification chips", () => {
         await expect(turn).toHaveAttribute("data-state", "complete");
         await expect(turn).not.toHaveAttribute("data-state", "clarification_required");
 
-        await expect(page.getByRole("region", { name: "Which subject did you mean?" })).toHaveCount(
+        await expect(page.getByRole("group", { name: "Which subject did you mean?" })).toHaveCount(
             0,
         );
         await expect(page.getByRole("button", { name: /^Select /u })).toHaveCount(0);
@@ -386,7 +390,7 @@ test.describe("clarification chips", () => {
         // answer carries no `structure_needs`, so the panel must not render
         // either.
         await expect(
-            page.getByRole("region", { name: "More structure would narrow this" }),
+            page.getByRole("group", { name: "More structure would narrow this" }),
         ).toHaveCount(0);
         await expect(page.getByRole("button", { name: /^Select /u })).toHaveCount(0);
     });
@@ -639,7 +643,7 @@ test.describe("mixed receipt families", () => {
         // No inline panel anywhere — the popup is the ONLY rendering of the
         // offer.
         await expect(
-            page.getByRole("region", { name: "More structure would narrow this" }),
+            page.getByRole("group", { name: "More structure would narrow this" }),
         ).toHaveCount(0);
 
         // Accumulate a structure pick WITHOUT confirming it — the exact
@@ -821,7 +825,8 @@ test.describe("cohort ranking", () => {
         await expect(rows.first()).toContainText("CHAOS");
         await expect(rows.first()).toContainText("43.5");
         await expect(rows.first()).toContainText("qualified");
-        await expect(rows.first()).toContainText("complete");
+        // CHAOS-12245: the served driver rows, never the raw completeness word.
+        await expect(rows.first()).not.toContainText("complete");
         // The two strongest drivers, strongest first.
         await expect(rows.first()).toContainText("operational deficiencies.severity");
         await expect(rows.first()).toContainText("health.compounding risk");
@@ -867,5 +872,160 @@ test.describe("cohort ranking", () => {
         await expect(turn).toContainText("CHAOS: operational deficiencies");
         await expect(page.getByTestId("cohort-ranking-panel")).toHaveCount(0);
         await expect(page.getByTestId("ranking-row")).toHaveCount(0);
+    });
+});
+
+/**
+ * CHAOS-12429: the render meets web's written rules for a host panel (416 px) and a phone sheet
+ * (a 390 px window holds a sheet about 334 px wide; 320 px is the narrowest window a phone has).
+ *  - The conversation and every answer never scroll sideways; a wide table scrolls inside its own
+ *    named region.
+ *  - axe finds no `landmark-unique` and no `scrollable-region-focusable` violation in a transcript
+ *    of two turns.
+ * Each case is a real browser against the production build: jsdom has no layout, so it cannot
+ * measure either rule.
+ */
+const AXE_SOURCE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
+
+const PHONE_WIDTHS = [320, 334, 390] as const;
+const PANEL_WIDTH = 416;
+
+const LAYOUT_CASES = [
+    { name: "a plain answer", question: "Why is Ask Dev still not ready to ship?" },
+    { name: "a ranking", question: `Which teams are struggling, ${TRIGGER_COHORT}?` },
+    {
+        name: "fact tables and a readiness trend chart",
+        question: `Which teams are struggling, ${TRIGGER_SHAPES}?`,
+    },
+] as const;
+
+async function ask(page: Page, question: string) {
+    await page.getByLabel("Ask a question").fill(question);
+    await page.getByRole("button", { name: "Send" }).click();
+}
+
+/** What scrolls sideways: the page, the conversation, and each answer. */
+async function sidewaysOverflow(page: Page) {
+    return page.evaluate(() => {
+        const over = (name: string, element: Element | null) =>
+            element === null
+                ? [`${name}: missing`]
+                : element.scrollWidth > element.clientWidth
+                  ? [`${name}: ${element.scrollWidth} > ${element.clientWidth}`]
+                  : [];
+        return [
+            ...over("document", document.documentElement),
+            ...over("conversation", document.querySelector('[role="log"]')),
+            ...Array.from(document.querySelectorAll("article")).flatMap((article, index) =>
+                over(`answer ${index + 1}`, article),
+            ),
+        ];
+    });
+}
+
+async function axeViolations(page: Page) {
+    await page.evaluate(AXE_SOURCE);
+    return page.evaluate(async () => {
+        const axe = (
+            window as unknown as {
+                axe: {
+                    run: (
+                        context: unknown,
+                        options: unknown,
+                    ) => Promise<{
+                        violations: { id: string; nodes: { target: unknown[] }[] }[];
+                    }>;
+                };
+            }
+        ).axe;
+        const outcome = await axe.run(document, {
+            runOnly: {
+                type: "rule",
+                values: ["landmark-unique", "scrollable-region-focusable"],
+            },
+        });
+        return outcome.violations.map((violation) => ({
+            id: violation.id,
+            targets: violation.nodes.map((node) => node.target.join(" ")),
+        }));
+    });
+}
+
+test.describe("narrow windows and the host rules", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    test("fact tiles with long values fit a phone sheet", async ({ page }) => {
+        await page.setViewportSize({ width: 334, height: 800 });
+        await page.goto("/");
+        await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
+        await expect(
+            page.getByTestId("fact-tiles").filter({ hasText: "0.8333333333333334" }),
+        ).toHaveCount(1);
+        expect(await sidewaysOverflow(page)).toEqual([]);
+    });
+
+    for (const width of PHONE_WIDTHS) {
+        for (const layout of LAYOUT_CASES) {
+            test(`${width} px: ${layout.name} does not scroll sideways`, async ({ page }) => {
+                await page.setViewportSize({ width, height: 800 });
+                await page.goto("/");
+                await ask(page, layout.question);
+                await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(1);
+                await expect(page.getByRole("article", { name: "Answer" })).toHaveAttribute(
+                    "data-state",
+                    "complete",
+                );
+
+                // Discriminating: the wide parts are really on the page, so a pass is not an
+                // answer that drew nothing.
+                if (layout.name.includes("chart")) {
+                    await expect(page.locator("figure.render-shape").first()).toBeVisible();
+                    await expect(page.getByRole("group", { name: "Ranking" })).toBeVisible();
+                }
+                expect(await sidewaysOverflow(page)).toEqual([]);
+            });
+        }
+    }
+
+    test("a wide table scrolls inside its own named region", async ({ page }) => {
+        await page.setViewportSize({ width: 334, height: 800 });
+        await page.goto("/");
+        await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
+        const ranking = page.getByRole("group", { name: "Ranking" });
+        await expect(ranking).toBeVisible();
+
+        const box = await ranking.evaluate((element) => ({
+            scroll: element.scrollWidth,
+            client: element.clientWidth,
+            tabindex: element.getAttribute("tabindex"),
+        }));
+        // Discriminating: the table really is wider than the room, and the wrapper takes the
+        // overflow and can be reached by keyboard.
+        expect(box.scroll).toBeGreaterThan(box.client);
+        expect(box.tabindex).toBe("0");
+    });
+
+    for (const width of [...PHONE_WIDTHS, PANEL_WIDTH]) {
+        test(`${width} px: axe finds no repeated landmark and no unreachable scroll region in two turns`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 800 });
+            await page.goto("/");
+            await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
+            await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(1);
+            await ask(page, `And which teams improved, ${TRIGGER_SHAPES}?`);
+            await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(2);
+
+            expect(await axeViolations(page)).toEqual([]);
+        });
+    }
+
+    test("every answer shows AI-written, and no visible text names a ticket", async ({ page }) => {
+        await page.setViewportSize({ width: PANEL_WIDTH, height: 800 });
+        await page.goto("/");
+        await ask(page, "Why is Ask Dev still not ready to ship?");
+        const turn = page.getByRole("article", { name: "Answer" });
+        await expect(turn.getByText("AI-written", { exact: true })).toBeVisible();
+        await expect(turn).not.toContainText(/CHAOS-\d+/u);
     });
 });

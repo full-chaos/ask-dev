@@ -61,7 +61,11 @@ export function ChosenAnswersSummaryCard({
     );
 
     return (
-        <section aria-label="Chosen answers" className="panel panel--compact chosen-answers">
+        <section
+            role="group"
+            aria-label="Chosen answers"
+            className="panel panel--compact chosen-answers"
+        >
             <h2 className="panel__title">Your answers</h2>
             <ul className="chosen-answers__list">
                 {rows.map((row) => (

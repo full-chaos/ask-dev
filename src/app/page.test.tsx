@@ -234,7 +234,7 @@ describe("the clarification popup is live only on the most recent assistant turn
         expect(dialog).toBeInTheDocument();
         // No inline offer panel anywhere in the transcript — the popup is the
         // ONLY place the offers render (ticket acceptance).
-        expect(screen.queryByRole("region", { name: CLARIFICATION_PROMPT })).toBeNull();
+        expect(screen.queryByRole("group", { name: CLARIFICATION_PROMPT })).toBeNull();
         for (const candidate of clarification.subject_resolution.candidates) {
             expect(
                 within(dialog).getByRole("button", { name: candidate.subject.label }),
@@ -667,7 +667,7 @@ describe("structure-needs offers (CHAOS-3927 P2, now popup-only per CHAOS-4671)"
         // in the transcript — the popup is the ONLY rendering of the offer.
         await screen.findByRole("dialog", { name: "Which kind of thing is this about?" });
         expect(
-            screen.queryByRole("region", { name: "More structure would narrow this" }),
+            screen.queryByRole("group", { name: "More structure would narrow this" }),
         ).toBeNull();
         // A single-select page has no separate "Continue" — picking IS
         // confirming, since it is the only page in this result.
@@ -782,7 +782,7 @@ describe("mixed receipt families page through the SAME popup as a 2-question ste
         expect(within(page1).getByText("1 of 2")).toBeInTheDocument();
         // No inline panel anywhere — this is the ONLY rendering of the offer.
         expect(
-            screen.queryByRole("region", { name: "More structure would narrow this" }),
+            screen.queryByRole("group", { name: "More structure would narrow this" }),
         ).toBeNull();
 
         await user.click(screen.getByRole("button", { name: "Next question" }));

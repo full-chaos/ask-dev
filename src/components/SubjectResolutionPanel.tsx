@@ -42,7 +42,7 @@ export function SubjectResolutionPanel({
         !hasPriorReceiptDisclosure;
     if (isContentless) return null;
     return (
-        <section className="panel" aria-labelledby="subjects-title">
+        <section role="group" className="panel" aria-labelledby="subjects-title">
             <h2 className="panel__title" id="subjects-title">
                 Subjects
             </h2>

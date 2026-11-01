@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { FactChart } from "./FactChart";
 import { FactTable } from "./FactTable";
+import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { RenderShapeChart } from "./RenderShapeChart";
 import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
@@ -11,6 +12,7 @@ import {
     groupFactsByTable,
     selectPresentation,
 } from "../lib/fact-rows";
+import { rollupsOfClaims } from "../lib/investment-rollup";
 import { trendShapesForClaim } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 
@@ -130,8 +132,12 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     const idPrefix = useId();
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
+    const rollups = rollupsOfClaims(allFacts, [
+        fact.claim_id,
+        ...alsoClaims.map((claim) => claim.claim_id),
+    ]);
     return (
-        <section aria-labelledby={titleId} className="panel panel--card">
+        <section role="group" aria-labelledby={titleId} className="panel panel--card">
             <h2 className="panel__title" id={titleId}>
                 {humanizeTerm(fact.kind)} · {humanizeTerm(fact.field)}
             </h2>
@@ -140,6 +146,18 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 {rollupBasis !== undefined ? ` · ${humanizeTerm(rollupBasis)}` : ""}
                 {` · ${rows.length} row${rows.length === 1 ? "" : "s"}`}
             </p>
+            {rollups.length === 0 ? null : (
+                // CHAOS-12178: the owning-team roll-ups among the claims this table backs.
+                <p className="fact-panel__caption" data-testid="fact-rollups">
+                    {rollups.map((rollup) => (
+                        <InvestmentRollupLabel
+                            key={rollup.subject.canonical_id}
+                            rollup={rollup}
+                            named={rollups.length > 1}
+                        />
+                    ))}
+                </p>
+            )}
             {alsoClaims.length > 0 ? (
                 // CHAOS-4672: this table backs more than one claim. The
                 // OTHER claims are referenced here, not re-plotted as their

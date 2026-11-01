@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import type { CohortMember, CohortMemberDriver, InvestigationResult } from "@/lib/contracts";
 import {
+    cohortRanking,
     isCohortIntent,
+    isRankedCohortKind,
+    MEMBER_DRIVER_MAX,
+    memberDriversText,
     RANKING_TABLE_TOP_DRIVERS,
     rankingTable,
     rowWindow,
@@ -220,5 +224,108 @@ describe("rowWindow", () => {
 
     it("is current for a member carrying no drivers at all", () => {
         expect(rowWindow([])).toBe("current");
+    });
+});
+
+/**
+ * CHAOS-12429 G1 (restored): the render ranks a cohort of kind team, project or repository only.
+ * This is an allow-list of kinds the render may RANK -- a safety gate that gives no words.
+ */
+describe("G1: the kinds the render may rank", () => {
+    it("admits team, project and repository", () => {
+        for (const kind of ["team", "project", "repository"]) {
+            expect(isRankedCohortKind(kind)).toBe(true);
+        }
+    });
+
+    it("refuses every other kind, documented or not", () => {
+        for (const kind of [
+            "person",
+            "organization",
+            "pull_request",
+            "work_item",
+            "deployment",
+            "incident",
+            "document",
+            "decision",
+            "episode",
+            "metric",
+            "pull_request_review",
+            "ci_pipeline_run",
+            "work_item_ref",
+            "brand_new_kind",
+            "",
+        ]) {
+            expect(isRankedCohortKind(kind)).toBe(false);
+        }
+    });
+
+    const rankedCohort = (cohortKind: string, memberKinds: readonly string[]) => ({
+        ...result.cohort!,
+        kind: cohortKind,
+        members: memberKinds.map((kind, index) => ({
+            ...member({
+                label: `m${String(index)}`,
+                ranking_computed: true,
+                attention_rank: index + 1,
+                score: 10,
+            }),
+            subject: {
+                kind,
+                canonical_id: `${kind}:m${String(index)}`,
+                label: `m${String(index)}`,
+            },
+        })),
+    });
+
+    it("a rankable cohort of rankable members ranks", () => {
+        expect(
+            cohortRanking("explicit_cohort", rankedCohort("project", ["project", "project"])).state,
+        ).toBe("rows");
+    });
+
+    it("one non-rankable MEMBER fails the whole cohort closed", () => {
+        expect(
+            cohortRanking("explicit_cohort", rankedCohort("team", ["team", "person", "team"]))
+                .state,
+        ).toBe("kind_not_ranked");
+    });
+
+    it("a non-rankable COHORT kind fails closed even when every member is a team", () => {
+        for (const kind of ["person", "organization", "pull_request", "brand_new_kind"]) {
+            expect(cohortRanking("explicit_cohort", rankedCohort(kind, ["team"])).state).toBe(
+                "kind_not_ranked",
+            );
+        }
+    });
+});
+
+describe("memberDriversText (CHAOS-12245: the enum is never shown or mapped to a number)", () => {
+    const driverRows = (n: number) =>
+        Array.from({ length: n }, () => driver({})) as unknown as CohortMember["drivers"];
+
+    it("says the served driver rows against the most ACR serves", () => {
+        expect(MEMBER_DRIVER_MAX).toBe(5);
+        expect(memberDriversText(member({ label: "A", drivers: driverRows(3)! }))).toBe(
+            "3 of 5 drivers",
+        );
+        expect(memberDriversText(member({ label: "A", drivers: driverRows(5)! }))).toBe(
+            "5 of 5 drivers",
+        );
+    });
+
+    it("says nothing when the member serves no driver rows, an empty list included", () => {
+        expect(memberDriversText(member({ label: "A" }))).toBeNull();
+        expect(memberDriversText(member({ label: "A", drivers: [] }))).toBeNull();
+    });
+
+    it("never reads data_completeness: partial with 4 rows says 4, degraded with none says nothing", () => {
+        expect(
+            memberDriversText(
+                member({ label: "A", data_completeness: "partial", drivers: driverRows(4)! }),
+            ),
+        ).toBe("4 of 5 drivers");
+        expect(memberDriversText(member({ label: "A", data_completeness: "degraded" }))).toBeNull();
+        expect(memberDriversText(member({ label: "A", data_completeness: "complete" }))).toBeNull();
     });
 });

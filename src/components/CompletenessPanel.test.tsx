@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { CompletenessPanel } from "@/components/CompletenessPanel";
 import type { AnswerCompleteness, PlanRequirementOutcomeRow } from "@/lib/contracts";
+import { visibleText } from "@/test/visible-text";
 
 /** A raw term is carried in `data-value`: a user reads the served or generic word instead. */
 const byValue = (root: ParentNode, value: string): Element | null =>
@@ -18,7 +19,7 @@ const byValue = (root: ParentNode, value: string): Element | null =>
  * (genuinely optional fields) are handled elsewhere.
  */
 describe("CompletenessPanel", () => {
-    it("shows the terminal status as visible chip text, not just a color", () => {
+    it("shows no terminal status word: the raw value stays in a data attribute only (CHAOS-12245)", () => {
         const completeness: AnswerCompleteness = {
             terminal_status: "complete",
             claimed_facts_count: 4,
@@ -27,7 +28,9 @@ describe("CompletenessPanel", () => {
         };
         render(<CompletenessPanel completeness={completeness} />);
         const panel = screen.getByTestId("completeness-panel");
-        expect(within(panel).getByTestId("completeness-chip-row")).toHaveTextContent("complete");
+        expect(within(panel).queryByTestId("completeness-chip-row")).toBeNull();
+        expect(panel.getAttribute("data-terminal-status")).toBe("complete");
+        expect(panel.getAttribute("data-completeness-state")).toBe("not_derived");
     });
 
     it("shows the claimed-facts and row counts", () => {
@@ -109,70 +112,299 @@ describe("CompletenessPanel", () => {
             "limitation disclosed",
         );
     });
+
+    // A reason's value can hold a state word ("degraded_reason_disclosed"), so it sits in the
+    // closed fold CHAOS-12417 rules for it: CHAOS-12245 keeps the word out of view.
+    it("keeps the terminal reason in a closed fold, out of view", () => {
+        const completeness: AnswerCompleteness = {
+            terminal_status: "degraded",
+            terminal_reason: "degraded_reason_disclosed",
+            claimed_facts_count: 2,
+            rows_count: 0,
+            state: "degraded",
+        };
+        render(<CompletenessPanel completeness={completeness} />);
+        const fold = screen.getByTestId("completeness-terminal-reason").closest("details");
+        expect(fold).not.toBeNull();
+        expect(fold).not.toHaveAttribute("open");
+        expect(visibleText(screen.getByTestId("completeness-panel"))).not.toMatch(/degraded/iu);
+    });
 });
 
 /**
- * CHAOS-5640/CHAOS-5109: `state` is server-derived from the requirement
- * outcomes, independent of `terminal_status` — its own badge, exhaustive
- * over the four-member enum, with a tone that never reads `not_derived` as
- * `complete`. CHAOS-12245, chris's ruling: not derived renders nothing about
- * completeness, so it shows no badge.
+ * CHAOS-12245, chris's ruling: web never shows the raw completeness state, nor a sentence that only
+ * restates it. `terminal_status` and `state` badges are gone; `partial` and `degraded` add at most
+ * one "Missing data" sentence (CHAOS-12429), with no state word.
  */
-describe("CompletenessPanel — completeness.state badge", () => {
-    const EXPECTED_TONE = {
-        complete: "badge--ok",
-        partial: "badge--warn",
-        degraded: "badge--bad",
-    } as const;
+/** Each text node apart: `textContent` joins a heading to the next word, and `\\b` then misses it. */
+function textNodesOf(root: Element): string {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const texts: string[] = [];
+    while (walker.nextNode()) texts.push(walker.currentNode.textContent ?? "");
+    return texts.join(" ");
+}
 
-    it("shows no badge for a state that was not derived", () => {
-        const completeness: AnswerCompleteness = {
-            terminal_status: "no_match",
-            claimed_facts_count: 0,
-            rows_count: 0,
-            state: "not_derived",
-        };
-        render(<CompletenessPanel completeness={completeness} />);
+describe("CompletenessPanel — no raw completeness state in view", () => {
+    const base = { claimed_facts_count: 0, rows_count: 0 } as const;
 
-        expect(byValue(document, "state: not_derived")).toBeNull();
-        expect(screen.getByTestId("completeness-chip-row").textContent).not.toMatch(/derived/u);
-    });
-
-    for (const state of ["complete", "partial", "degraded"] as const) {
-        it(`renders the "${state}" state with its own title and tone`, () => {
-            const completeness: AnswerCompleteness = {
-                terminal_status: "no_match",
-                claimed_facts_count: 0,
-                rows_count: 0,
-                state,
-            };
-            const { unmount } = render(<CompletenessPanel completeness={completeness} />);
-
-            const badge = byValue(document, `state: ${state}`)!;
-            expect(badge).toHaveTextContent(state.replaceAll("_", " "));
-            expect(badge).toHaveClass(EXPECTED_TONE[state]);
-
-            unmount();
-        });
+    for (const terminal_status of ["complete", "partial", "degraded", "no_match"] as const) {
+        for (const state of ["complete", "partial", "degraded", "not_derived"] as const) {
+            it(`shows neither "${terminal_status}" nor "${state}" as a word`, () => {
+                render(<CompletenessPanel completeness={{ ...base, terminal_status, state }} />);
+                const panel = screen.getByTestId("completeness-panel");
+                expect(panel.querySelectorAll(".badge")).toHaveLength(0);
+                // Not as any other text either: a state word is never display text.
+                expect(textNodesOf(panel)).not.toMatch(
+                    /\b(?:complete|partial|degraded|no[ _]match|not[ _]derived)\b/iu,
+                );
+                expect(byValue(document, `terminal_status: ${terminal_status}`)).toBeNull();
+                expect(byValue(document, `state: ${state}`)).toBeNull();
+                expect(panel.getAttribute("data-terminal-status")).toBe(terminal_status);
+                expect(panel.getAttribute("data-completeness-state")).toBe(state);
+            });
+        }
     }
 
-    /**
-     * D25/B2 (chris 2026-09-13): `terminal_status` (disposition) and `state`
-     * (derived outcome) answer different questions and can legitimately
-     * disagree on the same result. This panel never reconciles them — both
-     * badges stay visible, unedited.
-     */
-    it("shows BOTH badges, unreconciled, when terminal_status and state disagree", () => {
+    it("the Withheld badge stays", () => {
+        render(
+            <CompletenessPanel
+                completeness={{ ...base, terminal_status: "complete", state: "complete" }}
+                rankingWithheld={{ reason: "subject_kind_not_ranked", members_affected: 1 }}
+            />,
+        );
+        expect(screen.getByText("Withheld")).toBeInTheDocument();
+        expect(screen.getByTestId("completeness-withheld")).toBeInTheDocument();
+    });
+});
+
+describe("CompletenessPanel — the Missing data sentence (CHAOS-12429)", () => {
+    const withRows = (
+        state: AnswerCompleteness["state"],
+        outcomes: PlanRequirementOutcomeRow[],
+    ): AnswerCompleteness => ({
+        terminal_status: "partial",
+        claimed_facts_count: 2,
+        rows_count: 2,
+        state,
+        outcomes,
+    });
+    const sentence = () => screen.queryByTestId("completeness-missing-data");
+
+    it("says one plain sentence for partial: what was missing, by requirement, no state word", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    outcomeRow({
+                        requirement: "state/project",
+                        obligation: "state",
+                        outcome: "narrowed",
+                        impact: "depth",
+                        served: 2,
+                        declared: 5,
+                    }),
+                    outcomeRow({
+                        requirement: "ranking/team",
+                        obligation: "ranking",
+                        outcome: "unavailable",
+                        impact: "dimension",
+                        served: 0,
+                        declared: 0,
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toHaveTextContent(
+            "Missing data: state narrowed (2 of 5); ranking unavailable.",
+        );
+        expect(sentence()!.textContent).not.toMatch(/partial|degraded|complete|derived/iu);
+    });
+
+    it("also says it for degraded", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("degraded", [
+                    outcomeRow({
+                        requirement: "flow/team",
+                        obligation: "flow",
+                        outcome: "not_attempted",
+                        impact: "scope",
+                        served: 0,
+                        declared: 0,
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toHaveTextContent("Missing data: flow not attempted.");
+    });
+
+    it("says nothing for complete or not_derived, even when a row names a gap", () => {
+        const gap = outcomeRow({
+            requirement: "state/project",
+            obligation: "state",
+            outcome: "unavailable",
+            impact: "scope",
+        });
+        for (const state of ["complete", "not_derived"] as const) {
+            const { unmount } = render(<CompletenessPanel completeness={withRows(state, [gap])} />);
+            expect(sentence()).toBeNull();
+            unmount();
+        }
+    });
+
+    it("names a row with an empty obligation by its requirement", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    outcomeRow({
+                        requirement: "workload/team",
+                        obligation: "  ",
+                        outcome: "unavailable",
+                        impact: "scope",
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toHaveTextContent("Missing data: workload unavailable.");
+    });
+
+    it("skips a row that names nothing, and says nothing when no row names a gap", () => {
+        const { unmount } = render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    {
+                        ...outcomeRow({ impact: "scope" }),
+                        requirement: undefined,
+                        obligation: undefined,
+                    } as unknown as PlanRequirementOutcomeRow,
+                    outcomeRow({
+                        requirement: "health/team",
+                        obligation: "health",
+                        outcome: "satisfied",
+                        impact: "none",
+                    }),
+                    outcomeRow({
+                        requirement: "flow/team",
+                        obligation: "flow",
+                        outcome: "not_applicable",
+                        impact: "none",
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toBeNull();
+        unmount();
+    });
+
+    it("skips a row whose requirement is empty, even when it carries an obligation", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    outcomeRow({
+                        requirement: "",
+                        obligation: "state",
+                        outcome: "unavailable",
+                        impact: "scope",
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toBeNull();
+    });
+
+    it("never says a state word inside a longer obligation either (codex r2)", () => {
         const completeness: AnswerCompleteness = {
-            terminal_status: "complete",
-            claimed_facts_count: 4,
-            rows_count: 2,
+            terminal_status: "partial",
+            claimed_facts_count: 1,
+            rows_count: 1,
             state: "partial",
+            outcomes: [
+                {
+                    requirement: "status/items",
+                    obligation: "partial status",
+                    outcome: "unavailable",
+                    impact: "section_missing",
+                    served: 0,
+                    declared: 1,
+                } as unknown as PlanRequirementOutcomeRow,
+            ],
         };
         render(<CompletenessPanel completeness={completeness} />);
-        const row = screen.getByTestId("completeness-chip-row");
-        expect(byValue(row, "terminal_status: complete")).toHaveTextContent("complete");
-        expect(byValue(row, "state: partial")).toHaveTextContent("partial");
+        expect(screen.queryByTestId("completeness-missing-data")).toBeNull();
+    });
+
+    it("never says a state word as an obligation's name", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("degraded", [
+                    outcomeRow({
+                        requirement: "partial/team",
+                        obligation: "partial",
+                        outcome: "unavailable",
+                        impact: "scope",
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toBeNull();
+    });
+
+    it("uses the last row of a requirement: a later stage supersedes an earlier one", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    outcomeRow({
+                        requirement: "state/project",
+                        obligation: "state",
+                        outcome: "unavailable",
+                        impact: "scope",
+                        stage: "planning",
+                    }),
+                    outcomeRow({
+                        requirement: "state/project",
+                        obligation: "state",
+                        outcome: "satisfied",
+                        impact: "none",
+                        stage: "projection",
+                    }),
+                ])}
+            />,
+        );
+        expect(sentence()).toBeNull();
+    });
+
+    it("falls back to the generic path for an outcome it does not know, with no table", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    {
+                        ...outcomeRow({
+                            requirement: "state/project",
+                            obligation: "state",
+                            impact: "scope",
+                        }),
+                        outcome: "brand_new_outcome",
+                    } as unknown as PlanRequirementOutcomeRow,
+                ])}
+            />,
+        );
+        expect(sentence()).toHaveTextContent("Missing data: state brand new outcome.");
+    });
+
+    it("is not shown while parts are withheld", () => {
+        render(
+            <CompletenessPanel
+                completeness={withRows("partial", [
+                    outcomeRow({
+                        requirement: "state/project",
+                        obligation: "state",
+                        outcome: "unavailable",
+                        impact: "scope",
+                    }),
+                ])}
+                rankingWithheld={{ reason: "subject_kind_not_ranked", members_affected: 1 }}
+            />,
+        );
+        expect(sentence()).toBeNull();
     });
 });
 
@@ -252,7 +484,6 @@ describe("CompletenessPanel — requirement outcomes", () => {
             "No requirement outcomes were derived",
         );
         expect(screen.queryByTestId("completeness-outcomes-table")).not.toBeInTheDocument();
-        expect(byValue(document, "state: not_derived")).toBeNull();
     });
 
     it("shows an explicit empty-state line when outcomes is an empty array, agreeing with not_derived", () => {

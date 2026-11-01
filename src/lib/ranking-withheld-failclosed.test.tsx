@@ -15,6 +15,8 @@ import {
     RESULT_FIELDS_DROPPED,
     RESULT_FIELDS_DROPPED_TO_EMPTY,
     RESULT_FIELDS_KEPT,
+    RESULT_FIELDS_REPLACED,
+    WITHHELD_ANSWER,
     withholdUnrankableRankings,
 } from "@/lib/ranking-withheld";
 import { validateContract } from "@/lib/acr/validate";
@@ -38,6 +40,124 @@ function personResult(): InvestigationResult {
         ) as NonNullable<InvestigationResult["render_shapes"]>,
     };
 }
+
+/**
+ * Lead's ruling on CHAOS-12429: no person ranking is a platform hard rule, and service prose can
+ * name and score a member. The boundary fires only when the contract was already broken, so this
+ * case is synthetic: the service serves no person ranks.
+ */
+describe("a withheld answer's prose", () => {
+    const leaky = (result: InvestigationResult): InvestigationResult => ({
+        ...result,
+        deterministic_answer: "Ada ranks first with a score of 97.",
+        direct_judgment: "Ada leads, then Grace.",
+        current_state: "Ada scored 97 and Grace scored 91.",
+        limitations: ["The kept limitation."],
+    });
+    const oneMember = (kind: string): InvestigationResult => ({
+        ...teamResult,
+        cohort: {
+            ...teamResult.cohort!,
+            members: teamResult.cohort!.members.map((m, i) =>
+                i === 0 ? { ...m, subject: { ...m.subject, kind } } : m,
+            ),
+        },
+    });
+    const kind = (cohortKind: string): InvestigationResult => ({
+        ...teamResult,
+        cohort: {
+            ...teamResult.cohort!,
+            kind: cohortKind,
+            members: teamResult.cohort!.members.map((m) => ({
+                ...m,
+                subject: { ...m.subject, kind: cohortKind },
+            })),
+        },
+    });
+
+    for (const [name, make] of [
+        ["a person cohort", personResult],
+        ["a team cohort with one person member", () => oneMember("person")],
+        ["an unknown kind", () => kind("brand_new_kind")],
+    ] as const) {
+        it(`replaces every prose field of ${name}, and keeps the rest`, () => {
+            const source = leaky(make());
+            const { result, rankingWithheld } = withholdUnrankableRankings(source);
+            expect(rankingWithheld).toBeDefined();
+            const text = JSON.stringify([
+                result.deterministic_answer,
+                result.direct_judgment,
+                result.current_state,
+            ]);
+            expect(text).not.toMatch(/Ada|Grace|97|91/u);
+            expect(result.direct_judgment).toBe(WITHHELD_ANSWER);
+            expect(result.deterministic_answer).toBe(WITHHELD_ANSWER);
+            expect(result.current_state).toBe("");
+            expect(result.result_id).toBe(source.result_id);
+            expect(result.coverage).toEqual(source.coverage);
+            expect(result.limitations).toEqual(["The kept limitation."]);
+        });
+
+        it(`draws none of the prose of ${name}`, async () => {
+            const user = userEvent.setup();
+            const { result, rankingWithheld } = withholdUnrankableRankings(leaky(make()));
+            const { container } = render(
+                <DeterministicAnswerView rankingWithheld={rankingWithheld} result={result} />,
+            );
+            for (const fold of Array.from(container.querySelectorAll("summary"))) {
+                await user.click(fold);
+            }
+            // The contract requires both fields, and a reader sees the sentence once.
+            expect(container.textContent?.split(WITHHELD_ANSWER)).toHaveLength(2);
+            expect(container.textContent).not.toMatch(/Ada|Grace|\b97\b|\b91\b/u);
+            expect(container.textContent).toContain("The kept limitation.");
+        });
+    }
+
+    it("replaces the prose of a person cohort whose members all read as teams", () => {
+        const source = leaky({
+            ...teamResult,
+            cohort: { ...teamResult.cohort!, kind: "person" },
+        });
+        const { result, rankingWithheld } = withholdUnrankableRankings(source);
+        expect(rankingWithheld).toBeDefined();
+        expect(result.direct_judgment).toBe(WITHHELD_ANSWER);
+    });
+
+    it("names no member and no count in the fixed sentence or the notice", () => {
+        expect(WITHHELD_ANSWER).not.toMatch(/\d/u);
+        const { result, rankingWithheld } = withholdUnrankableRankings(leaky(personResult()));
+        render(<DeterministicAnswerView rankingWithheld={rankingWithheld} result={result} />);
+        const notice = screen.getByTestId("ranking-withheld-notice").textContent ?? "";
+        expect(notice).not.toMatch(/\d/u);
+        expect(notice).not.toContain("as the service wrote it");
+    });
+
+    it("leaves a normal team cohort's prose unchanged", () => {
+        const source = leaky(teamResult);
+        const { result, rankingWithheld } = withholdUnrankableRankings(source);
+        expect(rankingWithheld).toBeUndefined();
+        expect(result.deterministic_answer).toBe(source.deterministic_answer);
+        expect(result.direct_judgment).toBe(source.direct_judgment);
+        expect(result.current_state).toBe(source.current_state);
+    });
+
+    for (const allowed of ["organization", "pull_request"]) {
+        it(`leaves a ${allowed} cohort's prose unchanged`, () => {
+            const source = leaky(kind(allowed));
+            const { result, rankingWithheld } = withholdUnrankableRankings(source);
+            expect(rankingWithheld).toBeUndefined();
+            expect(result.direct_judgment).toBe(source.direct_judgment);
+        });
+    }
+
+    it("is idempotent", () => {
+        const first = withholdUnrankableRankings(leaky(personResult()));
+        const second = withholdUnrankableRankings(first.result);
+        expect(second.result).toEqual(first.result);
+        expect(second.result.direct_judgment).toBe(WITHHELD_ANSWER);
+    });
+});
 
 describe("fail-closed withholding (allowlist)", () => {
     it("(a) a person cohort result carries no value, label or subject id of its shapes", () => {
@@ -90,6 +210,7 @@ describe("fail-closed withholding (allowlist)", () => {
             ...RESULT_FIELDS_KEPT,
             ...RESULT_FIELDS_DROPPED,
             ...RESULT_FIELDS_DROPPED_TO_EMPTY,
+            ...Object.keys(RESULT_FIELDS_REPLACED),
         ]);
         const undecided = Object.keys(schema.properties).filter((key) => !decided.has(key));
         expect(undecided).toEqual([]);

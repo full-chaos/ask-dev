@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskDevChat } from "@/components/chat/AskDevChat";
 import { HISTORY_COPY, NOT_RUN_COPY } from "@/render/chat-copy";
@@ -446,6 +446,125 @@ describe("History: on the desktop rail", () => {
     it("has no New conversation button of its own: rail__new is there", () => {
         setup();
         expect(screen.queryByTestId("ask-dev-history-new")).toBeNull();
+    });
+});
+
+/**
+ * CHAOS-12429: a host's rule is that opening its narrow panel sends nothing, so the list is read
+ * only when it is on screen. `ask-dev.css` hides the rail under 860px of the frame; this sheet does
+ * the same here, because the test document does not load `ask-dev.css`.
+ */
+describe("History: read only when it is on screen", () => {
+    let sheet: HTMLStyleElement;
+    let resized: (() => void)[];
+    const resize = () => {
+        act(() => {
+            for (const callback of resized) callback();
+        });
+    };
+
+    beforeEach(() => {
+        sheet = document.createElement("style");
+        sheet.textContent = ".ask__rail--left { display: none; }";
+        document.head.append(sheet);
+        resized = [];
+        vi.stubGlobal(
+            "ResizeObserver",
+            class {
+                constructor(callback: () => void) {
+                    resized.push(callback);
+                }
+                observe() {}
+                disconnect() {
+                    resized = [];
+                }
+            },
+        );
+    });
+
+    afterEach(() => {
+        sheet.remove();
+        vi.unstubAllGlobals();
+    });
+
+    it("reads nothing on mount, or for a new conversation, while the rail is hidden", () => {
+        const { api, host } = setup({ currentId: null });
+        expect(api.load).not.toHaveBeenCalled();
+        host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: THREAD_A }) });
+        expect(api.load).not.toHaveBeenCalled();
+    });
+
+    it("reads when the toggle opens the list, and again on the next open", async () => {
+        const user = userEvent.setup();
+        const { api } = setup();
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledOnce();
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledOnce();
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads once for an open under Strict Mode", async () => {
+        const user = userEvent.setup();
+        const api = fakeHistory();
+        const host = hostSource({ ...snapshotOf(), history: historySnapshot() }, { history: api });
+        render(
+            <StrictMode>
+                <AskDevChat source={host} />
+            </StrictMode>,
+        );
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledOnce();
+    });
+
+    it("reads once when another conversation remounts the surface with the list open", async () => {
+        const user = userEvent.setup();
+        const api = fakeHistory();
+        const host = hostSource(
+            { ...snapshotOf(), conversationKey: 1, history: historySnapshot() },
+            { history: api },
+        );
+        render(
+            <StrictMode>
+                <AskDevChat source={host} />
+            </StrictMode>,
+        );
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledOnce();
+        host.publish({ ...snapshotOf(), conversationKey: 2, history: historySnapshot() });
+        expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads for a new conversation while the open list shows", async () => {
+        const user = userEvent.setup();
+        const { api, host } = setup({ currentId: null });
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).toHaveBeenCalledOnce();
+        host.publish({ ...snapshotOf(), history: historySnapshot({ currentId: THREAD_A }) });
+        expect(api.load).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads when the frame grows until the rail shows, and not on a resize that keeps it hidden", () => {
+        const { api } = setup();
+        resize();
+        expect(api.load).not.toHaveBeenCalled();
+        sheet.remove();
+        resize();
+        expect(api.load).toHaveBeenCalledOnce();
+        resize();
+        expect(api.load).toHaveBeenCalledOnce();
+    });
+
+    it("waits for the host's first history even when the list opens first", async () => {
+        const user = userEvent.setup();
+        const api = fakeHistory();
+        const host = hostSource(snapshotOf(), { history: api });
+        render(<AskDevChat source={host} />);
+        await user.click(screen.getByTestId("ask-dev-history-toggle"));
+        expect(api.load).not.toHaveBeenCalled();
+        host.publish({ ...snapshotOf(), history: historySnapshot() });
+        expect(api.load).toHaveBeenCalledOnce();
     });
 });
 

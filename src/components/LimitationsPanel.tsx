@@ -31,6 +31,7 @@ export function LimitationsPanel({ limitations, warnings }: LimitationsPanelProp
     const idPrefix = useId();
     return (
         <section
+            role="group"
             className="panel panel--card panel--compact"
             aria-labelledby={`${idPrefix}-limitations-title`}
         >

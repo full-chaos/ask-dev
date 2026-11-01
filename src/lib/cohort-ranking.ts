@@ -9,9 +9,8 @@
  * the member already carries. Nothing is re-derived, re-scored, or re-worded
  * — the Workbench is a read-only consumer (README, "What this is").
  *
- * The one intentional difference: `data_completeness` is carried through as a
- * column. acr's row omits it; CHAOS-4449 asks for it, and it is a real
- * contract field on the member, so surfacing it invents nothing.
+ * `data_completeness` is not a column (CHAOS-12245, CHAOS-12429): the render never shows a raw
+ * completeness word. A member's served driver rows are said instead (`memberDriversText`).
  */
 import type {
     Cohort,
@@ -172,7 +171,25 @@ export function rankingTable(members: readonly CohortMember[]): readonly RankedC
 }
 
 /**
- * The subject kinds a cohort ranking may be built over: a CLOSED allowlist,
+ * The subject kinds the render may RANK: a CLOSED allowlist of exactly team, project and
+ * repository (G1, CHAOS-12429; the rule web's panel held). `Cohort.kind` and `SubjectRef.kind` are
+ * open vocabularies, so every other value -- `person`, `organization`, `pull_request`, a kind
+ * documented but not rankable here, and any value not yet known -- fails closed: "Ranking not
+ * shown", with no name, score, rank or chart. A safety gate that gives no words, not a phrasing
+ * table. It is NARROWER than `RANKABLE_SUBJECT_KINDS` below on purpose: that list decides which
+ * cohorts may stay in a result at all (a work-item cohort feeds the work-item status panel), this
+ * one decides which cohorts may be RANKED.
+ */
+export const RANKED_COHORT_KINDS: readonly string[] = ["team", "project", "repository"];
+
+/** True only for a kind the render may rank. */
+export function isRankedCohortKind(kind: string): boolean {
+    return RANKED_COHORT_KINDS.includes(kind);
+}
+
+/**
+ * The subject kinds a cohort may CARRY through the result boundary (`withholdUnrankableRankings`):
+ * a CLOSED allowlist,
  * and exactly the kinds the pre-open-vocabulary pin's closed `Cohort.kind` /
  * `SubjectRef.kind` enum declared (a7310f9). `Cohort.kind` and
  * `SubjectRef.kind` are open vocabularies now ("a client must tolerate values
@@ -206,6 +223,22 @@ export function isRankableSubjectKind(kind: string): boolean {
     return RANKABLE_SUBJECT_KINDS.includes(kind);
 }
 
+/** The most driver rows ACR serves for one cohort member (`CohortMember`: complete has 5). */
+export const MEMBER_DRIVER_MAX = 5;
+
+/**
+ * A member's data completeness in plain words, from its SERVED driver rows only: "3 of 5 drivers"
+ * (CHAOS-12245: the render never shows `data_completeness`, a raw completeness word). The enum is
+ * never mapped back to a number: partial is 3 or 4 drivers, so that would invent one. `null` when
+ * the member serves no driver rows, an empty list included: then nothing is said. The ranking
+ * column and the unranked summary both use this one function, so the two never disagree.
+ */
+export function memberDriversText(member: Pick<CohortMember, "drivers">): string | null {
+    const drivers = member.drivers;
+    if (!Array.isArray(drivers) || drivers.length === 0) return null;
+    return `${String(drivers.length)} of ${String(MEMBER_DRIVER_MAX)} drivers`;
+}
+
 export type CohortRankingState =
     /** The question did not ask for a ranking, or there is no cohort. */
     | { readonly state: "not_requested" }
@@ -229,8 +262,8 @@ export function cohortRanking(
     // Kinds FIRST: a person cohort is "Ranking not shown" whether or not
     // acr set `ranking_computed`, never silently nothing.
     const kindsRankable =
-        isRankableSubjectKind(cohort.kind) &&
-        cohort.members.every((member) => isRankableSubjectKind(member.subject.kind));
+        isRankedCohortKind(cohort.kind) &&
+        cohort.members.every((member) => isRankedCohortKind(member.subject.kind));
     if (!kindsRankable) return { state: "kind_not_ranked" };
     const rows = rankingTable(cohort.members);
     if (rows === null) return { state: "not_computed" };
