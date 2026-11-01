@@ -33,7 +33,7 @@ export function StructureConfirmationRecords({
                     <div className="record__head">
                         <span className="record__title">{summary.label}</span>
                         <Badge
-                            title={summary.entry.disposition}
+                            data-value={summary.entry.disposition}
                             tone={structureDispositionTone(summary.entry.disposition)}
                         >
                             {summary.entry.disposition.replaceAll("_", " ")}

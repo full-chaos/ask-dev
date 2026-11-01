@@ -62,7 +62,7 @@ export function PriorSubjectReceiptDisclosure({
                     >
                         <Badge
                             tone={priorSubjectReceiptDispositionTone(entry.disposition)}
-                            title={entry.disposition}
+                            data-value={entry.disposition}
                         >
                             {humanizeTerm(entry.disposition)}
                         </Badge>

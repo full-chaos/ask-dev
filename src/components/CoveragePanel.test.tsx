@@ -268,9 +268,7 @@ describe("CoveragePanel — CHAOS-4690 degraded reasons: engine Phrasing when pr
             expect(visibleText(panel)).not.toContain(reason);
             expect(rawReasons(panel)).toContain(reason);
         }
-        expect(visibleText(panel)).toContain(
-            "This source didn't fully contribute; no reason was reported.",
-        );
+        expect(visibleText(panel)).toContain("This source did not fully contribute.");
 
         // The old vocab-mapping.ts sentence for this exact raw shape never
         // reappears (that module, and the sentence it composed, are both
@@ -579,6 +577,7 @@ describe("CoveragePanel — Complete is gated on the sources, not on partial alo
  */
 describe("CoveragePanel — a degraded reason is visible, never only collapsed", () => {
     const FLOOR = "This source didn't fully contribute; no reason was reported.";
+    const RAW_ONLY = "This source did not fully contribute.";
 
     function detailCoverage(detail: Record<string, unknown>) {
         return {
@@ -642,7 +641,7 @@ describe("CoveragePanel — a degraded reason is visible, never only collapsed",
         );
         const panel = screen.getByTestId("coverage-panel");
         expect(visibleText(panel)).not.toContain("metrics: stale_provider_window");
-        expect(visibleText(panel)).toContain(FLOOR);
+        expect(visibleText(panel)).toContain(RAW_ONLY);
         expect(rawReasons(panel)).toEqual(["metrics: stale_provider_window"]);
     });
 });
@@ -684,6 +683,7 @@ describe("CoveragePanel — an unknown source state never carries the Complete h
  */
 describe("CoveragePanel — the degraded-reason display rule, whole input domain", () => {
     const FLOOR = "This source didn't fully contribute; no reason was reported.";
+    const RAW_ONLY = "This source did not fully contribute.";
 
     function show(detail: Record<string, unknown>) {
         const coverage = {
@@ -717,7 +717,7 @@ describe("CoveragePanel — the degraded-reason display rule, whole input domain
         ["all absent", {}, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing real only", { phrasing: "P." }, { shows: "P.", collapsedCount: 0 }],
         ["label real only", { label: "L." }, { shows: "L.", collapsedCount: 0 }],
-        ["raw real only", { raw: "R." }, { shows: FLOOR, collapsedCount: 1 }],
+        ["raw real only", { raw: "R." }, { shows: RAW_ONLY, collapsedCount: 1 }],
         ["phrasing empty", { phrasing: "" }, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing whitespace", { phrasing: "  " }, { shows: FLOOR, collapsedCount: 0 }],
         ["phrasing zero-width", { phrasing: "​" }, { shows: FLOOR, collapsedCount: 0 }],
@@ -749,7 +749,7 @@ describe("CoveragePanel — the degraded-reason display rule, whole input domain
         [
             "both blank, the floor shows and raw collapses",
             { phrasing: " ", label: "​", raw: "R." },
-            { shows: FLOOR, collapsedCount: 1 },
+            { shows: RAW_ONLY, collapsedCount: 1 },
         ],
         [
             "raw identical to what shows is not repeated in a disclosure",

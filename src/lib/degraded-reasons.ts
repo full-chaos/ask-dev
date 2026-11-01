@@ -11,6 +11,12 @@ export const GENERIC_DEGRADED_REASON_SENTENCE =
     "This source didn't fully contribute; no reason was reported.";
 
 /**
+ * The plain sentence over a raw reason no sentence was served for: the fold below it holds the
+ * reason, so this one must not say that none was reported.
+ */
+export const RAW_ONLY_DEGRADED_REASON_SENTENCE = "This source did not fully contribute.";
+
+/**
  * What a degraded reason SHOWS, and what is left over as supplementary detail.
  *
  * INVARIANT: visible text is served text. A raw string is a machine token (a
@@ -33,7 +39,11 @@ export function degradedReasonDisplay(reason: {
     const shown = nonBlank(reason.phrasing) ?? nonBlank(reason.label);
     const raw = nonBlank(reason.raw);
     return {
-        text: shown ?? GENERIC_DEGRADED_REASON_SENTENCE,
+        text:
+            shown ??
+            (raw === undefined
+                ? GENERIC_DEGRADED_REASON_SENTENCE
+                : RAW_ONLY_DEGRADED_REASON_SENTENCE),
         supplementaryRaw: raw !== undefined && raw !== shown ? raw : undefined,
     };
 }

@@ -318,9 +318,7 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         const reason = unsupportedExample.coverage.degraded_reasons[0]!;
 
         expect(visibleText(coverage)).not.toContain(reason);
-        expect(visibleText(coverage)).toContain(
-            "This source didn't fully contribute; no reason was reported.",
-        );
+        expect(visibleText(coverage)).toContain("This source did not fully contribute.");
         expect(within(coverage).getByTestId("degraded-reason-raw").textContent).toContain(reason);
     });
 
@@ -339,7 +337,7 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         expect(visible).toContain("The service returned no direct judgment.");
         expect(visible).toContain("Some sources did not contribute.");
         expect(visible).toContain("unavailable");
-        expect(visible).toContain("This source didn't fully contribute; no reason was reported.");
+        expect(visible).toContain("This source did not fully contribute.");
         expect(visible).toContain(result.limitations[0]!);
         expect(visible).not.toContain("Every source contributed.");
     });

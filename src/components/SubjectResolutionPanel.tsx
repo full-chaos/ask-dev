@@ -53,7 +53,7 @@ export function SubjectResolutionPanel({
                 {resolution.committed.length === 0
                     ? "No subject settled on."
                     : `Settled on: ${resolution.committed
-                          .map((subject) => `${subject.label} (${subject.kind})`)
+                          .map((subject) => subject.label)
                           .join(", ")}`}
             </p>
             {resolution.candidates.length === 0 ? (
@@ -66,7 +66,7 @@ export function SubjectResolutionPanel({
                                 <span className="record__title">{candidate.subject.label}</span>
                                 <Badge
                                     tone={candidateStateTone(candidate.state)}
-                                    title={candidate.state}
+                                    data-value={candidate.state}
                                 >
                                     {humanizeTerm(candidate.state)}
                                 </Badge>

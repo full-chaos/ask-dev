@@ -146,7 +146,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                 {withheld ? (
                     <Badge
                         tone="warn"
-                        title={`withheld; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
+                        data-value={`withheld; service terminal_status: ${completeness.terminal_status}, state: ${completeness.state}`}
                     >
                         Withheld
                     </Badge>
@@ -154,7 +154,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                     <>
                         <Badge
                             tone={statusTone(completeness.terminal_status)}
-                            title={`terminal_status: ${completeness.terminal_status}`}
+                            data-value={`terminal_status: ${completeness.terminal_status}`}
                         >
                             {humanizeTerm(completeness.terminal_status)}
                         </Badge>
@@ -164,7 +164,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                             completeness.state === "not_derived" ? null : (
                                 <Badge
                                     tone={completenessStateTone(completeness.state)}
-                                    title={`state: ${completeness.state}`}
+                                    data-value={`state: ${completeness.state}`}
                                 >
                                     {humanizeTerm(completeness.state)}
                                 </Badge>
@@ -213,7 +213,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                     // filtered, only ever rendered in the
                                     // server's own append-only order.
                                     <tr data-testid="completeness-outcome-row" key={index}>
-                                        <td title={row.requirement}>
+                                        <td data-value={row.requirement}>
                                             {row.requirement === undefined
                                                 ? "—"
                                                 : humanizeTerm(row.requirement)}
@@ -232,7 +232,7 @@ export function CompletenessPanel({ completeness, rankingWithheld }: Completenes
                                         <td>
                                             <Badge
                                                 tone={planRequirementOutcomeTone(row.outcome)}
-                                                title={`outcome: ${row.outcome}`}
+                                                data-value={`outcome: ${row.outcome}`}
                                             >
                                                 {humanizeTerm(row.outcome)}
                                             </Badge>

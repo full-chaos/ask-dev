@@ -32,7 +32,16 @@ const FAILURE_MESSAGE_FILES = [
 const RAW_FIELDS = new Set(["code", "details", "httpStatus", "upstreamCode"]);
 
 /** Ids a component reads into a view. A `lib/` file builds keys and request bodies from them. */
-const RAW_ID_FIELDS = new Set(["applied_value", "canonical_id", "prior_result_id", "receipt_id"]);
+const RAW_ID_FIELDS = new Set([
+    "applied_value",
+    "canonical_id",
+    "disposition",
+    "kind",
+    "prior_result_id",
+    "provenance",
+    "receipt_id",
+    "state",
+]);
 
 const FORBIDDEN = [
     /\bACR\b/u,
@@ -225,6 +234,8 @@ describe("the guard", () => {
         ["an id", "const a = <p>{chosen.canonical_id}</p>;"],
         ["a receipt", "const a = <p>{candidate.receipt_id}</p>;"],
         ["an applied value", "const a = <p>{entry.applied_value}</p>;"],
+        ["a kind", "const a = <p>{subject.kind}</p>;"],
+        ["a state", "const a = <p title={`${name}: ${source.state}`} />;"],
     ])("fires on a raw field read into %s", (_name, source) => {
         expect(offences("plant.tsx", source)).toHaveLength(1);
     });

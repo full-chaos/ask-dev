@@ -169,7 +169,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                 <Badge
                                     key={`${source.source}:${source.state}`}
                                     tone={coverageStateTone(source.state)}
-                                    title={`${name}: ${source.state}`}
+                                    data-value={`${name}: ${source.state}`}
                                 >
                                     {name} · {stateText}
                                 </Badge>

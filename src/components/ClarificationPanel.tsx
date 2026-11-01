@@ -86,7 +86,7 @@ function CandidateRecord({
             <div className="record__head">
                 <span className="record__meta">#{rank}</span>
                 <span className="record__title">{candidate.subject.label}</span>
-                <Badge tone={candidateStateTone(candidate.state)} title={candidate.state}>
+                <Badge data-value={candidate.state} tone={candidateStateTone(candidate.state)}>
                     {humanizeTerm(candidate.state)}
                 </Badge>
                 {selected ? (
