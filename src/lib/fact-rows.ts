@@ -108,6 +108,10 @@ function isValidCalendarDate(year: number, month: number, day: number): boolean 
  * check correct for a bare date AND a full offset timestamp alike, by
  * validating the calendar digits directly instead of anything timezone-
  * shifted.
+ *
+ * A date-time with no zone is UTC, as ACR's `parseRenderDate` reads it. `Date.parse` would read it
+ * in the viewer's zone, so a valid trend could be withheld or drawn in another order there
+ * (CHAOS-11986 problem 3). `served-shape-account.test.tsx` holds this to ACR's own parser.
  */
 export function parseIsoDate(value: string): number | null {
     const match = ISO_DATE_PATTERN.exec(value);
@@ -116,7 +120,8 @@ export function parseIsoDate(value: string): number | null {
     const month = Number(match[2]);
     const day = Number(match[3]);
     if (!isValidCalendarDate(year, month, day)) return null;
-    const millis = Date.parse(value);
+    const zoneLessTime = match[4] !== undefined && match[7] === undefined;
+    const millis = Date.parse(zoneLessTime ? `${value.replace(" ", "T")}Z` : value);
     return Number.isNaN(millis) ? null : millis;
 }
 

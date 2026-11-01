@@ -1,0 +1,153 @@
+// Scratch generator, not built by this repo. Run from a detached acr worktree at d617cbd2 with one
+// extra scratch file that exports parseRenderDate: `go run ./cmd/zzshapes <this directory>`.
+// Scratch only (CHAOS-11986): ask-dev's served-shape fixtures, from ACR's real SelectRenderShapes,
+// ServeVocabularyLabels and json.Marshal at the pin, plus a date table from ACR's real parseRenderDate.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+const maxBytes = 262144
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func load() contextfabric.InvestigationResult {
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var result contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &result))
+	return result
+}
+
+var frame = &contextfabric.QuestionFrame{SubjectExpression: contextfabric.SubjectExpression{
+	Kind:       contextfabric.SubjectExpressionDiscoveredKind,
+	Discovered: &contextfabric.DiscoveredSetExpression{MemberKind: contextfabric.SubjectTeam},
+}}
+
+// ranked turns the example's unranked second member into a ranked one, with the first member's
+// fields as its base.
+func secondRanked(result *contextfabric.InvestigationResult, rank int, score float64) *contextfabric.CohortMember {
+	first := result.Cohort.Members[0]
+	second := &result.Cohort.Members[1]
+	subject := second.Subject
+	*second = first
+	second.Subject = subject
+	second.Drivers = append([]contextfabric.CohortMemberDriver(nil), first.Drivers...)
+	second.Rank = rank
+	second.AttentionRank = rank
+	value := score
+	second.Score = &value
+	return second
+}
+
+func select_(result contextfabric.InvestigationResult) contextfabric.InvestigationResult {
+	result.RenderShapes = nil
+	result.RenderShapes, _ = contextfabric.SelectRenderShapes(result, frame)
+	result.Completeness = contextfabric.ComputeAnswerCompleteness(result)
+	return result
+}
+
+func main() {
+	out := os.Args[1]
+
+	// Problem 4: the first driver family (sorted by signal) omits the top-ranked member. Every number
+	// follows ACR's scoring formula, because its validator holds them to it.
+	order := load()
+	second := secondRanked(&order, 2, 0)
+	var secondScore float64
+	for index := range second.Drivers {
+		driver := &second.Drivers[index]
+		driver.SourceClaimedFactIDs = nil
+		driver.Value /= 4
+		driver.WeightContributed /= 4
+		secondScore += driver.WeightContributed
+	}
+	second.Score = &secondScore
+	top := &order.Cohort.Members[0]
+	var kept []contextfabric.CohortMemberDriver
+	var available float64
+	for _, driver := range top.Drivers {
+		if driver.Signal != "health.compounding_risk" {
+			kept = append(kept, driver)
+			available += driver.Weight
+		}
+	}
+	var topScore float64
+	for index := range kept {
+		kept[index].WeightContributed = 100 * kept[index].Weight * kept[index].Value / available
+		topScore += kept[index].WeightContributed
+	}
+	top.Drivers = kept
+	top.Score = &topScore
+	top.DataCompleteness = "partial"
+	var basis []string
+	for _, family := range top.RankingBasis {
+		if family != "health.compounding_risk" {
+			basis = append(basis, family)
+		}
+	}
+	top.RankingBasis = basis
+
+	// Problem 3: zone-less date-times, two of them an hour apart across the Los Angeles spring gap.
+	zoneless := load()
+	days := []string{"2026-03-08T01:30:00", "2026-03-08T02:30:00", "2026-03-08T03:30:00"}
+	for index := range zoneless.ClaimedFacts {
+		fact := &zoneless.ClaimedFacts[index]
+		if fact.ClaimID != "claim_metrics_ask_dev_commits" {
+			continue
+		}
+		for row := range fact.Rows {
+			day := days[row]
+			fact.Rows[row].Fields["day"] = contextfabric.ScalarValue{String: &day}
+		}
+	}
+
+	cases := map[string]contextfabric.InvestigationResult{
+		"category-order":  select_(order),
+		"zone-less-trend": select_(zoneless),
+	}
+	for name, result := range cases {
+		served, tier := contextfabric.ServeVocabularyLabels(result, true, maxBytes)
+		must(served.Validate())
+		encoded, err := json.MarshalIndent(served, "", "    ")
+		must(err)
+		must(os.WriteFile(filepath.Join(out, name+".json"), append(encoded, '\n'), 0o644))
+		fmt.Printf("%-16s tier=%s shapes=%d bytes=%d\n", name, tier, len(served.RenderShapes), len(encoded))
+	}
+
+	// The date table: what ACR's parser accepts, and the instant it reads. Go's own answer, never ours.
+	type row struct {
+		Value  string `json:"value"`
+		Millis *int64 `json:"millis"`
+	}
+	values := []string{
+		"2026-03-08", "2026-03-08T02:30:00", "2026-03-08 02:30:00", "2026-03-08T02:30", "2026-03-08 02:30",
+		"2026-03-08T02:30:00Z", "2026-03-08T02:30:00-08:00", "2026-03-08T02:30:00+05:30", "2026-03-08T02:30:00.5",
+		"2026-03-08T02:30:00.5Z", "2026-11-01T01:30:00", "2026-12-31T23:59:59", "2026-01-01T00:00:00",
+		"2026-02-30", "2026-02-30T10:00:00", "2026-13-01", "not a date",
+	}
+	rows := make([]row, 0, len(values))
+	for _, value := range values {
+		instant, _, ok := contextfabric.ParseRenderDateForOracle(value)
+		entry := row{Value: value}
+		if ok {
+			millis := instant.UnixMilli()
+			entry.Millis = &millis
+		}
+		rows = append(rows, entry)
+	}
+	encoded, err := json.MarshalIndent(rows, "", "    ")
+	must(err)
+	must(os.WriteFile(filepath.Join(out, "date-oracle.json"), append(encoded, '\n'), 0o644))
+	fmt.Println("date-oracle", len(rows))
+}
