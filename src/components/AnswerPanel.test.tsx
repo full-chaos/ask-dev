@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { AnswerPanel } from "@/components/AnswerPanel";
@@ -140,5 +140,67 @@ describe("AnswerPanel — codex round 3/4 close-out: blank-content decisions rou
         render(<AnswerPanel result={result} />);
         expect(screen.getByText("The service returned no direct judgment.")).toBeInTheDocument();
         expect(screen.queryByText("\u200B\u2066")).toBeNull();
+    });
+});
+
+/**
+ * CHAOS-12481: what an answer dropped, when it was made, and how its sources stood. ACR serves no
+ * words for these fields yet, so each stays raw in one collapsed fold. Absent, zero and false show
+ * nothing: missing is not healthy (check 12).
+ */
+describe("AnswerPanel — the scope fields ACR serves no words for", () => {
+    const fold = () => screen.getByTestId("answer-scope-details");
+    const raw = (name: string) => within(fold()).queryByTestId(`answer-scope-${name}`);
+
+    it("keeps them in a closed fold, not on the page", () => {
+        render(
+            <AnswerPanel
+                result={{
+                    ...base,
+                    reused: true,
+                    limitations_displaced: 3,
+                    generated_at: "2026-11-01T10:00:00Z",
+                }}
+            />,
+        );
+        expect(fold()).not.toHaveAttribute("open");
+        expect(raw("generated_at")).toHaveTextContent("generated_at: 2026-11-01T10:00:00Z");
+        expect(raw("reused")).toHaveTextContent("reused: true");
+        expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: 3");
+    });
+
+    it("shows the time of every answer", () => {
+        render(<AnswerPanel result={base} />);
+        expect(raw("generated_at")).toHaveTextContent(base.generated_at);
+    });
+
+    it("says nothing for reused false, and for a count absent or zero", () => {
+        const first = render(<AnswerPanel result={{ ...base, reused: false }} />);
+        expect(raw("reused")).toBeNull();
+        expect(raw("limitations_displaced")).toBeNull();
+        first.unmount();
+        render(<AnswerPanel result={{ ...base, limitations_displaced: 0 }} />);
+        expect(raw("limitations_displaced")).toBeNull();
+    });
+
+    it("keeps an odd count: a restored answer is not validated, so the fold shows what it holds", () => {
+        render(<AnswerPanel result={{ ...base, limitations_displaced: -1 }} />);
+        expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: -1");
+    });
+
+    it("shows retrieval_degraded when it is true, and nothing when it is false or absent", () => {
+        const degraded = (value: boolean): InvestigationResult => ({
+            ...base,
+            subject_resolution: { ...base.subject_resolution, retrieval_degraded: value },
+        });
+        const on = render(<AnswerPanel result={degraded(true)} />);
+        expect(raw("retrieval_degraded")).toHaveTextContent("retrieval_degraded: true");
+        on.unmount();
+        const off = render(<AnswerPanel result={degraded(false)} />);
+        expect(raw("retrieval_degraded")).toBeNull();
+        off.unmount();
+        const { retrieval_degraded: _absent, ...withoutFlag } = base.subject_resolution;
+        render(<AnswerPanel result={{ ...base, subject_resolution: withoutFlag }} />);
+        expect(raw("retrieval_degraded")).toBeNull();
     });
 });

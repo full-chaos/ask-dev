@@ -15,7 +15,7 @@ import type {
     InvestigationResult,
     SubjectRef,
 } from "../lib/contracts";
-import { formatConfidence, humanizeTerm } from "../lib/presentation";
+import { formatConfidence, humanizeTerm, nonBlank } from "../lib/presentation";
 import { useVocabularyWord } from "./VocabularyWordContext";
 
 /**
@@ -117,6 +117,11 @@ function DriverCard({
                     <SafeAnswerText text={driver.summary} />
                 </p>
             )}
+            {nonBlank(driver.source_state_note) === undefined ? null : (
+                <p className="record__meta" data-testid="driver-source-note">
+                    <SafeAnswerText text={driver.source_state_note ?? ""} />
+                </p>
+            )}
             {rollups.length === 0 ? null : (
                 <p className="record__meta" data-testid="driver-rollups">
                     {rollups.map((rollup) => (
@@ -133,6 +138,16 @@ function DriverCard({
                 {isWithheld ? (
                     <p className="record__meta">
                         <SafeAnswerText text={driver.summary} />
+                    </p>
+                ) : null}
+                {driver.source_state === undefined ? null : (
+                    <p className="record__meta" data-testid="driver-source-state">
+                        <code>source_state: {driver.source_state}</code>
+                    </p>
+                )}
+                {driver.summary_corrected === true ? (
+                    <p className="record__meta" data-testid="driver-summary-corrected">
+                        <code>summary_corrected: true</code>
                     </p>
                 ) : null}
                 <p className="record__meta">
