@@ -427,6 +427,11 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // CHAOS-12073, and acr #1847, CHAOS-12334), the same SHA as web (CHAOS-12370).
 // The v2 result and response require `structure_needs`, and StructureNeedsV2
 // requires `anchor_options`; the MCP output schemas admit a v2 result.
+// 7c3734c6 -> 4baa3dc4 (CHAOS-12432): train 4, the same SHA as web (CHAOS-12431).
+// Coverage detail codes and the read_facts outcome `withheld_project_scope` widen
+// (open vocabulary: the server writes the label); five `state_label` words change
+// (CHAOS-12415); `project_identities` also applies to pull_request entities and
+// the optional root field `vocabulary_labels` arrives.
 // 1e983670 -> 09c9706a: acr widened its served refusals with four
 // `details.reason` members on a 403 `feature_not_enabled`: own_model_gate_closed,
 // ai_features_turned_off, byo_no_investigate_config, own_model_turned_off
@@ -434,7 +439,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "7c3734c690691f827a86bb800a894ac32153e798";
+export const SOURCE_COMMIT = "4baa3dc48f53e9a979a45aa6da761068a617efa5";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",

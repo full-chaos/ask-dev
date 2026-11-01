@@ -98,6 +98,9 @@ export const RESULT_FIELDS_DROPPED = [
     "fact_scope_census",
     "fact_scope_census_omitted",
     "evidence_ref_labels",
+    // Shape-only contract: a schema-valid label could carry anything. A value
+    // with no entry takes its generic path, as the schema says.
+    "vocabulary_labels",
 ] as const;
 
 /**
