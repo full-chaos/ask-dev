@@ -1183,3 +1183,73 @@ describe("AskDevChat on the standalone source: unchanged", () => {
         vi.unstubAllGlobals();
     });
 });
+
+describe("AskDevChat: a host swaps the source", () => {
+    function clarificationSource(): HostSource {
+        const scenario = mockScenarios().find((entry) => entry.id === "clarification")!;
+        const result = structuredClone(scenario.result);
+        return hostSource(
+            snapshotOf(
+                userTurn(0, result.question),
+                assistantTurn(1, { kind: "answered", result }),
+            ),
+        );
+    }
+
+    it("a dismissal in the old conversation does not hide the new one's popup", async () => {
+        const user = userEvent.setup();
+        const view = render(<AskDevChat source={clarificationSource()} />);
+        await user.click(screen.getByRole("button", { name: "Dismiss" }));
+        expect(screen.queryByRole("dialog")).toBeNull();
+
+        // Turn ids are unique per source only: the new source reuses id 1.
+        view.rerender(<AskDevChat source={clarificationSource()} />);
+
+        expect(screen.getByRole("dialog")).toBeTruthy();
+    });
+
+    it("keeps the UI state while the host passes the same source again", async () => {
+        const user = userEvent.setup();
+        const source = clarificationSource();
+        const view = render(<AskDevChat source={source} />);
+        await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+        view.rerender(<AskDevChat source={source} />);
+
+        expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+describe("AskDevChat: the pin when a draft clears", () => {
+    it("pins again after the answered ask clears the draft", async () => {
+        const user = userEvent.setup();
+        const fetchImpl = (() =>
+            Promise.resolve({
+                json: () => Promise.resolve({ result: canonicalResult }),
+            })) as unknown as typeof fetch;
+        render(<AskDevChat source={createStandaloneSource(fetchImpl)} />);
+        const log = screen.getByRole("log", { name: "Conversation" });
+        const box = screen.getByPlaceholderText<HTMLTextAreaElement>(/Ask about a project/);
+        // jsdom has no layout. In a browser the empty composer takes another height, which moves
+        // the log's bottom: the wrapped placeholder is taller than a one-line draft.
+        const bottomWith = { draft: 100, empty: 120 };
+        let written = 0;
+        Object.defineProperty(log, "scrollHeight", {
+            configurable: true,
+            get: () => (box.value === "" ? bottomWith.empty : bottomWith.draft),
+        });
+        Object.defineProperty(log, "scrollTop", {
+            configurable: true,
+            get: () => written,
+            set: (value: number) => {
+                written = value;
+            },
+        });
+
+        await user.type(box, "Is Ask Dev ready?");
+        await user.click(screen.getByRole("button", { name: "Send" }));
+
+        await waitFor(() => expect(box.value).toBe(""));
+        await waitFor(() => expect(written).toBe(bottomWith.empty));
+    });
+});

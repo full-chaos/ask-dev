@@ -143,9 +143,18 @@ export type AskDevChatProps = {
 };
 
 export function AskDevChat({ source }: AskDevChatProps = {}) {
-    const domId = useId();
     const [standaloneSource] = useState(() => createStandaloneSource());
     const chat = source ?? standaloneSource;
+    // All of `ChatSurface`'s state belongs to one source: a turn id is unique
+    // per source only, so a dismissal, a selection or a pending retry must
+    // not reach the next source's turns. A new generation remounts it.
+    const [mounted, setMounted] = useState({ chat, generation: 0 });
+    if (mounted.chat !== chat) setMounted({ chat, generation: mounted.generation + 1 });
+    return <ChatSurface chat={chat} key={mounted.generation} />;
+}
+
+function ChatSurface({ chat }: { readonly chat: ChatSource }) {
+    const domId = useId();
     // Called through the source (never detached), so a source whose methods
     // read `this` still works; stable per source, so React subscribes once.
     const subscribe = useCallback((listener: () => void) => chat.subscribe(listener), [chat]);
@@ -216,6 +225,11 @@ export function AskDevChat({ source }: AskDevChatProps = {}) {
     const pendingRetryTurnRef = useRef<number | undefined>(undefined);
     const [isPinnedToBottom, setIsPinnedToBottom] = useState(true);
     const [hasUnseenBelow, setHasUnseenBelow] = useState(false);
+    // A source's update renders synchronously, BEFORE the ask resolves and
+    // the composer clears its draft. The emptied composer then takes another
+    // height, which moves the timeline's bottom, so the autoscroll below
+    // runs once more for that commit.
+    const [draftClears, setDraftClears] = useState(0);
     // Mirrors `turns` so the block below can tell "new content just landed"
     // apart from an ordinary re-render, and adjust derived state DURING
     // render rather than in an effect (react-hooks/set-state-in-effect: an
@@ -246,7 +260,7 @@ export function AskDevChat({ source }: AskDevChatProps = {}) {
         const el = timelineRef.current;
         if (el === null || !isPinnedToBottom) return;
         el.scrollTop = el.scrollHeight;
-    }, [turns, isPinnedToBottom]);
+    }, [turns, isPinnedToBottom, draftClears]);
 
     function handleTimelineScroll() {
         const el = timelineRef.current;
@@ -981,7 +995,14 @@ export function AskDevChat({ source }: AskDevChatProps = {}) {
                                 </button>
                             </div>
                         ) : null}
-                        <ChatComposer pending={isPending} onAsk={ask} ref={composerRef} />
+                        <ChatComposer
+                            onAsk={ask}
+                            onDraftCleared={() => {
+                                setDraftClears((count) => count + 1);
+                            }}
+                            pending={isPending}
+                            ref={composerRef}
+                        />
                     </div>
                 </section>
 
