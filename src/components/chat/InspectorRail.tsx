@@ -1,12 +1,6 @@
 import { Badge } from "../Badge";
 import type { InvestigationResult } from "../../lib/contracts";
-import { coverageStateTone, nonBlank } from "../../lib/presentation";
-import {
-    coverageStateText,
-    labelFor,
-    RELATIVE_WINDOW_WORDS,
-    WINDOW_PROVENANCE_WORDS,
-} from "../../render/answer-copy";
+import { coverageStateTone, humanizeTerm, nonBlank } from "../../lib/presentation";
 
 export type InspectorRailProps = {
     /** The latest ANSWERED result; undefined before the first answer. */
@@ -48,7 +42,7 @@ export function InspectorRail({ result }: InspectorRailProps) {
         window?.start !== undefined && window.end !== undefined
             ? `${formatDay(window.start)} – ${formatDay(window.end)}`
             : window?.relative_id !== undefined
-              ? RELATIVE_WINDOW_WORDS[window.relative_id]
+              ? humanizeTerm(window.relative_id)
               : // A current-state snapshot window (acr #1791) carries only `as_of`.
                 window?.as_of !== undefined
                 ? `As of ${formatDay(window.as_of)}`
@@ -66,11 +60,8 @@ export function InspectorRail({ result }: InspectorRailProps) {
                                 <span className="rail__row-name">
                                     {nonBlank(source.label) ?? GENERIC_SOURCE_LABEL}
                                 </span>
-                                <Badge
-                                    data-value={source.state}
-                                    tone={coverageStateTone(source.state)}
-                                >
-                                    {coverageStateText(source)}
+                                <Badge tone={coverageStateTone(source.state)} title={source.state}>
+                                    {nonBlank(source.state_label) ?? humanizeTerm(source.state)}
                                 </Badge>
                                 {source.observed_at === undefined ? null : (
                                     <span className="rail__row-meta">
@@ -90,8 +81,8 @@ export function InspectorRail({ result }: InspectorRailProps) {
                     <p className="rail__value">{windowRange}</p>
                 )}
                 {window === undefined ? null : (
-                    <p className="rail__note" data-value={window.provenance}>
-                        {labelFor(WINDOW_PROVENANCE_WORDS, window.provenance)}
+                    <p className="rail__note" title={window.provenance}>
+                        {humanizeTerm(window.provenance)}
                     </p>
                 )}
             </section>

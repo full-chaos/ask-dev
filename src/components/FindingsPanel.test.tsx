@@ -30,27 +30,6 @@ const DUPLICATE: DedupedFinding = {
  * CHAOS-4669 defect 1: a duplicate fact renders as a compact one-line
  * cross-reference, never a second full copy.
  */
-describe("FindingsPanel words", () => {
-    const kinded = (finding: DedupedFinding): DedupedFinding => ({
-        ...finding,
-        finding: { ...finding.finding, kind: "actual_completion" },
-    });
-
-    it("words a finding's kind in web's words, on a primary and on a reference", () => {
-        render(
-            <FindingsPanel
-                emptyMessage="None."
-                evidenceRefLabels={undefined}
-                findings={[kinded(PRIMARY), kinded(DUPLICATE)]}
-                title="Readiness gaps"
-            />,
-        );
-        expect(screen.getByText("Completion")).toBeInTheDocument();
-        expect(screen.getByText(/^Completion — also shown in full under/u)).toBeInTheDocument();
-        expect(document.body.textContent).not.toContain("actual completion");
-    });
-});
-
 describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
     it("renders a non-duplicate finding in full (summary + evidence)", () => {
         render(

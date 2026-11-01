@@ -9,8 +9,7 @@ import {
     degradingDetails as degradingDetailsOf,
     uncoveredLegacyReasons,
 } from "../lib/degraded-reasons";
-import { coverageStateTone, nonBlank } from "../lib/presentation";
-import { COVERAGE_COPY, coverageStateText, subjectKindNoun } from "../render/answer-copy";
+import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
 
 /**
  * The deterministic floor for a read-origin-state row whose contract-required
@@ -47,9 +46,7 @@ const GENERIC_SOURCE_LABEL = "Source";
  * strike-three ruling: consumer phrasing tables cease to exist). The chip
  * text now renders the engine's own contract-carried `source.label`/
  * `.state_label` (a totality-tested display-label registry, not a
- * consumer-side guess; CHAOS-12406: a documented `state` now reads in web's
- * words, `COVERAGE_STATE_WORDS`, and `.state_label` stands only for a state no
- * table knows); the degraded-reason sentences render the engine's
+ * consumer-side guess); the degraded-reason sentences render the engine's
  * own `coverage.details[]` — synthesis-phrased (`.phrasing`) when the model
  * chose to phrase it, the deterministic `.label` floor otherwise (never
  * both blank — `.label` is contract-required on every detail).
@@ -59,11 +56,11 @@ const GENERIC_SOURCE_LABEL = "Source";
  * but NONE of the new fields — `coverage.details` is simply absent, not an
  * empty array. Rendering it via the SAME sentence-table parser this ticket
  * deletes would be exactly the banned "reconstruct by parsing" shape, so a
- * legacy result's raw string is therefore never parsed into a sentence — it
- * is shown VERBATIM instead, on screen rather than behind a closed
- * disclosure, so the visible page discloses what the result carries.
- * Degraded, not silently dropped, and not reconstructed. This legacy
- * rendering is triggered by "no DEGRADING detail covers this" — `details`
+ * legacy result's raw string is therefore never parsed into a sentence: the
+ * plain generic sentence shows, and the raw string sits verbatim in a collapsed
+ * fold (chris, CHAOS-12406). Degraded, not silently dropped, and not
+ * reconstructed. This legacy rendering is triggered by "no DEGRADING detail
+ * covers this" — `details`
  * absent (the true legacy shape) OR merely insufficient (present but empty,
  * or present without a matching degrading entry) both count, so a
  * schema-valid but internally inconsistent response can never silently
@@ -166,13 +163,15 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             // identifier — that stays in "Source details"
                             // below, inside the closed disclosure.
                             const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                            const stateText =
+                                nonBlank(source.state_label) ?? humanizeTerm(source.state);
                             return (
                                 <Badge
-                                    data-value={source.state}
                                     key={`${source.source}:${source.state}`}
                                     tone={coverageStateTone(source.state)}
+                                    title={`${name}: ${source.state}`}
                                 >
-                                    {name} · {coverageStateText(source)}
+                                    {name} · {stateText}
                                 </Badge>
                             );
                         })}
@@ -182,6 +181,8 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         <div className="coverage">
                             {coverage.sources.map((source) => {
                                 const name = nonBlank(source.label) ?? GENERIC_SOURCE_LABEL;
+                                const stateText =
+                                    nonBlank(source.state_label) ?? humanizeTerm(source.state);
                                 return (
                                     <div
                                         className="coverage__source"
@@ -189,10 +190,10 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                     >
                                         <span className="coverage__name">{name}</span>
                                         <Badge
-                                            data-value={source.state}
                                             tone={coverageStateTone(source.state)}
+                                            title={source.state}
                                         >
-                                            {coverageStateText(source)}
+                                            {stateText}
                                         </Badge>
                                         {source.observed_at !== undefined ? (
                                             <p className="coverage__reason">
@@ -277,7 +278,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                 <li className="record" key={detail.detail_id}>
                                     <p className="record__body">
                                         {kind === undefined ? null : (
-                                            <strong>{subjectKindNoun(kind)}: </strong>
+                                            <strong>{humanizeTerm(kind)}: </strong>
                                         )}
                                         {facts ?? GENERIC_DEGRADED_REASON_SENTENCE}
                                     </p>
@@ -303,7 +304,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                         disclosure, and a response carrying both shapes must not
                         render "Degraded reasons" twice. */}
                     <h3 className="panel__title" style={{ marginTop: 14 }}>
-                        {COVERAGE_COPY.limitsTitle}
+                        What limits this answer
                     </h3>
                     <ul className="stack stack--tight">
                         {genericDegradingDetails.map((detail) => {
@@ -328,21 +329,12 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                             );
                         })}
                         {legacyDegradedReasons.map((reason) => {
-                            // The legacy `degraded_reasons[]` string IS the only
-                            // reason text there is, so it is what shows; there is
-                            // nothing left to put behind a disclosure.
+                            // A legacy `degraded_reasons[]` string is no served
+                            // sentence, so the floor shows and the string folds.
                             const shown = degradedReasonDisplay({ raw: reason });
                             return (
                                 <li className="record" key={reason}>
-                                    {/* `<code>` only when what shows IS the raw
-                                        wire text; the generic floor is prose. */}
-                                    <p className="record__body">
-                                        {shown.text === nonBlank(reason) ? (
-                                            <code>{shown.text}</code>
-                                        ) : (
-                                            shown.text
-                                        )}
-                                    </p>
+                                    <p className="record__body">{shown.text}</p>
                                     {shown.supplementaryRaw === undefined ? null : (
                                         <Details
                                             data-testid="degraded-reason-raw"

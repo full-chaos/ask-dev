@@ -76,10 +76,7 @@ describe("clarification flow", () => {
 
         const panel = screen.getByRole("region", { name: "Which subject did you mean?" });
         for (const candidate of clarification.subject_resolution.candidates) {
-            // The receipt stays on the record for a test; a user never reads it.
-            const record = panel.querySelector(`[data-receipt-id="${candidate.receipt_id}"]`);
-            expect(record).not.toBeNull();
-            expect(panel.textContent).not.toContain(candidate.receipt_id);
+            expect(within(panel).getByText(candidate.receipt_id)).toBeInTheDocument();
             expect(within(panel).getByText(candidate.subject.label)).toBeInTheDocument();
             for (const reason of candidate.match_reasons) {
                 expect(within(panel).getByText(reason)).toBeInTheDocument();

@@ -62,9 +62,31 @@ describe("CohortGroupsPanel", () => {
         render(<CohortGroupsPanel cohort={cohortWithGroups([GROUP_A, GROUP_B])} />);
         const panel = screen.getByTestId("cohort-groups-panel");
         expect(panel).toHaveTextContent("Team Alpha");
-        expect(panel).toHaveTextContent("Team Alpha: read in full");
+        expect(panel).toHaveTextContent("Team Alpha: all included");
         expect(panel).toHaveTextContent("Team Beta");
         expect(panel).toHaveTextContent("Team Beta: partly included");
+    });
+
+    it("a truncated group is never all included, whatever `complete` says", () => {
+        render(
+            <CohortGroupsPanel
+                cohort={cohortWithGroups([{ ...GROUP_A, complete: true, truncated: true }])}
+            />,
+        );
+        expect(screen.getByTestId("cohort-groups-panel")).toHaveTextContent(
+            "Team Alpha: partly included",
+        );
+    });
+
+    it("claims nothing about a group that is neither complete nor truncated", () => {
+        render(
+            <CohortGroupsPanel
+                cohort={cohortWithGroups([{ ...GROUP_A, complete: false, truncated: false }])}
+            />,
+        );
+        expect(screen.getByTestId("cohort-groups-panel")).toHaveTextContent(
+            "Team Alpha: may be incomplete",
+        );
     });
 
     it("shows the shown-vs-total count per group", () => {

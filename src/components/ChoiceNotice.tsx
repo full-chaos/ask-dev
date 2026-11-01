@@ -1,6 +1,6 @@
+import { Details } from "./Details";
 import type { ChoiceDisposition } from "../lib/clarification";
 import type { SubjectRef } from "../lib/contracts";
-import { subjectKindNoun } from "../render/answer-copy";
 
 export type ChoiceNoticeProps = {
     readonly chosen: SubjectRef;
@@ -33,9 +33,12 @@ export function ChoiceNotice({ chosen, disposition }: ChoiceNoticeProps) {
                     ? `This answer is NOT about ${chosen.label}. Ask Dev did not settle on that subject, so the result below concerns something else.`
                     : `Ask Dev did not settle on ${chosen.label} and is asking again. Choosing the same candidate is likely to repeat this.`}
             </p>
-            <p className="record__meta">
-                chosen: {chosen.label} · {subjectKindNoun(chosen.kind)}
-            </p>
+            <p className="record__meta">chosen: {chosen.label}</p>
+            <Details summary="Details">
+                <p className="record__meta">
+                    {chosen.kind} · {chosen.canonical_id}
+                </p>
+            </Details>
             <p className="record__meta">
                 Ask Dev can drop a choice without saying so: the earlier answer may be unreadable,
                 the choice may match no candidate, or the subject may be outside what you can read.

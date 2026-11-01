@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 import type { Cohort } from "../lib/contracts";
-import { cohortKindPlural, subjectKindNoun } from "../render/answer-copy";
+import { humanizeTerm } from "../lib/presentation";
 
 export type CohortGroupsPanelProps = {
     readonly cohort: Cohort | undefined;
@@ -39,15 +39,13 @@ export function CohortGroupsPanel({ cohort }: CohortGroupsPanelProps) {
                     <li className="record__meta" key={group.subject.canonical_id}>
                         {group.subject.label}:{" "}
                         {group.complete && !group.truncated
-                            ? "read in full"
+                            ? "all included"
                             : group.truncated
                               ? "partly included"
-                              : "read in part"}{" "}
+                              : "may be incomplete"}{" "}
                         — {group.member_canonical_ids.length} of {group.total}{" "}
-                        {group.total === 1
-                            ? subjectKindNoun(cohort?.kind ?? "member")
-                            : cohortKindPlural(cohort?.kind ?? "members")}{" "}
-                        shown
+                        {humanizeTerm(cohort?.kind ?? "member")}
+                        {group.total === 1 ? "" : "s"} shown
                     </li>
                 ))}
             </ul>

@@ -1,9 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { render, within } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup } from "@testing-library/react";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { InspectorRail } from "@/components/chat/InspectorRail";
@@ -11,106 +10,178 @@ import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
-import {
-    ANSWER_STATUS_LABEL,
-    CANDIDATE_STATE_WORDS,
-    COHORT_OUTCOME_WORDS,
-    COMPLETENESS_STATE_WORDS,
-    COVERAGE_STATE_WORDS,
-    RECEIPT_DISPOSITION_WORDS,
-    REQUIREMENT_OUTCOME_WORDS,
-    STANDING_LABEL,
-    STRUCTURE_DISPOSITION_WORDS,
-} from "./answer-copy";
-
 /**
  * CHAOS-12406: what `product-words.test.ts` cannot see, because it is a value at run time. Every
- * result the repo holds is rendered, and a raw state value must not reach a badge or a tooltip.
- * Served prose stays as served, so this reads the render's own chrome: badges and the attributes a
- * browser shows, never the answer's text.
+ * result the repo holds is rendered, and what a user can read must name no internal service and no
+ * ticket in the render's own words.
+ *
+ * Two things pass by rule. What ACR served passes whatever it says: language is the engine's
+ * (CHAOS-4690), so this takes every served string out first. What sits in a closed fold passes by
+ * position: that is where a raw value belongs.
  */
 const EXAMPLES_DIR = path.resolve(import.meta.dirname, "../contracts/examples");
+const PRODUCER_FIXTURE = path.resolve(
+    import.meta.dirname,
+    "../../tests/fixtures/work-item-status-result.json",
+);
 
-const examples: readonly (readonly [string, InvestigationResult])[] = readdirSync(EXAMPLES_DIR)
-    .filter((file) => file.includes("investigation_result") && file.endsWith(".json"))
-    .map((file) => [
-        file,
-        JSON.parse(readFileSync(path.join(EXAMPLES_DIR, file), "utf8")) as InvestigationResult,
-    ]);
+const readResult = (file: string) => JSON.parse(readFileSync(file, "utf8")) as InvestigationResult;
 
 const results: readonly (readonly [string, InvestigationResult])[] = [
-    ...examples,
+    ...readdirSync(EXAMPLES_DIR)
+        .filter((file) => file.includes("investigation_result") && file.endsWith(".json"))
+        .map((file) => [file, readResult(path.join(EXAMPLES_DIR, file))] as const),
     ...mockScenarios().map((scenario) => [scenario.id, scenario.result] as const),
     ...structureMockScenarios().map((scenario) => [scenario.id, scenario.result] as const),
+    ["work-item-status-result.json", readResult(PRODUCER_FIXTURE)],
 ];
 
-const STATE_TABLES: readonly Readonly<Record<string, string>>[] = [
-    ANSWER_STATUS_LABEL,
-    CANDIDATE_STATE_WORDS,
-    COHORT_OUTCOME_WORDS,
-    COMPLETENESS_STATE_WORDS,
-    COVERAGE_STATE_WORDS,
-    RECEIPT_DISPOSITION_WORDS,
-    REQUIREMENT_OUTCOME_WORDS,
-    STANDING_LABEL,
-    STRUCTURE_DISPOSITION_WORDS,
-];
+const FORBIDDEN = [/\bACR\b/u, /Context Fabric/u, /Workbench/u, /CHAOS-\d+/u] as const;
 
-/** The raw values, and their old spaced form. A value that is its own word ("stale") is allowed. */
-const RAW_STATES = new Set([
-    // The one state with no word at all: it renders nothing (CHAOS-12245).
-    "not_derived",
-    "not derived",
-    ...STATE_TABLES.flatMap((table) =>
-        Object.entries(table)
-            .filter(([value, word]) => value !== word)
-            .flatMap(([value]) => [value, value.replaceAll("_", " ")]),
-    ),
-]);
+/** Whether a closed fold hides `element`. A fold's summary stays on screen. */
+function insideClosedFold(element: Element): boolean {
+    for (let node: Element | null = element; node !== null; node = node.parentElement) {
+        if (node.tagName !== "DETAILS" || node.hasAttribute("open")) continue;
+        const summary = node.querySelector(":scope > summary");
+        if (summary === null || !summary.contains(element)) return true;
+    }
+    return false;
+}
+
+/** The strings a user can reach: text, and every attribute a browser shows, outside a closed fold. */
+function reachableStrings(root: Element): readonly string[] {
+    const found: string[] = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+        const parent = walker.currentNode.parentElement;
+        const text = walker.currentNode.textContent ?? "";
+        if (parent !== null && !insideClosedFold(parent) && text.trim() !== "") found.push(text);
+    }
+    for (const node of root.querySelectorAll("*")) {
+        if (insideClosedFold(node)) continue;
+        for (const name of ["title", "aria-label", "alt", "placeholder"]) {
+            const value = node.getAttribute(name);
+            if (value !== null) found.push(value);
+        }
+    }
+    return found;
+}
+
+/** A pin that reads nothing did not measure, so it fails here. */
+function readStrings(root: Element): readonly string[] {
+    const strings = reachableStrings(root);
+    if (strings.length === 0) throw new Error("the runtime pin read no text");
+    return strings;
+}
+
+function allStrings(value: unknown): readonly string[] {
+    if (typeof value === "string") return [value];
+    if (Array.isArray(value)) return value.flatMap(allStrings);
+    if (value !== null && typeof value === "object") {
+        return Object.values(value).flatMap(allStrings);
+    }
+    return [];
+}
+
+/** The render's own words: `strings`, with every string of the result taken out. */
+function ownWords(strings: readonly string[], result: unknown): readonly string[] {
+    const served = [...new Set(allStrings(result))].sort((a, b) => b.length - a.length);
+    return strings.map((text) => served.reduce((left, value) => left.replaceAll(value, " "), text));
+}
+
+function offending(strings: readonly string[]): readonly string[] {
+    return strings.filter((text) => FORBIDDEN.some((pattern) => pattern.test(text)));
+}
+
+/** Every surface of one result, in both presentations. */
+function renderedStrings(result: InvestigationResult): readonly string[] {
+    const chosenSubject = result.subject_resolution.candidates[0]?.subject;
+    const { container, unmount } = render(
+        <>
+            <DeterministicAnswerView chosenSubject={chosenSubject} result={result} />
+            <DeterministicAnswerView
+                chosenSubject={chosenSubject}
+                offersPresentation="popup"
+                result={result}
+            />
+            <InspectorRail result={result} />
+        </>,
+    );
+    const strings = readStrings(container);
+    unmount();
+    return strings;
+}
+
+function fixture(html: string): HTMLElement {
+    const root = document.createElement("div");
+    root.innerHTML = html;
+    return root;
+}
 
 afterEach(cleanup);
 
-describe("the render's chrome over every result the repo holds", () => {
+describe("the runtime pin", () => {
     it("holds results to read", () => {
         expect(results.length).toBeGreaterThan(10);
-        expect(RAW_STATES.has("not_derived")).toBe(true);
-        expect(RAW_STATES.has("not derived")).toBe(true);
     });
 
-    it.each(results)("%s: no raw state in a badge", (_name, result) => {
-        const { container } = render(<DeterministicAnswerView result={result} />);
+    it.each(results)(
+        "%s: the render's own words name no service and no ticket",
+        (_name, result) => {
+            expect(offending(ownWords(renderedStrings(result), result))).toEqual([]);
+        },
+    );
+});
 
-        const badges = [...container.querySelectorAll(".badge")].map(
-            (badge) => badge.textContent ?? "",
-        );
-        expect(badges.filter((text) => RAW_STATES.has(text))).toEqual([]);
+describe("the pin's own rules", () => {
+    it("fails on a render that reads no text", () => {
+        expect(() => readStrings(document.createElement("div"))).toThrow("read no text");
     });
 
-    it.each(results)("%s: no raw value in an attribute a browser shows", (_name, result) => {
-        const { container } = render(
-            <>
-                <DeterministicAnswerView result={result} />
-                <InspectorRail result={result} />
-            </>,
+    it("one word in a fold and one in visible text: only the visible one fires", () => {
+        const root = fixture(
+            "<p>ACR on the page</p><details><summary>Fold</summary><p>ACR in a fold</p></details>",
         );
 
-        const shown = [...container.querySelectorAll("[title]")].map(
-            (node) => node.getAttribute("title") ?? "",
-        );
-        expect(shown.filter((title) => RAW_STATES.has(title) || /_/u.test(title))).toEqual([]);
+        expect(offending(readStrings(root))).toEqual(["ACR on the page"]);
     });
 
-    it.each(results)("%s: no receipt and no canonical id on the page", (_name, result) => {
-        const { container } = render(<DeterministicAnswerView result={result} />);
+    it("a fold's summary stays on screen", () => {
+        const root = fixture("<details><summary>ACR</summary><p>body</p></details>");
+        expect(offending(readStrings(root))).toEqual(["ACR"]);
+    });
 
-        const candidates = result.subject_resolution.candidates;
-        const text = container.textContent ?? "";
-        for (const candidate of candidates) {
-            expect(text).not.toContain(candidate.receipt_id);
-            if (candidate.subject.canonical_id.includes(":")) {
-                expect(text).not.toContain(candidate.subject.canonical_id);
-            }
-        }
-        expect(within(container).queryAllByText(/^receipt\b/u)).toEqual([]);
+    it("an open fold is no fold", () => {
+        const root = fixture("<details open><summary>Fold</summary><p>ACR</p></details>");
+        expect(offending(readStrings(root))).toEqual(["ACR"]);
+    });
+
+    it("a fold inside a fold is folded", () => {
+        const root = fixture(
+            "<p>Text</p><details><summary>A</summary><details open><p>ACR</p></details></details>",
+        );
+        expect(offending(readStrings(root))).toEqual([]);
+    });
+
+    it("reads an attribute a browser shows, outside a fold only", () => {
+        const root = fixture(
+            '<p title="ACR">x</p><details><summary>A</summary><p title="ACR">y</p></details>',
+        );
+        expect(offending(readStrings(root))).toEqual(["ACR"]);
+    });
+
+    it("finds each word", () => {
+        expect(
+            offending(["the ACR", "a Context Fabric", "the Workbench", "CHAOS-12"]),
+        ).toHaveLength(4);
+        expect(offending(["Ask Dev", "chaos-12", "acreage"])).toEqual([]);
+    });
+
+    it("served text passes whatever it says, and the render's own does not", () => {
+        const strings = ["The ACR said so", "ACR is the render's word here"];
+
+        expect(offending(ownWords(strings, { answer: "The ACR said so" }))).toEqual([
+            "ACR is the render's word here",
+        ]);
     });
 });

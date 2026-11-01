@@ -1,12 +1,17 @@
 "use client";
 
+import { Details } from "./Details";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
 import { EvidenceReferences } from "./EvidenceReferences";
 import type { EvidenceRefLabels, InvestigationResult, SubjectCandidate } from "../lib/contracts";
-import { CANNOT_REASK_HERE_COPY, candidateStateTone, formatConfidence } from "../lib/presentation";
-import { CANDIDATE_STATE_WORDS, labelFor, subjectKindNoun } from "../render/answer-copy";
+import {
+    CANNOT_REASK_HERE_COPY,
+    candidateStateTone,
+    formatConfidence,
+    humanizeTerm,
+} from "../lib/presentation";
 
 export type ClarificationChoice = {
     readonly result_id: string;
@@ -77,17 +82,20 @@ function CandidateRecord({
     readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
     return (
-        <li className="record" data-receipt-id={candidate.receipt_id}>
+        <li className="record">
             <div className="record__head">
                 <span className="record__meta">#{rank}</span>
                 <span className="record__title">{candidate.subject.label}</span>
-                <Badge data-value={candidate.state} tone={candidateStateTone(candidate.state)}>
-                    {labelFor(CANDIDATE_STATE_WORDS, candidate.state)}
+                <Badge tone={candidateStateTone(candidate.state)} title={candidate.state}>
+                    {humanizeTerm(candidate.state)}
                 </Badge>
-                {selected ? <Badge tone="ok">selected</Badge> : null}
+                {selected ? (
+                    <Badge tone="ok" title="selected">
+                        selected
+                    </Badge>
+                ) : null}
                 <span className="record__meta">
-                    {subjectKindNoun(candidate.subject.kind)} · confidence{" "}
-                    {formatConfidence(candidate.confidence)}
+                    confidence {formatConfidence(candidate.confidence)}
                 </span>
             </div>
             <ul className="stack stack--tight record__body">
@@ -102,6 +110,12 @@ function CandidateRecord({
                 evidenceRefLabels={evidenceRefLabels}
                 label="Evidence"
             />
+            <Details summary="Details">
+                <p className="record__meta">
+                    {candidate.subject.kind} · {candidate.subject.canonical_id} · receipt{" "}
+                    <code>{candidate.receipt_id}</code>
+                </p>
+            </Details>
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}

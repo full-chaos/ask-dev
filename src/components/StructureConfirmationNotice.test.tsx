@@ -45,20 +45,12 @@ describe("StructureConfirmationNotice", () => {
         ).toBeInTheDocument();
     });
 
-    it("words a selection's outcome and origin, never the raw values", () => {
-        render(<StructureConfirmationNotice entries={vetoed.confirmed_structure} />);
-
-        const region = screen.getByRole("alert", { name: "Structure confirmation" });
-        expect(region.textContent).not.toMatch(/vetoed|clarification_confirmed|inferred_default/u);
-        expect(within(region).getAllByText(/^Not applied: /u).length).toBeGreaterThan(0);
-    });
-
     it("shows a carried (not receipt) structure member's source verbatim", () => {
         render(<StructureConfirmationNotice entries={flowLandscape.confirmed_structure} />);
 
         const region = screen.getByRole("status", { name: "Structure confirmation" });
-        expect(region).toHaveTextContent("source: carried from an earlier turn");
-        expect(region).toHaveTextContent("source: your choice");
+        expect(region).toHaveTextContent("source carried");
+        expect(region).toHaveTextContent("source receipt");
     });
 
     /**
@@ -74,7 +66,11 @@ describe("StructureConfirmationNotice", () => {
         const region = screen.getByRole("status", { name: "Structure confirmation" });
         const chipRow = within(region).getByTestId("structure-confirmation-chips");
         for (const entry of applied.confirmed_structure!) {
-            expect(chipRow).toHaveTextContent(entry.applied_value);
+            expect(
+                within(chipRow).getByText(/./u, {
+                    selector: `[data-applied-value="${entry.applied_value}"]`,
+                }),
+            ).toBeInTheDocument();
         }
         const details = within(region).getByText("Selection details").closest("details")!;
         expect(details).not.toHaveAttribute("open");

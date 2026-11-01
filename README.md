@@ -735,8 +735,8 @@ call failure). The offer VALUE stays structural — `receipt_id`/`option_id`
 and what gets submitted on selection are unaffected by `phrasing`.
 `StructureNeedsPanel` displays `phrasing ?? label` as each offer's title and
 button text, but always shows the structural `label` alongside it when
-`phrasing` is present: the offered value is never hidden behind generated
-wording.
+`phrasing` is present (same rule `@/lib/presentation.ts` holds for its tone
+maps: the raw contract term is never hidden behind generated wording).
 
 **THE SEAM LANDED.** P1 (CHAOS-3927 #159) and CHAOS-3900 W1 (#158) merged to
 acr `main`, and this repo's pin bumped past that merge (`7d275c2e`, "Bumping

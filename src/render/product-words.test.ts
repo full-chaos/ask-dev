@@ -7,15 +7,17 @@ import { describe, expect, it } from "vitest";
 import { checkRenderGraph } from "../../scripts/render-entry-graph.mjs";
 
 /**
- * CHAOS-12406: one product wording, on every surface. No string a user can reach names an internal
- * service, a ticket, a repo word or a raw code. This reads the source of every file a host loads at
- * run time, plus the files that write `failure.message`, with the TypeScript parser.
+ * CHAOS-12406: no string the render writes names an internal service or a ticket on screen, and no
+ * raw failure code reaches a user. This reads the source of every file a host loads at run time,
+ * plus the files that write `failure.message`, with the TypeScript parser.
  *
  * Exemptions go by AST position, never by a word list: a comment is not a string, and an import
  * path, a type, a log call, an object key, a `data-*`/`className`/test id value, a failure's `code`
- * and an operand of `===` or `case` never reach the DOM.
+ * and an operand of `===` or `case` never reach the DOM. The body of a closed fold (`<Details>`, or
+ * `<details>` with no `open`) is allowed: raw data belongs there (CHAOS-4690). Its summary stays on
+ * screen, so it is read.
  *
- * Served text is not here: it is data at run time, and it stays as served.
+ * Served text is not here: it is data at run time, and it passes whatever it says.
  */
 const ROOT = path.resolve(import.meta.dirname, "../..");
 
@@ -27,7 +29,10 @@ const FAILURE_MESSAGE_FILES = [
 ];
 
 /** What a raw field is called: read straight into a user's view, it shows the raw value. */
-const RAW_FIELDS = new Set(["code", "details", "httpStatus", "terminal_status", "upstreamCode"]);
+const RAW_FIELDS = new Set(["code", "details", "httpStatus", "upstreamCode"]);
+
+/** Ids a component reads into a view. A `lib/` file builds keys and request bodies from them. */
+const RAW_ID_FIELDS = new Set(["applied_value", "canonical_id", "prior_result_id", "receipt_id"]);
 
 const FORBIDDEN = [
     /\bACR\b/u,
@@ -35,7 +40,6 @@ const FORBIDDEN = [
     /^raw field: /u,
     /Workbench/u,
     /CHAOS-\d+/u,
-    /terminal_status/u,
     /acr_[a-z_]+/u,
     /HTTP \d/u,
 ] as const;
@@ -43,7 +47,7 @@ const FORBIDDEN = [
 type Literal = { readonly line: number; readonly text: string };
 
 const EXEMPT_JSX_ATTRIBUTE = (name: string): boolean =>
-    name === "className" || name === "testId" || name.startsWith("data-");
+    name === "className" || name === "key" || name === "testId" || name.startsWith("data-");
 
 function isConsoleCall(node: ts.Node): boolean {
     return (
@@ -60,6 +64,27 @@ function isFailureCodeTable(node: ts.Node): boolean {
         ts.isVariableDeclaration(node) &&
         ts.isIdentifier(node.name) &&
         node.name.text === "workbenchFailureCodes"
+    );
+}
+
+/** A JSX element's tag, as written. */
+function jsxTag(node: ts.JsxElement): string {
+    return node.openingElement.tagName.getText();
+}
+
+/** A JSX value a user reads: a child, or a text attribute. A prop or a key is not read here. */
+function reachesTheText(node: ts.JsxExpression): boolean {
+    if (!ts.isJsxAttribute(node.parent)) return true;
+    return ["aria-label", "alt", "placeholder", "title"].includes(node.parent.name.getText());
+}
+
+/** A fold a user has to open: `<Details>`, which always starts closed, or a plain `<details>`. */
+function isClosedFold(node: ts.JsxElement): boolean {
+    const tag = jsxTag(node);
+    if (tag === "Details") return true;
+    if (tag !== "details") return false;
+    return !node.openingElement.attributes.properties.some(
+        (attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText() === "open",
     );
 }
 
@@ -88,6 +113,14 @@ function visibleLiterals(fileName: string, text: string): readonly Literal[] {
             return;
         }
         if (ts.isJsxAttribute(node) && EXEMPT_JSX_ATTRIBUTE(node.name.getText(source))) return;
+        if (ts.isJsxElement(node) && isClosedFold(node)) {
+            // The attributes and a `<summary>` stay on screen; the rest is the fold's body.
+            visit(node.openingElement);
+            node.children.forEach((child) => {
+                if (ts.isJsxElement(child) && jsxTag(child) === "summary") visit(child);
+            });
+            return;
+        }
         if (ts.isPropertyAssignment(node)) {
             if (ts.isComputedPropertyName(node.name)) visit(node.name);
             const isCode = ts.isIdentifier(node.name) && node.name.text === "code";
@@ -107,10 +140,11 @@ function visibleLiterals(fileName: string, text: string): readonly Literal[] {
         }
         // A value read into text is not a literal, so the words above cannot see it.
         if (
-            (ts.isTemplateSpan(node) || ts.isJsxExpression(node)) &&
+            (ts.isTemplateSpan(node) || (ts.isJsxExpression(node) && reachesTheText(node))) &&
             node.expression !== undefined &&
             ts.isPropertyAccessExpression(node.expression) &&
-            RAW_FIELDS.has(node.expression.name.text)
+            (RAW_FIELDS.has(node.expression.name.text) ||
+                (fileName.endsWith(".tsx") && RAW_ID_FIELDS.has(node.expression.name.text)))
         ) {
             const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
             found.push({ line: line + 1, text: `raw field: ${node.expression.getText(source)}` });
@@ -173,7 +207,7 @@ describe("product words", () => {
         expect(literals).toBeGreaterThan(1000);
     });
 
-    it("finds no internal name, ticket, repo word or raw code in what a user can reach", () => {
+    it("finds no internal name, ticket or raw code in what a user can reach", () => {
         expect(scan([...runtimeSources(), ...FAILURE_MESSAGE_FILES]).offences).toEqual([]);
     });
 });
@@ -188,13 +222,50 @@ describe("the guard", () => {
         ["a JSX expression", "const a = <p>{failure.upstreamCode}</p>;"],
         ["a title", "const a = <p title={failure.httpStatus} />;"],
         ["the details", "const a = <p>{failure.details}</p>;"],
+        ["an id", "const a = <p>{chosen.canonical_id}</p>;"],
+        ["a receipt", "const a = <p>{candidate.receipt_id}</p>;"],
+        ["an applied value", "const a = <p>{entry.applied_value}</p>;"],
     ])("fires on a raw field read into %s", (_name, source) => {
         expect(offences("plant.tsx", source)).toHaveLength(1);
     });
 
-    it("fires on a raw status read into a template", () => {
-        const source = "const a = <p>{`was ${completeness.terminal_status}`}</p>;";
-        expect(offences("plant.tsx", source).join(" ")).toContain("raw field");
+    it("does not fire on a raw field that only the old rule held", () => {
+        const source = "const a = <p>{completeness.terminal_status}</p>;";
+        expect(offences("plant.tsx", source)).toEqual([]);
+    });
+
+    it.each([
+        ["a Details body", '<Details summary="Fold"><code>ACR said so</code></Details>'],
+        ["a details body", "<details><summary>Fold</summary><p>ACR said so</p></details>"],
+        ["a nested body", '<Details summary="Fold"><div><p>ACR said so</p></div></Details>'],
+        ["a raw field in a fold", '<Details summary="Fold"><code>{failure.code}</code></Details>'],
+        ["a raw value in a fold", "<details><summary>Fold</summary>{failure.details}</details>"],
+    ])("allows %s, by position", (_name, jsx) => {
+        expect(offences("plant.tsx", `const a = ${jsx};`)).toEqual([]);
+    });
+
+    it.each([
+        ["a Details summary", '<Details summary="ACR said so"><code>x</code></Details>'],
+        ["a details summary", "<details><summary>ACR said so</summary><p>x</p></details>"],
+        ["an open details body", "<details open><p>ACR said so</p></details>"],
+        ["a summary's raw field", "<details><summary>{failure.code}</summary><p>x</p></details>"],
+    ])("fires on %s: it stays on screen", (_name, jsx) => {
+        expect(offences("plant.tsx", `const a = ${jsx};`)).toHaveLength(1);
+    });
+
+    it("one word in a fold and one in visible text: only the visible one fires", () => {
+        const source = [
+            "const a = (",
+            "    <div>",
+            '        <Details summary="Fold">ACR in the fold</Details>',
+            "        <p>ACR on the page</p>",
+            "    </div>",
+            ");",
+        ].join("\n");
+
+        const found = offences("plant.tsx", source);
+        expect(found).toHaveLength(1);
+        expect(found[0]).toContain("ACR on the page");
     });
 
     it("does not fire on a raw field read into a data attribute, or into a lookup", () => {
@@ -222,7 +293,6 @@ describe("the guard", () => {
         ["Context Fabric", "the Context Fabric engine"],
         ["Workbench", "the Workbench"],
         ["a ticket", "see CHAOS-3813"],
-        ["terminal_status", "terminal_status: x"],
         ["a failure code", "acr_rejected_request"],
         ["an HTTP status", "HTTP 413"],
     ])("fires on %s", (_name, words) => {
@@ -235,6 +305,7 @@ describe("the guard", () => {
         ["a JSX comment", "const a = <p>{/* ACR said so */}</p>;"],
         ["a log call", 'console.error("ACR said so");'],
         ["a test id", 'const a = <p data-testid="ACR said so" />;'],
+        ["a key", 'const a = <p key="ACR said so" />;'],
         ["a data attribute", 'const a = <p data-reason="acr_rejected_request" />;'],
         ["a class name", 'const a = <p className="ACR" />;'],
         ["an import path", 'import a from "./ACR said so";'],

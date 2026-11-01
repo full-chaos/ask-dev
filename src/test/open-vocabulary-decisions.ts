@@ -12,8 +12,8 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "state_snapshot",
         "explicit_window",
     ],
-    // server_default (acr #1791, CHAOS-11601): InspectorRail words the window's
-    // provenance with WINDOW_PROVENANCE_WORDS ("Default window"), with no tone map.
+    // server_default (acr #1791, CHAOS-11601): InspectorRail shows the window's
+    // provenance through humanizeTerm ("Server default"), with no tone map.
     "context_fabric_common.v1.schema.json#/$defs/EffectiveEvidenceWindow/properties/provenance": [
         "inferred_default",
         "question_stated",

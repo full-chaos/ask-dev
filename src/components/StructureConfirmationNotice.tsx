@@ -1,12 +1,7 @@
+import { Details } from "./Details";
 import { Badge } from "./Badge";
 import type { ConfirmedStructureEntry } from "../lib/contracts";
 import { structureDispositionTone } from "../lib/presentation";
-import {
-    labelFor,
-    STRUCTURE_DISPOSITION_WORDS,
-    STRUCTURE_PROVENANCE_WORDS,
-    STRUCTURE_SOURCE_WORDS,
-} from "../render/answer-copy";
 import {
     hasVetoedStructureConfirmation,
     summarizeConfirmedStructure,
@@ -38,18 +33,19 @@ export function StructureConfirmationRecords({
                     <div className="record__head">
                         <span className="record__title">{summary.label}</span>
                         <Badge
-                            data-value={summary.entry.disposition}
+                            title={summary.entry.disposition}
                             tone={structureDispositionTone(summary.entry.disposition)}
                         >
-                            {STRUCTURE_DISPOSITION_WORDS[summary.entry.disposition]}
+                            {summary.entry.disposition.replaceAll("_", " ")}
                         </Badge>
                     </div>
                     <p className="answer__body">{summary.sentence}</p>
-                    <p className="record__meta">
-                        applied value <code>{summary.entry.applied_value}</code> · source:{" "}
-                        {labelFor(STRUCTURE_SOURCE_WORDS, summary.entry.source)} ·{" "}
-                        {labelFor(STRUCTURE_PROVENANCE_WORDS, summary.entry.provenance)}
-                    </p>
+                    <Details summary="Details">
+                        <p className="record__meta">
+                            applied value <code>{summary.entry.applied_value}</code> · source{" "}
+                            {summary.entry.source} · provenance {summary.entry.provenance}
+                        </p>
+                    </Details>
                 </li>
             ))}
         </ul>
@@ -96,8 +92,13 @@ export function StructureConfirmationNotice({ entries }: StructureConfirmationNo
             </h2>
             <div className="chip-row" data-testid="structure-confirmation-chips">
                 {summaries.map((summary) => (
-                    <span className="chip" key={summary.entry.member} title={summary.sentence}>
-                        {summary.label}: <code>{summary.entry.applied_value}</code>
+                    <span
+                        className="chip"
+                        data-applied-value={summary.entry.applied_value}
+                        key={summary.entry.member}
+                        title={summary.sentence}
+                    >
+                        {summary.label}
                     </span>
                 ))}
             </div>

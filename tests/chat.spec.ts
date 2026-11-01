@@ -759,8 +759,8 @@ test.describe("cohort ranking", () => {
         // The score AND the outcome that qualifies it — never a bare score.
         await expect(rows.first()).toContainText("CHAOS");
         await expect(rows.first()).toContainText("43.5");
-        await expect(rows.first()).toContainText("Qualified");
-        await expect(rows.first()).toContainText(/\d of 5 drivers/u);
+        await expect(rows.first()).toContainText("qualified");
+        await expect(rows.first()).toContainText("complete");
         // The two strongest drivers, strongest first.
         await expect(rows.first()).toContainText("operational deficiencies.severity");
         await expect(rows.first()).toContainText("health.compounding risk");

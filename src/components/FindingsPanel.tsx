@@ -4,7 +4,7 @@ import { SafeAnswerText } from "./SafeAnswerText";
 import type { EvidenceRefLabels } from "../lib/contracts";
 import type { DedupedFinding } from "../lib/fact-dedup";
 import { SURFACE_LABEL } from "../lib/fact-dedup";
-import { FACT_KIND_LABEL, labelFor } from "../render/answer-copy";
+import { humanizeTerm } from "../lib/presentation";
 
 export type FindingsPanelProps = {
     readonly title: string;
@@ -56,8 +56,8 @@ export function FindingsPanel({
                                      * primary can render BELOW this reference. "already"
                                      * would be a false positional claim in that case.
                                      */}
-                                    {labelFor(FACT_KIND_LABEL, finding.kind)} — also shown in full
-                                    under {SURFACE_LABEL[primarySurface]}.
+                                    {humanizeTerm(finding.kind)} — also shown in full under{" "}
+                                    {SURFACE_LABEL[primarySurface]}.
                                 </p>
                                 {/*
                                  * codex round 5: `subjects` is independent, optional
@@ -93,7 +93,7 @@ export function FindingsPanel({
                             <li className="record" key={finding.finding_id}>
                                 <div className="record__head">
                                     <span className="record__title">
-                                        {labelFor(FACT_KIND_LABEL, finding.kind)}
+                                        {humanizeTerm(finding.kind)}
                                     </span>
                                     {finding.subjects !== undefined &&
                                     finding.subjects.length > 0 ? (

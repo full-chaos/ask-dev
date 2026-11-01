@@ -35,52 +35,7 @@ describe("InspectorRail evidence window", () => {
         const section = within(evidenceWindowSection());
         expect(section.queryByText("Not reported.")).toBeNull();
         expect(section.getByText(/^As of /)).toBeTruthy();
-        expect(section.getByText("Default window")).toBeTruthy();
-    });
-
-    it("words a relative window in web's words, and its origin", () => {
-        render(
-            <InspectorRail
-                result={resultWithWindow({
-                    relative_id: "trailing_90d",
-                    provenance: "inferred_default",
-                })}
-            />,
-        );
-        const section = within(evidenceWindowSection());
-        expect(section.getByText("Last 90 days")).toBeTruthy();
-        expect(section.getByText("Window inferred")).toBeTruthy();
-    });
-
-    it("shows no raw provenance in a tooltip", () => {
-        render(
-            <InspectorRail
-                result={resultWithWindow({
-                    relative_id: "trailing_30d",
-                    provenance: "server_default",
-                })}
-            />,
-        );
-        const section = evidenceWindowSection();
-        expect(section.querySelector("[title]")).toBeNull();
-        expect(section.querySelector('[data-value="server_default"]')).not.toBeNull();
-    });
-
-    it("words a source's state, never the raw value", () => {
-        const result = resultWithWindow(undefined);
-        render(
-            <InspectorRail
-                result={{
-                    ...result,
-                    coverage: {
-                        ...result.coverage,
-                        sources: [{ source: "s", state: "no_data", state_label: "no_data" }],
-                    },
-                }}
-            />,
-        );
-        expect(screen.getByText("read: no data (zero rows)")).toBeTruthy();
-        expect(screen.queryByText("no_data")).toBeNull();
+        expect(section.getByText("server default")).toBeTruthy();
     });
 
     it("prefers the start and end of a bounded window over as_of", () => {

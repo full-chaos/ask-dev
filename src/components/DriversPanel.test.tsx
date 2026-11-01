@@ -44,42 +44,9 @@ describe("DriversPanel — narrated driver judgments", () => {
     });
 
     it("shows a principal driver's standing distinctly from a contributing one", () => {
-        const { container } = render(<DriversPanel result={result} />);
-        const badge = (standing: string) =>
-            container.querySelectorAll(`[data-value="${standing}"]`);
-        expect(badge("principal").length).toBeGreaterThan(0);
-        expect(badge("contributing").length).toBeGreaterThan(0);
-        expect(badge("principal")[0]).toHaveTextContent("Principal");
-        expect(badge("contributing")[0]).toHaveTextContent("Contributing");
-    });
-
-    it("words a driver's kind, certainty and origin in web's words", () => {
-        render(
-            <DriversPanel
-                result={{
-                    ...result,
-                    strongest_pressures: [],
-                    drivers: [
-                        {
-                            ...cohortDrivers[0]!,
-                            category: "actual_completion",
-                            epistemic_status: "source_asserted",
-                            derivation: "deterministic_projection",
-                            affected_subjects: [
-                                { ...cohortDrivers[0]!.affected_subjects[0], kind: "work_item" },
-                            ],
-                        },
-                    ],
-                }}
-            />,
-        );
-        const card = screen.getByText(cohortDrivers[0]!.title).closest("li")!;
-        expect(card).toHaveTextContent(
-            "Completion · stated by the source · computed from source data · confidence",
-        );
-        expect(within(card).getByTestId("driver-affected-subjects")).toHaveTextContent(
-            "(work item)",
-        );
+        render(<DriversPanel result={result} />);
+        expect(screen.getAllByTitle("principal").length).toBeGreaterThan(0);
+        expect(screen.getAllByTitle("contributing").length).toBeGreaterThan(0);
     });
 
     it("labels an inferred judgment as inferred, never as an observation", () => {

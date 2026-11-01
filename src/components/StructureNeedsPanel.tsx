@@ -1,5 +1,6 @@
 "use client";
 
+import { Details } from "./Details";
 import { useId, useState } from "react";
 
 import { Badge } from "./Badge";
@@ -124,15 +125,25 @@ function OfferButton({
     // Offer VALUES stay structural (§ chris 2026-08-24 10:04): `label` is what
     // is actually bound to `receiptId`. `phrasing` is presentation-only text
     // for the same offer, so it is what's DISPLAYED — but `label` is always
-    // shown too: the value is never hidden behind generated wording.
+    // shown too (same rule `@/lib/presentation.ts` holds for tone maps: the
+    // raw contract term is never hidden behind generated wording).
     const displayText = phrasing ?? label;
     return (
-        <li className="record" data-receipt-id={receiptId} key={optionId}>
+        <li className="record" key={optionId}>
             <div className="record__head">
                 <span className="record__title">{displayText}</span>
-                {selected ? <Badge tone="ok">selected</Badge> : null}
+                {selected ? (
+                    <Badge tone="ok" title="selected">
+                        selected
+                    </Badge>
+                ) : null}
             </div>
             {phrasing === undefined ? null : <p className="record__meta">Offered: {label}</p>}
+            <Details summary="Details">
+                <p className="record__meta">
+                    receipt <code>{receiptId}</code>
+                </p>
+            </Details>
             {onToggle === undefined ? null : (
                 <button
                     aria-pressed={selected}

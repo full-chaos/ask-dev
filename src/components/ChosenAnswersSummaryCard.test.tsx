@@ -124,8 +124,8 @@ describe("ChosenAnswersSummaryCard", () => {
         );
         const details = screen.getByText("Selection details").closest("details")!;
         expect(details).not.toHaveAttribute("open");
-        expect(within(details).getByText(/confirmed by you/)).toBeInTheDocument();
-        expect(within(details).getByText("Applied")).toBeInTheDocument();
+        expect(within(details).getByText(/provenance clarification_confirmed/)).toBeInTheDocument();
+        expect(within(details).getByText("applied")).toBeInTheDocument();
     });
 
     it("renders no 'Selection details' disclosure when there is nothing to detail (subject-only row)", () => {

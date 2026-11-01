@@ -1,13 +1,7 @@
 import { useId } from "react";
 
 import type { AnswerPlan } from "../lib/contracts";
-import {
-    labelFor,
-    NARROWING_BASIS_WORDS,
-    NARROWING_STAGE_WORDS,
-    OVERRUN_WORDS,
-    QUESTION_FAMILY_WORDS,
-} from "../render/answer-copy";
+import { humanizeTerm } from "../lib/presentation";
 
 export type AnswerPlanPanelProps = {
     readonly answerPlan: AnswerPlan | undefined;
@@ -28,8 +22,8 @@ export type AnswerPlanPanelProps = {
  *
  * `narrowing` is the "showing 2 of 3 teams, 3 of N projects each" disclosure
  * North Star checks 5 and 12 ask for: each step names its own before/after
- * counts, shown verbatim, and the basis it narrowed by, in product words
- * (CHAOS-12406) — never re-derived (README, "What this is").
+ * counts and the basis it narrowed by, shown verbatim — never re-derived or
+ * re-worded (README, "What this is").
  */
 export function AnswerPlanPanel({ answerPlan }: AnswerPlanPanelProps) {
     const idPrefix = useId();
@@ -38,7 +32,7 @@ export function AnswerPlanPanel({ answerPlan }: AnswerPlanPanelProps) {
     return (
         <details className="disclosure" data-testid="answer-plan-panel">
             <summary id={`${idPrefix}-answer-plan-title`}>
-                Plan — {labelFor(QUESTION_FAMILY_WORDS, answerPlan.family)}
+                Plan — {humanizeTerm(answerPlan.family)}
             </summary>
             <div className="stack stack--tight">
                 <p className="record__meta" data-testid="answer-plan-budget">
@@ -54,11 +48,10 @@ export function AnswerPlanPanel({ answerPlan }: AnswerPlanPanelProps) {
                                     // same rule CohortRankingPanel's own
                                     // truncated notice follows.
                                 }
-                                Showing {step.after} of {step.before}{" "}
-                                {NARROWING_STAGE_WORDS[step.stage]} (
-                                {NARROWING_BASIS_WORDS[step.basis]})
+                                Showing {step.after} of {step.before} at {humanizeTerm(step.stage)}{" "}
+                                (by {humanizeTerm(step.basis)})
                                 {step.overrun === undefined ? null : (
-                                    <> — {OVERRUN_WORDS[step.overrun]}</>
+                                    <> — {humanizeTerm(step.overrun)}</>
                                 )}
                             </li>
                         ))}

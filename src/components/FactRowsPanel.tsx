@@ -13,7 +13,6 @@ import {
 } from "../lib/fact-rows";
 import { trendShapesForClaim } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
-import { FACT_KIND_LABEL, labelFor } from "../render/answer-copy";
 
 export type FactRowsPanelsProps = {
     readonly facts: readonly ClaimedFact[];
@@ -134,7 +133,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     return (
         <section aria-labelledby={titleId} className="panel panel--card">
             <h2 className="panel__title" id={titleId}>
-                {labelFor(FACT_KIND_LABEL, fact.kind)} · {humanizeTerm(fact.field)}
+                {humanizeTerm(fact.kind)} · {humanizeTerm(fact.field)}
             </h2>
             <p className="fact-panel__caption">
                 {fact.subject.label}

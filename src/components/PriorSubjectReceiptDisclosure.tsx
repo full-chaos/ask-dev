@@ -1,9 +1,9 @@
+import { Details } from "./Details";
 import { useId } from "react";
 
 import { Badge } from "./Badge";
 import type { PriorSubjectReceiptDispositionEntry } from "../lib/contracts";
-import { priorSubjectReceiptDispositionTone } from "../lib/presentation";
-import { RECEIPT_DISPOSITION_WORDS } from "../render/answer-copy";
+import { humanizeTerm, priorSubjectReceiptDispositionTone } from "../lib/presentation";
 
 export type PriorSubjectReceiptDisclosureProps = {
     readonly dispositions: readonly PriorSubjectReceiptDispositionEntry[] | undefined;
@@ -58,16 +58,18 @@ export function PriorSubjectReceiptDisclosure({
                     // gap the join alone cannot.
                     <li
                         className="record__meta"
-                        data-receipt-id={entry.receipt_id}
                         key={`${index}:${entry.prior_result_id}:${entry.receipt_id}`}
                     >
-                        Choice {index + 1}:{" "}
                         <Badge
-                            data-value={entry.disposition}
                             tone={priorSubjectReceiptDispositionTone(entry.disposition)}
+                            title={entry.disposition}
                         >
-                            {RECEIPT_DISPOSITION_WORDS[entry.disposition]}
+                            {humanizeTerm(entry.disposition)}
                         </Badge>
+                        <Details summary="Details">
+                            <code>{entry.receipt_id}</code> from{" "}
+                            <code>{entry.prior_result_id}</code>
+                        </Details>
                     </li>
                 ))}
             </ul>

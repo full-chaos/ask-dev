@@ -60,18 +60,11 @@ describe("choiceDisposition", () => {
  * the second as an ordinary second clarification.
  */
 describe("what a dishonoured choice says", () => {
-    it("names the subject and its kind in words, with no canonical id and no ticket", () => {
-        const subject: SubjectRef = {
-            ...chosen,
-            kind: "work_item",
-            canonical_id: "work_item:9001",
-        };
-        render(<DeterministicAnswerView chosenSubject={subject} result={clarification} />);
+    it("names no internal service and no ticket", () => {
+        render(<DeterministicAnswerView chosenSubject={chosen} result={clarification} />);
 
         const notice = screen.getByRole("alert", { name: "Choice not applied" });
-        expect(notice).toHaveTextContent(`chosen: ${subject.label} · work item`);
-        expect(notice.textContent).not.toContain("work_item");
-        expect(notice.textContent).not.toMatch(/receipt|CHAOS-|principal/u);
+        expect(notice.textContent).not.toMatch(/\bACR\b|Workbench|CHAOS-\d/u);
     });
 });
 

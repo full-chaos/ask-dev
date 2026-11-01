@@ -12,15 +12,7 @@ import type {
     InvestigationResult,
     SubjectRef,
 } from "../lib/contracts";
-import { formatConfidence } from "../lib/presentation";
-import {
-    DERIVATION_LABEL,
-    EPISTEMIC_LABEL,
-    FACT_KIND_LABEL,
-    labelFor,
-    STANDING_LABEL,
-    subjectKindNoun,
-} from "../render/answer-copy";
+import { formatConfidence, humanizeTerm } from "../lib/presentation";
 
 /**
  * A subject's identity for set/map membership: `(kind, canonical_id)`, never
@@ -102,8 +94,8 @@ function DriverCard({
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
             <div className="record__head">
                 <span className="record__title">{driver.title}</span>
-                <Badge data-value={driver.standing} tone={isPrincipal ? "warn" : "neutral"}>
-                    {labelFor(STANDING_LABEL, driver.standing)}
+                <Badge tone={isPrincipal ? "warn" : "neutral"} title={driver.standing}>
+                    {humanizeTerm(driver.standing)}
                 </Badge>
             </div>
             {isWithheld ? (
@@ -124,9 +116,8 @@ function DriverCard({
                     </p>
                 ) : null}
                 <p className="record__meta">
-                    {labelFor(FACT_KIND_LABEL, driver.category)} ·{" "}
-                    {labelFor(EPISTEMIC_LABEL, driver.epistemic_status)} ·{" "}
-                    {labelFor(DERIVATION_LABEL, driver.derivation)} · confidence{" "}
+                    {humanizeTerm(driver.category)} · {humanizeTerm(driver.epistemic_status)} ·{" "}
+                    {humanizeTerm(driver.derivation)} · confidence{" "}
                     {formatConfidence(driver.confidence)}
                 </p>
                 {driver.qualification !== undefined ? (
@@ -137,7 +128,7 @@ function DriverCard({
                 <p className="record__meta" data-testid="driver-affected-subjects">
                     Affected:{" "}
                     {driver.affected_subjects
-                        .map((subject) => `${subject.label} (${subjectKindNoun(subject.kind)})`)
+                        .map((subject) => `${subject.label} (${subject.kind})`)
                         .join(", ")}
                 </p>
                 <EvidenceReferences

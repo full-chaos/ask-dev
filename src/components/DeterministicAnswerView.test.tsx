@@ -51,13 +51,13 @@ describe("DeterministicAnswerView: prior-subject-receipt disclosure on the clari
         const result = clarificationResultWithDroppedReceipt();
         expect(result.status).toBe("clarification_required");
 
-        const { container } = render(<DeterministicAnswerView result={result} />);
+        render(<DeterministicAnswerView result={result} />);
 
         expect(
             screen.getByRole("heading", { name: "Earlier subject choices" }),
         ).toBeInTheDocument();
-        expect(container.querySelector('[data-receipt-id="subr_0001"]')).not.toBeNull();
-        expect(screen.getByText("Not applied: the data has changed since")).toBeInTheDocument();
+        expect(screen.getByText("subr_0001")).toBeInTheDocument();
+        expect(screen.getByText("skipped stale graph epoch")).toBeInTheDocument();
         // The candidate list itself still comes from ClarificationPanel, not
         // a duplicated SubjectResolutionPanel (no `onChooseCandidate` here,
         // so ClarificationPanel's own read-only heading applies).
@@ -305,25 +305,23 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
     });
 
     /**
-     * The reason the non-complete headline is reporting is ON SCREEN, not one
-     * click away. acr's example carries the legacy `degraded_reasons[]` shape
-     * (no `coverage.details`), whose raw string is the only reason text there
-     * is — so it is what shows, and nothing is left to collapse. This is the
-     * end-to-end form of the invariant: a reader who never opens a
-     * disclosure still learns WHY the answer was withheld.
+     * acr's example carries the legacy `degraded_reasons[]` shape (no
+     * `coverage.details`), whose only text is a raw token. Chris's ruling
+     * (CHAOS-12406): the plain generic sentence shows, and the raw string sits
+     * in a collapsed fold.
      */
-    it("shows the concrete degraded reason on screen, with nothing left behind a disclosure", () => {
+    it("shows the generic sentence, with the raw degraded reason in its fold", () => {
         const result = unsupportedExample as unknown as InvestigationResult;
         render(<DeterministicAnswerView result={result} />);
 
         const coverage = screen.getByTestId("coverage-panel");
         const reason = unsupportedExample.coverage.degraded_reasons[0]!;
 
-        expect(visibleText(coverage)).toContain(reason);
-        expect(visibleText(coverage)).not.toContain(
+        expect(visibleText(coverage)).not.toContain(reason);
+        expect(visibleText(coverage)).toContain(
             "This source didn't fully contribute; no reason was reported.",
         );
-        expect(within(coverage).queryAllByTestId("degraded-reason-raw")).toEqual([]);
+        expect(within(coverage).getByTestId("degraded-reason-raw").textContent).toContain(reason);
     });
 
     /**
@@ -341,7 +339,7 @@ describe("DeterministicAnswerView: the unsupported result's empty answer renders
         expect(visible).toContain("The service returned no direct judgment.");
         expect(visible).toContain("Some sources did not contribute.");
         expect(visible).toContain("unavailable");
-        expect(visible).toContain(unsupportedExample.coverage.degraded_reasons[0]!);
+        expect(visible).toContain("This source didn't fully contribute; no reason was reported.");
         expect(visible).toContain(result.limitations[0]!);
         expect(visible).not.toContain("Every source contributed.");
     });

@@ -109,15 +109,6 @@ function Harness({
     );
 }
 
-/** A receipt stays on its record for a test; a user never reads it. */
-function expectReceiptsOnRecords(options: readonly { readonly receipt_id: string }[]) {
-    for (const option of options) {
-        const record = document.querySelector(`[data-receipt-id="${option.receipt_id}"]`);
-        expect(record).not.toBeNull();
-        expect(document.body.textContent).not.toContain(option.receipt_id);
-    }
-}
-
 describe("StructureNeedsPanel", () => {
     it("renders exactly the offers the result carries, in the result's own order", () => {
         render(
@@ -133,7 +124,9 @@ describe("StructureNeedsPanel", () => {
             .getAllByRole("button", { name: /^Select / })
             .map((button) => button.textContent);
         expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
-        expectReceiptsOnRecords(options);
+        for (const option of options) {
+            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
+        }
     });
 
     /**
@@ -159,7 +152,9 @@ describe("StructureNeedsPanel", () => {
             .getAllByRole("button", { name: /^Select / })
             .map((button) => button.textContent);
         expect(buttons).toEqual(options.map((option) => `Select ${option.label}`));
-        expectReceiptsOnRecords(options);
+        for (const option of options) {
+            expect(screen.getByText(option.receipt_id)).toBeInTheDocument();
+        }
 
         const first = options[0]!;
         await user.click(screen.getByRole("button", { name: `Select ${first.label}` }));
