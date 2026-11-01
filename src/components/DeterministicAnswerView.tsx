@@ -356,7 +356,10 @@ export function DeterministicAnswerView({
                     );
                 })()}
                 <SemanticReadingNotice semanticReading={result.semantic_reading} />
-                <CoveragePanel coverage={result.coverage} />
+                <CoveragePanel
+                    coverage={result.coverage}
+                    evidenceWindow={result.effective_evidence_window}
+                />
                 <CompletenessPanel
                     completeness={result.completeness}
                     rankingWithheld={rankingWithheld}
@@ -459,7 +462,10 @@ export function DeterministicAnswerView({
                 // raw evidence references.
             }
             <div className="strip">
-                <CoveragePanel coverage={result.coverage} />
+                <CoveragePanel
+                    coverage={result.coverage}
+                    evidenceWindow={result.effective_evidence_window}
+                />
                 <CompletenessPanel
                     completeness={result.completeness}
                     rankingWithheld={rankingWithheld}

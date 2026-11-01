@@ -458,3 +458,18 @@ describe("DeterministicAnswerView: a stored clarification whose reading was unav
         expect(view.container.querySelector("[data-semantic-reading]")).toBeNull();
     });
 });
+
+/**
+ * CHAOS-12421: every answer, on either branch, shows its own window in its Coverage panel. The rail
+ * shows only the latest answer's, and hides at a narrow width.
+ */
+describe("DeterministicAnswerView: the answer's own evidence window", () => {
+    const WINDOW = { relative_id: "trailing_90d", provenance: "server_default" } as const;
+
+    it.each(["complete", "clarification"])("on a %s result", (id) => {
+        const base = mockScenarios().find((scenario) => scenario.id === id)!.result;
+        const result = { ...base, effective_evidence_window: WINDOW };
+        render(<DeterministicAnswerView result={result} />);
+        expect(screen.getByTestId("coverage-evidence-window")).toHaveTextContent("trailing 90d");
+    });
+});

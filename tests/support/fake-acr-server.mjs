@@ -128,6 +128,9 @@ export const TRIGGER_CANDIDATE_NEEDS = "e2e-candidate-me";
 // which overrides `shape` and nothing else, is the positive one.
 export const TRIGGER_COHORT = "e2e-cohort-me";
 
+// CHAOS-12421: a decisive result that reports its evidence window (the canonical example has none).
+export const TRIGGER_WINDOW = "e2e-window-me";
+
 const canonical = JSON.parse(
     readFileSync(
         join(__dirname, "../../src/contracts/examples/context_fabric_investigation_result.v1.json"),
@@ -588,17 +591,26 @@ const server = createServer((request, response) => {
               ? conversationEchoResult(question, conversation)
               : question.includes(TRIGGER_PARENT_REFERENCE_ECHO)
                 ? parentReferenceEchoResult(question, parentResultId, subjectHints)
-                : question.includes(TRIGGER_COHORT)
-                  ? cohortResult(question)
-                  : hasChosenReceipt
-                    ? answeredResult(question)
-                    : question.includes(TRIGGER_STRUCTURE_NEEDS)
-                      ? structureNeedsResult(question)
-                      : question.includes(TRIGGER_CANDIDATE_NEEDS)
-                        ? candidateNeedsResult(question)
-                        : question.includes(TRIGGER_CLARIFICATION)
-                          ? clarificationResult(question)
-                          : answeredResult(question);
+                : question.includes(TRIGGER_WINDOW)
+                  ? {
+                        ...answeredResult(question),
+                        effective_evidence_window: {
+                            start: "2026-10-01T12:00:00Z",
+                            end: "2026-10-30T12:00:00Z",
+                            provenance: "question_stated",
+                        },
+                    }
+                  : question.includes(TRIGGER_COHORT)
+                    ? cohortResult(question)
+                    : hasChosenReceipt
+                      ? answeredResult(question)
+                      : question.includes(TRIGGER_STRUCTURE_NEEDS)
+                        ? structureNeedsResult(question)
+                        : question.includes(TRIGGER_CANDIDATE_NEEDS)
+                          ? candidateNeedsResult(question)
+                          : question.includes(TRIGGER_CLARIFICATION)
+                            ? clarificationResult(question)
+                            : answeredResult(question);
         response.writeHead(200, { "Content-Type": "application/json" });
         response.end(JSON.stringify(result));
     });

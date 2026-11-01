@@ -23,6 +23,8 @@ const TRIGGER_COHORT = "e2e-cohort-me";
 const TRIGGER_CONVERSATION_ECHO = "e2e-conversation-echo";
 // Kept in sync by hand with `TRIGGER_PARENT_REFERENCE_ECHO` for the same reason.
 const TRIGGER_PARENT_REFERENCE_ECHO = "e2e-parent-reference-echo";
+// Kept in sync by hand with `TRIGGER_WINDOW` for the same reason.
+const TRIGGER_WINDOW = "e2e-window-me";
 
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
@@ -387,6 +389,65 @@ test.describe("clarification chips", () => {
             page.getByRole("region", { name: "More structure would narrow this" }),
         ).toHaveCount(0);
         await expect(page.getByRole("button", { name: /^Select /u })).toHaveCount(0);
+    });
+});
+
+/**
+ * CHAOS-12421: the rail hides at 1180px of the `ask-dev` container, so at a host's panel width and on
+ * a phone the answer's own Coverage panel must carry the window and the Observed date. A container
+ * query only runs in a browser, so this is the proof that the hidden rail takes nothing with it.
+ */
+test.describe("the evidence window without the rail", () => {
+    test.use({ baseURL: configuredBaseURL });
+
+    async function ask(page: import("@playwright/test").Page) {
+        await page.goto("/");
+        await page.getByLabel("Ask a question").fill(`How is it going? ${TRIGGER_WINDOW}`);
+        await page.getByRole("button", { name: "Send" }).click();
+        const turn = page.getByRole("article", { name: "Answer" });
+        await expect(turn).toHaveCount(1);
+        return {
+            rail: page.getByRole("complementary", { name: "Latest answer sources" }),
+            panel: turn.getByTestId("coverage-panel"),
+        };
+    }
+
+    for (const width of [390, 480, 1000, 1180]) {
+        test(`at ${String(width)}px the rail is hidden, and the answer still shows both`, async ({
+            page,
+        }) => {
+            await page.setViewportSize({ width, height: 900 });
+            const { rail, panel } = await ask(page);
+            await expect(rail).toBeHidden();
+
+            const line = panel.getByTestId("coverage-evidence-window");
+            await expect(line).toBeVisible();
+            await expect(line).toContainText("Evidence window: ");
+            await expect(line).toContainText("2026");
+            await expect(line).toContainText("question stated");
+
+            await panel.getByText("Source details").click();
+            await expect(panel.getByText(/^Observed /u).first()).toBeVisible();
+
+            const sideways = await page.evaluate(
+                () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            );
+            expect(sideways).toBe(false);
+        });
+    }
+
+    test("past the breakpoint the rail shows both as well, with the same words", async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 1400, height: 900 });
+        const { rail, panel } = await ask(page);
+        await expect(rail).toBeVisible();
+        await expect(rail.getByText(/^Observed /u).first()).toBeVisible();
+        const range = await rail.locator(".rail__value").textContent();
+        expect(range).toContain("2026");
+        await expect(panel.getByTestId("coverage-evidence-window")).toContainText(
+            range ?? "absent",
+        );
     });
 });
 

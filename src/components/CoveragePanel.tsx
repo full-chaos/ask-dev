@@ -9,6 +9,7 @@ import {
     degradingDetails as degradingDetailsOf,
     uncoveredLegacyReasons,
 } from "../lib/degraded-reasons";
+import { type EvidenceWindow, evidenceWindowRange, formatDay } from "../lib/evidence-window";
 import { coverageStateTone, humanizeTerm, nonBlank } from "../lib/presentation";
 
 /**
@@ -21,6 +22,8 @@ const GENERIC_READ_ORIGIN_STATE_SENTENCE =
 
 export type CoveragePanelProps = {
     readonly coverage: Coverage;
+    /** The window this answer speaks for. With none, the panel says "Not reported." */
+    readonly evidenceWindow?: EvidenceWindow;
 };
 
 /** The deterministic fail-readable floor for a source absent a `label` (never a guess at what the raw name means). */
@@ -66,7 +69,7 @@ const GENERIC_SOURCE_LABEL = "Source";
  * schema-valid but internally inconsistent response can never silently
  * drop a real `degraded_reasons[]` entry either.
  */
-export function CoveragePanel({ coverage }: CoveragePanelProps) {
+export function CoveragePanel({ coverage, evidenceWindow }: CoveragePanelProps) {
     // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
     // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
     // hardcoded heading id collided across turns.
@@ -142,6 +145,28 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                       ? "Some sources did not contribute."
                       : "Every source contributed."}
             </p>
+            {/* CHAOS-12421: the rail hides at a narrow width and shows only the latest answer, so
+                the answer's own panel carries its window at every width. */}
+            <p className="record__meta" data-testid="coverage-evidence-window">
+                Evidence window: {evidenceWindowRange(evidenceWindow) ?? "Not reported."}
+                {evidenceWindow === undefined ? null : (
+                    <span data-value={evidenceWindow.provenance}>
+                        {" · "}
+                        {humanizeTerm(evidenceWindow.provenance)}
+                    </span>
+                )}
+            </p>
+            {evidenceWindow === undefined ? null : (
+                <Details data-testid="coverage-evidence-window-raw" summary="Window details">
+                    {Object.entries(evidenceWindow).map(([field, value]) => (
+                        <p className="record__meta" key={field}>
+                            <code>
+                                {field}: {String(value)}
+                            </code>
+                        </p>
+                    ))}
+                </Details>
+            )}
             {!hasSources ? null : (
                 <>
                     <div className="chip-row" data-testid="coverage-chip-row">
@@ -197,7 +222,7 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                         </Badge>
                                         {source.observed_at !== undefined ? (
                                             <p className="coverage__reason">
-                                                observed at {source.observed_at}
+                                                Observed {formatDay(source.observed_at)}
                                             </p>
                                         ) : null}
                                         {/* Raw identifiers stay INSIDE this already-
@@ -210,6 +235,12 @@ export function CoveragePanel({ coverage }: CoveragePanelProps) {
                                             the engine's own `coverage.details[]`). */}
                                         <p className="record__meta">
                                             <code>{source.source}</code>
+                                            {source.observed_at === undefined ? null : (
+                                                <>
+                                                    {" · "}
+                                                    <code>{source.observed_at}</code>
+                                                </>
+                                            )}
                                             {source.reason === undefined ? null : (
                                                 <>
                                                     {" · "}
