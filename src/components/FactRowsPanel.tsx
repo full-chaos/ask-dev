@@ -17,7 +17,7 @@ import { rollupsOfClaims } from "../lib/investment-rollup";
 import { trendShapesForClaim } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
-import { useVocabularyWord } from "./VocabularyWordContext";
+import { useClaimFieldWord, useVocabularyWord } from "./VocabularyWordContext";
 
 export type FactRowsPanelsProps = {
     readonly facts: readonly ClaimedFact[];
@@ -133,9 +133,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // instance-unique, same pattern as every other panel touched here.
     const idPrefix = useId();
     const word = useVocabularyWord();
-    // A derived claim's field is free text, even when it matches a declared name (ACR's rule).
-    const fieldWord = ({ field, derived_from }: ClaimedFact): string =>
-        (derived_from?.length ?? 0) === 0 ? word("fact_field", field) : humanizeTerm(field);
+    const fieldWord = useClaimFieldWord();
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
     const rollups = rollupsOfClaims(allFacts, [

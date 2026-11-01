@@ -1,12 +1,16 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { DriversPanel } from "./DriversPanel";
 import { FactChart } from "./FactChart";
 import { FactRowsPanels } from "./FactRowsPanel";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
-import type { ClaimedFact, ClaimedFactRow } from "../lib/contracts";
+import plainExample from "../contracts/examples/context_fabric_investigation_result.v1.json";
+import type { ClaimedFact, ClaimedFactRow, InvestigationResult } from "../lib/contracts";
 
 afterEach(cleanup);
+
+const plain = plainExample as unknown as InvestigationResult;
 
 /**
  * CHAOS-12510. The shape of the real served answer the ticket's repro read: one claim with a row
@@ -101,6 +105,37 @@ describe("the claims that cite one table", () => {
         });
         draw([claim(), derived]);
         expect(screen.getByTestId("fact-also-referenced")).toHaveTextContent("team id");
+    });
+});
+
+describe("a driver's claimed facts", () => {
+    const shown = (claimed: ClaimedFact) => {
+        const result = {
+            ...plain,
+            claimed_facts: [claimed],
+            drivers: [{ ...plain.drivers[0], claimed_fact_ids: [claimed.claim_id] }],
+            vocabulary_labels: WORDS,
+        } as unknown as InvestigationResult;
+        render(
+            <VocabularyLabelsContext.Provider value={WORDS}>
+                <DriversPanel result={result} />
+            </VocabularyLabelsContext.Provider>,
+        );
+        return screen.getByTestId("driver-claimed-fact");
+    };
+
+    it("name a field in ACR's word", () => {
+        expect(shown(claim())).toHaveTextContent("ID: d29d160a");
+    });
+
+    it("name a derived claim's field in its own words", () => {
+        const derived = claim({
+            derived_from: [
+                { fact_id: "a", field: "x" },
+                { fact_id: "b", field: "y" },
+            ],
+        });
+        expect(shown(derived)).toHaveTextContent("id: d29d160a");
     });
 });
 
