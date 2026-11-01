@@ -500,6 +500,21 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "table_shape_undeclared",
         "computed_population_absent",
     ],
+    // CHAOS-12432 (train 4, CHAOS-4690 ruling): ask-dev has no table over this
+    // vocabulary. CoveragePanel renders the server's own label, and the chip tone
+    // comes from the source state, never from the code, so a new value needs no
+    // table change. Decisions, each measured by the "train 4 codes" cell in
+    // CoveragePanel.test.tsx:
+    //  - project_scope_withheld: always degrading, source_state unauthorized
+    //    (chip tone bad); the server label is shown under "What limits this answer".
+    //  - graph_hop_walk_truncated: degrading; generic list row, server label.
+    //  - graph_team_narrowing_undecided_paths: degrading; the count stays in the
+    //    server label, no ask-dev count field; generic list row.
+    //  - graph_answer_pull_requests_on_explicit_text_links and
+    //    ..._on_heuristic_links: NEVER degrading (acr
+    //    ContextFabricCoverageDetailCodeMayDegrade); a disclosure of the link tier.
+    //    A non-degrading detail is not in "What limits this answer" and the panel
+    //    does not render it; the tier is named in the server's answer text.
     "context_fabric_common.v1.schema.json#/$defs/CoverageDetail/properties/code": [
         "fact_unconfigured",
         "fact_no_declaring_producer",
@@ -516,6 +531,8 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "graph_cohort_denied_by_authorization",
         "graph_unknown_relationship_type",
         "graph_validity_unbounded",
+        "graph_answer_pull_requests_on_explicit_text_links",
+        "graph_answer_pull_requests_on_heuristic_links",
         "reuse_auxiliary_refs_stripped",
         "answer_terminated_before_attempt",
         "population_truncated",
@@ -527,10 +544,13 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
         "computed_population_absent",
         "requirement_not_evaluable",
         "graph_no_member_found",
+        "graph_hop_walk_truncated",
+        "graph_team_narrowing_undecided_paths",
         "synthesis_input_bounded",
         "synthesis_model_failed",
         "synthesis_not_run",
         "fact_score_withheld",
+        "project_scope_withheld",
     ],
     "context_fabric_common.v1.schema.json#/$defs/CoverageDetail/properties/kind": [
         "organization",

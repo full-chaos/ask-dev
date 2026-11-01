@@ -62,7 +62,7 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         expect(visibleText(chipRow)).toContain("Dev Health — status");
         expect(visibleText(chipRow)).toContain("available");
         expect(visibleText(chipRow)).toContain("Canonical facts — incident");
-        expect(visibleText(chipRow)).toContain("not authorized");
+        expect(visibleText(chipRow)).toContain("not readable with your access");
         // The raw closed-vocabulary source names are not on the
         // always-visible chip row at all (CHAOS-4673 acceptance).
         expect(visibleText(chipRow)).not.toContain("canonical_fact:");
@@ -91,7 +91,7 @@ describe("CoveragePanel — compact strip (CHAOS-4581)", () => {
         // structure — underscores to spaces, not a phrasing table) even
         // without an engine `state_label`: "unauthorized" has no
         // underscore to replace, so it renders unchanged (never the
-        // engine's OWN "not authorized" phrase, which only ships with
+        // engine's OWN "not readable with your access" phrase, which only ships with
         // `state_label`).
         expect(visibleText(chipRow)).toContain("available");
         expect(visibleText(chipRow)).toContain("unauthorized");
@@ -1024,6 +1024,8 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "graph_cohort_denied_by_authorization",
             "graph_unknown_relationship_type",
             "graph_validity_unbounded",
+            "graph_answer_pull_requests_on_explicit_text_links",
+            "graph_answer_pull_requests_on_heuristic_links",
             "reuse_auxiliary_refs_stripped",
             "answer_terminated_before_attempt",
             "population_truncated",
@@ -1035,10 +1037,13 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
             "computed_population_absent",
             "requirement_not_evaluable",
             "graph_no_member_found",
+            "graph_hop_walk_truncated",
+            "graph_team_narrowing_undecided_paths",
             "synthesis_input_bounded",
             "synthesis_model_failed",
             "synthesis_not_run",
             "fact_score_withheld",
+            "project_scope_withheld",
         ]);
     });
 
@@ -1083,6 +1088,73 @@ describe("CoveragePanel — a detail's code changes nothing about how it renders
         expect(visible).not.toContain("Every source contributed.");
         // The per-source state stays visible on the chip, beside the detail.
         expect(visible).toContain("unavailable");
+    });
+});
+
+/**
+ * CHAOS-12432 (train 4): five codes arrive. ask-dev keeps no table over the
+ * vocabulary (CHAOS-4690), so the tone is the chip's, from the source STATE, and
+ * the words are the server's label. Each code is rendered with the degrading bit
+ * and source state acr gives it, and the result is pinned: a degrading detail must
+ * show under "What limits this answer" and its chip must not read healthy.
+ */
+describe("CoveragePanel — train 4 coverage codes: tone is measured, not assumed", () => {
+    function renderTrain4(code: string, degrading: boolean, state: string) {
+        const label = `server label for ${code}`;
+        const coverage = {
+            sources: [{ source: "canonical_fact:status", state, label: "Status facts" }],
+            partial: degrading,
+            degraded_reasons: [],
+            details: [
+                {
+                    detail_id: "cov-t4",
+                    source: "canonical_fact:status",
+                    code,
+                    degrading,
+                    label,
+                    raw: `raw ${code}`,
+                },
+            ],
+        } as unknown as Parameters<typeof CoveragePanel>[0]["coverage"];
+        const { container, unmount } = render(<CoveragePanel coverage={coverage} />);
+        const panel = container.querySelector('[data-testid="coverage-panel"]')!;
+        const out = {
+            visible: visibleText(panel),
+            chipTone: panel.querySelector('[data-testid="coverage-chip-row"] .badge')!.className,
+            label,
+        };
+        unmount();
+        return out;
+    }
+
+    it("project_scope_withheld: degrading, unauthorized, chip bad, server label shown", () => {
+        const r = renderTrain4("project_scope_withheld", true, "unauthorized");
+        expect(r.chipTone).toContain("badge--bad");
+        expect(r.visible).toContain("What limits this answer");
+        expect(r.visible).toContain(r.label);
+        expect(r.visible).toContain("Some sources did not contribute.");
+        expect(r.visible).not.toContain("Every source contributed.");
+    });
+
+    it.each(["graph_hop_walk_truncated", "graph_team_narrowing_undecided_paths"])(
+        "%s: degrading, shown as a generic limit with the server label, never as healthy",
+        (code) => {
+            const r = renderTrain4(code, true, "truncated");
+            expect(r.chipTone).toContain("badge--warn");
+            expect(r.visible).toContain("What limits this answer");
+            expect(r.visible).toContain(r.label);
+            expect(r.visible).not.toContain("Every source contributed.");
+        },
+    );
+
+    it.each([
+        "graph_answer_pull_requests_on_explicit_text_links",
+        "graph_answer_pull_requests_on_heuristic_links",
+    ])("%s: never degrading (acr), so it adds no limit and reads as a disclosure", (code) => {
+        const r = renderTrain4(code, false, "available");
+        expect(r.chipTone).toContain("badge--ok");
+        expect(r.visible).not.toContain("What limits this answer");
+        expect(r.visible).toContain("Every source contributed.");
     });
 });
 
