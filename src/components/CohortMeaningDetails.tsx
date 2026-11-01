@@ -1,12 +1,35 @@
-import type { ReactNode } from "react";
-
 import { useVocabularyLabels } from "./VocabularyWordContext";
 import type { Cohort } from "../lib/contracts";
+import { nonBlank, rawText } from "../lib/presentation";
 import { type VocabularyLabels, servedNote, servedWord } from "../lib/vocabulary-labels";
 
-/** A restored answer is not validated, so a field can hold anything: show it, never throw. */
-function rawText(value: unknown): string {
-    return typeof value === "string" ? value : JSON.stringify(value);
+/** The rows that hold both a name and a reason: a restored answer is not validated. */
+function readableExclusions(cohort: Cohort) {
+    return (Array.isArray(cohort.exclusions) ? cohort.exclusions : []).filter(
+        (exclusion: Partial<NonNullable<Cohort["exclusions"]>[number]> | null) =>
+            typeof exclusion?.subject?.label === "string" && typeof exclusion.reason === "string",
+    );
+}
+
+/** Who the service left out of a cohort, and why, in its own words. */
+export function CohortExclusions({ cohort }: { readonly cohort: Cohort }) {
+    const exclusions = readableExclusions(cohort);
+    if (exclusions.length === 0) return null;
+    return (
+        <>
+            <h3 className="panel__title" style={{ marginTop: 14 }}>
+                Left out
+            </h3>
+            <ul className="stack stack--tight">
+                {exclusions.map((exclusion, index) => (
+                    // Index key: the contract does not promise a unique canonical id.
+                    <li className="record__meta" data-testid="cohort-exclusion" key={index}>
+                        {exclusion.subject.label}: {exclusion.reason}
+                    </li>
+                ))}
+            </ul>
+        </>
+    );
 }
 
 type MeaningField = {
@@ -73,26 +96,29 @@ export function CohortMeaningLines({ cohort, ranked }: CohortMeaningProps) {
     );
 }
 
-export type CohortMeaningDetailsProps = CohortMeaningProps & {
-    /** Served text the panel has not put on the page itself. */
-    readonly children?: ReactNode;
-};
-
 /**
  * What a cohort rests on, in one closed fold, under the ranked table or the member list. Every
  * member's reasons show: the status table draws its work items but not why they are here. A
  * zero-match has no reasons but can have a population, so the fold goes only when it would be empty.
+ * A ranked panel's page has no room for the rationale and the exclusions, so they sit here. A member
+ * list draws them on the page.
  */
-export function CohortMeaningDetails({ cohort, ranked, children }: CohortMeaningDetailsProps) {
+export function CohortMeaningDetails({ cohort, ranked }: CohortMeaningProps) {
     const fields = meaningFields(cohort, useVocabularyLabels(), ranked).filter(
         ({ line }) => line === undefined,
     );
     const members = cohort.members.filter((member) => Array.isArray(member.inclusion_reasons));
-    if (children === undefined && members.length === 0 && fields.length === 0) return null;
+    const rationale =
+        ranked && typeof cohort.rationale === "string" ? nonBlank(cohort.rationale) : undefined;
+    const excluded = ranked && readableExclusions(cohort).length > 0;
+    if (rationale === undefined && !excluded && members.length === 0 && fields.length === 0) {
+        return null;
+    }
     return (
         <details className="disclosure" data-testid="cohort-meaning-details">
             <summary>Details</summary>
-            {children}
+            {rationale === undefined ? null : <p className="record__meta">{rationale}</p>}
+            {excluded ? <CohortExclusions cohort={cohort} /> : null}
             {members.map((member, index) => (
                 // Index key: the contract does not promise a unique canonical id.
                 <p className="record__meta" data-testid="cohort-inclusion-reasons" key={index}>

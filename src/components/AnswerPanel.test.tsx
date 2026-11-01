@@ -204,10 +204,17 @@ describe("AnswerPanel — the scope fields ACR serves words for", () => {
     });
 
     it("keeps an odd value raw: a stray word must not hide it", () => {
-        const odd = { ...served, reused: "yes", limitations_displaced: -1 } as unknown;
+        const odd = {
+            ...served,
+            reused: "yes",
+            limitations_displaced: -1,
+            subject_resolution: { ...base.subject_resolution, retrieval_degraded: "yes" },
+        } as unknown;
         render(<AnswerPanel result={odd as InvestigationResult} />);
         expect(line("reused")).toBeNull();
-        expect(raw("reused")).toHaveTextContent("reused: true");
+        expect(raw("reused")).toHaveTextContent("reused: yes");
+        expect(line("retrieval_degraded")).toBeNull();
+        expect(raw("retrieval_degraded")).toHaveTextContent("retrieval_degraded: yes");
         expect(line("limitations_displaced")).toBeNull();
         expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: -1");
     });

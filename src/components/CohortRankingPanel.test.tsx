@@ -607,12 +607,46 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             expect(raw("population_lower_bound")).toHaveTextContent("population_lower_bound: true");
         });
 
-        it("keeps the rationale in the fold when no member has reasons", () => {
+        it("draws no fold with nothing in it, on a ranked panel too", () => {
             const members = meaning.members.map(({ inclusion_reasons: _reasons, ...rest }) => rest);
-            worded({ ...meaning, members } as unknown as Cohort);
-            expect(screen.getByTestId("cohort-meaning-details")).toHaveTextContent(
-                meaning.rationale,
+            const { exclusions: _exclusions, ...rest } = meaning;
+            worded({ ...rest, rationale: "  ", members } as unknown as Cohort);
+            expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
+        });
+
+        describe("each thing alone keeps the fold", () => {
+            const noReasons = meaning.members.map(
+                ({ inclusion_reasons: _reasons, ...rest }) => rest,
             );
+            const { exclusions, ...noExclusions } = meaning;
+
+            it("the rationale", () => {
+                worded({ ...noExclusions, members: noReasons } as unknown as Cohort);
+                expect(screen.getByTestId("cohort-meaning-details")).toHaveTextContent(
+                    meaning.rationale,
+                );
+            });
+
+            it("the exclusions", () => {
+                worded({
+                    ...meaning,
+                    rationale: "  ",
+                    members: noReasons,
+                    exclusions,
+                } as unknown as Cohort);
+                expect(screen.getByTestId("cohort-meaning-details")).toHaveTextContent(
+                    "It owns no repository.",
+                );
+            });
+
+            it("the reasons", () => {
+                worded({ ...noExclusions, rationale: "  " });
+                expect(
+                    within(screen.getByTestId("cohort-meaning-details")).getAllByTestId(
+                        "cohort-inclusion-reasons",
+                    ),
+                ).toHaveLength(meaning.members.length);
+            });
         });
 
         it("a mismatch that is not true keeps its raw value, not the sentence", () => {

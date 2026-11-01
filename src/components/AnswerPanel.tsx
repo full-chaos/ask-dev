@@ -3,7 +3,7 @@ import { useId } from "react";
 import { SafeAnswerText } from "./SafeAnswerText";
 import type { InvestigationResult } from "../lib/contracts";
 import { formatDay } from "../lib/evidence-window";
-import { nonBlank } from "../lib/presentation";
+import { nonBlank, rawText } from "../lib/presentation";
 import { servedNote } from "../lib/vocabulary-labels";
 
 export type AnswerPanelProps = {
@@ -71,14 +71,13 @@ function scopeFields(result: InvestigationResult): readonly ScopeField[] {
     const fields: ScopeField[] = [
         { name: "generated_at", raw: result.generated_at, line: answeredLine(result) },
     ];
-    if (result.reused) fields.push(field("reused", "true", result.reused === true));
+    if (result.reused) fields.push(field("reused", rawText(result.reused), result.reused === true));
     const displaced = result.limitations_displaced ?? 0;
     if (displaced !== 0) {
         fields.push(field("limitations_displaced", String(displaced), displaced > 0));
     }
-    if (result.subject_resolution?.retrieval_degraded === true) {
-        fields.push(field("retrieval_degraded", "true", true));
-    }
+    const degraded: unknown = result.subject_resolution?.retrieval_degraded;
+    if (degraded) fields.push(field("retrieval_degraded", rawText(degraded), degraded === true));
     return fields;
 }
 

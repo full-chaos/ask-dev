@@ -205,6 +205,11 @@ export function formatConfidence(confidence: number): string {
  */
 const INVISIBLE_CONTENT = /[\p{White_Space}\p{Cf}\p{Mn}]/gu;
 
+/** A restored answer is not validated, so a field can hold anything: show it, never throw. */
+export function rawText(value: unknown): string {
+    return typeof value === "string" ? value : JSON.stringify(value);
+}
+
 /**
  * `undefined` unless `value` is a defined string with visible, non-blank
  * content.
