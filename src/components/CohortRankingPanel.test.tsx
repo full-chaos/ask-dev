@@ -140,9 +140,11 @@ describe("CohortRankingPanel", () => {
 
         expect(row.getByText("operational deficiencies.severity")).toBeInTheDocument();
         expect(row.getByText("health.compounding risk")).toBeInTheDocument();
-        // The three weaker drivers stay off the row — it is a summary, and the
-        // full set is on the member in the canonical inspector.
-        expect(row.queryByText("workload.forecast pressure")).not.toBeInTheDocument();
+        // The three weaker drivers stay off the row's lead: it is a summary. They sit in its fold.
+        expect(row.getByText("workload.forecast pressure").closest("details")).toHaveAttribute(
+            "data-testid",
+            "ranking-other-drivers",
+        );
     });
 
     it("never shows a score without the drivers that explain it", () => {
@@ -676,6 +678,58 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             worded(rest);
             expect(line("population")).toBeNull();
             expect(line("score_meaning")).toBeNull();
+        });
+    });
+
+    describe("a ranked member's other drivers (CHAOS-12515)", () => {
+        const example = renderShapesResult as unknown as InvestigationResult;
+        const ranked = example.cohort!;
+        const drivers = ranked.members[0]!.drivers!;
+
+        it("the example is the case: five drivers, two in the row", () => {
+            expect(drivers).toHaveLength(5);
+        });
+
+        const other = () => screen.getByTestId("ranking-other-drivers");
+
+        it("holds the other three in a closed fold on the row", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(other()).not.toHaveAttribute("open");
+            expect(other().closest("tr")).toHaveTextContent(ranked.members[0]!.subject.label);
+            expect(within(other()).getAllByRole("listitem")).toHaveLength(3);
+        });
+
+        it("lists every served driver once, row and fold together", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            const row = other().closest("tr")!;
+            const shown = [...row.querySelectorAll(".ranking__driver-signal")].map(
+                (node) => node.textContent,
+            );
+            expect(shown).toHaveLength(5);
+            expect(new Set(shown).size).toBe(5);
+        });
+
+        it("keeps the service's order: the fold goes on from the row by contribution", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            const weights = [...other().querySelectorAll(".ranking__driver .record__meta")].map(
+                (node) => Number(/contributed (\d+(?:\.\d+)?)/u.exec(node.textContent ?? "")?.[1]),
+            );
+            expect(weights).toEqual([...weights].sort((a, b) => b - a));
+        });
+
+        it("draws no fold for a member with two drivers or fewer", () => {
+            const two = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: drivers.slice(0, 2) }],
+            } as Cohort;
+            render(<CohortRankingPanel cohort={two} result={undefined} shape="explicit_cohort" />);
+            expect(screen.queryByTestId("ranking-other-drivers")).toBeNull();
         });
     });
 

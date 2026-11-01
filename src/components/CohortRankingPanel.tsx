@@ -310,6 +310,22 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                             ))}
                                         </ul>
                                     )}
+                                    {row.otherDrivers.length === 0 ? null : (
+                                        <details
+                                            className="disclosure"
+                                            data-testid="ranking-other-drivers"
+                                        >
+                                            <summary>Other drivers</summary>
+                                            <ul className="ranking__drivers">
+                                                {row.otherDrivers.map((driver) => (
+                                                    <DriverCell
+                                                        driver={driver}
+                                                        key={driver.signal}
+                                                    />
+                                                ))}
+                                            </ul>
+                                        </details>
+                                    )}
                                 </td>
                             </tr>
                         ))}
