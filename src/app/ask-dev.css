@@ -1104,6 +1104,96 @@
         background: var(--accent-2);
     }
 
+    /* A pending turn whose source reports progress (CHAOS-12382): the phase
+       line, the stage checklist, and what became of a Stop. */
+    .chat__progress {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .chat__progress-meta {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .chat__elapsed {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .chat__stages {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .chat__stage {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .chat__stage--active {
+        color: var(--text-strong);
+    }
+
+    .chat__stage--skipped .chat__stage-label {
+        text-decoration: line-through;
+    }
+
+    .chat__stage-mark {
+        flex: 0 0 auto;
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--border-strong);
+        border-radius: 50%;
+    }
+
+    .chat__stage--done .chat__stage-mark,
+    .chat__stage--active .chat__stage-mark {
+        border-color: var(--accent-2);
+    }
+
+    .chat__stage--done .chat__stage-mark {
+        background: var(--accent-2);
+    }
+
+    /* A turn with no answer for a reason the source names (CHAOS-12382). It
+       reads as a quiet note in the conversation, not as a failure panel. */
+    .chat__status {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        padding: 12px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--surface-1);
+    }
+
+    .chat__status-words {
+        margin: 0;
+        color: var(--text-strong);
+        font-size: 14px;
+        overflow-wrap: anywhere;
+    }
+
+    .chat__status-meta {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .chat__status-slot {
+        margin-top: 4px;
+    }
+
     .chat__jump-to-latest {
         position: absolute;
         left: 50%;
@@ -1130,6 +1220,33 @@
         .chat__pending {
             animation: ask-dev-pending-pulse 1.6s ease-in-out infinite;
         }
+    }
+
+    /* Stop: shown only when the source can stop a run (CHAOS-12382). */
+    .chat__stop-row {
+        display: flex;
+        justify-content: flex-end;
+        padding-bottom: 8px;
+    }
+
+    .chat__stop {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .chat__stop:hover {
+        background: var(--surface-2);
     }
 
     .chat__composer-bar {
