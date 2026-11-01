@@ -48,7 +48,7 @@ function scopeFields(result: InvestigationResult): readonly (readonly [string, s
     const fields: (readonly [string, string])[] = [["generated_at", result.generated_at]];
     if (result.reused) fields.push(["reused", "true"]);
     const displaced = result.limitations_displaced ?? 0;
-    if (displaced > 0) fields.push(["limitations_displaced", String(displaced)]);
+    if (displaced !== 0) fields.push(["limitations_displaced", String(displaced)]);
     if (result.subject_resolution?.retrieval_degraded === true) {
         fields.push(["retrieval_degraded", "true"]);
     }

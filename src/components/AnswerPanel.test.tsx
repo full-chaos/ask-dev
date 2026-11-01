@@ -183,6 +183,11 @@ describe("AnswerPanel — the scope fields ACR serves no words for", () => {
         expect(raw("limitations_displaced")).toBeNull();
     });
 
+    it("keeps an odd count: a restored answer is not validated, so the fold shows what it holds", () => {
+        render(<AnswerPanel result={{ ...base, limitations_displaced: -1 }} />);
+        expect(raw("limitations_displaced")).toHaveTextContent("limitations_displaced: -1");
+    });
+
     it("shows retrieval_degraded when it is true, and nothing when it is false or absent", () => {
         const degraded = (value: boolean): InvestigationResult => ({
             ...base,
