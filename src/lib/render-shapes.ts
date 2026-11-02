@@ -27,7 +27,7 @@ import type {
     RenderShape,
     ScalarValue,
 } from "./contracts";
-import { cellValue, parseIsoDate } from "./fact-rows";
+import { aboutNoPerson, cellValue, parseIsoDate } from "./fact-rows";
 
 /** The selection rule that produced a shape (acr's closed vocabulary). */
 export type RenderShapeRule = RenderShape["selected_by"];
@@ -158,6 +158,14 @@ function sourceAddressMatchesKind(
                 !has(source.subject_canonical_id) &&
                 !has(source.signal)
             );
+        case "claimed_fact_value":
+            return (
+                has(source.claim_id) &&
+                has(source.field) &&
+                !has(source.row_index) &&
+                !has(source.subject_canonical_id) &&
+                !has(source.signal)
+            );
         default:
             return false;
     }
@@ -267,6 +275,51 @@ export const THEME_SHARE_RULE: RenderShapeRule = "investment_theme_share";
 /** The rules whose shape belongs to the panel of a fact it cites. */
 export const FACT_PANEL_RULES: readonly RenderShapeRule[] = ["dated_fact_trend", THEME_SHARE_RULE];
 
+/** The rule of a side-by-side table: its own panel draws it, with no host chart (CHAOS-12513). */
+export const COMPARISON_RULE: RenderShapeRule = "comparison_side_by_side";
+
+/** The one claim an id names. Two claims of one id name none (see `hasDuplicate`). */
+function claimFor(facts: readonly ClaimedFact[], claimId: string | undefined) {
+    const matches = facts.filter((fact) => fact.claim_id === claimId);
+    return matches.length === 1 ? matches[0] : undefined;
+}
+
+/**
+ * True when a table compares: mirrors acr's `validateComparisonShape`. Each series is one subject
+ * and holds only that subject's claims, the subjects are of one kind, a label is one measure on
+ * every side, and at least one measure stands on every side. A measure a side lacks has no point,
+ * so its cell stays empty, never zero. Rows mix measures, so the shape declares no unit.
+ *
+ * Two clauses differ from acr's:
+ * - A label is the served word of its field. The word map is acr's, and a copy here would be a
+ *   consumer table (CHAOS-4690), so this trusts acr's validator for that clause, as the treemap
+ *   does. It holds the part it can: one label, one field, on every side. Acr's word names one
+ *   field, so a served answer cannot fail this.
+ * - No side is a person: individual views are single-person (AGENTS.md).
+ */
+function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    if (shape.kind !== "table" || shape.axis_kind !== "category") return false;
+    if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
+    if (shape.series.length < 2) return false;
+    const subjectKinds = new Set<string>();
+    const measures = new Map<string, string>();
+    const sides = new Map<string, number>();
+    for (const series of shape.series) {
+        for (const { label, source } of series.points) {
+            if (source.kind !== "claimed_fact_value") return false;
+            const claim = claimFor(facts, source.claim_id);
+            if (claim === undefined || claim.subject.canonical_id !== series.key) return false;
+            if (!aboutNoPerson(claim)) return false;
+            subjectKinds.add(claim.subject.kind);
+            const measure = JSON.stringify([claim.kind, claim.field]);
+            if ((measures.get(label) ?? measure) !== measure) return false;
+            measures.set(label, measure);
+            sides.set(label, (sides.get(label) ?? 0) + 1);
+        }
+    }
+    return subjectKinds.size === 1 && [...sides.values()].includes(shape.series.length);
+}
+
 /**
  * True when a treemap is ALL the parts of ONE whole: one claim's declared `theme_breakdown` table,
  * every row once, the same measure, and a real split. Mirrors acr's `validateTreemapShape`. A row
@@ -283,9 +336,8 @@ function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): b
     if (shape.series.length !== 1 || shape.value_unit !== "ratio") return false;
     const points = shape.series[0].points;
     const claimId = points[0]?.source.claim_id;
-    const matches = facts.filter((fact) => fact.claim_id === claimId);
-    if (matches.length !== 1) return false;
-    const fact = matches[0]!;
+    const fact = claimFor(facts, claimId);
+    if (fact === undefined) return false;
     // A claim with a time series resolves its rows to the series, not to this table.
     if (fact.table?.field !== "theme_breakdown" || (fact.time_series_rows?.length ?? 0) > 0) {
         return false;
@@ -368,6 +420,13 @@ function resolvePointSource(
             if (row === undefined || source.field === undefined) return undefined;
             return numericCell(row.fields[source.field]);
         }
+        case "claimed_fact_value": {
+            const fact = claimFor(facts, source.claim_id);
+            if (fact === undefined || fact.field !== source.field) return undefined;
+            // A derived claim holds no stored value to copy.
+            if ((fact.derived_from?.length ?? 0) > 0) return undefined;
+            return numericCell(fact.value);
+        }
         default:
             return undefined;
     }
@@ -402,6 +461,8 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // renderer lands, its kind joins this list in the same change.
     if (shape.selected_by === THEME_SHARE_RULE) {
         if (!isThemeShareWhole(shape, result.claimed_facts)) return false;
+    } else if (shape.selected_by === COMPARISON_RULE) {
+        if (!isSideBySide(shape, result.claimed_facts)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }

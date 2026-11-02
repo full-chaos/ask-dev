@@ -12,6 +12,7 @@ import { CohortGroupsPanel } from "./CohortGroupsPanel";
 import { CohortMembersPanel } from "./CohortMembersPanel";
 import { RankingWithheldNotice } from "./RankingWithheldNotice";
 import { CohortRankingPanel } from "./CohortRankingPanel";
+import { ComparisonTablePanel } from "./ComparisonTablePanel";
 import { CompletenessPanel } from "./CompletenessPanel";
 import { CoveragePanel } from "./CoveragePanel";
 import { DriversPanel } from "./DriversPanel";
@@ -485,6 +486,7 @@ function AnswerView({
             />
             <CohortMembersPanel result={result} />
             <CohortGroupsPanel cohort={result.cohort} />
+            <ComparisonTablePanel result={result} />
             <WorkItemStatusPanel result={result} />
             {cohortRanking(askedForCohort(result.interpretation.shape, result), result.cohort)
                 .state === "rows" ? (
