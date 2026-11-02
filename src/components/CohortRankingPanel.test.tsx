@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { EvidenceOpenContext } from "./EvidenceOpenContext";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
@@ -616,7 +617,9 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
         });
 
         it("draws no fold with nothing in it, on a ranked panel too", () => {
-            const members = meaning.members.map(({ inclusion_reasons: _reasons, ...rest }) => rest);
+            const members = meaning.members.map(
+                ({ inclusion_reasons: _reasons, evidence_ref_ids: _refs, ...rest }) => rest,
+            );
             const { exclusions: _exclusions, ...rest } = meaning;
             worded({ ...rest, rationale: "  ", members } as unknown as Cohort);
             expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
@@ -768,6 +771,50 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             } as Cohort;
             render(<CohortRankingPanel cohort={two} result={undefined} shape="explicit_cohort" />);
             expect(screen.queryByTestId("ranking-other-drivers")).toBeNull();
+        });
+    });
+
+||||||| 76eb68a
+    describe("each member's evidence (CHAOS-12514)", () => {
+        const member = meaning.members[0]!;
+        const withRefs: Cohort = {
+            ...meaning,
+            members: [
+                { ...member, evidence_ref_ids: ["evidence_probe"] },
+                ...meaning.members.slice(1),
+            ],
+        };
+        const LABELS = { evidence_probe: "Team roster" };
+        const opened = () => {
+            const open = vi.fn();
+            render(
+                <EvidenceOpenContext.Provider value={{ open }}>
+                    <CohortRankingPanel
+                        cohort={withRefs}
+                        result={{ evidence_ref_labels: LABELS } as unknown as InvestigationResult}
+                        shape="explicit_cohort"
+                    />
+                </EvidenceOpenContext.Provider>,
+            );
+            return open;
+        };
+
+        it("sits in the fold, on the member's line, as a working control", () => {
+            const open = opened();
+            const button = within(fold()).getByRole("button", { name: "Team roster" });
+            expect(button.closest("[data-testid='cohort-member-evidence']")).toHaveTextContent(
+                member.subject.label,
+            );
+            fireEvent.click(button);
+            expect(open).toHaveBeenCalledWith("evidence_probe", "Team roster");
+        });
+
+        it("draws nothing for a member with no refs", () => {
+            const members = meaning.members.map(
+                ({ evidence_ref_ids: _refs, ...rest }) => rest,
+            ) as Cohort["members"];
+            draw({ ...meaning, members });
+            expect(within(fold()).queryByTestId("cohort-member-evidence")).toBeNull();
         });
     });
 

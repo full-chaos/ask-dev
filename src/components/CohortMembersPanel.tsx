@@ -81,7 +81,12 @@ export function CohortMembersPanel({ result }: { readonly result: InvestigationR
                 </ul>
             )}
             <CohortExclusions cohort={cohort} />
-            <CohortMeaningDetails cohort={cohort} ranked={false} />
+            <CohortMeaningDetails
+                cohort={cohort}
+                evidenceElsewhere={drawnByStatusTable}
+                evidenceRefLabels={result.evidence_ref_labels}
+                ranked={false}
+            />
         </section>
     );
 }

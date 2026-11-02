@@ -348,7 +348,11 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                     Not ranked by the service: {unranked.join(", ")}.
                 </p>
             )}
-            <CohortMeaningDetails cohort={cohort} ranked />
+            <CohortMeaningDetails
+                cohort={cohort}
+                evidenceRefLabels={result?.evidence_ref_labels}
+                ranked
+            />
         </section>
     );
 }
