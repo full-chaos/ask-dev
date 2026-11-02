@@ -21,9 +21,20 @@ export function setAcrLogger(next: AcrLogger): void {
     sink = next;
 }
 
+/** A line is never a reason for the client to fail: a sink that throws loses the line only. */
+function safely(write: () => void): void {
+    try {
+        write();
+    } catch {
+        // The host's sink failed; the client's own outcome stands (CHAOS-12593, codex r2 P2).
+    }
+}
+
 export const logger: Required<AcrLogger> = {
-    info: (fields, message) => sink.info(fields, message),
-    warn: (fields, message) => sink.warn(fields, message),
+    info: (fields, message) => safely(() => sink.info(fields, message)),
+    warn: (fields, message) => safely(() => sink.warn(fields, message)),
     error: (fields, message) =>
-        sink.error === undefined ? sink.warn(fields, message) : sink.error(fields, message),
+        safely(() =>
+            sink.error === undefined ? sink.warn(fields, message) : sink.error(fields, message),
+        ),
 };

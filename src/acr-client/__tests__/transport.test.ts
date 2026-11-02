@@ -1121,12 +1121,15 @@ describe("logs", () => {
  * result_978f8973… of reach run part 1 (ACR pin 7b0caff2 against acr e84ac54f's `measure_units`).
  */
 describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
+    /** A value from the refused document: Ajv can carry one in `data`, `message` or `params`. */
+    const SENTINEL = "value-from-the-refused-answer";
     const FIRST_ERROR = {
         instancePath: "/claimed_facts/0/table",
         schemaPath: "#/$defs/ContextFabricClaimedFactTable/additionalProperties",
         keyword: "additionalProperties",
-        params: { additionalProperty: "measure_units" },
-        message: "must NOT have additional properties",
+        params: { additionalProperty: "measure_units", allowedValues: [SENTINEL] },
+        message: `must NOT have additional properties ${SENTINEL}`,
+        data: { question: SENTINEL },
     };
     const errors = [
         FIRST_ERROR,
@@ -1218,6 +1221,7 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
             }),
         );
         const [fields] = log.error.mock.calls[0] as [Record<string, unknown>, string];
+        expect(JSON.stringify(fields)).not.toContain(SENTINEL);
         expect(Object.keys(fields).sort()).toEqual(
             [
                 "additional_property",
@@ -1256,6 +1260,29 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
                 additional_property: "measure_units",
                 error_count: 9,
             },
+            REFUSED,
+        );
+    });
+
+    it("a replayed v2 result names the v2 refusal, not v1's (codex r2 P2)", async () => {
+        const result = (resultEvent(9) as unknown as { result: Record<string, unknown> }).result;
+        const v2 = { ...result, schema_version: "context_fabric_investigation_result.v2" };
+        fetchMock.mockResolvedValue(jsonResponse(v2, 200));
+        await transportChecking(streamEnvelopeValidators, {
+            ...streamValidators,
+            validateInvestigationResultV1: Object.assign((_value: unknown) => false, {
+                errors: [{ instancePath: "/schema_version", keyword: "const", schemaPath: "#/v1" }],
+            }),
+            validateInvestigationResultV2: refusing(),
+        })
+            .readResult(String(result.result_id), new AbortController().signal)
+            .catch(() => undefined);
+        expect(log.error).toHaveBeenCalledWith(
+            expect.objectContaining({
+                call: "replay",
+                path: "/claimed_facts/0/table",
+                keyword: "additionalProperties",
+            }),
             REFUSED,
         );
     });

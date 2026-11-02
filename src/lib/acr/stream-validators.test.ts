@@ -6,6 +6,8 @@ import result from "@/contracts/examples/context_fabric_investigation_event_resu
 import status from "@/contracts/examples/context_fabric_submission_status.v1.json";
 import error from "@/contracts/examples/error_context_fabric_interpretation_rejected.v1.json";
 
+import { schemaRefusal } from "@/acr-client/schemaRefusal";
+
 import { loadStreamValidators, streamEnvelopeValidators } from "./stream-validators";
 
 /** CHAOS-12106: the Workbench's stream checks, against ACR's own documents at the pin. */
@@ -28,6 +30,24 @@ describe("the stream validators", () => {
         const full = await loadStreamValidators();
         expect(streamEnvelopeValidators.validateInvestigationEventEnvelope(event)).toBe(false);
         expect(full.validateInvestigationEvent(event)).toBe(false);
+    });
+
+    it("keep the schema's own errors beside a refusal (CHAOS-12593, codex r2 P2)", async () => {
+        const full = await loadStreamValidators();
+        // ACR's result event with a field the pinned contract does not know, on the result itself.
+        const newer = { ...result, result: { ...result.result, field_from_a_newer_acr: 1 } };
+        for (const check of [
+            streamEnvelopeValidators.validateInvestigationEventEnvelope,
+            full.validateInvestigationEvent,
+        ]) {
+            expect(check(newer)).toBe(false);
+            const refusal = schemaRefusal(check);
+            expect(refusal.error_count).toBeGreaterThan(0);
+            expect(refusal.keyword).not.toBe("");
+            expect(refusal.path.startsWith("/result")).toBe(true);
+            expect(check(result)).toBe(true);
+            expect(schemaRefusal(check).error_count).toBe(0);
+        }
     });
 
     it("read ACR's submission status, and refuse a broken one", () => {

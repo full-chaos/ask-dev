@@ -774,11 +774,14 @@ export function createAcrCalls<TResult, TStatus>(
                 validators.validateInvestigationResultV2(body);
             if (!valid && typeof body === "object" && body !== null && !Array.isArray(body)) {
                 // CHAOS-12593 (codex r1 P2): a stored answer the pinned contract refuses, as on the
-                // stream. The v1 refusal is the one named: the answer schema both versions share.
-                logger.error(
-                    { call: "replay", ...schemaRefusal(validators.validateInvestigationResultV1) },
-                    CONTRACT_REFUSED,
-                );
+                // stream. The refusal named is the one of the version the answer says it is
+                // (codex r2 P2): a v2 answer is v2's to refuse.
+                const version = (body as { readonly schema_version?: unknown }).schema_version;
+                const refusing =
+                    typeof version === "string" && version.endsWith(".v2")
+                        ? validators.validateInvestigationResultV2
+                        : validators.validateInvestigationResultV1;
+                logger.error({ call: "replay", ...schemaRefusal(refusing) }, CONTRACT_REFUSED);
                 throw new TransportFailure("invalid_upstream", "schema");
             }
             if (!valid || !dependencies.isResult(body)) {

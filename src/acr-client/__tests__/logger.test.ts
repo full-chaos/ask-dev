@@ -18,6 +18,17 @@ describe("logger.error", () => {
         expect(sink.warn).not.toHaveBeenCalled();
     });
 
+    it.each(["info", "warn", "error"] as const)(
+        "never throws when the host sink's %s throws (codex r2 P2)",
+        (level) => {
+            const down = () => {
+                throw new Error("sink down");
+            };
+            setAcrLogger({ info: down, warn: down, error: down });
+            expect(() => logger[level]({ seq: 2 }, "line")).not.toThrow();
+        },
+    );
+
     it("falls back to warn for a sink with no error", () => {
         const sink = { info: vi.fn(), warn: vi.fn() };
         setAcrLogger(sink);

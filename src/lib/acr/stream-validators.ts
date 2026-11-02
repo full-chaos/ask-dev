@@ -1,5 +1,5 @@
 import type { StreamEnvelopeValidators, StreamValidators } from "@/acr-client";
-import { validateContract, type ContractSchemaName } from "@/lib/acr/validate";
+import { contractValidator, type ContractSchemaName } from "@/lib/acr/validate";
 
 /**
  * The checks the shared ACR client asks of its host (CHAOS-12106), built from the vendored
@@ -16,10 +16,22 @@ const ERROR = "error.v1.schema.json";
 const RESPONSE_V1 = "context_fabric_investigation_response.v1.schema.json";
 const RESPONSE_V2 = "context_fabric_investigation_response.v2.schema.json";
 
-const valid =
-    (schema: ContractSchemaName) =>
-    (value: unknown): boolean =>
-        validateContract(schema, value).valid;
+/**
+ * A check that keeps the schema's own errors beside a refusal, as a compiled Ajv validator does
+ * (CHAOS-12593, codex r2 P2): the transport reads them to log where and by which rule.
+ */
+const valid = (schema: ContractSchemaName) => {
+    const check = Object.assign(
+        (value: unknown): boolean => {
+            const validator = contractValidator(schema);
+            const ok = validator !== undefined && validator(value) === true;
+            check.errors = ok ? null : (validator?.errors ?? null);
+            return ok;
+        },
+        { errors: null } as { errors: unknown },
+    );
+    return check;
+};
 
 export const streamEnvelopeValidators: StreamEnvelopeValidators = {
     validateInvestigationEventEnvelope: valid(EVENT),

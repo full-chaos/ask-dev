@@ -62,6 +62,14 @@ addFormats(ajv);
 ajv.addKeyword({ keyword: "x-documented-values", schemaType: "array" });
 for (const [name, schema] of Object.entries(CONTRACT_SCHEMAS)) ajv.addSchema(schema, name);
 
+/**
+ * The compiled validator of one schema, so a caller can keep Ajv's own `errors` beside a refusal
+ * (CHAOS-12593: the transport logs where and by which rule the pinned contract refused).
+ */
+export function contractValidator(schema: ContractSchemaName) {
+    return ajv.getSchema(schema);
+}
+
 export function validateContract(schema: ContractSchemaName, value: unknown): ValidationResult {
     const validator = ajv.getSchema(schema);
     if (validator === undefined)
