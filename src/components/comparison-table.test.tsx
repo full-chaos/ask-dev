@@ -182,6 +182,46 @@ describe("the verifier reads a side-by-side table (CHAOS-12513)", () => {
     });
 });
 
+describe("a table acr's real selector served (CHAOS-12560)", () => {
+    const served = servedShapeScenarios["comparison-table-served"];
+    const shape = served.render_shapes!.find(
+        (candidate) => candidate.selected_by === "comparison_side_by_side",
+    )!;
+
+    it("passes the result contract the server route holds it to", () => {
+        const verdict = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            served,
+        );
+        expect(verdict.errors ?? []).toEqual([]);
+    });
+
+    it("is the case: one family, two committed subjects, a label from the served word map", () => {
+        expect(served.answer_plan?.family).toBe("explicit_comparison");
+        expect(served.subject_resolution.committed.map((subject) => subject.canonical_id)).toEqual(
+            shape.series.map((series) => series.key),
+        );
+        for (const point of shape.series.flatMap((series) => series.points)) {
+            expect(served.vocabulary_labels?.[`fact_field:${point.source.field!}`]).toBe(
+                point.label,
+            );
+        }
+    });
+
+    it("verifies, and draws one table with no notice", () => {
+        expect(verifyRenderShape(shape, served)).toBe(true);
+        render(<DeterministicAnswerView offersPresentation="popup" result={served} />);
+        const panel = screen.getByTestId("comparison-table");
+        const table = within(panel).getAllByRole("table")[0]!;
+        for (const series of shape.series) {
+            expect(within(table).getByRole("columnheader", { name: series.label })).toBeVisible();
+        }
+        expect(within(table).getAllByRole("rowheader")).toHaveLength(2);
+        expect(screen.queryByTestId("comparison-table-withheld")).toBeNull();
+        expect(screen.queryByTestId("render-shapes-not-drawn")).toBeNull();
+    });
+});
+
 describe("a side-by-side table on the answer (CHAOS-12513)", () => {
     const draw = (result: InvestigationResult, slot: ShapeSlot | null = null) =>
         render(
