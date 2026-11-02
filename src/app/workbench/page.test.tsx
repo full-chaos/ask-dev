@@ -3,9 +3,21 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import WorkbenchPage from "@/app/workbench/page";
+import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
+import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { servedWordScenarios as served } from "@/test/fixtures/served-words";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
+
+// CHAOS-12106: the pages ask ACR from the browser. These tests drive them through a fake `fetch`
+// that answers `{ result }` or `{ failure }`; the fake sees the call's options as the POST body.
+vi.mock("@/lib/acr/investigate", async (importOriginal) => {
+    const { investigateFromGlobalFetch } = await import("@/test/fixtures/investigate-fake");
+    return {
+        ...(await importOriginal<typeof import("@/lib/acr/investigate")>()),
+        investigateFromBrowser: investigateFromGlobalFetch,
+    };
+});
 
 const clarification = mockScenarios().find((scenario) => scenario.id === "clarification")!.result;
 const answered = mockScenarios().find((scenario) => scenario.id === "complete")!.result;
@@ -80,9 +92,9 @@ describe("the clarification choice is reachable from every view", () => {
  * boundary — see README's "What this is, and what it is not"), so the
  * closest thing to an end-to-end proof of the panel-hint flow is driving the
  * REAL page component against a schema-shaped mock response, same as every
- * test above. The fetch mock stands in for the server hop (which this test
- * does not exercise); everything from the click through to the outgoing
- * request body is the real component tree.
+ * test above. The fetch mock stands in for the browser's ACR call (which this
+ * test does not exercise); everything from the click through to the outgoing
+ * call's options is the real component tree.
  */
 describe("structure-needs panel hints (design brief §2.2)", () => {
     it("renders the offers and sends the full accumulated batch in ONE re-ask", async () => {
@@ -115,13 +127,9 @@ describe("structure-needs panel hints (design brief §2.2)", () => {
         // The question travels UNCHANGED — the same rule the subject-choice
         // flow already holds (never rewrite it to encode the pick).
         expect(secondCallBody.question).toBe("How's the pipeline doing?");
-        // CHAOS-4171 standing order: verify the CONSUMER, not just the
-        // producer — `use-structure-selections.test.ts` proves the hook
-        // queues the event, `route.test.ts` proves the route emits it; this
-        // is the one place that proves `ask()` actually puts it on the wire.
-        expect(secondCallBody.structureSelectionEvents).toEqual([
-            { member: "expected_kind", outcome: "submitted" },
-        ]);
+        // The selection record was telemetry for a server that emitted it. This app has none
+        // (CHAOS-12106), so the call carries no such field.
+        expect(secondCallBody).not.toHaveProperty("structureSelectionEvents");
     });
 
     it("surfaces a vetoed selection as a visible notice, reachable from every view", async () => {
@@ -215,16 +223,12 @@ describe("a failure is shown as a failure", () => {
 });
 
 /**
- * Medium, codex review round 2: `chooseCandidates`'s sequential loop calls
- * the SAME `ask()` closure once per selected candidate. `ask()` used to
- * re-read `candidateSelections.pendingSelectionEvents` itself on every one
- * of those calls — but a closure captured before the loop started never
- * sees the effect of its own `.reset()` calls, so every iteration read the
- * SAME pre-reset (non-empty) value, resending one tester action's telemetry
- * once per fired request instead of once total.
+ * CHAOS-4343 items 1/2: `chooseCandidates`'s sequential loop calls the SAME `ask()` closure once
+ * per selected candidate, and each call carries its own candidate. (Until CHAOS-12106 the first
+ * also carried the selection record, once; no call carries it now.)
  */
-describe("Workbench multi-select telemetry (CHAOS-4343, codex review round 2)", () => {
-    it("emits candidate-selection telemetry once for the whole batch, not once per sequential request", async () => {
+describe("Workbench multi-select (CHAOS-4343)", () => {
+    it("fires one request per candidate, each with its own receipt and no selection record", async () => {
         const [first, second] = clarification.subject_resolution.candidates;
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
@@ -251,20 +255,20 @@ describe("Workbench multi-select telemetry (CHAOS-4343, codex review round 2)", 
         await user.click(screen.getByRole("button", { name: "Ask about 2 selected candidates" }));
 
         expect(fetchSpy).toHaveBeenCalledTimes(3);
-        const secondCallBody = JSON.parse(fetchSpy.mock.calls[1]![1]!.body as string) as Record<
-            string,
-            unknown
-        >;
-        const thirdCallBody = JSON.parse(fetchSpy.mock.calls[2]![1]!.body as string) as Record<
-            string,
-            unknown
-        >;
-        expect(secondCallBody.structureSelectionEvents).toEqual([
-            { member: "subject_candidate", outcome: "submitted" },
-            { member: "subject_candidate", outcome: "submitted" },
+        const bodies = [1, 2].map(
+            (index) =>
+                JSON.parse(fetchSpy.mock.calls[index]![1]!.body as string) as Record<
+                    string,
+                    unknown
+                >,
+        );
+        expect(bodies[0]!.priorSubjectReceipts).toEqual([
+            { result_id: clarification.result_id, receipt_id: first!.receipt_id },
         ]);
-        // The SECOND fired request must NOT resend the same telemetry.
-        expect(thirdCallBody).not.toHaveProperty("structureSelectionEvents");
+        expect(bodies[1]!.priorSubjectReceipts).toEqual([
+            { result_id: clarification.result_id, receipt_id: second!.receipt_id },
+        ]);
+        for (const body of bodies) expect(body).not.toHaveProperty("structureSelectionEvents");
     });
 });
 
@@ -302,10 +306,10 @@ describe("the header's status badge", () => {
     });
 
     it("a withheld answer keeps its badge, and names no raw status on hover", async () => {
-        respondWith({
-            result: served.corrected,
-            rankingWithheld: { reason: "subject_kind_not_ranked", members_affected: 1 },
-        });
+        // The boundary withholds where the result enters the page (CHAOS-12106: nothing marks it
+        // marks it first), so a raw person cohort is what makes the badge read "withheld".
+        const rankable = shapesExample as unknown as InvestigationResult;
+        respondWith({ result: { ...rankable, cohort: { ...rankable.cohort!, kind: "person" } } });
         await ask();
         await screen.findByRole("article", { name: "Answer" });
         const badge = headerBadge();

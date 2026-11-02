@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
-import { buildInvestigationRequest } from "@/lib/acr/client";
+import { buildInvestigationRequest } from "@/lib/acr/investigate";
 import { validateContract } from "@/lib/acr/validate";
 import type { SubjectRef } from "@/lib/contracts";
 import {

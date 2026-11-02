@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AskDevChat } from "@/components/chat/AskDevChat";
 import shapesExample from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import { createStandaloneSource } from "@/render/standalone-source";
+import { investigateFromGlobalFetch } from "@/test/fixtures/investigate-fake";
 
 /**
  * CHAOS-12387: the standalone app stays as it was. Its source offers none of what a host offers, so
@@ -38,7 +39,7 @@ afterEach(() => {
 
 describe("the standalone app", () => {
     it("its source offers none of it", () => {
-        const source = createStandaloneSource();
+        const source = createStandaloneSource(() => new Promise(() => undefined));
         for (const capability of [
             "history",
             "feedback",
@@ -52,7 +53,7 @@ describe("the standalone app", () => {
     });
 
     it("shows none of it on an empty page, and keeps its own empty line", () => {
-        render(<AskDevChat />);
+        render(<AskDevChat source={createStandaloneSource(() => new Promise(() => undefined))} />);
         expectNoneOfIt();
         expect(screen.getByText("Ask a question to start an investigation.")).toBeInTheDocument();
     });
@@ -65,7 +66,7 @@ describe("the standalone app", () => {
                 Promise.resolve({ json: () => Promise.resolve({ result: shapesExample }) }),
             ),
         );
-        render(<AskDevChat />);
+        render(<AskDevChat source={createStandaloneSource(investigateFromGlobalFetch)} />);
         await user.type(
             screen.getByRole("textbox", { name: "Ask a question" }),
             "Is Ask Dev ready?{Enter}",

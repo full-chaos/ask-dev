@@ -1,41 +1,51 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createStandaloneSource } from "./standalone-source";
+import {
+    createStandaloneSource,
+    type StandaloneInvestigate,
+    type StandaloneInvestigateOutcome,
+} from "./standalone-source";
 import type { BatchItem, ChatAssistantTurn, ChatTurn } from "./source";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import shapesResult from "@/contracts/examples/context_fabric_investigation_result_render_shapes.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
+import type { WorkbenchFailure } from "@/lib/acr/errors";
+import { unsentSubjectsNotice } from "@/lib/conversation";
 import type { InvestigationResult } from "@/lib/contracts";
 import workItemStatusResult from "../../tests/fixtures/work-item-status-result.json";
 
 /**
- * CHAOS-12382: the standalone source is today's behaviour moved out of `AskDevChat`. The answered
- * bodies are the pinned ACR captures, never hand-written result JSON.
+ * CHAOS-12382: the standalone source is today's behaviour moved out of `AskDevChat`. CHAOS-12106:
+ * its investigation call is injected, so these tests drive a fake one. The answered results are the
+ * pinned ACR captures, never hand-written result JSON.
  */
 
 type Call = {
-    readonly url: unknown;
-    readonly init: RequestInit;
+    /** The options the source passed to the investigation call. */
     readonly body: Record<string, unknown>;
+    /** `{ result }` answers, `{ failure }` fails; anything else answers neither. */
     readonly respond: (payload: unknown) => void;
     readonly fail: (error: unknown) => void;
 };
 
-/** A fetch whose calls stay open until a test answers them. */
-function controlledFetch() {
+/** An investigation call whose calls stay open until a test answers them. */
+function controlledInvestigate() {
     const calls: Call[] = [];
-    const impl = ((url: unknown, init: RequestInit) =>
-        new Promise<Response>((resolve, reject) => {
+    const impl: StandaloneInvestigate = (options) =>
+        new Promise<StandaloneInvestigateOutcome>((resolve, reject) => {
             calls.push({
-                url,
-                init,
-                body: JSON.parse(init.body as string) as Record<string, unknown>,
+                body: { ...options },
                 respond: (payload) => {
-                    resolve({ json: () => Promise.resolve(payload) } as Response);
+                    const { result, failure } = payload as {
+                        result?: InvestigationResult;
+                        failure?: WorkbenchFailure;
+                    };
+                    if (failure !== undefined) resolve({ kind: "failed", failure });
+                    else resolve({ kind: "answered", result: result as InvestigationResult });
                 },
                 fail: reject,
             });
-        })) as unknown as typeof fetch;
+        });
     return { impl, calls };
 }
 
@@ -59,7 +69,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("ask appends a user turn and a pending turn, then settles answered", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const answered = source.ask("Is Ask Dev ready?");
 
@@ -75,10 +85,8 @@ describe("createStandaloneSource", () => {
             retryQuestion: "Is Ask Dev ready?",
             rootQuestion: "Is Ask Dev ready?",
         });
-        // Today's request, field for field: one POST to the one route.
-        expect(call(calls, 0).url).toBe("/api/investigations");
-        expect(call(calls, 0).init.method).toBe("POST");
-        expect(call(calls, 0).init.headers).toEqual({ "Content-Type": "application/json" });
+        // Today's request, field for field: one call, with these options.
+        expect(calls).toHaveLength(1);
         expect(call(calls, 0).body).toEqual({
             question: "Is Ask Dev ready?",
             priorSubjectReceipts: [],
@@ -94,25 +102,75 @@ describe("createStandaloneSource", () => {
         });
     });
 
-    it("keeps the route's notice and marker beside the result", async () => {
-        const { impl, calls } = controlledFetch();
+    it("words the scope-loss notice itself, from the subjects the follow-up could not carry", async () => {
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
-        const answered = source.ask("Status of Project Alpha?");
-        call(calls, 0).respond({
-            result: workItemStatusResult,
-            scopeLossNotice: "This follow-up does not carry Atlas.",
-            rankingWithheld: { reason: "subject_kind_not_ranked", members_affected: 2 },
-        });
+        const first = source.ask("Status of Project Alpha?");
+        const unsendable = structuredClone(workItemStatusResult) as unknown as InvestigationResult;
+        // A committed subject of a kind that cannot ride as a scope hint.
+        unsendable.subject_resolution.committed = [
+            { kind: "new_entity", canonical_id: "x:1", label: "Atlas" },
+        ] as typeof unsendable.subject_resolution.committed;
+        call(calls, 0).respond({ result: unsendable });
+        await first;
+        // The first answer carries no notice: nothing came before it.
+        expect(assistant(source.getSnapshot().turns, 1).outcome).not.toHaveProperty(
+            "scopeLossNotice",
+        );
+
+        const followUp = source.ask("And last month?");
+        call(calls, 1).respond({ result: canonicalResult });
+        await followUp;
+        const { outcome } = assistant(source.getSnapshot().turns, 3);
+        if (outcome.kind !== "answered") throw new Error("not answered");
+        expect(outcome.scopeLossNotice).toBe(
+            unsentSubjectsNotice([{ kind: "new_entity", label: "Atlas" }]),
+        );
+        expect(outcome.scopeLossNotice).toMatch(/does not carry Atlas/);
+    });
+
+    it("carries no notice when every committed subject rode as a hint", async () => {
+        const { impl, calls } = controlledInvestigate();
+        const source = createStandaloneSource(impl);
+        const first = source.ask("Is Ask Dev ready?");
+        call(calls, 0).respond({ result: canonicalResult });
+        await first;
+        const followUp = source.ask("And last month?");
+        call(calls, 1).respond({ result: canonicalResult });
+        await followUp;
+        expect(assistant(source.getSnapshot().turns, 3).outcome).not.toHaveProperty(
+            "scopeLossNotice",
+        );
+    });
+
+    it("withholds a person cohort's ranking where the result enters, with a typed marker", async () => {
+        const { impl, calls } = controlledInvestigate();
+        const source = createStandaloneSource(impl);
+        const base = canonicalResult as unknown as InvestigationResult;
+        const person = {
+            ...base,
+            interpretation: { ...base.interpretation, shape: "explicit_cohort" },
+            cohort: {
+                ...base.cohort!,
+                kind: "person",
+                members: base.cohort!.members.map((member) => ({
+                    ...member,
+                    subject: { ...member.subject, kind: "person" },
+                })),
+            },
+        };
+        const answered = source.ask("Who needs attention?");
+        call(calls, 0).respond({ result: person });
         await answered;
-        expect(assistant(source.getSnapshot().turns, 1).outcome).toMatchObject({
-            kind: "answered",
-            scopeLossNotice: "This follow-up does not carry Atlas.",
-            rankingWithheld: { reason: "subject_kind_not_ranked", members_affected: 2 },
-        });
+        const { outcome } = assistant(source.getSnapshot().turns, 1);
+        if (outcome.kind !== "answered") throw new Error("not answered");
+        expect(outcome.rankingWithheld?.reason).toBe("subject_kind_not_ranked");
+        expect(JSON.stringify(outcome.result)).not.toContain("attention_rank");
+        expect(JSON.stringify(outcome.result)).not.toContain('"score"');
     });
 
     it("holds the withheld form of a raw person cohort: its state feeds what it sends", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const rankable = shapesResult as unknown as InvestigationResult;
         const person = {
@@ -129,8 +187,8 @@ describe("createStandaloneSource", () => {
         expect(outcome.rankingWithheld?.reason).toBe("subject_kind_not_ranked");
     });
 
-    it("a { failure } body settles failed and resolves false", async () => {
-        const { impl, calls } = controlledFetch();
+    it("a failed outcome settles failed and resolves false", async () => {
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const failure = { code: "acr_runtime_unavailable", message: "Down.", retryable: true };
         const answered = source.ask("Is Ask Dev ready?");
@@ -142,24 +200,8 @@ describe("createStandaloneSource", () => {
         });
     });
 
-    it("a body with neither a result nor a failure is acr_contract_violation", async () => {
-        const { impl, calls } = controlledFetch();
-        const source = createStandaloneSource(impl);
-        const answered = source.ask("Is Ask Dev ready?");
-        call(calls, 0).respond({});
-        await expect(answered).resolves.toBe(false);
-        expect(assistant(source.getSnapshot().turns, 1).outcome).toEqual({
-            kind: "failed",
-            failure: {
-                code: "acr_contract_violation",
-                message: "Ask Dev's server returned neither a result nor a failure.",
-                retryable: false,
-            },
-        });
-    });
-
-    it("a thrown fetch is acr_unreachable (retryable) and is logged", async () => {
-        const { impl, calls } = controlledFetch();
+    it("a thrown call is acr_unreachable (retryable) and is logged", async () => {
+        const { impl, calls } = controlledInvestigate();
         const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
         const source = createStandaloneSource(impl);
         const answered = source.ask("Is Ask Dev ready?");
@@ -170,7 +212,7 @@ describe("createStandaloneSource", () => {
             kind: "failed",
             failure: {
                 code: "acr_unreachable",
-                message: "Ask Dev's server could not be reached.",
+                message: "Ask Dev could not be reached.",
                 retryable: true,
             },
         });
@@ -178,7 +220,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("threads the prior answer into a follow-up: conversation, parent, subject hints", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         call(calls, 0).respond({ result: canonicalResult });
@@ -202,7 +244,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("does not thread a blank answer (a real unsupported capture)", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         call(calls, 0).respond({ result: unsupportedResult });
@@ -214,7 +256,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("a narrower re-ask keeps the chain's root; a receipt re-ask is silent and not retryable", () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         void source.ask("Rank all repositories, top 5 only", { narrowingRoot: "Rank all" });
         expect(assistant(source.getSnapshot().turns, 1)).toMatchObject({
@@ -233,8 +275,8 @@ describe("createStandaloneSource", () => {
         expect(call(calls, 1).body.priorSubjectReceipts).toEqual([receipt]);
     });
 
-    it("sends the structure batch and selection events a re-ask carries", () => {
-        const { impl, calls } = controlledFetch();
+    it("sends the structure batch a re-ask carries, and not the selection events", () => {
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const expectedKind = { result_id: "r1", receipt_id: "kindr_1" };
         void source.ask("Is Atlas on track?", {
@@ -247,12 +289,14 @@ describe("createStandaloneSource", () => {
             priorHandleReceipts: [],
             priorWindowReceipts: [],
             priorCandidateReceipts: [],
-            structureSelectionEvents: [{ member: "expected_kind", outcome: "submitted" }],
         });
+        // Telemetry only, and nothing in this app emits it (CHAOS-12106).
+        expect(call(calls, 0).body).not.toHaveProperty("structureSelectionEvents");
+        expect(call(calls, 0).body).not.toHaveProperty("selectionEvents");
     });
 
     it("askBatch fires N requests in parallel and settles each on its own", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = { result_id: "r1", receipt_id: "receipt_1" };
         const second = { result_id: "r1", receipt_id: "receipt_2" };
@@ -291,10 +335,7 @@ describe("createStandaloneSource", () => {
             "assistant",
         ]);
         expect(turns[0]).toMatchObject({ question: "Is Atlas on track?", showBubble: false });
-        expect(call(calls, 0).body.structureSelectionEvents).toEqual([
-            { member: "subject_candidate", outcome: "submitted" },
-        ]);
-        expect(call(calls, 1).body.structureSelectionEvents).toBeUndefined();
+        expect(call(calls, 0).body).not.toHaveProperty("selectionEvents");
         expect(call(calls, 2).body.priorCandidateReceipts).toEqual([third]);
 
         // The last request answers first, and only its own turn settles.
@@ -307,7 +348,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("askBatch with no items does nothing", () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const before = source.getSnapshot();
         source.askBatch([], "Is Atlas on track?");
@@ -316,7 +357,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("records what the superseded turn submitted, in the update that appends the new turns", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Atlas on track?");
         call(calls, 0).respond({ result: canonicalResult });
@@ -355,7 +396,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("retry resends a plain question as a new pair, and says how it ended", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         call(calls, 0).respond({
@@ -373,8 +414,8 @@ describe("createStandaloneSource", () => {
         await expect(retried).resolves.toBe(true);
     });
 
-    it("retry passes the intent to ask, so the body is the one ask would send", async () => {
-        const { impl, calls } = controlledFetch();
+    it("retry passes the intent to ask, so the call is the one ask would make", async () => {
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         call(calls, 0).respond({
@@ -386,9 +427,7 @@ describe("createStandaloneSource", () => {
             selectionEvents: [{ member: "subject_candidate", outcome: "submitted" }],
             narrowingRoot: "The root",
         });
-        expect(call(calls, 1).body.structureSelectionEvents).toEqual([
-            { member: "subject_candidate", outcome: "submitted" },
-        ]);
+        expect(call(calls, 1).body).not.toHaveProperty("selectionEvents");
         expect(assistant(source.getSnapshot().turns, 3).rootQuestion).toBe("The root");
         call(calls, 1).respond({
             failure: { code: "acr_unreachable", message: "No.", retryable: true },
@@ -397,7 +436,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("retry does nothing for a receipt re-ask or an unknown turn, and resolves false", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         void source.ask("Is Atlas on track?", {
             priorSubjectReceipts: [{ result_id: "r1", receipt_id: "receipt_1" }],
@@ -408,7 +447,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("newConversation empties the timeline, and the next ask threads nothing", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         call(calls, 0).respond({ result: canonicalResult });
@@ -425,7 +464,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("a request that answers after newConversation leaves the fresh conversation alone", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const first = source.ask("Is Ask Dev ready?");
         source.newConversation();
@@ -436,7 +475,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("snapshots are immutable and change identity only on change", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         const listener = vi.fn();
         const unsubscribe = source.subscribe(listener);
@@ -471,7 +510,7 @@ describe("createStandaloneSource", () => {
     });
 
     it("never offers stop, never reports progress, never sends a status", async () => {
-        const { impl, calls } = controlledFetch();
+        const { impl, calls } = controlledInvestigate();
         const source = createStandaloneSource(impl);
         expect("stop" in source).toBe(false);
         expect(source.getSnapshot().stoppable).toBe(false);
@@ -486,14 +525,17 @@ describe("createStandaloneSource", () => {
         expect(assistant(source.getSnapshot().turns, 1).outcome.kind).toBe("failed");
     });
 
-    it("the default fetch is the global one, read at request time", async () => {
-        const source = createStandaloneSource();
-        const stub = vi.fn(() =>
-            Promise.resolve({ json: () => Promise.resolve({ result: canonicalResult }) }),
+    it("asks through the injected call and no other, once per ask", async () => {
+        const stub = vi.fn<StandaloneInvestigate>(() =>
+            Promise.resolve({
+                kind: "answered",
+                result: canonicalResult as unknown as InvestigationResult,
+            }),
         );
-        vi.stubGlobal("fetch", stub);
+        const fetchSpy = vi.spyOn(globalThis, "fetch");
+        const source = createStandaloneSource(stub);
         await expect(source.ask("Is Ask Dev ready?")).resolves.toBe(true);
         expect(stub).toHaveBeenCalledTimes(1);
-        vi.unstubAllGlobals();
+        expect(fetchSpy).not.toHaveBeenCalled();
     });
 });

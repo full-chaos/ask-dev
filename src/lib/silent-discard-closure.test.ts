@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { POST } from "@/app/api/investigations/route";
+import { investigateFromBrowser } from "@/lib/acr/investigate";
 import { validateContract } from "@/lib/acr/validate";
 import { choiceDisposition } from "@/lib/clarification";
 import type { InvestigationResult } from "@/lib/contracts";
@@ -57,18 +57,18 @@ type Seam = {
 
 export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
     {
-        seam: "HTTP body → route",
-        discard: "A non-object body is read as though it had fields.",
+        seam: "Question text → request",
+        discard: "An empty or over-long question is sent, or silently cut to fit.",
         verdict: "structurally-impossible",
         evidence:
-            "route.ts rejects any body that is not a non-array object before a property is read; typeof/null/Array checks precede all use.",
+            "investigateFromBrowser checks the question (non-empty after trim, at most 8000 code points) before it builds a request, and ends with acr_rejected_request; nothing goes out and nothing is cut.",
     },
     {
         seam: "Browser receipts → ACR request",
         discard: "A malformed receipt is dropped and the re-ask runs without the chosen subject.",
         verdict: "structurally-impossible",
         evidence:
-            "parseReceipts throws on the first malformed entry and the route returns acr_rejected_request; there is no filtering path that can produce a partial list.",
+            "investigateFromBrowser rejects a receipt outside its own id namespace, and the request schema bounds the rest, with acr_rejected_request before anything is sent; there is no filtering path that can produce a partial list.",
     },
     {
         seam: "Receipt list → contract bound",
@@ -82,7 +82,7 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
         discard: "A payload that violates the contract is rendered as an answer.",
         verdict: "structurally-impossible",
         evidence:
-            "The client schema-validates every 200 against the pinned schema and raises acr_contract_violation; no unvalidated payload reaches the UI.",
+            "The browser schema-validates every `result` event against the pinned schema and ends with acr_contract_violation; no unvalidated payload reaches the UI.",
     },
     {
         seam: "ACR error → failure surface",
@@ -126,13 +126,6 @@ export const SILENT_DISCARD_SEAMS: readonly Seam[] = [
         verdict: "structurally-impossible",
         evidence:
             "EnrichmentView returns the deterministic clarification panel for clarification_required before any enrichment work; the enriched branch is unreachable for that status.",
-    },
-    {
-        seam: "Result → telemetry",
-        discard: "A failure aggregates as an answer with zero findings.",
-        verdict: "structurally-impossible",
-        evidence:
-            "outcome is derived independently of the counts, so failed and empty-but-answered never collapse; clarificationChoiceHonoured is undefined vs false for the same reason.",
     },
     {
         seam: "Fixtures → product code",
@@ -207,19 +200,36 @@ describe("silent-discard class closure — the enumeration", () => {
     });
 
     it("pins the seam count, so an added or dropped row is deliberate", () => {
-        expect(SILENT_DISCARD_SEAMS).toHaveLength(15);
+        expect(SILENT_DISCARD_SEAMS).toHaveLength(14);
     });
 });
 
 describe("silent-discard class closure — the mechanically checkable rows", () => {
-    it("a non-object body cannot be read as though it had fields", async () => {
-        const response = await POST(
-            new Request("http://workbench.test/api/investigations", {
-                method: "POST",
-                body: "null",
-            }),
-        );
-        expect(response.status).toBe(400);
+    it("a question that is not a question is never sent", async () => {
+        const sent = vi.spyOn(globalThis, "fetch");
+        for (const question of ["", "   ", "a".repeat(8_001)]) {
+            const outcome = await investigateFromBrowser({ question });
+            expect(outcome).toMatchObject({
+                kind: "failed",
+                failure: { code: "acr_rejected_request" },
+            });
+        }
+        expect(sent).not.toHaveBeenCalled();
+        vi.restoreAllMocks();
+    });
+
+    it("a receipt outside its own namespace is rejected, not dropped", async () => {
+        const sent = vi.spyOn(globalThis, "fetch");
+        const outcome = await investigateFromBrowser({
+            question: "q",
+            priorKindReceipts: [{ result_id: "result_0001", receipt_id: "ancr_wrong_member" }],
+        });
+        expect(outcome).toMatchObject({
+            kind: "failed",
+            failure: { code: "acr_rejected_request" },
+        });
+        expect(sent).not.toHaveBeenCalled();
+        vi.restoreAllMocks();
     });
 
     it("a contract-violating payload cannot be mistaken for a result", () => {

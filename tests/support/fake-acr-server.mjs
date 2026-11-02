@@ -2,28 +2,31 @@
 /**
  * A REAL HTTP server standing in for ACR, for e2e only.
  *
- * "e2e uses zero mocking" means no `page.route` interception and no fetch
- * stubbing inside the app or the test runner — every request in the e2e
- * suite is a genuine network call. It does not mean the suite can only ever
- * exercise ACR's absence: the Workbench/Ask Dev route already has (and
- * needs) a smoke test for that path (`tests/workbench.smoke.spec.ts`), but
- * "clarification chips render" and "clarification chips do not render" can
- * only be proven by driving the REAL `/api/investigations` server hop
- * against something that answers like ACR — and there is no committed ACR
- * checkout this repo can start. This process is that something: a plain
- * Node HTTP server on the real network, reached over a real fetch from the
- * app's server-only ACR client (`src/lib/acr/client.ts`), returning
- * responses that satisfy the SAME pinned JSON Schema
- * (`context_fabric_investigation_result.v1.schema.json`) the real client
- * validates every response against. It is not product code, does not ship,
- * and is never imported by anything under `src/` — it lives entirely in
- * `tests/`, same as the Playwright specs it backs.
+ * "e2e uses zero mocking" means no fetch stubbing inside the app or the test runner: every
+ * request in the e2e suite is a genuine network call. It does not mean the suite can only ever
+ * exercise ACR's absence: "clarification chips render" and "clarification chips do not render" can
+ * only be proven by driving the REAL browser client against something that answers like ACR, and
+ * there is no committed ACR checkout this repo can start. This process is that something: a plain
+ * Node HTTP server on the real network, reached over a real `fetch` from the browser (CHAOS-12106:
+ * the app is a browser OAuth client of ACR; no server hop stands between them). It serves:
  *
- * It does not verify the `X-ACR-Web-Assertion` header. Signature
- * verification is ACR's own concern and is exercised nowhere in this repo
- * (real ACR is the only thing that holds the corresponding public key); this
- * double's job is only to prove the Workbench/Ask Dev UI renders a
- * schema-valid response correctly, not to re-prove ACR's auth.
+ *   - ACR's OAuth surface: the authorization server metadata, `/authorize` (it redirects at once,
+ *     with `code`, `state` and `iss`, as the consent step would), and `/token` (the code and the
+ *     refresh grant, each rotating the refresh token);
+ *   - `POST /api/v1/context-fabric/investigations`, as `text/event-stream`: `accepted`, then the
+ *     result or the error. Its responses satisfy the SAME pinned JSON Schemas the browser validates
+ *     every event against. It requires a bearer token it issued.
+ *
+ * CORS is for the app's origin (a loopback origin), on every route, with the preflight of the
+ * investigations route. It is not product code, does not ship, and is never imported by anything
+ * under `src/`. It lives entirely in `tests/`, same as the Playwright specs it backs.
+ *
+ * The origin named in FAKE_ACR_REFUSED_ORIGIN stands for a user ACR refuses (403 `access_denied`,
+ * before any stream). The suite uses it for the failure paths: a refusal is not retryable, and no
+ * answer surface may appear.
+ *
+ * It does not verify the token beyond its shape. ACR's authorization is ACR's own concern; this
+ * double's job is only to prove the UI renders a schema-valid response correctly.
  *
  * Response selection is a dumb keyword router, not a scenario engine: a
  * question containing TRIGGER_CLARIFICATION returns a `clarification_required`
@@ -47,11 +50,9 @@
  * zero-mocking rule deserves an honest answer, not a technicality.
  *
  *   (a) Nothing like this existed in the repo before the PR that introduced
- *       this file. Every e2e spec that predates it (`tests/workbench.smoke.spec.ts`)
- *       runs with NO ACR configuration at all and only ever proves the
- *       honest-failure path (see the README's "Gates" section — the
- *       unconfigured instance is still exactly that, unconfigured). There
- *       was no prior stand-in pattern to follow; this was new.
+ *       this file. The smoke specs once ran with NO ACR at all and only proved
+ *       the honest-failure path; the refused origin (see above) keeps that
+ *       coverage: a failure presents as a failure, never as a thin answer.
  *   (b) Real-ACR e2e is not merely inconvenient, it is IMPOSSIBLE in this
  *       repo's CI or dev environment: there is no ACR checkout either can
  *       build and run (ACR lives in the separate `dev-health-acr` repo). So
@@ -88,13 +89,18 @@
  *       for structure-needs chips specifically.
  * ============================================================================
  */
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { errorEnvelope, resultStream } from "./acr-events.mjs";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.FAKE_ACR_PORT ?? "4021");
+const ISSUER = `http://127.0.0.1:${String(PORT)}`;
+const REFUSED_ORIGIN = process.env.FAKE_ACR_REFUSED_ORIGIN;
 export const TRIGGER_CLARIFICATION = "e2e-clarify-me";
 export const TRIGGER_STRUCTURE_NEEDS = "e2e-structure-me";
 // Mixed-receipt-family unification follow-up: a response that discloses
@@ -511,20 +517,169 @@ function parentReferenceEchoResult(question, parentResultId, subjectHints) {
     };
 }
 
+const API_PATH = "/api/v1/context-fabric/investigations";
+const ALLOWED_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Last-Event-ID",
+    "X-ACR-Resource",
+    "X-ACR-Client-Version",
+    "X-ACR-Submission-ID",
+    "X-ACR-Thread-ID",
+    "X-ACR-Wait-Budget-Seconds",
+].join(", ");
+
+/** A loopback origin is the app's; the double answers it, and no other. */
+function corsHeaders(request) {
+    const origin = request.headers.origin;
+    if (typeof origin !== "string" || !/^http:\/\/(127\.0\.0\.1|localhost):\d+$/u.test(origin)) {
+        return {};
+    }
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": ALLOWED_HEADERS,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Max-Age": "600",
+        "Access-Control-Expose-Headers": "Retry-After",
+        Vary: "Origin",
+    };
+}
+
+function sendJson(request, response, status, body) {
+    response.writeHead(status, { "Content-Type": "application/json", ...corsHeaders(request) });
+    response.end(JSON.stringify(body));
+}
+
+// Issued tokens: `fcacr_` and `acrrt_` with 43 base64url characters, as ACR mints them. A refresh
+// token is single use, so a family that presents one twice is refused, as ACR's reuse rule does.
+const live = { access: new Set(), refresh: new Set() };
+const token = (prefix) => `${prefix}${randomBytes(32).toString("base64url")}`;
+
+function issue() {
+    const access = token("fcacr_");
+    const refresh = token("acrrt_");
+    live.access.add(access);
+    live.refresh.add(refresh);
+    return {
+        access_token: access,
+        token_type: "Bearer",
+        expires_in: 600,
+        refresh_token: refresh,
+        scope: "context:read evidence:read",
+    };
+}
+
+function readBody(request, then) {
+    let body = "";
+    request.on("data", (chunk) => {
+        body += chunk;
+    });
+    request.on("end", () => {
+        then(body);
+    });
+}
+
+function handleOAuth(request, response, url) {
+    if (request.method === "GET" && url.pathname === "/.well-known/oauth-authorization-server") {
+        sendJson(request, response, 200, {
+            issuer: ISSUER,
+            authorization_endpoint: `${ISSUER}/authorize`,
+            token_endpoint: `${ISSUER}/token`,
+            revocation_endpoint: `${ISSUER}/revoke`,
+            response_types_supported: ["code"],
+            grant_types_supported: ["authorization_code", "refresh_token"],
+            code_challenge_methods_supported: ["S256"],
+            authorization_response_iss_parameter_supported: true,
+        });
+        return true;
+    }
+    if (request.method === "GET" && url.pathname === "/authorize") {
+        const redirectUri = url.searchParams.get("redirect_uri");
+        const state = url.searchParams.get("state");
+        if (redirectUri === null || state === null) {
+            sendJson(request, response, 400, { error: "invalid_request" });
+            return true;
+        }
+        const target = new URL(redirectUri);
+        target.searchParams.set("code", token("code_"));
+        target.searchParams.set("state", state);
+        target.searchParams.set("iss", ISSUER);
+        response.writeHead(302, { Location: target.href });
+        response.end();
+        return true;
+    }
+    if (request.method === "POST" && url.pathname === "/token") {
+        readBody(request, (body) => {
+            const form = new URLSearchParams(body);
+            const grant = form.get("grant_type");
+            if (grant === "authorization_code" && (form.get("code") ?? "") !== "") {
+                sendJson(request, response, 200, issue());
+                return;
+            }
+            const presented = form.get("refresh_token") ?? "";
+            if (grant === "refresh_token" && live.refresh.delete(presented)) {
+                sendJson(request, response, 200, issue());
+                return;
+            }
+            sendJson(request, response, 400, { error: "invalid_grant" });
+        });
+        return true;
+    }
+    if (request.method === "POST" && url.pathname === "/revoke") {
+        readBody(request, () => {
+            sendJson(request, response, 200, {});
+        });
+        return true;
+    }
+    return false;
+}
+
 const server = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", ISSUER);
+
     // Playwright's `webServer.url` readiness probe is a plain GET / — answer
     // it distinctly from the (POST-only) investigation endpoint.
-    if (request.method === "GET" && request.url === "/") {
+    if (request.method === "GET" && url.pathname === "/") {
         response.writeHead(200, { "Content-Type": "text/plain" });
         response.end("fake-acr-server ok");
         return;
     }
 
-    if (request.method !== "POST" || request.url !== "/api/v1/context-fabric/investigations") {
-        response.writeHead(404, { "Content-Type": "application/json" });
-        response.end(JSON.stringify({ error: { code: "not_found" } }));
+    if (request.method === "OPTIONS") {
+        response.writeHead(204, corsHeaders(request));
+        response.end();
         return;
     }
+
+    if (handleOAuth(request, response, url)) return;
+
+    if (request.method !== "POST" || url.pathname !== API_PATH) {
+        sendJson(request, response, 404, { error: { code: "not_found" } });
+        return;
+    }
+
+    const bearer = /^Bearer (fcacr_[A-Za-z0-9_-]{43})$/u.exec(request.headers.authorization ?? "");
+    if (bearer === null || !live.access.has(bearer[1])) {
+        sendJson(
+            request,
+            response,
+            401,
+            errorEnvelope({ code: "invalid_token", status: 401, message: "no token" }),
+        );
+        return;
+    }
+    if (REFUSED_ORIGIN !== undefined && request.headers.origin === REFUSED_ORIGIN) {
+        sendJson(
+            request,
+            response,
+            403,
+            errorEnvelope({ code: "access_denied", status: 403, message: "refused" }),
+        );
+        return;
+    }
+    const submissionId = request.headers["x-acr-submission-id"];
+    const threadId = request.headers["x-acr-thread-id"];
 
     let body = "";
     request.on("data", (chunk) => {
@@ -545,7 +700,7 @@ const server = createServer((request, response) => {
             conversation = parsed.conversation;
             // `parent_result_id` and `requested_scope.subject_hints`
             // are the pinned wire contract's own field names (same "the
-            // client renames it, not the route" pattern the comment below
+            // client renames it" pattern the comment below
             // documents for the receipt fields) — read here exactly as
             // `conversation` is read for the sibling echo trigger above.
             parentResultId = parsed.parent_result_id;
@@ -553,16 +708,10 @@ const server = createServer((request, response) => {
             // `prior_subject_receipts` — the PINNED WIRE CONTRACT'S own
             // snake_case field name (see
             // src/contracts/schemas/context_fabric_investigation_request.v1.schema.json).
-            // NOT `priorSubjectReceipts` — that camelCase name is the
-            // browser-to-Next-route body's own field, one layer up
-            // (src/app/page.tsx's `fetch("/api/investigations", ...)`).
-            // src/app/api/investigations/route.ts forwards that value
-            // UNCHANGED (still camelCase, as a same-named JS option) into
-            // `investigate()`; it is `buildInvestigationRequest` in
-            // src/lib/acr/client.ts — the function that actually POSTs to
-            // THIS server — that renames it to `prior_subject_receipts` on
-            // the wire (codex review round 2, correcting an earlier version
-            // of this comment that credited the route with the rename).
+            // NOT `priorSubjectReceipts` — that camelCase name is the option
+            // `InvestigationOptions` carries one layer up (src/lib/acr/investigate.ts);
+            // `buildInvestigationRequest` there renames it to `prior_subject_receipts` on the
+            // wire, and the browser sends that request to THIS server.
             // Getting this wrong silently defeats the whole positive
             // control: `hasChosenReceipt` stays false, the re-ask falls
             // through to the trigger-keyword check below, and — because the
@@ -574,7 +723,7 @@ const server = createServer((request, response) => {
             // `prior_kind_receipts` (and its three window/anchor/handle
             // siblings) is the SAME wire-renamed pattern, one layer up in the
             // CHAOS-3927 P1 structure-receipt flow — `buildInvestigationRequest`
-            // renames the route's `priorKindReceipts` option the same way.
+            // renames the `priorKindReceipts` option the same way.
             // Checking only `prior_kind_receipts` (not all four) is enough
             // for this double's one structure-needs scenario, which only
             // ever offers `kind_options`. Matched against the EXACT offered
@@ -669,8 +818,18 @@ const server = createServer((request, response) => {
                             : question.includes(TRIGGER_CLARIFICATION)
                               ? clarificationResult(question)
                               : answeredResult(question);
-        response.writeHead(200, { "Content-Type": "application/json" });
-        response.end(JSON.stringify(result));
+        response.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-store",
+            ...corsHeaders(request),
+        });
+        response.end(
+            resultStream({
+                result,
+                submissionId: typeof submissionId === "string" ? submissionId : undefined,
+                threadId: typeof threadId === "string" ? threadId : undefined,
+            }),
+        );
     });
 });
 

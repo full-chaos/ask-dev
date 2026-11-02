@@ -490,9 +490,8 @@ describe("StructureNeedsPanel", () => {
         // just the successful path — but not emitted HERE (team-lead
         // ruling: a browser console.info is collected nowhere in prod).
         // `onReject` is what the caller (`useStructureSelections`) queues
-        // for the next submit to carry and the route to emit; see
-        // `use-structure-selections.test.ts` and `route.test.ts` for the
-        // rest of that chain.
+        // for the next submit to carry to its source; see
+        // `use-structure-selections.test.ts` for the rest of that chain.
         expect(onReject).toHaveBeenCalledWith("expected_kind");
         consoleError.mockRestore();
     });
@@ -501,8 +500,7 @@ describe("StructureNeedsPanel", () => {
      * CHAOS-4171 standing order: telemetry baked into new logic, same PR.
      * The panel's own job is only to call `onToggle` on a namespace-valid
      * pick — `useStructureSelections.toggle` (not this component) is what
-     * records the "submitted" outcome, and the route is what emits it
-     * (see `use-structure-selections.test.ts` / `route.test.ts`).
+     * records the "submitted" outcome (see `use-structure-selections.test.ts`).
      */
     it("calls onToggle, not onReject, on a real (namespace-valid) selection", async () => {
         const onToggle = vi.fn();

@@ -3,10 +3,12 @@
  *
  * This is PRODUCT code, not a test helper (CHAOS-3738). Two things depend on it:
  *
- *   1. The server hop validates every investigation result ACR returns before
- *      handing it to the UI. A result that does not satisfy its own contract is
- *      an upstream failure, and the Workbench reports it as one rather than
- *      rendering a half-understood payload as if it were an answer.
+ *   1. The browser validates every event and investigation result ACR sends
+ *      before handing it to the UI (CHAOS-12106: no server hop stands between
+ *      them). A result that does not satisfy its own contract is an upstream
+ *      failure, and the Workbench reports it as one rather than rendering a
+ *      half-understood payload as if it were an answer. It is importable in
+ *      the browser: the schemas are bundled, nothing is fetched.
  *   2. M3's enrichment adapter validates the whole presentation composition
  *      before rendering, and falls closed to the deterministic view.
  *
@@ -20,6 +22,11 @@ import commonSchema from "@/contracts/schemas/context_fabric_common.v1.schema.js
 import investigationRequestSchema from "@/contracts/schemas/context_fabric_investigation_request.v1.schema.json";
 import investigationResultSchema from "@/contracts/schemas/context_fabric_investigation_result.v1.schema.json";
 import investigationResultV2Schema from "@/contracts/schemas/context_fabric_investigation_result.v2.schema.json";
+import answerProjectionSchema from "@/contracts/schemas/context_fabric_answer_projection.v1.schema.json";
+import investigationEventSchema from "@/contracts/schemas/context_fabric_investigation_event.v1.schema.json";
+import investigationResponseSchema from "@/contracts/schemas/context_fabric_investigation_response.v1.schema.json";
+import investigationResponseV2Schema from "@/contracts/schemas/context_fabric_investigation_response.v2.schema.json";
+import submissionStatusSchema from "@/contracts/schemas/context_fabric_submission_status.v1.schema.json";
 import errorSchema from "@/contracts/schemas/error.v1.schema.json";
 
 export const CONTRACT_SCHEMAS = {
@@ -27,6 +34,11 @@ export const CONTRACT_SCHEMAS = {
     "context_fabric_investigation_request.v1.schema.json": investigationRequestSchema,
     "context_fabric_investigation_result.v1.schema.json": investigationResultSchema,
     "context_fabric_investigation_result.v2.schema.json": investigationResultV2Schema,
+    "context_fabric_investigation_event.v1.schema.json": investigationEventSchema,
+    "context_fabric_answer_projection.v1.schema.json": answerProjectionSchema,
+    "context_fabric_investigation_response.v1.schema.json": investigationResponseSchema,
+    "context_fabric_investigation_response.v2.schema.json": investigationResponseV2Schema,
+    "context_fabric_submission_status.v1.schema.json": submissionStatusSchema,
     "error.v1.schema.json": errorSchema,
 } as const;
 
@@ -68,8 +80,7 @@ export function validateContract(schema: ContractSchemaName, value: unknown): Va
  * `ajv-formats` enforces everywhere else in this file — a strict RFC 3339
  * check, not the looser `Date.parse`, which accepts values the pinned
  * schema rejects (`"2026-01-01"`, `"2026-01-01T00:00:00"` with no offset).
- * Exists so `src/app/api/investigations/route.ts`'s eager conversation-turn
- * validation matches the contract it is a proxy for, rather than an
+ * Exists so a caller's eager conversation-turn validation matches the contract it stands in for, rather than an
  * independently-drifting approximation of it (codex review round 2).
  */
 const dateTimeValidator = ajv.compile({ type: "string", format: "date-time" });

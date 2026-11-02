@@ -7,6 +7,16 @@ import type { InvestigationResult } from "@/lib/contracts";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 
+// CHAOS-12106: the pages ask ACR from the browser. These tests drive them through a fake `fetch`
+// that answers `{ result }` or `{ failure }`; the fake sees the call's options as the POST body.
+vi.mock("@/lib/acr/investigate", async (importOriginal) => {
+    const { investigateFromGlobalFetch } = await import("@/test/fixtures/investigate-fake");
+    return {
+        ...(await importOriginal<typeof import("@/lib/acr/investigate")>()),
+        investigateFromBrowser: investigateFromGlobalFetch,
+    };
+});
+
 const clarification = mockScenarios().find((scenario) => scenario.id === "clarification")!.result;
 const answered = mockScenarios().find((scenario) => scenario.id === "complete")!.result;
 /** The fixture's own `subject_resolution.clarification_prompt` — ACR's wording, verbatim, is the popup page's title (never Ask Dev's own chrome). `mixed`/`mixedCandidates` below clone `clarification`, so they share this same prompt. */
@@ -681,13 +691,9 @@ describe("structure-needs offers (CHAOS-3927 P2, now popup-only per CHAOS-4671)"
         expect(secondCallBody.priorKindReceipts).toEqual([
             { result_id: structureKind.result_id, receipt_id: option.receipt_id },
         ]);
-        // CHAOS-4171 standing order: verify the CONSUMER, not just the
-        // producer — `use-structure-selections.test.ts` proves the hook
-        // queues the event, `route.test.ts` proves the route emits it; this
-        // is the one place that proves `ask()` actually puts it on the wire.
-        expect(secondCallBody.structureSelectionEvents).toEqual([
-            { member: "expected_kind", outcome: "submitted" },
-        ]);
+        // The selection record was telemetry for a server that emitted it. This app has none
+        // (CHAOS-12106), so the call carries no such field.
+        expect(secondCallBody).not.toHaveProperty("structureSelectionEvents");
 
         // The superseded turn renders a collapsed disclosure, no live
         // controls — the old "shown for inspection only" dead control is
@@ -880,9 +886,9 @@ describe("mixed receipt families page through the SAME popup as a 2-question ste
 /**
  * CHAOS-4343 item 3: verifies the CONSUMER, not just the producer —
  * `kind-nouns.test.ts` proves `literalKindNounsInQuestion` itself,
- * `client.test.ts` proves `buildInvestigationRequest` attaches it,
- * `route.test.ts` proves the route parses it — this is the one place that
- * proves the chat surface's own `ask()` actually puts it on the wire, for a
+ * `investigate.test.ts` proves `buildInvestigationRequest` attaches it —
+ * this is the one place that proves the chat surface's own `ask()` actually
+ * passes it to the call, for a
  * FRESH question with no prior receipt at all (CHAOS-4171 standing order).
  */
 describe("literal kind nouns bind as an explicit expectedKinds hint (CHAOS-4343 item 3)", () => {
@@ -1077,7 +1083,7 @@ describe("fan-out correctness (codex review)", () => {
      * dropped just because the tester's NEXT action was a plain ask rather
      * than confirming that candidate pick.
      */
-    it("does not drop a candidate toggle's queued telemetry when the next action is a plain ask", async () => {
+    it("a plain ask after an unconfirmed candidate toggle carries no receipt and no selection record", async () => {
         const fetchSpy = vi
             .spyOn(globalThis, "fetch")
             .mockResolvedValueOnce(
@@ -1110,9 +1116,10 @@ describe("fan-out correctness (codex review)", () => {
             string,
             unknown
         >;
-        expect(secondCallBody.structureSelectionEvents).toEqual([
-            { member: "subject_candidate", outcome: "submitted" },
-        ]);
+        // The toggle was never confirmed, so the plain ask carries no receipt; and there is no
+        // selection record to carry (CHAOS-12106).
+        expect(secondCallBody.priorSubjectReceipts).toEqual([]);
+        expect(secondCallBody).not.toHaveProperty("structureSelectionEvents");
     });
 
     /**

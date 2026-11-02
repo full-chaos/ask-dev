@@ -1,5 +1,6 @@
 "use client";
 
+import { investigateFromBrowser } from "@/lib/acr/investigate";
 import { type RankingWithheld, withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import Link from "next/link";
 import { useState } from "react";
@@ -21,9 +22,7 @@ import type { BoundStructureReceipt, InvestigationResult, SubjectRef } from "@/l
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
-    EMPTY_SELECTION_EVENTS,
     pendingStructureBatchOrUndefined,
-    type PendingSelectionEvent,
     type StructureSelectionBatch,
 } from "@/lib/structure-selections";
 import { useCandidateSelections } from "@/lib/use-candidate-selections";
@@ -33,7 +32,8 @@ import { answerStatusWord } from "@/lib/vocabulary-labels";
 /**
  * Context Fabric Workbench (CHAOS-3738).
  *
- * A tester asks a question; the server hop runs a REAL ACR investigation; the
+ * A tester asks a question; this page runs a REAL ACR investigation as the
+ * signed-in user (CHAOS-12106: the browser is an OAuth client of ACR); the
  * immutable result is rendered through the canonical inspector and the
  * deterministic answer view side by side. There is no mock path — when ACR
  * cannot answer, the failure is shown as a failure.
@@ -56,15 +56,6 @@ const AVAILABLE_VIEWS: readonly WorkbenchView[] = ["raw", "deterministic"];
 function HeaderStatus({ result }: { readonly result: InvestigationResult }) {
     const word = answerStatusWord(result);
     return word === undefined ? null : <span className="badge">{word}</span>;
-}
-
-function isFailure(value: unknown): value is WorkbenchFailure {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        typeof (value as { code?: unknown }).code === "string" &&
-        typeof (value as { message?: unknown }).message === "string"
-    );
 }
 
 export default function WorkbenchPage() {
@@ -115,17 +106,6 @@ export default function WorkbenchPage() {
         priorSubjectReceipts: readonly ClarificationChoice[] = [],
         chosen?: SubjectRef,
         structureSelectionsToSend?: StructureSelectionBatch,
-        // The COMPLETE set of selection-outcome telemetry to emit with THIS
-        // request, computed by the CALLER (codex review round 2): `ask()`
-        // itself must never read a selection hook's `pendingSelectionEvents`
-        // directly, because `chooseCandidates`/`chooseStructure` below call
-        // this SAME function repeatedly from within one sequential loop —
-        // every call after the first reuses THIS closure's already-captured
-        // hook references, so `.reset()` (also called below) never actually
-        // empties what THIS closure sees on a later iteration, and reading
-        // the hook again here would resend the identical telemetry once per
-        // fired request instead of once per tester action.
-        selectionEvents: readonly PendingSelectionEvent[] = EMPTY_SELECTION_EVENTS,
     ) {
         setAskedQuestion(question);
         setChosenSubject(chosen);
@@ -155,57 +135,32 @@ export default function WorkbenchPage() {
         // stays consistent with whatever hint fired on the first ask.
         const expectedKinds = literalKindNounsInQuestion(question);
         try {
-            const response = await fetch("/api/investigations", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    question,
-                    priorSubjectReceipts,
-                    ...structureReceiptFields,
-                    ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
-                    ...(selectionEvents.length > 0
-                        ? { structureSelectionEvents: selectionEvents }
-                        : {}),
-                }),
+            const answer = await investigateFromBrowser({
+                question,
+                priorSubjectReceipts,
+                ...structureReceiptFields,
+                ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
             });
-            const payload: unknown = await response.json();
-            const failure = (payload as { failure?: unknown }).failure;
-            if (isFailure(failure)) {
-                setOutcome({ kind: "failed", failure });
+            if (answer.kind === "failed") {
+                setOutcome({ kind: "failed", failure: answer.failure });
                 return;
             }
-            const result = (payload as { result?: unknown }).result;
-            if (result === undefined || result === null) {
-                setOutcome({
-                    kind: "failed",
-                    failure: {
-                        code: "acr_contract_violation",
-                        message: "The Workbench server returned neither a result nor a failure.",
-                        retryable: false,
-                    },
-                });
-                return;
-            }
-            const boundary = withholdUnrankableRankings(result as InvestigationResult);
-            const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
-            const rankingWithheld =
-                boundary.rankingWithheld ??
-                (typeof routeMarker === "object" && routeMarker !== null
-                    ? (routeMarker as RankingWithheld)
-                    : undefined);
+            const boundary = withholdUnrankableRankings(answer.result);
             setOutcome({
                 kind: "answered",
                 result: boundary.result,
-                ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
+                ...(boundary.rankingWithheld !== undefined
+                    ? { rankingWithheld: boundary.rankingWithheld }
+                    : {}),
             });
         } catch (error) {
-            // Never swallow: a dead server hop is itself a reportable outcome.
+            // Never swallow: a dead call is itself a reportable outcome.
             console.error("investigation request failed", error);
             setOutcome({
                 kind: "failed",
                 failure: {
                     code: "acr_unreachable",
-                    message: "The Workbench server could not be reached.",
+                    message: "Ask Dev could not be reached.",
                     retryable: true,
                 },
             });
@@ -238,37 +193,20 @@ export default function WorkbenchPage() {
         const pendingStructureCandidateReceipts = (result.structure_needs?.candidate_options ?? [])
             .filter((option) => structureCandidateSelections.batch.has(option.receipt_id))
             .map((option) => ({ result_id: result.result_id, receipt_id: option.receipt_id }));
-        // Captured ONCE, synchronously, before any `.reset()` — `ask()` no
-        // longer reads these hooks itself (codex review round 2: it used to,
-        // which replayed the SAME pre-reset telemetry on every iteration of
-        // this loop, since every call below reuses THIS closure's `ask`
-        // reference — see `ask()`'s own parameter doc comment).
-        const selectionEvents = [
-            ...structureSelections.pendingSelectionEvents,
-            ...candidateSelections.pendingSelectionEvents,
-            ...structureCandidateSelections.pendingSelectionEvents,
-        ];
         structureCandidateSelections.reset();
-        let index = 0;
         for (const choice of choices) {
             await ask(
                 askedQuestion,
                 [choice],
                 subjectForReceipt(result, choice.receipt_id),
                 structureBatch,
-                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
             );
-            index += 1;
         }
         for (const receipt of pendingStructureCandidateReceipts) {
-            await ask(
-                askedQuestion,
-                [],
-                undefined,
-                { ...structureBatch, subject_candidate: receipt },
-                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            );
-            index += 1;
+            await ask(askedQuestion, [], undefined, {
+                ...structureBatch,
+                subject_candidate: receipt,
+            });
         }
     }
 
@@ -301,40 +239,16 @@ export default function WorkbenchPage() {
                 receipt_id: candidate.receipt_id,
             }));
 
-        // Captured ONCE, synchronously, before any `.reset()` — see `ask()`'s
-        // own parameter doc comment for why it can't safely read these hooks
-        // itself across this loop's repeated calls.
-        const selectionEvents = [
-            ...structureSelections.pendingSelectionEvents,
-            ...candidateSelections.pendingSelectionEvents,
-            ...structureCandidateSelections.pendingSelectionEvents,
-        ];
-
         if (candidateReceipts.length === 0 && pendingSubjectChoices.length === 0) {
-            await ask(askedQuestion, [], undefined, batch, selectionEvents);
+            await ask(askedQuestion, [], undefined, batch);
             return;
         }
         candidateSelections.reset();
-        let index = 0;
         for (const receipt of candidateReceipts) {
-            await ask(
-                askedQuestion,
-                [],
-                undefined,
-                { ...batch, subject_candidate: receipt },
-                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            );
-            index += 1;
+            await ask(askedQuestion, [], undefined, { ...batch, subject_candidate: receipt });
         }
         for (const choice of pendingSubjectChoices) {
-            await ask(
-                askedQuestion,
-                [choice],
-                subjectForReceipt(result, choice.receipt_id),
-                batch,
-                index === 0 ? selectionEvents : EMPTY_SELECTION_EVENTS,
-            );
-            index += 1;
+            await ask(askedQuestion, [choice], subjectForReceipt(result, choice.receipt_id), batch);
         }
     }
 
@@ -358,15 +272,7 @@ export default function WorkbenchPage() {
                     initialQuestion=""
                     pending={outcome.kind === "pending"}
                     onAsk={(question) => {
-                        // Captured explicitly (codex review round 2): a plain new
-                        // question must not silently drop telemetry for a
-                        // candidate the tester toggled but never confirmed.
-                        const selectionEvents = [
-                            ...structureSelections.pendingSelectionEvents,
-                            ...candidateSelections.pendingSelectionEvents,
-                            ...structureCandidateSelections.pendingSelectionEvents,
-                        ];
-                        void ask(question, [], undefined, undefined, selectionEvents);
+                        void ask(question);
                     }}
                 />
 

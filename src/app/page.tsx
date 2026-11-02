@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { AskDevChat } from "@/components/chat/AskDevChat";
+import { StandaloneChat } from "@/app/StandaloneChat";
 import { AppHeader } from "@/components/shell/AppHeader";
 
 export default function ChatPage() {
@@ -12,7 +12,7 @@ export default function ChatPage() {
                 </Link>
             </AppHeader>
             <main className="app__main">
-                <AskDevChat />
+                <StandaloneChat />
             </main>
         </div>
     );

@@ -1,13 +1,14 @@
 /**
- * The standalone app's `ChatSource` (CHAOS-12382): the turns and the `/api/investigations` hop
- * that lived inside `AskDevChat` before the seam, moved here unchanged.
+ * The standalone app's `ChatSource` (CHAOS-12382): the turns and the investigation call that lived
+ * inside `AskDevChat` before the seam, moved here.
  *
- * It calls the SAME server hop the Workbench does (`/api/investigations`), which calls the real
- * ACR investigation API — there is no mock path here either (CHAOS-3738's hard boundary holds for
- * every surface, not just the Workbench).
+ * The call is injected (CHAOS-12106). The app passes `investigateFromBrowser`, which asks the real
+ * ACR investigation API as the signed-in user: there is no mock path here either (CHAOS-3738's
+ * hard boundary holds for every surface, not just the Workbench). This file is in the render entry
+ * graph, so it imports types only and none of the client behind them.
  *
- * It never sends a `status` outcome, never sends `pending.progress`, and has no `stop`: the
- * standalone route answers in one response, so there is no run to report on or stop.
+ * It never sends a `status` outcome, never sends `pending.progress`, and has no `stop`: the call
+ * answers once, so there is no run to report on or stop.
  *
  * A small external store: `subscribe`/`getSnapshot` for `useSyncExternalStore`. Every change makes
  * a new frozen snapshot; nothing else does.
@@ -24,28 +25,49 @@ import type {
 } from "./source";
 import type { ClarificationChoice } from "../components/ClarificationPanel";
 import type { WorkbenchFailure } from "../lib/acr/errors";
-import type { ConversationTurn, InvestigationResult, SubjectHint } from "../lib/contracts";
+import type {
+    BoundStructureReceipt,
+    ConversationTurn,
+    InvestigationResult,
+    StructureSubjectKind,
+    SubjectHint,
+} from "../lib/contracts";
 import {
     buildConversationTurns,
     deriveParentReference,
+    unsentSubjectsNotice,
     type UnsentSubject,
 } from "../lib/conversation";
 import { literalKindNounsInQuestion } from "../lib/kind-nouns";
-import { type RankingWithheld, withholdUnrankableRankings } from "../lib/ranking-withheld";
-import {
-    buildStructureReceiptFields,
-    EMPTY_SELECTION_EVENTS,
-    type PendingSelectionEvent,
-} from "../lib/structure-selections";
+import { withholdUnrankableRankings } from "../lib/ranking-withheld";
+import { buildStructureReceiptFields } from "../lib/structure-selections";
 
-function isFailure(value: unknown): value is WorkbenchFailure {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        typeof (value as { code?: unknown }).code === "string" &&
-        typeof (value as { message?: unknown }).message === "string"
-    );
-}
+/**
+ * What the source asks of the investigation call. A local type, so that this file imports none of
+ * the client: `InvestigationOptions` in `lib/acr/investigate.ts` is assignable from it.
+ */
+export type StandaloneInvestigationOptions = {
+    readonly question: string;
+    readonly priorSubjectReceipts: readonly ClarificationChoice[];
+    readonly conversation: readonly ConversationTurn[];
+    readonly parentResultId?: string | undefined;
+    readonly subjectHints?: readonly SubjectHint[] | undefined;
+    readonly expectedKinds?: readonly StructureSubjectKind[] | undefined;
+    readonly priorKindReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorAnchorReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorHandleReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorWindowReceipts?: readonly BoundStructureReceipt[] | undefined;
+    readonly priorCandidateReceipts?: readonly BoundStructureReceipt[] | undefined;
+};
+
+/** The call's answer: a result, or a failure in the Workbench's own words. */
+export type StandaloneInvestigateOutcome =
+    | { readonly kind: "answered"; readonly result: InvestigationResult }
+    | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
+
+export type StandaloneInvestigate = (
+    options: StandaloneInvestigationOptions,
+) => Promise<StandaloneInvestigateOutcome>;
 
 type InvestigationParams = {
     readonly question: string;
@@ -56,27 +78,23 @@ type InvestigationParams = {
     // producer of both.
     readonly parentResultId: string | undefined;
     readonly subjectHints: readonly SubjectHint[];
-    /** Committed subjects that could not ride as hints; the route words the notice. */
+    /** Committed subjects that could not ride as hints; the notice below words them. */
     readonly unsentSubjects: readonly UnsentSubject[];
-    readonly structureReceiptFields: Record<string, unknown>;
-    readonly selectionEvents: readonly PendingSelectionEvent[];
+    readonly structureReceiptFields: Partial<ReturnType<typeof buildStructureReceiptFields>>;
 };
 
 /**
- * The one place a request actually goes out over the wire, shared by `ask`
- * (one request) and `askBatch` (N independent requests, CHAOS-4343
- * items 1/2) — both build the SAME body shape and interpret the SAME
- * response shape, and duplicating that between them would be the
- * two-branches-one-tested trap: a fix to one would silently not apply to
- * the other.
+ * The one place a question actually goes out, shared by `ask` (one request) and `askBatch` (N
+ * independent requests, CHAOS-4343 items 1/2): both build the SAME options and interpret the SAME
+ * outcome, and duplicating that between them would be the two-branches-one-tested trap: a fix to
+ * one would silently not apply to the other.
  *
- * Takes no turn ids and touches no timeline state: the caller owns settling
- * whichever turn(s) this outcome belongs to, which is what lets `askBatch`
- * fire several of these concurrently and settle each independently as it
- * resolves, rather than waiting for the slowest.
+ * Takes no turn ids and touches no timeline state: the caller owns settling whichever turn(s) this
+ * outcome belongs to, which is what lets `askBatch` fire several of these concurrently and settle
+ * each independently as it resolves, rather than waiting for the slowest.
  */
 async function fireInvestigation(
-    fetchImpl: typeof fetch,
+    investigate: StandaloneInvestigate,
     params: InvestigationParams,
 ): Promise<AssistantOutcome> {
     // CHAOS-4343 item 3: derived from the SAME `question` text this request
@@ -85,69 +103,38 @@ async function fireInvestigation(
     // hint consistently, with no separate call site to keep in sync.
     const expectedKinds = literalKindNounsInQuestion(params.question);
     try {
-        const response = await fetchImpl("/api/investigations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                question: params.question,
-                priorSubjectReceipts: params.priorSubjectReceipts,
-                conversation: params.conversation,
-                ...(params.parentResultId !== undefined
-                    ? { parentResultId: params.parentResultId }
-                    : {}),
-                ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
-                ...(params.unsentSubjects.length > 0
-                    ? { unsentSubjects: params.unsentSubjects }
-                    : {}),
-                ...params.structureReceiptFields,
-                ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
-                ...(params.selectionEvents.length > 0
-                    ? { structureSelectionEvents: params.selectionEvents }
-                    : {}),
-            }),
+        const outcome = await investigate({
+            question: params.question,
+            priorSubjectReceipts: params.priorSubjectReceipts,
+            conversation: params.conversation,
+            ...(params.parentResultId !== undefined
+                ? { parentResultId: params.parentResultId }
+                : {}),
+            ...(params.subjectHints.length > 0 ? { subjectHints: params.subjectHints } : {}),
+            ...params.structureReceiptFields,
+            ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
         });
-        const payload: unknown = await response.json();
-        const failure = (payload as { failure?: unknown }).failure;
-        if (isFailure(failure)) {
-            return { kind: "failed", failure };
-        }
-        const result = (payload as { result?: unknown }).result;
-        if (result === undefined || result === null) {
-            return {
-                kind: "failed",
-                failure: {
-                    code: "acr_contract_violation",
-                    message: "Ask Dev's server returned neither a result nor a failure.",
-                    retryable: false,
-                },
-            };
-        }
-        const scopeLossNotice = (payload as { scopeLossNotice?: unknown }).scopeLossNotice;
-        // The route already withholds; applying the same idempotent boundary
-        // where the result enters client state keeps a caller that bypasses
-        // the route from ever holding the unwithheld form. The route's own
-        // marker (beside the result) wins: a second pass returns none.
-        const boundary = withholdUnrankableRankings(result as InvestigationResult);
-        const routeMarker = (payload as { rankingWithheld?: unknown }).rankingWithheld;
-        const rankingWithheld =
-            boundary.rankingWithheld ??
-            (typeof routeMarker === "object" && routeMarker !== null
-                ? (routeMarker as RankingWithheld)
-                : undefined);
+        if (outcome.kind === "failed") return outcome;
+        // The boundary: unrankable cohorts are withheld where the result enters client state, and
+        // the scope-loss notice is built here, once.
+        const boundary = withholdUnrankableRankings(outcome.result);
+        const scopeLossNotice = unsentSubjectsNotice(params.unsentSubjects);
         return {
             kind: "answered",
             result: boundary.result,
-            ...(rankingWithheld !== undefined ? { rankingWithheld } : {}),
-            ...(typeof scopeLossNotice === "string" ? { scopeLossNotice } : {}),
+            ...(boundary.rankingWithheld !== undefined
+                ? { rankingWithheld: boundary.rankingWithheld }
+                : {}),
+            ...(scopeLossNotice !== undefined ? { scopeLossNotice } : {}),
         };
     } catch (error) {
-        // Never swallow: a dead server hop is itself a reportable outcome.
+        // Never swallow: a dead call is itself a reportable outcome.
         console.error("investigation request failed", error);
         return {
             kind: "failed",
             failure: {
                 code: "acr_unreachable",
-                message: "Ask Dev's server could not be reached.",
+                message: "Ask Dev could not be reached.",
                 retryable: true,
             },
         };
@@ -191,14 +178,8 @@ function markSubmitted(
     );
 }
 
-/**
- * Creates the standalone source. `fetchImpl` defaults to the global `fetch`, read at request time
- * (as the component read it before the seam), so a test that stubs the global after creation is
- * still honoured.
- */
-export function createStandaloneSource(
-    fetchImpl: typeof fetch = (input, init) => fetch(input, init),
-): ChatSource {
+/** Creates the standalone source over an investigation call (`investigateFromBrowser`). */
+export function createStandaloneSource(investigate: StandaloneInvestigate): ChatSource {
     let snapshot: ChatSnapshot = Object.freeze({ turns: Object.freeze([]), stoppable: false });
     // A monotonic counter, not crypto.randomUUID(): turn identity only needs
     // to be unique within this session, and a counter keeps the ask/settle
@@ -228,7 +209,7 @@ export function createStandaloneSource(
 
     /**
      * Appends a user turn and a pending assistant turn, then settles the
-     * assistant turn in place once the server hop answers — see the
+     * assistant turn in place once the call answers — see the
      * Workbench's own `ask()` for why the question travels UNCHANGED
      * alongside a chosen receipt rather than being rewritten to mention it.
      *
@@ -272,7 +253,7 @@ export function createStandaloneSource(
                 rootQuestion: isPlainAsk ? (intent.narrowingRoot ?? question) : undefined,
             }),
         ]);
-        const outcome = await fireInvestigation(fetchImpl, {
+        const outcome = await fireInvestigation(investigate, {
             question,
             priorSubjectReceipts,
             conversation,
@@ -281,7 +262,6 @@ export function createStandaloneSource(
             unsentSubjects,
             structureReceiptFields:
                 structureBatch === undefined ? {} : buildStructureReceiptFields(structureBatch),
-            selectionEvents: intent.selectionEvents ?? EMPTY_SELECTION_EVENTS,
         });
         settleTurn(assistantTurnId, outcome);
         return outcome.kind === "answered";
@@ -337,7 +317,7 @@ export function createStandaloneSource(
             ),
         ]);
         for (const { id, item } of assistantTurns) {
-            void fireInvestigation(fetchImpl, {
+            void fireInvestigation(investigate, {
                 question: hiddenQuestion,
                 priorSubjectReceipts: item.priorSubjectReceipts,
                 conversation,
@@ -345,7 +325,6 @@ export function createStandaloneSource(
                 subjectHints,
                 unsentSubjects,
                 structureReceiptFields: buildStructureReceiptFields(item.structureBatch),
-                selectionEvents: item.selectionEvents,
             }).then((outcome) => {
                 settleTurn(id, outcome);
             });

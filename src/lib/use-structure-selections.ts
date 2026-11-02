@@ -23,9 +23,8 @@ export type UseStructureSelectionsResult = {
     readonly reject: (member: StructureNeedKind) => void;
     /**
      * Every selection outcome observed since the last `reset()`, queued for
-     * the next `/api/investigations` submit to carry and the route to emit —
-     * see `structure-selections.ts`'s own `PendingSelectionEvent` header for
-     * why this does not emit client-side.
+     * the next submit to carry to its source — see `structure-selections.ts`'s own
+     * `PendingSelectionEvent` header for why this does not emit client-side.
      */
     readonly pendingSelectionEvents: readonly PendingSelectionEvent[];
     readonly reset: () => void;

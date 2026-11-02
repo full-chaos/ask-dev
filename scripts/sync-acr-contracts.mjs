@@ -469,6 +469,14 @@ const SCHEMA_PATHS = [
     // it minted a membership-verify anchor option, so validate.ts must accept it.
     "contracts/jsonschema/v1/context_fabric_investigation_result.v2.schema.json",
     "contracts/jsonschema/v1/error.v1.schema.json",
+    // CHAOS-12106: the Workbench reads ACR's event stream in the browser, so its checks need the
+    // event, its result forms and the submission status. No generated types: the client's are
+    // generic, and these are read by the validators only.
+    "contracts/jsonschema/v1/context_fabric_answer_projection.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_event.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_response.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_response.v2.schema.json",
+    "contracts/jsonschema/v1/context_fabric_submission_status.v1.schema.json",
 ];
 const EXAMPLE_PATHS = [
     "contracts/examples/v1/context_fabric_investigation_request.v1.json",
@@ -496,6 +504,11 @@ const EXAMPLE_PATHS = [
     // reading `no_data`/`unavailable`.
     "contracts/examples/v1/context_fabric_investigation_result_origin_state.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
+    // CHAOS-12106: the stream validators run against ACR's own documents, not a hand-made shape.
+    "contracts/examples/v1/context_fabric_investigation_event_accepted.v1.json",
+    "contracts/examples/v1/context_fabric_investigation_event_result.v1.json",
+    "contracts/examples/v1/context_fabric_investigation_event_error_budget_refusal.v1.json",
+    "contracts/examples/v1/context_fabric_submission_status.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];
 

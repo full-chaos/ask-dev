@@ -1,7 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { AskDevChat } from "./index";
+import { AskDevChat, createStandaloneSource } from "./index";
 
 /**
  * CHAOS-12381: the entry carries the whole three-column shell, not only the answer panels. A host
@@ -10,7 +10,9 @@ import { AskDevChat } from "./index";
  */
 describe("the render entry's shell", () => {
     it("renders the left rail, the transcript, the composer and the sources rail, scoped by .ask-dev", () => {
-        const { container } = render(<AskDevChat />);
+        const { container } = render(
+            <AskDevChat source={createStandaloneSource(() => new Promise(() => undefined))} />,
+        );
         const root = container.firstElementChild as HTMLElement;
         expect(root.classList.contains("ask-dev")).toBe(true);
         expect(screen.getByRole("complementary", { name: "This conversation" })).toBeTruthy();

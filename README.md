@@ -96,37 +96,45 @@ Rendered today:
 
 ```sh
 pnpm install
-pnpm dev            # http://127.0.0.1:3000
+pnpm dev            # http://localhost:3021
 ```
 
-The Workbench needs a configured server hop before it can answer. Without one it
-still runs and says so — it has no mock path, so an unconfigured server reports
-`workbench_misconfigured` rather than inventing an answer.
+The app is a **browser OAuth client of ACR**, the same way the web app is
+(CHAOS-12106). The user is the signed-in web user, and consent happens on web's
+review page. The page holds no key, no assertion and no identity of its own:
+with no token, the first question sends the tab to ACR and back to the page it
+came from, and the user asks again. The browser then calls ACR directly and
+reads its event stream through the shared client (`@full-chaos/ask-dev/acr-client`,
+`src/acr-client/`); `src/lib/acr/browser-host.ts` is this app's host of it.
 
-| Variable                     | Required | Purpose                                     |
-| ---------------------------- | -------- | ------------------------------------------- |
-| `ACR_API_ORIGIN`             | yes      | ACR base URL, e.g. `http://127.0.0.1:18080` |
-| `ACR_ORG_ID`                 | yes      | Organization to investigate as              |
-| `ACR_WEB_ASSERTION_KEY_FILE` | yes      | **Path** to the Ed25519 signing key         |
-| `ACR_REPOSITORY_SCOPES`      | yes      | Comma-separated `owner/name` slugs          |
-| `ACR_WEB_ASSERTION_ISSUER`   | no       | Default `dev-health-web`                    |
-| `ACR_WEB_ASSERTION_AUDIENCE` | no       | Default `dev-health-acr`                    |
-| `ACR_WEB_ASSERTION_KID`      | no       | Default `acr-dev-web`                       |
-| `ACR_SUBJECT`                | no       | Default `context-fabric-workbench`          |
-| `ACR_TIMEOUT_MS`             | no       | Default `120000`                            |
+| Variable                       | Required | Purpose                                                                               |
+| ------------------------------ | -------- | ------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_ACR_OAUTH_ISSUER` | yes      | ACR's issuer: an exact origin, e.g. `http://localhost:18080`. `next build` inlines it |
 
-No `.env` is committed and no endpoint is hardcoded. The signing key is
-referenced **by path** and never enters this repo. Nothing is `NEXT_PUBLIC_*`,
-so no ACR value can reach the browser bundle.
+Unset, there is no ACR client, and a question ends with "Ask Dev is not
+configured here." (`workbench_misconfigured`): it has no mock path, so it never
+invents an answer. The value is a public origin and nothing else is configured
+(`.env.example`). `src/lib/acr/secret-boundary.test.ts` fails the build if a key,
+an assertion or a server-side identity comes back.
 
-## Why there is a server
+**What a local run needs**
 
-Both ACR credentials are server-to-server by construction: `bearerAuth` is a
-client secret, and `webAssertionAuth` requires signing each request with an
-Ed25519 **private** key, bound to the exact method, path, and body digest, with
-a 30-second lifetime. A browser cannot hold either. `src/app/api/investigations`
-is the hop that signs and forwards; it mirrors `dev-health-web`'s server-only
-ACR client so the code ports cleanly when this surface migrates.
+- A web app running, for consent (its review page).
+- ACR's development browser client `https://localhost/acr/dev-browser-client`,
+  configured with the redirect `http://localhost:3021/oauth/callback` and the
+  CORS origin `http://localhost:3021`. Open the app as `http://localhost:3021`,
+  not `127.0.0.1`: the redirect is exact.
+- `bash scripts/dev-launch.sh` builds and serves the app on port 3021 for the
+  kiac or docker target (see its header).
+
+## Why the browser calls ACR
+
+ACR accepts a browser OAuth client (authorization code with PKCE, a bearer token
+held in the page's memory, never in a URL). That replaced a server route that
+signed a web assertion with an Ed25519 private key and an environment-supplied
+identity: the app no longer needs a server to hold a credential, and no
+credential can leak from one. The page validates the request before it sends it
+and every event ACR sends before it renders one (`src/lib/acr/validate.ts`).
 
 ## Gates
 
@@ -144,21 +152,27 @@ bash ci/run_checks.sh build
 bash ci/run_checks.sh e2e         # Playwright smoke over the BUILT artifact
 ```
 
-Most of the e2e suite (`tests/workbench.smoke.spec.ts`, and the shell/
-honest-failure specs in `tests/chat.spec.ts`) runs with **no** ACR
-configuration on purpose. Neither surface has a mock path, so the only honest
-thing either can do unconfigured is say so — and proving that a failure
-presents as a failure, never as a thin answer, is exactly what those specs are
-for.
+The e2e suite talks to `tests/support/fake-acr-server.mjs` — a real, wire-level
+HTTP server standing in for ACR, not a fetch/route mock (see that file's own
+header for the full "why," including why a real ACR checkout can't be used
+here today). It serves ACR's OAuth endpoints (metadata, `/authorize`, `/token`)
+and the investigation event stream, with CORS for the app's origin. Playwright
+starts two `next start` instances of the same build, and every spec signs in
+first (`tests/support/signed-in.ts`); `tests/sign-in.spec.ts` proves the
+redirect itself.
 
-The chat surface's clarification-chip positive/negative controls
-(`tests/chat.spec.ts`'s `"clarification chips"` group) are the one exception:
-they run against a SECOND, ACR-**configured** `next start` instance, pointed at
-`tests/support/fake-acr-server.mjs` — a real, wire-level HTTP server standing
-in for ACR (not a fetch/route mock; see that file's own header for the full
-"why," including why a real ACR checkout can't be used here today). Both
-instances are started by `playwright.config.ts`'s `webServer` array; only that
-one spec group opts into the configured one.
+- The default instance is a user the fake ACR **refuses** (403). The shell and
+  honest-failure specs (`tests/workbench.smoke.spec.ts`, and the failure specs in
+  `tests/chat.spec.ts`) run there: proving that a failure presents as a failure,
+  never as a thin answer, is exactly what they are for.
+- The second, **configured** instance is answered: the chat surface's
+  clarification-chip positive/negative controls (`tests/chat.spec.ts`'s
+  `"clarification chips"` group) and the other fake-ACR groups opt into it with
+  `test.use({ baseURL: configuredBaseURL })`.
+
+`next build` inlines `NEXT_PUBLIC_ACR_OAUTH_ISSUER`, so `ci/run_checks.sh`
+builds with it pointing at the fake ACR's port (`http://127.0.0.1:4021`). Set it
+yourself to build for a real ACR.
 
 Workflows: `tests.yml` (the gates above), `codeql-analysis.yml`, and
 `security-scan.yml` (Gitleaks + `pnpm audit`). Gitleaks is a hard gate here —
@@ -420,8 +434,7 @@ Two things moved in the canonical example, and both had consequences here: it
 gained a ranked `cohort` plus three narrated cohort `drivers` (what the new
 tests read), and its `canonical_fact:workload` coverage source flipped from
 `pruned` to `available`, failing a telemetry test that had named those two
-states literally (`src/lib/telemetry/outcome.test.ts`, now asserted against the
-example's own source/state pairs instead).
+states literally (the test is gone with the telemetry, CHAOS-12106).
 
 **Not in this bump: CHAOS-4413.** Its `terminal_status`, `terminal_reason`,
 `rows_count` and `claimed_facts_count` are absent from
@@ -471,7 +484,7 @@ against at request/response time) is untouched and still byte-identical to
 the pinned commit's own blob; only the TYPE loses information TypeScript
 could never have used anyway (conditional validation isn't representable as
 a structural type). Every other field's maxItems tuple-union typing (e.g.
-`prior_subject_receipts`, already documented in `@/lib/acr/client.ts`'s
+`prior_subject_receipts`, already documented in `@/lib/acr/investigate.ts`'s
 `buildInvestigationRequest`) is unaffected.
 
 ### Why Next.js is pinned exactly
@@ -502,17 +515,16 @@ exactly what that repo runs on this one axis until web catches up.
 Things worth knowing before touching the client, learned against the live
 service rather than from documentation:
 
-- **A rejected server credential surfaces as 502, not 401.** The server hop
-  holds the ACR credential, so an ACR rejection says nothing about the browser
-  session. Proxying it as 401 would invite a client-side re-auth that cannot
-  possibly help.
-- **`repository_scopes` must not be empty.** `validWebRepositories` in acr
+- **A 401 is the sign-in, not a failure.** ACR rejecting the token ends the call as
+  `authorization_required`, and the page goes through the redirect once
+  (`acr_sign_in_required`, "Signing you in to Ask Dev."). A 403 `access_denied`
+  is a refusal for this user, and nothing retries it.
+- **(Historical, from the removed server hop.) `repository_scopes` must not be empty.** `validWebRepositories` in acr
   `internal/auth/web_assertion_binding.go:34-37` opens with
   `if len(scopes) == 0 { return false }`, and the whole assertion then fails as
   `invalid_web_assertion` — reaching the caller as a bare `401 invalid_token`
   that says nothing about scopes. `dev-health-web` never trips this because its
-  scopes always come from a resolved org authorization. `signWebAssertion`
-  guards it locally so a new consumer gets a named error instead. Recorded as an
+  scopes always come from a resolved org authorization. The removed server hop guarded it locally so a consumer got a named error instead. Recorded as an
   observation, not a patch: acr is not this repo's to change, and failing closed
   on an empty scope set may well be deliberate.
 - **TLS is ON by default for the graph dial, and `ALLOW_INSECURE` does not turn
@@ -616,14 +628,14 @@ Three idioms enforce it, and they are deliberately **not** unified behind one
 helper — consistency of _behaviour_ is the invariant, consistency of _idiom_ is
 aesthetics:
 
-| Where                                 | Idiom                                                                                                                           |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app/api/investigations/route.ts` | `codePointLength` (spread) — question and receipt ids                                                                           |
-| `src/lib/acr/upstream-vocabulary.ts`  | `u`-flagged regex quantifier — its `{1,128}` counts code points because of the flag, and it does charset and length in one pass |
-| `src/lib/acr/validate.ts` (Ajv)       | `ucs2length` — verified by probing the pinned dependency, not by reading docs                                                   |
+| Where                                | Idiom                                                                                                                           |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `src/lib/acr/investigate.ts`         | `codePointLength` (spread) — the question                                                                                       |
+| `src/lib/acr/upstream-vocabulary.ts` | `u`-flagged regex quantifier — its `{1,128}` counts code points because of the flag, and it does charset and length in one pass |
+| `src/lib/acr/validate.ts` (Ajv)      | `ucs2length` — verified by probing the pinned dependency, not by reading docs                                                   |
 
-Byte bounds are a separate thing and are measured in bytes
-(`exceedsResponseCap`), not in either character unit.
+Byte bounds are a separate thing and are measured in bytes (the shared client's
+stream caps, `src/acr-client/limits.ts`), not in either character unit.
 
 If you add a length bound, count code points, and add an **astral boundary
 test** — a correct fix with only ASCII fixtures is indistinguishable from a fix
@@ -755,11 +767,11 @@ handful of vocabulary aliases derived by indexed access, since
 validates directly against the real pinned contract now
 (`structure-needs.test.ts`), no fragment-stripping.
 
-`buildInvestigationRequest` in `src/lib/acr/client.ts` still attaches the
+`buildInvestigationRequest` in `src/lib/acr/investigate.ts` still attaches the
 four `prior_*_receipts` fields **only when non-empty** — that used to be a
 correctness requirement (the pre-seam pinned schema's `additionalProperties:
 false` would reject them outright); post-seam it is wire minimization only,
-since an empty array is just as schema-valid as an absent key. `client.test.ts`
+since an empty array is just as schema-valid as an absent key. `investigate.test.ts`
 still pins the omit-when-empty behavior.
 
 Real e2e coverage for the panel-hint flow now exists too:

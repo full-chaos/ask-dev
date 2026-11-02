@@ -98,8 +98,8 @@ export const acrErrorCodeVocabulary: ReadonlySet<string> = ACR_ERROR_CODES;
  * per chris's 2026-08-31 ruling that naming a structural axis is not a wire
  * widening); its vocabulary is hand-copied from ACR's own source of truth
  * (internal/contextfabric/chaos4632_question_family_registry.go) and
- * verified against a real fixture in client.test.ts. `none` is excluded on
- * purpose: the route OMITS `narrower_continuation` entirely rather than
+ * verified against a real fixture in investigate.test.ts. `none` is excluded on
+ * purpose: ACR OMITS `narrower_continuation` entirely rather than
  * sending `{"axis":"none"}` when no axis can be named, so a consumer never
  * sees that member on the wire.
  */
@@ -204,7 +204,7 @@ export function boundedNonNegativeInteger(value: unknown): number | undefined {
  * bounds `details.reason` only by a pattern (an open string), so the pin
  * carries no member list: this copy is acr's documented set (acr-v1
  * `error` description; internal/contracts/v1/context_fabric_service_model.go)
- * and is asserted in client.test.ts. `service_model_not_entitled` is left out
+ * and is asserted in investigate.test.ts. `service_model_not_entitled` is left out
  * on purpose: it has no entry in the copy table, so it stays a credential-
  * class failure rather than gaining a message nobody verified.
  */

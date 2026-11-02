@@ -14,9 +14,9 @@
         "node": ">=22"
     },
     "scripts": {
-        "dev": "next dev",
+        "dev": "next dev -p 3021",
         "build": "next build",
-        "start": "next start",
+        "start": "next start -p 3021",
         "lint": "eslint .",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
@@ -36,7 +36,6 @@
         "next": "16.4.2",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
-        "server-only": "0.0.1",
         "zod": "^4.6.6"
     },
     "devDependencies": {

@@ -1,20 +1,15 @@
-import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
 import { readFileSync } from "node:fs";
+
+import { answerInvestigations, expect, test } from "./support/signed-in";
 
 const FIXTURE = "src/test/fixtures/served-shapes/comparison-table.json";
 
 async function openTable(page: Page, width: number) {
     const result: unknown = JSON.parse(readFileSync(FIXTURE, "utf8"));
     await page.setViewportSize({ width, height: 844 });
-    await page.route("**/api/investigations", (route) =>
-        route.fulfill({
-            status: 200,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ result }),
-        }),
-    );
+    await answerInvestigations(page, result);
     await page.goto("/");
     await page.getByLabel("Ask a question").fill("Compare the two repositories");
     await page.getByRole("button", { name: "Send" }).click();

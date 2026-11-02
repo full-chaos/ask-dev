@@ -7,10 +7,6 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": path.resolve(import.meta.dirname, "./src"),
-            // `server-only` throws when imported from a client bundle. Under
-            // Vitest every module is "server", so it is stubbed rather than
-            // letting the import fail the suite.
-            "server-only": path.resolve(import.meta.dirname, "./src/test/server-only.ts"),
         },
     },
     test: {

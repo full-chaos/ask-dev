@@ -55,7 +55,6 @@ import {
     isRetryableStatus,
     type SubmittedSelections,
 } from "../../render/source";
-import { createStandaloneSource } from "../../render/standalone-source";
 
 /**
  * Ask Dev — the chat surface (chat pivot, Phase 1), as one embeddable unit:
@@ -71,10 +70,10 @@ import { createStandaloneSource } from "../../render/standalone-source";
  * CHAOS-12382: the conversation comes from a `ChatSource` (`@/render/source`).
  * The component holds UI state only — the selection hooks, the popup's
  * dismissal and auto-confirm, scroll pinning, the composer — and asks
- * through the source with an intent; it never builds a request body. With
- * no `source` prop it creates `createStandaloneSource()`, which calls the
- * SAME server hop the Workbench does (`/api/investigations`), which calls
- * the real ACR investigation API — there is no mock path here either
+ * through the source with an intent; it never builds a request body. The
+ * `source` is required (CHAOS-12106): the standalone app passes
+ * `createStandaloneSource(investigateFromBrowser)`, which asks the real ACR
+ * investigation API as the signed-in user — there is no mock path here either
  * (CHAOS-3738's hard boundary holds for every surface, not just the
  * Workbench). A host (web) passes its own source and gets this same render,
  * including the outcomes only a host reports: a pending turn's progress, a
@@ -142,7 +141,7 @@ const BOTTOM_PIN_THRESHOLD_PX = 48;
 /**
  * The withheld boundary where a result enters this render (`@/lib/ranking-withheld`). No person
  * ranking may reach a screen, and a host's turns reach this component without passing through
- * ask-dev's route or `createStandaloneSource`, so the render applies the boundary itself and no
+ * `createStandaloneSource`, so the render applies the boundary itself and no
  * source can skip it. A result that needs nothing keeps its turn's object identity; a result the
  * boundary has already rebuilt has no cohort, so a second pass keeps the marker beside it.
  */
@@ -191,8 +190,8 @@ function EvidenceOpenProvider({
 }
 
 export type AskDevChatProps = {
-    /** Where the conversation comes from. Absent: one standalone source per mount. */
-    readonly source?: ChatSource;
+    /** Where the conversation comes from. */
+    readonly source: ChatSource;
 };
 
 /** What the chat column shows. `history` is reachable only under the left rail's width. */
@@ -228,9 +227,8 @@ function turnsOfUnrecordedQuestions(turns: readonly ChatTurn[]): ReadonlySet<num
     return ids;
 }
 
-export function AskDevChat({ source }: AskDevChatProps = {}) {
-    const [standaloneSource] = useState(() => createStandaloneSource());
-    const chat = source ?? standaloneSource;
+export function AskDevChat({ source }: AskDevChatProps) {
+    const chat = source;
     // All of `ChatSurface`'s state belongs to one source: a turn id is unique
     // per source only, so a dismissal, a selection or a pending retry must
     // not reach the next source's turns. A new generation remounts it.
@@ -468,7 +466,7 @@ function ChatSurface({
         const narrowingRoot = pendingNarrowingRootRef.current;
         pendingNarrowingRootRef.current = undefined;
         // CHAOS-4171: every selection outcome observed since the last
-        // reset() rides this SAME request — the route is the sink (see
+        // reset() rides this SAME request to the source (see
         // `useStructureSelections`'s own `pendingSelectionEvents` header).
         // Read before every hook's `reset()` below. All THREE selection
         // hooks are merged here (codex review: a tester can toggle a

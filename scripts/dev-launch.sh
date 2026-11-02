@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # One-command local launch for the Ask Dev Workbench (CHAOS-3738).
 #
-# ACR_TARGET picks what the Workbench's server hop talks to (default: kiac):
+# CHAOS-12106: the app is a browser OAuth client of ACR, as the web app is. The user is the signed-in
+# web user, and consent happens on web's review page, so this launch needs a running web app. The
+# app holds no key, assertion or identity of its own.
+#
+# ACR_TARGET picks which ACR the browser talks to (default: kiac):
 #   - kiac   (default): the shared kiac k3s cluster's acr-pilot Helm release
 #     (namespace/service "acr-pilot", real trial data, no local containers to
 #     manage). Reached over a supervised `kubectl port-forward` to
@@ -16,14 +20,18 @@
 #     lane's territory) -- it only adds new, independently-named containers.
 #
 # Requires (both targets):
-#   - dev-health/.acr-dev/{evidence-kid,evidence-keys,web-assertion.key,web-jwks.json}
-#     -- a reusable local dev keypair/evidence-key fixture. Generate once if
-#     missing; see that directory's own file shapes for the expected format
-#     (Ed25519 JWKS + matching PKCS8 private key, ACR evidence signing keys).
-#     The Workbench signs its own web-assertion with this key regardless of
-#     which acr-api backend receives it.
+#   - A web app running for consent (the review page), and ACR configured with its development
+#     browser client `https://localhost/acr/dev-browser-client`: redirect
+#     `http://localhost:3021/oauth/callback`, CORS origin `http://localhost:3021`.
+#   - NEXT_PUBLIC_ACR_OAUTH_ISSUER: ACR's issuer, an exact origin (default
+#     http://localhost:18080, this script's port-forward). `next build` inlines it.
 #
-# Requires (ACR_TARGET=docker only):
+# Requires (ACR_TARGET=docker only), for the acr-api container this script starts:
+#   - dev-health/.acr-dev/{evidence-kid,evidence-keys,web-jwks.json} -- a reusable local dev
+#     fixture (ACR evidence signing keys, and the web JWKS acr-api mounts). Generate once if
+#     missing; see that directory's own file shapes for the expected format.
+#
+# Also for ACR_TARGET=docker:
 #   - The dev-health docker compose stack already up (postgres + clickhouse
 #     healthy) -- `docker compose up -d` in dev-health/ if not.
 #   - OPENAI_API_KEY in the environment (ACR's model provider is openai;
@@ -59,7 +67,7 @@ DEV_HEALTH_ROOT="${DEV_HEALTH_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../d
 ACR_DEV_SECRETS="$DEV_HEALTH_ROOT/.acr-dev"
 NETWORK="dev-health_dev-health"
 ORG_ID="${ACR_DEV_ORG_ID:-70d529e0-3c06-4597-8480-794fd02328b6}"
-REPO_SCOPES="${ACR_DEV_REPOSITORY_SCOPES:-full.chaos/dev-health-ops,full.chaos/chaos-ops}"
+ACR_ISSUER="${ACR_DEV_ISSUER:-http://localhost:18080}"
 ACR_TARGET="${ACR_TARGET:-kiac}"
 KIAC_NAMESPACE="${ACR_KIAC_NAMESPACE:-acr-pilot}"
 KIAC_SERVICE="${ACR_KIAC_SERVICE:-acr-pilot}"
@@ -84,7 +92,7 @@ case "$ACR_TARGET" in
 esac
 note "ACR_TARGET=$ACR_TARGET"
 
-for f in web-assertion.key evidence-kid evidence-keys web-jwks.json; do
+for f in evidence-kid evidence-keys web-jwks.json; do
   if [[ ! -f "$ACR_DEV_SECRETS/$f" ]]; then
     note "Missing $ACR_DEV_SECRETS/$f -- see this script's header comment."
     exit 1
@@ -354,7 +362,7 @@ else
     exit 1
   fi
 
-  # --- acr-api (the Workbench's server hop talks to this) ---
+  # --- acr-api (the Workbench's browser talks to this) ---
   # Same always-recreate discipline as acr-projector above: an already-running
   # container from a PRIOR version of this script would otherwise silently
   # keep serving a stale model/mount/env forever (codex round 2 finding).
@@ -452,23 +460,16 @@ ENV_LOCAL_TMP="$(mktemp "${ENV_LOCAL}.XXXXXX")"
 # issue on this host (see repo memory), not specific to this script, but a
 # heredoc here would hit it every single launch.
 {
-  printf 'ACR_API_ORIGIN=http://127.0.0.1:18080\n'
-  printf 'ACR_ORG_ID=%s\n' "$ORG_ID"
-  printf 'ACR_WEB_ASSERTION_KEY_FILE=%s/web-assertion.key\n' "$ACR_DEV_SECRETS"
-  printf 'ACR_REPOSITORY_SCOPES=%s\n' "$REPO_SCOPES"
-  printf 'ACR_WEB_ASSERTION_ISSUER=dev-health-web\n'
-  printf 'ACR_WEB_ASSERTION_AUDIENCE=dev-health-acr\n'
-  printf 'ACR_WEB_ASSERTION_KID=acr-dev-web\n'
-  # Matches the server's ACR_REQUEST_TIMEOUT=490s below -- without this the
-  # Workbench's own 120s default can report "timeout" while ACR is still
-  # genuinely working.
-  printf 'ACR_TIMEOUT_MS=490000\n'
+  # The one setting: ACR's issuer. `next build` inlines it into the bundle. It is a public
+  # origin; nothing secret is written to this file.
+  printf 'NEXT_PUBLIC_ACR_OAUTH_ISSUER=%s\n' "$ACR_ISSUER"
 } > "$ENV_LOCAL_TMP"
 mv "$ENV_LOCAL_TMP" "$ENV_LOCAL"
 
 # Port 3000 is held by the dev-health stack's own traefik (dev-health-web).
-# Run the Workbench on 3100 to avoid the collision.
-PORT="${ASK_DEV_PORT:-3100}"
+# ACR's development browser client holds the redirect http://localhost:3021/oauth/callback, so the
+# app runs on 3021 and is opened as http://localhost:3021 (not 127.0.0.1).
+PORT="${ASK_DEV_PORT:-3021}"
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # `next dev`'s Turbopack HMR websocket failed to handshake in this
@@ -480,8 +481,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 # `pnpm dev` yourself and expect the composer to occasionally eat your input.
 note "Building (next start needs a build)..."
 pnpm build
-note "Launching the Workbench: http://127.0.0.1:$PORT"
+note "Launching the Workbench: http://localhost:$PORT"
 # -H 127.0.0.1: `next start` defaults to 0.0.0.0 (LAN-reachable) otherwise --
-# this route holds the ACR signing key and has no auth of its own, so it
-# must not be reachable from other machines on the network.
+# a local dev app has no reason to be reachable from other machines on the network.
 exec pnpm exec next start -p "$PORT" -H 127.0.0.1

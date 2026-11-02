@@ -1,8 +1,15 @@
 import { readFileSync } from "node:fs";
 
-import { expect, test, type Page } from "@playwright/test";
-
 import { configuredBaseURL } from "../playwright.config";
+
+import {
+    abortInvestigations,
+    expect,
+    restoreInvestigations,
+    signIn,
+    test,
+    type Page,
+} from "./support/signed-in";
 
 // Kept in sync by hand with tests/support/fake-acr-server.mjs's own
 // `TRIGGER_CLARIFICATION` — NOT imported from it. Playwright's test
@@ -33,10 +40,10 @@ const TRIGGER_SHAPES = "e2e-shapes-me";
 /**
  * Smoke coverage for the chat surface's shell and its honest-failure path.
  *
- * Runs against the SAME unconfigured app instance as
- * `tests/workbench.smoke.spec.ts` (this file's default `baseURL`) — there is
- * no mock path here either, so an unconfigured server hop must present as a
- * failure, never a thin answer, exactly as it does on `/workbench`.
+ * Runs against the SAME default app instance as `tests/workbench.smoke.spec.ts` (this file's
+ * default `baseURL`), whose user the fake ACR refuses — there is no mock path here either, so a
+ * refusal must present as a failure, never a thin answer, exactly as it does on `/workbench`.
+ * Each spec is signed in first (`./support/signed-in`).
  */
 test.describe("Ask Dev chat shell", () => {
     test("renders the timeline shell and its empty state", async ({ page }) => {
@@ -47,7 +54,7 @@ test.describe("Ask Dev chat shell", () => {
         await expect(page.getByText("Ask a question to start an investigation.")).toBeVisible();
     });
 
-    test("reports an unconfigured server hop as a failure, not an answer", async ({ page }) => {
+    test("reports a refusal by ACR as a failure, not an answer", async ({ page }) => {
         await page.goto("/");
 
         await page.getByLabel("Ask a question").fill("What is the status of dev-health-ops?");
@@ -55,8 +62,8 @@ test.describe("Ask Dev chat shell", () => {
 
         const failure = page.getByRole("alert", { name: "No answer" });
         await expect(failure).toBeVisible();
-        await expect(failure).toHaveAttribute("data-failure-code", "workbench_misconfigured");
-        await expect(failure).not.toContainText("workbench_misconfigured");
+        await expect(failure).toHaveAttribute("data-failure-code", "acr_access_denied");
+        await expect(failure).not.toContainText("acr_access_denied");
         await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(0);
     });
 
@@ -71,8 +78,8 @@ test.describe("Ask Dev chat shell", () => {
 
 /**
  * Composer ergonomics and autoscroll (UX-equivalence pass). Runs against the
- * SAME unconfigured instance as "Ask Dev chat shell" above — every ask here
- * fails honestly (`workbench_misconfigured`, not retryable), which is exactly
+ * SAME default instance as "Ask Dev chat shell" above — every ask here
+ * fails honestly (`acr_access_denied`, not retryable), which is exactly
  * what these controls need: draft-preservation and the not-retryable NEGATIVE
  * control need a real failure, not an answer, and none of this exercises
  * receipt/selection logic (that's covered by "clarification chips"/"structure
@@ -140,14 +147,11 @@ test.describe("composer ergonomics", () => {
 
     test("POSITIVE: a retryable failure offers a Retry action that re-asks", async ({ page }) => {
         await page.goto("/");
-        // The only way to reach `acr_unreachable` (retryable) without ACR
-        // configured is a dead server hop — a genuine network-level failure,
-        // not a fabricated answer. This is the SAME class of thing
-        // `tests/chat.spec.ts` already tests honestly (a real failure
-        // presenting as a failure); aborting the request tests that this
-        // lane's OWN retry affordance reacts to it, it does not stand in for
-        // the fake-ACR double or invent any ACR response.
-        await page.route("**/api/investigations", (route) => route.abort("failed"));
+        // The way to reach `acr_unreachable` (retryable) is a dead service: a
+        // genuine network-level failure, not a fabricated answer. Aborting the
+        // request tests that this lane's OWN retry affordance reacts to it, it
+        // does not stand in for the fake-ACR double or invent any ACR response.
+        await abortInvestigations(page);
 
         await page.getByLabel("Ask a question").fill("What is the status of dev-health-ops?");
         await page.getByRole("button", { name: "Send" }).click();
@@ -162,15 +166,12 @@ test.describe("composer ergonomics", () => {
         // one), appending a fresh turn rather than mutating the frozen one —
         // this repo's "always append, never mutate" rule holds for a retry
         // exactly as it does for a clarification/structure re-ask.
-        await page.unroute("**/api/investigations");
+        await restoreInvestigations(page);
         await retry.click();
 
         await expect(failures).toHaveCount(2);
         await expect(failures.first()).toHaveAttribute("data-retryable", "true");
-        await expect(failures.last()).toHaveAttribute(
-            "data-failure-code",
-            "workbench_misconfigured",
-        );
+        await expect(failures.last()).toHaveAttribute("data-failure-code", "acr_access_denied");
         // The now-superseded turn's OWN Retry is gone — only the latest
         // turn's failure can still act, same "only the latest turn is live"
         // rule the clarification/structure chips hold.
@@ -178,15 +179,16 @@ test.describe("composer ergonomics", () => {
     });
 
     // Configured baseURL: a SUCCESSFUL retry needs a real decisive answer to
-    // land, which the unconfigured instance can never produce. Same fake-ACR
+    // land, which the default instance (a refused user) can never produce. Same fake-ACR
     // double the "clarification chips"/"structure needs chips" blocks use —
     // an ordinary question with neither trigger keyword answers decisively
     // (see the NEGATIVE control in "clarification chips" below).
     test("a successful Retry clears the composer draft — no stale text left to accidentally resend", async ({
         page,
     }) => {
+        await signIn(page, configuredBaseURL);
         await page.goto(configuredBaseURL);
-        await page.route("**/api/investigations", (route) => route.abort("failed"));
+        await abortInvestigations(page);
 
         const question = "What is the status of dev-health-ops?";
         await page.getByLabel("Ask a question").fill(question);
@@ -198,7 +200,7 @@ test.describe("composer ergonomics", () => {
         await expect(retry).toBeVisible();
         await expect(page.getByLabel("Ask a question")).toHaveValue(question);
 
-        await page.unroute("**/api/investigations");
+        await restoreInvestigations(page);
         await retry.click();
 
         // The retry answered decisively (codex round 2 regression check):
@@ -538,7 +540,7 @@ test.describe("structure needs chips", () => {
         // `pick()`): picking an offer IS confirming — it advances/completes
         // on its own, no separate confirm click — proving the chip is
         // wired all the way through the chat surface's shared selection
-        // hook, the server hop, and the fake-ACR double's own receipt
+        // hook, the browser call, and the fake-ACR double's own receipt
         // check, not decorative.
         await page.getByRole("button", { name: "Pull request" }).click();
 
@@ -686,7 +688,7 @@ test.describe("mixed receipt families", () => {
  * the chat surface used to hardcode `conversation: []` on every ask, so a
  * follow-up question ran as an independent investigation with no memory of
  * the turn before it. This proves turn 2's re-ask actually threads turn 1's
- * own content — a real HTTP round trip through the server hop, not a
+ * own content — a real HTTP round trip to the fake ACR, not a
  * client-side-only assertion.
  */
 test.describe("conversation threading", () => {
@@ -729,7 +731,7 @@ test.describe("conversation threading", () => {
  * follow-up, and its engine-committed anchor carry (acr CHAOS-5788) never
  * engages. This proves turn 2's re-ask actually carries turn 1's OWN
  * `result_id` and committed subject — a real HTTP round trip through the
- * server hop, not a client-side-only assertion — for a plain TYPED
+ * fake ACR, not a client-side-only assertion — for a plain TYPED
  * follow-up with no chip click involved.
  */
 test.describe("same-conversation carry", () => {
