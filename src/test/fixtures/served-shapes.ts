@@ -41,10 +41,11 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * the sankey that plots it, through ACR's real vocabulary labels, `Validate` and encoder at the
  * contract commit (`served-shapes/generate-sankey.go.txt`). No producer emits the rule yet
  * (CHAOS-12582), so the shape is built as ACR's own contract test builds it (CHAOS-12579).
- * `landscape-quadrant` is five teams of four providers compared on landscape facts, through ACR's
- * real quadrant selector (flag on), served line, vocabulary labels, `Validate` and encoder at the
- * producer branch (`served-shapes/generate-quadrant.go.txt`). The fifth team has one identity, so
- * it gives no point (CHAOS-12624).
+ * `landscape-quadrant` is a whole served document from acr's real engine (`Engine.Investigate` over a
+ * real ClickHouse, production registry, flag on) at the producer branch, acr #1963 9599f5c0
+ * (`TestAComparisonOfTeamsOnOneDayDrawsTheirQuadrant`, p4-acr-conversation): five teams of the dho
+ * mixed world, one per provider, compared on landscape facts. The landscape rows are hand-seeded.
+ * The fifth team has one identity, so the real rule gives it no point (CHAOS-12624).
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,

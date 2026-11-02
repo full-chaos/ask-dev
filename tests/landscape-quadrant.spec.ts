@@ -38,7 +38,7 @@ test.describe("Landscape quadrant, standalone", () => {
             );
             await expect(page.getByTestId("landscape-quadrant-withheld")).toHaveCount(0);
             await expect(panel.locator("figcaption")).toHaveText(
-                "Churn and delivery units, 30 days to Nov 2, 2026",
+                "Churn and delivery units, 30 days to Oct 31, 2026",
             );
             // The teams' served words are in the value table; the one-identity team is not.
             for (const word of ["Identity", "Delivery", "Payments", "Checkout"]) {

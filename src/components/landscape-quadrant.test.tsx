@@ -30,6 +30,12 @@ function changed(change: Change): { shape: RenderShape; result: InvestigationRes
 
 type Point = RenderShape["series"][number]["points"][number];
 
+/** The one day the fixture's rows speak for, and another. */
+const DAY = "2026-10-31";
+const OTHER_DAY = "2026-10-30";
+/** The fixture's first point: Identity's churn. */
+const FIRST = 2400;
+
 const x = (shape: RenderShape) => shape.series[0];
 const y = (shape: RenderShape) => shape.series[1]!;
 const claim = (result: InvestigationResult, id: string | undefined): ClaimedFact =>
@@ -89,7 +95,7 @@ describe("the verifier reads a quadrant as teams on one day (CHAOS-12624)", () =
         const days = new Set(
             answer.claimed_facts.map((fact) => row(fact).fields.as_of_day?.string),
         );
-        expect([...days]).toEqual(["2026-11-02"]);
+        expect([...days]).toEqual([DAY]);
     });
 
     it("the fixture passes the result contract the server route holds it to", () => {
@@ -258,25 +264,25 @@ describe("the verifier reads a quadrant as teams on one day (CHAOS-12624)", () =
         ],
         [
             "a cell that is a number, not an integer",
-            (s, r) => void (row(cited(r, x(s).points[0])).fields.churn_loc_30d = { number: 18240 }),
+            (s, r) => void (row(cited(r, x(s).points[0])).fields.churn_loc_30d = { number: FIRST }),
         ],
         [
             "an integer cell that is not whole",
             (s, r) => {
                 const point = x(s).points[0];
-                point.value = 18240.5;
-                cited(r, point).value = { integer: 18240.5 };
-                row(cited(r, point)).fields.churn_loc_30d = { integer: 18240.5 };
+                point.value = FIRST + 0.5;
+                cited(r, point).value = { integer: FIRST + 0.5 };
+                row(cited(r, point)).fields.churn_loc_30d = { integer: FIRST + 0.5 };
             },
         ],
         [
             "a value that is not the row's cell",
             (s, r) =>
-                void (row(cited(r, x(s).points[0])).fields.churn_loc_30d = { integer: 18241 }),
+                void (row(cited(r, x(s).points[0])).fields.churn_loc_30d = { integer: FIRST + 1 }),
         ],
         [
             "a value that is not the claim's",
-            (s, r) => void (cited(r, x(s).points[0]).value = { integer: 18241 }),
+            (s, r) => void (cited(r, x(s).points[0]).value = { integer: FIRST + 1 }),
         ],
         [
             "a label that is not the team's",
@@ -316,19 +322,19 @@ describe("the verifier reads a quadrant as teams on one day (CHAOS-12624)", () =
             "a team on another day",
             (s, r) => {
                 for (const point of [x(s).points[3]!, y(s).points[3]!]) {
-                    row(cited(r, point)).fields.as_of_day = { string: "2026-11-01" };
+                    row(cited(r, point)).fields.as_of_day = { string: OTHER_DAY };
                 }
             },
         ],
         [
             "one point's x on another day",
             (s, r) =>
-                void (row(cited(r, x(s).points[3]!)).fields.as_of_day = { string: "2026-11-01" }),
+                void (row(cited(r, x(s).points[3]!)).fields.as_of_day = { string: OTHER_DAY }),
         ],
         [
             "one point's x and y on two days",
             (s, r) =>
-                void (row(cited(r, y(s).points[3]!)).fields.as_of_day = { string: "2026-11-01" }),
+                void (row(cited(r, y(s).points[3]!)).fields.as_of_day = { string: OTHER_DAY }),
         ],
     ])("refuses %s", (_, change) => {
         const { shape, result } = changed(change);
@@ -400,7 +406,7 @@ describe("a served quadrant on the answer (CHAOS-12624)", () => {
     });
 
     it("gives the host no shape that failed its check, and says it was withheld", () => {
-        const { result } = changed((s) => void (x(s).points[0].value = 18241));
+        const { result } = changed((s) => void (x(s).points[0].value = FIRST + 1));
         const slot = vi.fn<ShapeSlot>(() => <div>chart</div>);
         draw(result, slot);
         expect(slot).not.toHaveBeenCalled();
