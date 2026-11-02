@@ -8,7 +8,7 @@ import type { AcrAccessToken, AcrSilentOutcome } from "../auth";
 import type { AcrBrowserClientConfig } from "../config";
 import { createAcrCalls, type AcrCalls } from "../transport";
 import { TransportFailure, type TransportFailureReason } from "../types";
-import { asResult, validators, type TestResult, type TestStatus } from "./eventFixtures";
+import { isResult, validators, type TestResult, type TestStatus } from "./eventFixtures";
 
 type Calls = AcrCalls<TestResult, TestStatus>;
 
@@ -56,7 +56,7 @@ const transport = (): Calls =>
         rejected: (token: string) => rejected(token),
         authorize,
         envelope: validators.envelope,
-        asResult,
+        isResult,
         validators: async () => validators.full,
     });
 

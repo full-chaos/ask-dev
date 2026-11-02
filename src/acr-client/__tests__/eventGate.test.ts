@@ -11,7 +11,7 @@ import {
     heartbeatEvent,
     resultEvent,
     stageEvent,
-    asResult,
+    isResult,
     validators,
     type TestResult,
 } from "./eventFixtures";
@@ -40,7 +40,7 @@ const frameOf = (event: EventObject): SseEvent => {
 };
 
 function gate(validate: (value: unknown) => boolean = validateInvestigationEventEnvelope) {
-    return new InvestigationEventGate(validate, asResult, {
+    return new InvestigationEventGate(validate, isResult, {
         threadId: THREAD,
         submissionId: SUBMISSION,
     });
@@ -301,7 +301,7 @@ describe("an attach after a cursor", () => {
     const resumed = (after = 5) =>
         new InvestigationEventGate(
             validateInvestigationEventEnvelope,
-            asResult,
+            isResult,
             { submissionId: SUBMISSION },
             { resumeAfter: after },
         );
@@ -407,7 +407,7 @@ describe("an attach after a cursor", () => {
             kinds(
                 feed(
                     [withoutSubmission],
-                    new InvestigationEventGate(validateInvestigationEventEnvelope, asResult, {
+                    new InvestigationEventGate(validateInvestigationEventEnvelope, isResult, {
                         submissionId: SUBMISSION,
                     }),
                 ),
@@ -416,7 +416,7 @@ describe("an attach after a cursor", () => {
     });
 
     it("with no cursor, the whole grammar holds from accepted, and no thread is asked for", () => {
-        const fromStart = new InvestigationEventGate(validateInvestigationEventEnvelope, asResult, {
+        const fromStart = new InvestigationEventGate(validateInvestigationEventEnvelope, isResult, {
             submissionId: SUBMISSION,
         });
         const verdicts = feed(CAPTURED, fromStart);
@@ -425,7 +425,7 @@ describe("an attach after a cursor", () => {
             kinds(
                 feed(
                     [{ ...accepted(), submission_id: "sub_other" }],
-                    new InvestigationEventGate(validateInvestigationEventEnvelope, asResult, {
+                    new InvestigationEventGate(validateInvestigationEventEnvelope, isResult, {
                         submissionId: SUBMISSION,
                     }),
                 ),

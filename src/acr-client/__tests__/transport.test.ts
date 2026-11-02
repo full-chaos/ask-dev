@@ -17,7 +17,7 @@ import {
 import {
     acceptedEvent,
     acrFrame,
-    asResult,
+    isResult,
     CAPTURED_EVENTS,
     errorEvent,
     heartbeatEvent,
@@ -105,7 +105,7 @@ function transport(): Calls {
         rejected: (refused: string) => rejected(refused),
         authorize: async () => authorizeAnswer(),
         envelope: streamEnvelopeValidators,
-        asResult,
+        isResult,
         validators: async () => streamValidators,
     });
 }
@@ -122,7 +122,7 @@ function transportChecking(
         rejected: (refused: string) => rejected(refused),
         authorize: async () => authorizeAnswer(),
         envelope,
-        asResult,
+        isResult,
         validators: async () => full,
     });
 }
@@ -214,7 +214,7 @@ describe("investigate: the request", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: streamEnvelopeValidators,
-            asResult,
+            isResult,
             validators: async () => streamValidators,
         });
         await expect(collect(t.investigate(call(undefined, T0 + 14_999)))).rejects.toEqual(
@@ -245,7 +245,7 @@ describe("investigate: the request", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: streamEnvelopeValidators,
-            asResult,
+            isResult,
             validators: async () => streamValidators,
         });
         await collect(t.investigate(call()));
@@ -378,7 +378,7 @@ describe("investigate: the full checks load in parallel (option (c))", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: streamEnvelopeValidators,
-            asResult,
+            isResult,
             validators: load,
         });
     }
@@ -604,7 +604,7 @@ function withStore(...reads: Array<AcrAccessToken | (() => AcrAccessToken)>) {
         rejected: (refused: string) => rejected(refused),
         authorize: async () => authorizeAnswer(),
         envelope: streamEnvelopeValidators,
-        asResult,
+        isResult,
         validators: async () => streamValidators,
     });
     return { t, read };
@@ -769,7 +769,7 @@ describe("submissionStatus and readResult", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: streamEnvelopeValidators,
-            asResult,
+            isResult,
             validators: async () => streamValidators,
         });
         await expect(unread.submissionStatus(SUBMISSION, before.signal)).rejects.toBe(reason);
@@ -791,7 +791,7 @@ describe("submissionStatus and readResult", () => {
                 rejected: (refused: string) => rejected(refused),
                 authorize: async () => authorizeAnswer(),
                 envelope: streamEnvelopeValidators,
-                asResult,
+                isResult,
                 validators: async () => streamValidators,
             });
             await expect(read(t, during.signal)).rejects.toBe(reason);

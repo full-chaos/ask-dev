@@ -109,17 +109,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * A test copy of the web host's `asTranscriptResult` (`testModeAnswer.ts`): the fields its views
  * read, checked for shape. A result they cannot read is rejected, whatever the schema says.
  */
-export function asResult(value: unknown): TestResult | null {
-    if (!isRecord(value)) return null;
-    if (typeof value.status !== "string" || !STATUSES.has(value.status)) return null;
-    if (!STRING_FIELDS.every((field) => typeof value[field] === "string")) return null;
-    if (!ARRAY_FIELDS.every((field) => Array.isArray(value[field]))) return null;
-    if (!isRecord(value.versions)) return null;
-    if (!isRecord(value.subject_resolution)) return null;
-    if (!isRecord(value.coverage) || !Array.isArray(value.coverage.sources)) return null;
+export function isResult(value: unknown): value is TestResult {
+    if (!isRecord(value)) return false;
+    if (typeof value.status !== "string" || !STATUSES.has(value.status)) return false;
+    if (!STRING_FIELDS.every((field) => typeof value[field] === "string")) return false;
+    if (!ARRAY_FIELDS.every((field) => Array.isArray(value[field]))) return false;
+    if (!isRecord(value.versions)) return false;
+    if (!isRecord(value.subject_resolution)) return false;
+    if (!isRecord(value.coverage) || !Array.isArray(value.coverage.sources)) return false;
     if (!isRecord(value.interpretation) || typeof value.interpretation.shape !== "string")
-        return null;
-    return value;
+        return false;
+    return true;
 }
 
 /**

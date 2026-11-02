@@ -115,7 +115,7 @@ export class InvestigationEventGate<TResult> {
 
     constructor(
         private readonly validate: (value: unknown) => boolean,
-        private readonly asResult: (value: unknown) => TResult | null,
+        private readonly isResult: (value: unknown) => value is TResult,
         private readonly request: GateRequest,
         resume: GateResume = {},
     ) {
@@ -198,7 +198,7 @@ export class InvestigationEventGate<TResult> {
         if (known && event.type === "error" && event.stage !== this.lastStarted()) {
             return invalid("error_stage");
         }
-        if (event.type === "result" && this.asResult(event.result) === null) {
+        if (event.type === "result" && !this.isResult(event.result)) {
             return invalid("result_shape");
         }
         // Valid: commit.

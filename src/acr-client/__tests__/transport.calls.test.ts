@@ -11,7 +11,7 @@ import { TransportFailure, TransportRefusal, type InvestigationEvent } from "../
 import {
     acceptedEvent,
     acrFrame,
-    asResult,
+    isResult,
     CAPTURED_EVENTS,
     heartbeatEvent,
     validators,
@@ -55,7 +55,7 @@ function transport(): Calls {
         rejected: (refused: string) => rejected(refused),
         authorize: async () => authorizeAnswer(),
         envelope: validators.envelope,
-        asResult,
+        isResult,
         validators: async () => validators.full,
     });
 }
@@ -266,7 +266,7 @@ describe("attach", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: validators.envelope,
-            asResult,
+            isResult,
             validators: async () =>
                 validators.rejecting(validators.full, "validateInvestigationEvent"),
         });
@@ -364,7 +364,7 @@ describe("every call here", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: validators.envelope,
-            asResult,
+            isResult,
             validators: async () => validators.full,
         });
     }
@@ -492,7 +492,7 @@ describe("every call here", () => {
             rejected: (refused: string) => rejected(refused),
             authorize: async () => authorizeAnswer(),
             envelope: validators.envelope,
-            asResult,
+            isResult,
             validators: async () => validators.full,
         });
         for (const [name, run] of calls) {
@@ -548,7 +548,7 @@ describe("409 no_repository on the JSON calls", () => {
             rejected: () => undefined,
             authorize: async () => ({ kind: "off" }),
             envelope: validators.envelope,
-            asResult,
+            isResult,
             validators: async () => validators.full,
         });
     });

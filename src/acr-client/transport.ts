@@ -93,8 +93,11 @@ export type AcrCallDependencies<TResult> = {
     readonly envelope: StreamEnvelopeValidators;
     /** Starts (or joins) the load of the full checks. */
     readonly validators: () => Promise<StreamValidators>;
-    /** The host's reading of a result the checks passed; `null` is one its views cannot read. */
-    readonly asResult: (value: unknown) => TResult | null;
+    /**
+     * Whether the host's views can read a result the checks passed. A check, not a mapping: the
+     * full event check reads the wire value, and every call returns that value.
+     */
+    readonly isResult: (value: unknown) => value is TResult;
 };
 
 /** The calls of the client, and the helpers a host builds its other reads on. */
@@ -467,7 +470,7 @@ export function createAcrCalls<TResult, TStatus>(
             gate: () =>
                 new InvestigationEventGate(
                     dependencies.envelope.validateInvestigationEventEnvelope,
-                    dependencies.asResult,
+                    dependencies.isResult,
                     call,
                 ),
         });
@@ -509,7 +512,7 @@ export function createAcrCalls<TResult, TStatus>(
             gate: () =>
                 new InvestigationEventGate(
                     dependencies.envelope.validateInvestigationEventEnvelope,
-                    dependencies.asResult,
+                    dependencies.isResult,
                     { submissionId: call.submissionId },
                     { resumeAfter: cursor },
                 ),
@@ -743,9 +746,10 @@ export function createAcrCalls<TResult, TStatus>(
                 body !== undefined &&
                 (validators.validateInvestigationResultV1(body) ||
                     validators.validateInvestigationResultV2(body));
-            const result = valid ? dependencies.asResult(body) : null;
-            if (result === null) throw new TransportFailure("invalid_upstream");
-            return result;
+            if (!valid || !dependencies.isResult(body)) {
+                throw new TransportFailure("invalid_upstream");
+            }
+            return body;
         },
         async cancel({ submissionId, signal }): Promise<CancelAnswer> {
             const path = `/investigations/submissions/${encodeURIComponent(submissionId)}/cancel`;
