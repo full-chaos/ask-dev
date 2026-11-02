@@ -153,6 +153,16 @@ describe("a dated_fact_trend shape (CHAOS-12570)", () => {
         for (const mark of marks) expect(mark).toMatch(/: \d+ Backlog size \(count\)$/u);
     });
 
+    it("states the word in the value column header of its screen-reader table (codex r2 P2)", () => {
+        show(declared);
+        const trend = figure(/^Backlog size over time/u);
+        const headers = [...trend.querySelectorAll(".sr-only table thead th")];
+        const value = headers.find((th) => th.firstChild?.textContent === "Backlog size");
+        expect(value).toBeDefined();
+        expect(within(value as HTMLElement).getByTestId("measure-unit").textContent).toBe("count");
+        expect(within(headers[0] as HTMLElement).queryByTestId("measure-unit")).toBeNull();
+    });
+
     it("draws no unit for a trend whose table declares none", () => {
         show(declared);
         const trend = figure(/^Commits count over time/u);
