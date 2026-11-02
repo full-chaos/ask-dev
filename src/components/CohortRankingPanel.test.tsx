@@ -774,7 +774,6 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
         });
     });
 
-||||||| 76eb68a
     describe("each member's evidence (CHAOS-12514)", () => {
         const member = meaning.members[0]!;
         const withRefs: Cohort = {
