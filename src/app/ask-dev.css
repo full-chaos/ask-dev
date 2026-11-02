@@ -702,6 +702,14 @@
         overflow-wrap: anywhere;
     }
 
+    /* CHAOS-12570: a served unit word after a tile's value. */
+    .tile__unit {
+        color: var(--text-muted);
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0;
+    }
+
     .tile__label {
         color: var(--text-muted);
         font-size: 12px;
@@ -2117,6 +2125,13 @@
         font-weight: 600;
     }
 
+    /* CHAOS-12570: a declared measure's served unit word, a muted second line under its column. */
+    .fact-table__unit {
+        display: block;
+        font-size: 11px;
+        font-weight: 400;
+    }
+
     .fact-table td {
         color: var(--text);
         font-variant-numeric: tabular-nums;
@@ -2389,6 +2404,15 @@
         margin: 0 0 2px;
         color: var(--text-muted);
         font-size: 12px;
+    }
+
+    /* CHAOS-12570: a chart's y-axis caption, the served unit word of what it plots. */
+    .render-shape__unit,
+    .fact-chart__unit {
+        display: block;
+        margin: 0 0 2px;
+        color: var(--text-muted);
+        font-size: 11px;
     }
 
     .render-shape__legend {

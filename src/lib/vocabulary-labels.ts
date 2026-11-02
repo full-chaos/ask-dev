@@ -19,6 +19,7 @@ export type Vocabulary =
     | "driver_window"
     | "fact_field"
     | "fact_kind"
+    | "measure_unit"
     | "member_outcome"
     | "prior_receipt_disposition"
     | "ranking_signal"

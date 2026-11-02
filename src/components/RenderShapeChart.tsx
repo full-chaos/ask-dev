@@ -1,3 +1,4 @@
+import { type Cadence, missingDayBreaks } from "../lib/cadence";
 import type { Cohort, RenderShape } from "../lib/contracts";
 import { parseIsoDate } from "../lib/fact-rows";
 import { axisLabels } from "../lib/render-shapes";
@@ -7,7 +8,22 @@ export type RenderShapeChartProps = {
     readonly shape: RenderShape;
     /** The cohort a cohort chart plots: its axis follows the served rank (`axisLabels`). */
     readonly cohort?: Cohort;
+    /**
+     * CHAOS-12570: ACR's served word for the unit every point cites (`shapeMeasureUnit`), or
+     * nothing. It follows `value_label` wherever that is said, and is the y-axis caption.
+     */
+    readonly unit?: string | undefined;
+    /**
+     * CHAOS-12571: the cadence of the tables every point cites (`shapeCadence`). With `day`, the
+     * time line breaks at a missing day.
+     */
+    readonly cadence?: Cadence | undefined;
 };
+
+/** `value_label`, and the served unit word after it when there is one. */
+function valueLabelOf(shape: RenderShape, unit: string | undefined): string {
+    return unit === undefined ? shape.value_label : `${shape.value_label} (${unit})`;
+}
 
 const WIDTH = 640;
 const HEIGHT = 240;
@@ -109,9 +125,12 @@ export function ShapeDataTable({
     labels,
     visible = false,
     format = formatValue,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    /** CHAOS-12570: the served unit word of every value, under each value column's word. */
+    readonly unit?: string | undefined;
     /** How a cell prints a value. Exact unless the caller keeps the exact value elsewhere. */
     readonly format?: (value: number) => string;
     /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
@@ -126,6 +145,11 @@ export function ShapeDataTable({
                     {shape.series.map((series) => (
                         <th key={series.key} scope="col">
                             {series.label}
+                            {unit === undefined ? null : (
+                                <span className="fact-table__unit" data-testid="measure-unit">
+                                    {unit}
+                                </span>
+                            )}
                         </th>
                     ))}
                 </tr>
@@ -189,10 +213,13 @@ function Legend({ shape }: { readonly shape: RenderShape }) {
 function CategoryBars({
     shape,
     labels,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    readonly unit?: string | undefined;
 }) {
+    const valueLabel = valueLabelOf(shape, unit);
     const stacked = shape.presentation === "stacked_bars";
     const singleMax = Math.max(
         0,
@@ -227,7 +254,7 @@ function CategoryBars({
 
     return (
         <svg
-            aria-label={`${shape.title}: ${shape.value_label} by ${shape.axis_label}`}
+            aria-label={`${shape.title}: ${valueLabel} by ${shape.axis_label}`}
             className="fact-chart__svg"
             role="img"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -277,7 +304,7 @@ function CategoryBars({
                             if (stacked) cursor += value;
                             const top = yFor(base + value);
                             const height = Math.abs(yFor(base) - top);
-                            const markLabel = `${label}, ${series.label}: ${formatValue(value)} ${shape.value_label}`;
+                            const markLabel = `${label}, ${series.label}: ${formatValue(value)} ${valueLabel}`;
                             return (
                                 <g
                                     aria-label={markLabel}
@@ -368,10 +395,16 @@ function CategoryBars({
 function TimeLines({
     shape,
     labels,
+    unit,
+    breaks,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    readonly unit?: string | undefined;
+    /** Whether the line breaks between two consecutive served labels (`missingDayBreaks`). */
+    readonly breaks?: ((before: string, after: string) => boolean) | undefined;
 }) {
+    const valueLabel = valueLabelOf(shape, unit);
     const times = labels.map((label) => parseIsoDate(label) ?? Number.NaN);
     const usable = times.every((time) => !Number.isNaN(time));
     const minTime = usable ? Math.min(...times) : 0;
@@ -391,7 +424,7 @@ function TimeLines({
 
     return (
         <svg
-            aria-label={`${shape.title}: ${shape.value_label} over ${shape.axis_label}`}
+            aria-label={`${shape.title}: ${valueLabel} over ${shape.axis_label}`}
             className="fact-chart__svg"
             role="img"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -420,17 +453,23 @@ function TimeLines({
                     .filter((point): point is NonNullable<typeof point> => point !== null);
                 // A line never bridges a gap it does not cover: a break in
                 // the run of labels ends the polyline instead of drawing
-                // continuity the observations do not support.
+                // continuity the observations do not support. With a day
+                // cadence, so does a missing day between two served days
+                // (CHAOS-12571): each point keeps its marker below.
                 const segments: (typeof points)[] = [];
                 let current: typeof points = [];
-                let previous: number | null = null;
+                let previous: (typeof points)[number] | null = null;
                 for (const point of points) {
-                    if (previous !== null && point.index !== previous + 1) {
+                    if (
+                        previous !== null &&
+                        (point.index !== previous.index + 1 ||
+                            (breaks?.(previous.label, point.label) ?? false))
+                    ) {
                         if (current.length > 0) segments.push(current);
                         current = [];
                     }
                     current.push(point);
-                    previous = point.index;
+                    previous = point;
                 }
                 if (current.length > 0) segments.push(current);
                 const color = `var(${SERIES_VARS[seriesIndex]!})`;
@@ -446,7 +485,7 @@ function TimeLines({
                             />
                         ))}
                         {points.map((point) => {
-                            const markLabel = `${point.label}, ${series.label}: ${formatValue(point.value)} ${shape.value_label}`;
+                            const markLabel = `${point.label}, ${series.label}: ${formatValue(point.value)} ${valueLabel}`;
                             return (
                                 <g
                                     aria-label={markLabel}
@@ -509,20 +548,29 @@ function TimeLines({
  * component has never seen is how a chart starts claiming something the
  * answer does not.
  */
-export function RenderShapeChart({ shape, cohort }: RenderShapeChartProps) {
+export function RenderShapeChart({ shape, cohort, unit, cadence }: RenderShapeChartProps) {
     if (shape.kind !== "series") return null;
     const labels = axisLabels(shape, cohort);
     if (labels.length === 0) return null;
+    const breaks =
+        shape.presentation === "line"
+            ? missingDayBreaks(cadence, labels, `render shape ${shape.shape_id}`)
+            : undefined;
     return (
         <figure className="render-shape">
             <figcaption className="render-shape__title">{shape.title}</figcaption>
             <Legend shape={shape} />
-            {shape.presentation === "line" ? (
-                <TimeLines labels={labels} shape={shape} />
-            ) : (
-                <CategoryBars labels={labels} shape={shape} />
+            {unit === undefined ? null : (
+                <p className="render-shape__unit" data-testid="render-shape-unit">
+                    {unit}
+                </p>
             )}
-            <ShapeDataTable labels={labels} shape={shape} />
+            {shape.presentation === "line" ? (
+                <TimeLines breaks={breaks} labels={labels} shape={shape} unit={unit} />
+            ) : (
+                <CategoryBars labels={labels} shape={shape} unit={unit} />
+            )}
+            <ShapeDataTable labels={labels} shape={shape} unit={unit} />
         </figure>
     );
 }
