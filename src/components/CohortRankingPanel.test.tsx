@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
+import { EvidenceOpenContext } from "./EvidenceOpenContext";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import { CohortRankingPanel } from "@/components/CohortRankingPanel";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
@@ -140,9 +141,11 @@ describe("CohortRankingPanel", () => {
 
         expect(row.getByText("operational deficiencies.severity")).toBeInTheDocument();
         expect(row.getByText("health.compounding risk")).toBeInTheDocument();
-        // The three weaker drivers stay off the row — it is a summary, and the
-        // full set is on the member in the canonical inspector.
-        expect(row.queryByText("workload.forecast pressure")).not.toBeInTheDocument();
+        // The three weaker drivers stay off the row's lead: it is a summary. They sit in its fold.
+        expect(row.getByText("workload.forecast pressure").closest("details")).toHaveAttribute(
+            "data-testid",
+            "ranking-other-drivers",
+        );
     });
 
     it("never shows a score without the drivers that explain it", () => {
@@ -614,7 +617,9 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
         });
 
         it("draws no fold with nothing in it, on a ranked panel too", () => {
-            const members = meaning.members.map(({ inclusion_reasons: _reasons, ...rest }) => rest);
+            const members = meaning.members.map(
+                ({ inclusion_reasons: _reasons, evidence_ref_ids: _refs, ...rest }) => rest,
+            );
             const { exclusions: _exclusions, ...rest } = meaning;
             worded({ ...rest, rationale: "  ", members } as unknown as Cohort);
             expect(screen.queryByTestId("cohort-meaning-details")).toBeNull();
@@ -676,6 +681,139 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             worded(rest);
             expect(line("population")).toBeNull();
             expect(line("score_meaning")).toBeNull();
+        });
+    });
+
+    describe("a ranked member's other drivers (CHAOS-12515)", () => {
+        const example = renderShapesResult as unknown as InvestigationResult;
+        const ranked = example.cohort!;
+        const drivers = ranked.members[0]!.drivers!;
+
+        it("the example is the case: five drivers, two in the row", () => {
+            expect(drivers).toHaveLength(5);
+        });
+
+        const other = () => screen.getByTestId("ranking-other-drivers");
+
+        it("holds the other three in a closed fold on the row", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(other()).not.toHaveAttribute("open");
+            expect(other().closest("tr")).toHaveTextContent(ranked.members[0]!.subject.label);
+            expect(within(other()).getAllByRole("listitem")).toHaveLength(3);
+        });
+
+        it("lists every served driver once, row and fold together", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            const row = other().closest("tr")!;
+            const shown = [...row.querySelectorAll(".ranking__driver-signal")].map(
+                (node) => node.textContent,
+            );
+            expect(shown).toHaveLength(5);
+            expect(new Set(shown).size).toBe(5);
+        });
+
+        it("keeps the service's order: the fold goes on from the row by contribution", () => {
+            render(
+                <CohortRankingPanel cohort={ranked} result={undefined} shape="explicit_cohort" />,
+            );
+            const weights = [...other().querySelectorAll(".ranking__driver .record__meta")].map(
+                (node) => Number(/contributed (\d+(?:\.\d+)?)/u.exec(node.textContent ?? "")?.[1]),
+            );
+            expect(weights).toEqual([...weights].sort((a, b) => b - a));
+        });
+
+        it("shows an odd restored value as it came, and does not throw", () => {
+            const odd = drivers.map((driver, index) =>
+                index === drivers.length - 1
+                    ? { ...driver, value: { unexpected: 1 }, weight_contributed: -1 }
+                    : driver,
+            );
+            const restored = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: odd }],
+            } as unknown as Cohort;
+            render(
+                <CohortRankingPanel cohort={restored} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(other()).toHaveTextContent('value {"unexpected":1}');
+        });
+
+        it("keeps a repeated signal: the schema does not make signals unique", () => {
+            const [first, second, third] = drivers;
+            const repeated = [
+                first!,
+                second!,
+                third!,
+                { ...third!, value: 0.25, weight_contributed: 1 },
+                { ...third!, value: 0.125, weight_contributed: 0.5 },
+            ];
+            const restored = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: repeated }],
+            } as unknown as Cohort;
+            const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+            render(
+                <CohortRankingPanel cohort={restored} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(within(other()).getAllByRole("listitem")).toHaveLength(3);
+            expect(spy).not.toHaveBeenCalled();
+            spy.mockRestore();
+        });
+
+        it("draws no fold for a member with two drivers or fewer", () => {
+            const two = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: drivers.slice(0, 2) }],
+            } as Cohort;
+            render(<CohortRankingPanel cohort={two} result={undefined} shape="explicit_cohort" />);
+            expect(screen.queryByTestId("ranking-other-drivers")).toBeNull();
+        });
+    });
+
+    describe("each member's evidence (CHAOS-12514)", () => {
+        const member = meaning.members[0]!;
+        const withRefs: Cohort = {
+            ...meaning,
+            members: [
+                { ...member, evidence_ref_ids: ["evidence_probe"] },
+                ...meaning.members.slice(1),
+            ],
+        };
+        const LABELS = { evidence_probe: "Team roster" };
+        const opened = () => {
+            const open = vi.fn();
+            render(
+                <EvidenceOpenContext.Provider value={{ open }}>
+                    <CohortRankingPanel
+                        cohort={withRefs}
+                        result={{ evidence_ref_labels: LABELS } as unknown as InvestigationResult}
+                        shape="explicit_cohort"
+                    />
+                </EvidenceOpenContext.Provider>,
+            );
+            return open;
+        };
+
+        it("sits in the fold, on the member's line, as a working control", () => {
+            const open = opened();
+            const button = within(fold()).getByRole("button", { name: "Team roster" });
+            expect(button.closest("[data-testid='cohort-member-evidence']")).toHaveTextContent(
+                member.subject.label,
+            );
+            fireEvent.click(button);
+            expect(open).toHaveBeenCalledWith("evidence_probe", "Team roster");
+        });
+
+        it("draws nothing for a member with no refs", () => {
+            const members = meaning.members.map(
+                ({ evidence_ref_ids: _refs, ...rest }) => rest,
+            ) as Cohort["members"];
+            draw({ ...meaning, members });
+            expect(within(fold()).queryByTestId("cohort-member-evidence")).toBeNull();
         });
     });
 
