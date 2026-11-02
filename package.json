@@ -4,6 +4,8 @@
     "private": true,
     "exports": {
         "./render": "./src/render/index.ts",
+        "./acr-client": "./src/acr-client/index.ts",
+        "./acr-client/config": "./src/acr-client/config.ts",
         "./ask-dev.css": "./src/app/ask-dev.css",
         "./package.json": "./package.json"
     },
