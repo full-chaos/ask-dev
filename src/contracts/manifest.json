@@ -31,12 +31,28 @@
       "sha256": "dee22368289cfa0ee8fa0d1559f0f83dbf31db57636b0e06523fbf90e0e184e2"
     },
     {
+      "path": "schemas/context_fabric_answer_projection.v1.schema.json",
+      "sha256": "051611a28120904e84d2a32dca11cc1909d26e5a2d52d94b54b422389d1a9919"
+    },
+    {
       "path": "schemas/context_fabric_common.v1.schema.json",
       "sha256": "8b9a578e9393850ce063c8a8e9f5eb2618c32d2a17770c2b19624fadc46f34ef"
     },
     {
+      "path": "schemas/context_fabric_investigation_event.v1.schema.json",
+      "sha256": "253e443620cf8c8f5a6c9a4c8c01742dc8205d67f6b9b832587abc71c631bd14"
+    },
+    {
       "path": "schemas/context_fabric_investigation_request.v1.schema.json",
       "sha256": "6dc3afe9e370bfef5da6d58a421bebade195b0ab9cdfa9c9409b160d42d6b507"
+    },
+    {
+      "path": "schemas/context_fabric_investigation_response.v1.schema.json",
+      "sha256": "76803e3e6e426dca05e934ebfc202132a73a8b37dd3c5879557626b186be5ccd"
+    },
+    {
+      "path": "schemas/context_fabric_investigation_response.v2.schema.json",
+      "sha256": "3cec9b9aed264fd79e103a4d12b1b29b2a3f65f459a7a8430dffc9a9092e4733"
     },
     {
       "path": "schemas/context_fabric_investigation_result.v1.schema.json",
@@ -45,6 +61,10 @@
     {
       "path": "schemas/context_fabric_investigation_result.v2.schema.json",
       "sha256": "8591f26f8c2671ba50d9b62fba9e06001d55bfa37bf44299774ddfdca9659e02"
+    },
+    {
+      "path": "schemas/context_fabric_submission_status.v1.schema.json",
+      "sha256": "983475167bf88e97fac2cb9df331427a264d5fc8b91a370c0f157178b793787a"
     },
     {
       "path": "schemas/error.v1.schema.json",

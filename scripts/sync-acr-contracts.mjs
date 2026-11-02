@@ -469,6 +469,14 @@ const SCHEMA_PATHS = [
     // it minted a membership-verify anchor option, so validate.ts must accept it.
     "contracts/jsonschema/v1/context_fabric_investigation_result.v2.schema.json",
     "contracts/jsonschema/v1/error.v1.schema.json",
+    // CHAOS-12106: the Workbench reads ACR's event stream in the browser, so its checks need the
+    // event, its result forms and the submission status. No generated types: the client's are
+    // generic, and these are read by the validators only.
+    "contracts/jsonschema/v1/context_fabric_answer_projection.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_event.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_response.v1.schema.json",
+    "contracts/jsonschema/v1/context_fabric_investigation_response.v2.schema.json",
+    "contracts/jsonschema/v1/context_fabric_submission_status.v1.schema.json",
 ];
 const EXAMPLE_PATHS = [
     "contracts/examples/v1/context_fabric_investigation_request.v1.json",

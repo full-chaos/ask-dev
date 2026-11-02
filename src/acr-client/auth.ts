@@ -61,11 +61,13 @@
  * enum reason, a boolean or an HTTP status. It never carries a token, a code, a verifier, a state,
  * a tab id, a user or org id, or a URL. A served held token logs nothing.
  */
-import type { AcrBrowserClientConfig } from "./config";
+import { ACR_BROWSER_SCOPE, type AcrBrowserClientConfig } from "./config";
 import { logger } from "./logger";
 
 /** The token family this tab holds: the refresh token and where it is used. */
 export const ACR_TOKEN_FAMILY_KEY = "ask-dev:acr-family";
+/** This tab's authorization while the tab is away at ACR: written by begin, taken by complete. */
+export const ACR_PENDING_AUTHORIZATION_KEY = "ask-dev:acr-authorization";
 /** This tab's id. c4 replaces it when it finds a cloned tab. */
 export const ACR_TAB_KEY = "ask-dev:acr-tab";
 
@@ -266,8 +268,10 @@ type Dependencies = {
     readonly config: () => AcrBrowserClientConfig | undefined;
     /** The host's session read. It may reject; that reads as no session. */
     readonly session: () => Promise<AcrHostSession>;
-    /** The host's same-origin routes. */
-    readonly routes: AcrHostRoutes;
+    /** The host's same-origin routes; null for a host with no silent step (`beginAcrRedirect`). */
+    readonly routes: AcrHostRoutes | null;
+    /** Sends this tab to ACR. */
+    readonly navigate: (url: string) => void;
     /**
      * The session's principal; null with no session or on error (CHAOS-12305); an impersonating
      * session reads as such (CHAOS-12306).
@@ -318,7 +322,8 @@ const browserDependencies: Dependencies = {
             : inTabLock(name, task),
     config: () => undefined,
     session: () => Promise.resolve(null),
-    routes: { authorize: "", session: "" },
+    routes: null,
+    navigate: (url) => window.location.assign(url),
     principal: async () => {
         try {
             const session = await dependencies.session();
@@ -473,6 +478,7 @@ function dropTokens(storage: Storage | null): void {
     held = null;
     drops += 1;
     storage?.removeItem(ACR_TOKEN_FAMILY_KEY);
+    storage?.removeItem(ACR_PENDING_AUTHORIZATION_KEY);
 }
 
 function onTabMessage(channel: AcrTabChannel, message: unknown): void {
@@ -820,6 +826,7 @@ function routeRefusal(status: number, body: unknown): AcrSilentOutcome {
  * session that ended with a redirect to sign-in, which is not this call's page to follow.
  */
 async function askForCode(
+    routes: AcrHostRoutes,
     codeChallenge: string,
     state: string,
 ): Promise<AuthorizationCode | AcrSilentOutcome> {
@@ -827,7 +834,7 @@ async function askForCode(
     try {
         let response: Response;
         try {
-            response = await dependencies.fetch(dependencies.routes.authorize, {
+            response = await dependencies.fetch(routes.authorize, {
                 method: "POST",
                 headers: { Accept: "application/json", "Content-Type": "application/json" },
                 body: JSON.stringify({ code_challenge: codeChallenge, state }),
@@ -867,6 +874,7 @@ async function askForCode(
 async function attemptAuthorization(
     storage: Storage,
     config: AcrBrowserClientConfig,
+    routes: AcrHostRoutes,
     askedBy: AcrPrincipal,
     dropsAtStart: number,
 ): Promise<AcrSilentOutcome> {
@@ -885,7 +893,7 @@ async function attemptAuthorization(
         askedBy,
         dropsAtStart,
     };
-    const answer = await askForCode(await pkceChallenge(request.verifier), request.state);
+    const answer = await askForCode(routes, await pkceChallenge(request.verifier), request.state);
     return "code" in answer ? completeAuthorization(storage, request, answer) : answer;
 }
 
@@ -905,10 +913,10 @@ function logAttempt(outcome: AcrSilentOutcome): void {
  * session and for a failed read alike (`UserMenu` asks the same way), and only the first goes to
  * sign-in: anything but a clear "no session" is unknown, and a person can try again.
  */
-async function sessionHasEnded(): Promise<boolean> {
+async function sessionHasEnded(routes: AcrHostRoutes): Promise<boolean> {
     const limit = deadline();
     try {
-        const response = await dependencies.fetch(dependencies.routes.session, {
+        const response = await dependencies.fetch(routes.session, {
             credentials: "same-origin",
             cache: "no-store",
             signal: limit.signal,
@@ -926,7 +934,8 @@ async function sessionHasEnded(): Promise<boolean> {
 async function runAuthorization(): Promise<AcrSilentOutcome> {
     const config = dependencies.config();
     const storage = dependencies.storage();
-    if (config === undefined || storage === null) return { kind: "off" };
+    const { routes } = dependencies;
+    if (config === undefined || storage === null || routes === null) return { kind: "off" };
     listenForAcrTabs();
     await checkClone(storage);
     const dropsAtStart = drops;
@@ -943,7 +952,7 @@ async function runAuthorization(): Promise<AcrSilentOutcome> {
     // Fail closed (codex r1 on #1714): a code is bound to the session that asked. With no known
     // asker, the exchange could not compare, and another user could get this user's code.
     if (principal === null) {
-        const outcome: AcrSilentOutcome = (await sessionHasEnded())
+        const outcome: AcrSilentOutcome = (await sessionHasEnded(routes))
             ? { kind: "session_ended" }
             : failed("principal_unknown");
         logAttempt(outcome);
@@ -954,9 +963,119 @@ async function runAuthorization(): Promise<AcrSilentOutcome> {
         const current = servable(config);
         if (current?.kind === "token") return current;
     }
-    const outcome = await attemptAuthorization(storage, config, principal, dropsAtStart);
+    const outcome = await attemptAuthorization(storage, config, routes, principal, dropsAtStart);
     logAttempt(outcome);
     return outcome;
+}
+
+/** A start that left this tab, or why it did not. */
+export type AcrRedirectStart =
+    | { readonly kind: "redirected" }
+    | { readonly kind: "off" }
+    | { readonly kind: "impersonating" }
+    | { readonly kind: "failed"; readonly reason: AcrAuthorizationFailure };
+
+/** What this tab keeps while it is away at ACR. Nothing here goes in a URL or a log. */
+type PendingAuthorization = Omit<AuthorizationRequest, "dropsAtStart">;
+
+function pendingFrom(value: unknown): PendingAuthorization | null {
+    if (!isRecord(value)) return null;
+    const strings = [
+        "state",
+        "verifier",
+        "tabId",
+        "issuer",
+        "clientId",
+        "redirectUri",
+        "tokenEndpoint",
+    ];
+    if (strings.some((key) => typeof value[key] !== "string")) return null;
+    if (typeof value.expiresAt !== "number") return null;
+    if (value.revocationEndpoint !== null && typeof value.revocationEndpoint !== "string") {
+        return null;
+    }
+    const askedBy = value.askedBy;
+    if (!isRecord(askedBy) || typeof askedBy.userId !== "string") return null;
+    if (askedBy.orgId !== null && typeof askedBy.orgId !== "string") return null;
+    return value as unknown as PendingAuthorization;
+}
+
+/**
+ * The redirect path, for a host with no same-origin session route (the Workbench, CHAOS-12106). The
+ * tab goes to ACR, the host's web app asks for consent, and ACR sends the tab back to the client's
+ * redirect URI, where `completeAcrRedirect` finishes. The rules of the silent step hold: a code is
+ * bound to the principal that asked, and the exchange is `completeAuthorization`.
+ *
+ * One pending authorization per tab: a new start replaces an older one.
+ */
+export async function beginAcrRedirect(): Promise<AcrRedirectStart> {
+    const config = dependencies.config();
+    const storage = dependencies.storage();
+    if (config === undefined || storage === null) return { kind: "off" };
+    listenForAcrTabs();
+    await checkClone(storage);
+    const principal = await dependencies.principal();
+    if (isImpersonating(principal)) {
+        dropTokens(storage);
+        logPrincipal("begin", "impersonating");
+        return { kind: "impersonating" };
+    }
+    if (principal === null) return { kind: "failed", reason: "principal_unknown" };
+    const server = await discoverAcrAuthorizationServer(config.issuer);
+    if (server === null) return { kind: "failed", reason: "unavailable" };
+    const pending: PendingAuthorization = {
+        state: randomBase64Url(32),
+        verifier: randomBase64Url(32),
+        tabId: tabId(storage),
+        issuer: config.issuer,
+        clientId: config.clientId,
+        redirectUri: config.redirectUri,
+        tokenEndpoint: server.tokenEndpoint,
+        revocationEndpoint: server.revocationEndpoint,
+        expiresAt: dependencies.now() + ACR_AUTHORIZATION_TTL_MS,
+        askedBy: principal,
+    };
+    const url = new URL(server.authorizationEndpoint);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", config.clientId);
+    url.searchParams.set("redirect_uri", config.redirectUri);
+    url.searchParams.set("code_challenge", await pkceChallenge(pending.verifier));
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("state", pending.state);
+    url.searchParams.set("resource", config.issuer);
+    url.searchParams.set("scope", ACR_BROWSER_SCOPE);
+    storage.setItem(ACR_PENDING_AUTHORIZATION_KEY, JSON.stringify(pending));
+    dependencies.navigate(url.href);
+    return { kind: "redirected" };
+}
+
+/**
+ * Finishes the redirect this tab started, from the callback URL's query. The entry is single use:
+ * it is removed before anything else runs. The caller scrubs the URL first. It never rejects.
+ */
+export async function completeAcrRedirect(search: string): Promise<AcrSilentOutcome> {
+    const storage = dependencies.storage();
+    if (dependencies.config() === undefined || storage === null) return { kind: "off" };
+    listenForAcrTabs();
+    const pending = pendingFrom(readJson(storage, ACR_PENDING_AUTHORIZATION_KEY));
+    storage.removeItem(ACR_PENDING_AUTHORIZATION_KEY);
+    if (pending === null) return failed("expired");
+    const params = new URLSearchParams(search);
+    const code = params.get("code");
+    if (params.get("error") !== null || code === null || code === "") return failed("refused");
+    try {
+        return await completeAuthorization(
+            storage,
+            { ...pending, dropsAtStart: drops },
+            {
+                code,
+                state: params.get("state") ?? "",
+                iss: params.get("iss") ?? "",
+            },
+        );
+    } catch {
+        return failed("unavailable");
+    }
 }
 
 /**
