@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { readFileSync } from "node:fs";
 
-import { answerInvestigations, expect, test } from "./support/signed-in";
+import { answerInvestigations, expect, gotoStyled, test } from "./support/signed-in";
 
 /**
  * CHAOS-12559: ACR's bounded answer, from ACR's real projector at the pin
@@ -14,7 +14,8 @@ async function openBounded(page: Page, width: number) {
     const projection: unknown = JSON.parse(readFileSync(FIXTURE, "utf8"));
     await page.setViewportSize({ width, height: 844 });
     await answerInvestigations(page, projection);
-    await page.goto("/");
+    // The sideways check below needs the stylesheet applied (CHAOS-12636).
+    await gotoStyled(page, "/");
     await page.getByLabel("Ask a question").fill("Which teams are struggling right now, and why?");
     await page.getByRole("button", { name: "Send" }).click();
     const view = page.getByRole("region", { name: "Shortened answer" });
