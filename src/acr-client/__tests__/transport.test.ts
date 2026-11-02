@@ -562,11 +562,14 @@ describe("investigate: refusals", () => {
 
     // CHAOS-12564: ACR writes `Retry-After` as integer seconds only (CHAOS-12199 ruling). Its
     // monthly allowance answers up to a month ahead: `2475944` is the value askdev-1 sent on
-    // 2026-11-02. Any other form is undefined; there is no HTTP-date parser.
+    // 2026-11-02. A longer wait, or any other form, is undefined; there is no HTTP-date parser.
     it.each([
         ["7", 7],
         ["2475944", 2_475_944],
-        ["99999999", 99_999_999],
+        // ACR's longest wait is a month: 31 days is the bound, by value, not by digit count.
+        ["2678400", 2_678_400],
+        ["2678401", undefined],
+        ["99999999", undefined],
         ["123456789", undefined],
         ["Wed, 21 Oct 2026 07:28:00 GMT", undefined],
         ["1.5", undefined],

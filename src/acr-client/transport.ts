@@ -177,11 +177,17 @@ function isNotLeased(body: ACRErrorV1): boolean {
 }
 
 /** ACR's `Retry-After` in whole seconds, when it is one. */
+/**
+ * ACR's longest wait: its monthly allowance answers up to a month ahead (CHAOS-12564). A longer
+ * value is not one ACR sends, so it is no wait at all, never a multi-year one on the page.
+ */
+export const ACR_MAX_RETRY_AFTER_SECONDS = 31 * 24 * 60 * 60;
+
 function retryAfterOf(response: Response): number | undefined {
     const raw = response.headers.get("Retry-After");
-    // Up to 8 digits: ACR's monthly allowance answers up to a month ahead (CHAOS-12564).
-    if (raw === null || !/^\d{1,8}$/u.test(raw.trim())) return undefined;
-    return Number(raw.trim());
+    if (raw === null || !/^\d{1,7}$/u.test(raw.trim())) return undefined;
+    const seconds = Number(raw.trim());
+    return seconds <= ACR_MAX_RETRY_AFTER_SECONDS ? seconds : undefined;
 }
 
 /**
