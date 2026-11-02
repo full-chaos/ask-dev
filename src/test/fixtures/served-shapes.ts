@@ -12,6 +12,7 @@ import measureUnitsRepository from "./served-shapes/measure-units-repository.jso
 import measureUnitsUndeclared from "./served-shapes/measure-units-undeclared.json";
 import measureUnits from "./served-shapes/measure-units.json";
 import edgeWords from "./served-shapes/edge-words.json";
+import repositoryFlowSankey from "./served-shapes/repository-flow-sankey.json";
 import zoneLessTrend from "./served-shapes/zone-less-trend.json";
 
 /**
@@ -35,6 +36,10 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * metrics declare a unit and a cadence (CHAOS-12570, CHAOS-12571). `cadence-missing-day` and
  * `cadence-every-day` are that last case with the workload and commits days set to 28, 29 and 31
  * August, and to 28, 29 and 30 August, through the same real cadence (CHAOS-12571).
+ * `repository-flow-sankey` is one team's claim with a declared `repository_theme_breakdown` table and
+ * the sankey that plots it, through ACR's real vocabulary labels, `Validate` and encoder at the
+ * contract commit (`served-shapes/generate-sankey.go.txt`). No producer emits the rule yet
+ * (CHAOS-12582), so the shape is built as ACR's own contract test builds it (CHAOS-12579).
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
@@ -48,6 +53,7 @@ export const servedShapeScenarios = {
     "measure-units-labels-off": measureUnitsLabelsOff as unknown as InvestigationResult,
     "measure-units-repository": measureUnitsRepository as unknown as InvestigationResult,
     "measure-units-undeclared": measureUnitsUndeclared as unknown as InvestigationResult,
+    "repository-flow-sankey": repositoryFlowSankey as unknown as InvestigationResult,
     "zone-less-trend": zoneLessTrend as unknown as InvestigationResult,
 } as const;
 

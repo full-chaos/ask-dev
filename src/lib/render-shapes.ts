@@ -277,7 +277,11 @@ export function axisLabels(shape: RenderShape, cohort?: Cohort): readonly string
 export const THEME_SHARE_RULE: RenderShapeRule = "investment_theme_share";
 
 /** The rules whose shape belongs to the panel of a fact it cites. */
-export const FACT_PANEL_RULES: readonly RenderShapeRule[] = ["dated_fact_trend", THEME_SHARE_RULE];
+export const FACT_PANEL_RULES: readonly RenderShapeRule[] = [
+    "dated_fact_trend",
+    THEME_SHARE_RULE,
+    "investment_repository_flow",
+];
 
 /** The rule of a side-by-side table: its own panel draws it, with no host chart (CHAOS-12513). */
 export const COMPARISON_RULE: RenderShapeRule = "comparison_side_by_side";
@@ -366,6 +370,144 @@ function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): b
         if (value > 0) above += 1;
     }
     return above >= 2;
+}
+
+/** The rule of one team's repository → theme flow (CHAOS-12578): its fact's panel draws it, through the host. */
+export const REPOSITORY_FLOW_RULE: RenderShapeRule = "investment_repository_flow";
+
+/**
+ * How far parts may add up from their whole, relative to the larger: acr's
+ * `ContextFabricRenderShareSumTolerance`, the one number both ends hold a sum to.
+ */
+export const SHARE_SUM_TOLERANCE = 1e-12;
+
+/** A sankey draws 2 to 64 repositories with effort: past 64 it is refused, never an "other" node. */
+const REPOSITORY_FLOW_MIN_REPOSITORIES = 2;
+const REPOSITORY_FLOW_MAX_REPOSITORIES = 64;
+
+/** acr's `ContextFabricRepositoryCanonicalIDPrefix`: a sankey's left node is a repository, never a person. */
+const REPOSITORY_ID_PREFIX = "repository:";
+
+function partsSumToWhole(sum: number, whole: number): boolean {
+    return Math.abs(sum - whole) <= SHARE_SUM_TOLERANCE * Math.max(Math.abs(sum), Math.abs(whole));
+}
+
+/** A claim's declared `repository_theme_breakdown` table: acr's `holdsRepositoryFlowTable`. */
+function holdsRepositoryFlowTable(fact: ClaimedFact): boolean {
+    const table = fact.table;
+    if (table === undefined || (fact.time_series_rows?.length ?? 0) > 0) return false;
+    if (table.field !== "repository_theme_breakdown" || table.shape !== "breakdown") return false;
+    if (table.key.length !== 2 || table.key[0] !== "repository" || table.key[1] !== "theme") {
+        return false;
+    }
+    return (
+        (table.measures ?? []).includes("weighted_effort") &&
+        (table.measures ?? []).includes("theme_weighted_effort") &&
+        (table.observations ?? []).includes("repository_label")
+    );
+}
+
+type FlowLink = { readonly word: string; readonly theme: string };
+
+/**
+ * True when a sankey is one team's effort flowing from its repositories to the themes: mirrors acr's
+ * `validateSankeyShape` and `sankeyFlowsOf`. The points are ALL the links of ONE team claim's
+ * declared table that carry effort, each under its own theme's series and labelled with its
+ * repository's served word. A theme's links add up to the team's effort in that theme within
+ * `SHARE_SUM_TOLERANCE`, and between 2 and 64 repositories carry effort.
+ *
+ * A theme left out leaves its links out, so the count of plotted links refuses it.
+ *
+ * One clause is acr's alone: that a series label is the served word of its theme. The word map is
+ * acr's, and a copy here would be a consumer table (CHAOS-4690), so this holds only that the label
+ * is there. Each link is drawn once because a series holds one point per label and a point must sit
+ * under its own theme. `verifyRenderShape`'s own checks cover the rest: exact values, the source's
+ * address, and one label per position.
+ */
+function isRepositoryFlow(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    if (shape.kind !== "sankey" || shape.axis_kind !== "category") return false;
+    if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
+    const claimId = shape.series[0]?.points[0]?.source.claim_id;
+    const fact = claimFor(facts, claimId);
+    if (fact === undefined || !holdsRepositoryFlowTable(fact)) return false;
+    if (fact.subject.kind !== "team") return false;
+    const words = new Map<string, string>();
+    const themeEffort = new Map<string, number>();
+    const linkedThemes = new Set<string>();
+    const repositories = new Set<string>();
+    const links: FlowLink[] = [];
+    let linksWithEffort = 0;
+    for (const { fields } of fact.rows ?? []) {
+        const cell = (name: string) =>
+            fields[name] === undefined ? undefined : cellValue(fields[name]);
+        const [repository, word, theme] = [
+            cell("repository"),
+            cell("repository_label"),
+            cell("theme"),
+        ];
+        const [effort, total] = [cell("weighted_effort"), cell("theme_weighted_effort")];
+        if (
+            typeof repository !== "string" ||
+            typeof word !== "string" ||
+            typeof theme !== "string"
+        ) {
+            return false;
+        }
+        if (typeof effort !== "number" || typeof total !== "number") return false;
+        // No person node: every left node is a repository.
+        if (!repository.startsWith(REPOSITORY_ID_PREFIX) || repository === REPOSITORY_ID_PREFIX) {
+            return false;
+        }
+        if (nonBlank(word) === undefined) return false;
+        if ((words.get(repository) ?? word) !== word) return false;
+        words.set(repository, word);
+        if (!(effort >= 0) || !(total >= 0)) return false;
+        if ((themeEffort.get(theme) ?? total) !== total) return false;
+        themeEffort.set(theme, total);
+        links.push({ word, theme });
+        if (effort > 0) {
+            linksWithEffort += 1;
+            linkedThemes.add(theme);
+            repositories.add(repository);
+        }
+    }
+    for (const [theme, total] of themeEffort) {
+        if (total > 0 && !linkedThemes.has(theme)) return false;
+    }
+    if (
+        repositories.size < REPOSITORY_FLOW_MIN_REPOSITORIES ||
+        repositories.size > REPOSITORY_FLOW_MAX_REPOSITORIES
+    ) {
+        return false;
+    }
+    // No self link: no two nodes, repositories or themes, share a word.
+    const nodeWords = new Set<string>();
+    for (const repository of repositories) {
+        const word = words.get(repository)!;
+        if (nodeWords.has(word)) return false;
+        nodeWords.add(word);
+    }
+    let plotted = 0;
+    for (const series of shape.series) {
+        if (!linkedThemes.has(series.key) || nonBlank(series.label) === undefined) return false;
+        if (nodeWords.has(series.label)) return false;
+        nodeWords.add(series.label);
+        let sum = 0;
+        for (const { label, source, value } of series.points) {
+            // The address check in `verifyRenderShape` holds the source's kind: a row index
+            // belongs only to a claimed fact row.
+            if (source.field !== "weighted_effort") return false;
+            if (source.claim_id !== claimId || source.row_index === undefined) return false;
+            const link = links[source.row_index];
+            if (link === undefined || link.theme !== series.key || link.word !== label)
+                return false;
+            if (!(value > 0)) return false;
+            sum += value;
+            plotted += 1;
+        }
+        if (!partsSumToWhole(sum, themeEffort.get(series.key)!)) return false;
+    }
+    return plotted === linksWithEffort;
 }
 
 /**
@@ -473,6 +615,8 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
         if (!isThemeShareWhole(shape, result.claimed_facts)) return false;
     } else if (shape.selected_by === COMPARISON_RULE) {
         if (!isSideBySide(shape, result.claimed_facts)) return false;
+    } else if (shape.selected_by === REPOSITORY_FLOW_RULE) {
+        if (!isRepositoryFlow(shape, result.claimed_facts)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }
