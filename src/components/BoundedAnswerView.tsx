@@ -4,9 +4,9 @@ import { AnswerText } from "./AnswerPanel";
 import { Badge } from "./Badge";
 import { ClarificationView } from "./ClarificationPanel";
 import { DriverCard, StrongestPressures } from "./DriversPanel";
+import { FactRowsPanels } from "./FactRowsPanel";
 import { LimitationsPanel } from "./LimitationsPanel";
 import { RichShape } from "./RichShape";
-import { ScalarFactsPanel } from "./ScalarFactsPanel";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import type { AnswerProjection, ClaimedFact, RenderShape } from "../lib/contracts";
 import { identityLimitations } from "../lib/fact-dedup";
@@ -78,26 +78,43 @@ export function leftOutSentence(budget: ProjectionBudget): string | undefined {
 }
 
 /**
- * The projection's facts with a value and no rows, as the whole answer's fact table reads them. A
- * fact with rows is drawn by its chart, when the projection kept one; a fact with no value has
- * nothing for a table cell.
+ * The projection's facts as the whole answer's fact parts read them: a fact with rows gets its row
+ * panel, a fact with no rows its line in the scalar table (`FactRowsPanels`). The projection keeps
+ * these fields as the result has them; nothing is reworded. A fact the projection kept with no
+ * value has nothing a claimed fact can carry, so it is not drawn.
  */
-function scalarFactsOf(projection: AnswerProjection): readonly ClaimedFact[] {
-    return projection.key_facts.flatMap((fact) =>
-        fact.value === undefined ||
-        (fact.rows?.length ?? 0) > 0 ||
-        (fact.time_series_rows?.length ?? 0) > 0
-            ? []
-            : [
-                  {
-                      claim_id: fact.claim_id,
-                      kind: fact.kind,
-                      subject: fact.subject,
-                      field: fact.field,
-                      value: fact.value,
-                  },
-              ],
-    );
+/**
+ * A projected fact's rows are the result's rows: the projection's row schema is the claimed fact's
+ * (`ClaimedFactRow` in `context_fabric_common.v1`; only the descriptions differ), and the projection
+ * passed its schema. The generated types differ only in how their index signatures admit
+ * `undefined`.
+ */
+type ClaimedRows = NonNullable<ClaimedFact["rows"]>;
+
+function claimedFactsOf(projection: AnswerProjection): readonly ClaimedFact[] {
+    return projection.key_facts.flatMap((fact) => {
+        if (fact.value === undefined) return [];
+        return [
+            {
+                claim_id: fact.claim_id,
+                kind: fact.kind,
+                subject: fact.subject,
+                field: fact.field,
+                value: fact.value,
+                ...(fact.rows === undefined ? {} : { rows: fact.rows as ClaimedRows }),
+                ...(fact.table === undefined ? {} : { table: fact.table }),
+                ...(fact.time_series_rows === undefined
+                    ? {}
+                    : { time_series_rows: fact.time_series_rows as ClaimedRows }),
+                ...(fact.time_series_table === undefined
+                    ? {}
+                    : { time_series_table: fact.time_series_table }),
+                ...(fact.investment_mix === undefined
+                    ? {}
+                    : { investment_mix: fact.investment_mix }),
+            },
+        ];
+    });
 }
 
 const NO_FOOTNOTES: ReadonlySet<string> = new Set();
@@ -106,7 +123,7 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
     const idPrefix = useId();
     const status = answerStatusWord(projection);
     const leftOut = leftOutSentence(projection.projection_budget);
-    const facts = scalarFactsOf(projection);
+    const facts = claimedFactsOf(projection);
     const shapes: readonly RenderShape[] = projection.render_shapes ?? [];
     const drivers = projection.principal_drivers;
     const limitations = identityLimitations(projection.limitations);
@@ -174,7 +191,7 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
                         </ul>
                     </section>
                 ) : null}
-                <ScalarFactsPanel facts={facts} result={undefined} />
+                <FactRowsPanels facts={facts} result={undefined} />
                 {shapes.length > 0 ? (
                     <section aria-label="Charts" className="panel" role="group">
                         {shapes.map((shape) => (

@@ -38,6 +38,7 @@ import {
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
+import { OMISSION_COUNTS } from "@/lib/projection-budget";
 
 const auth = vi.hoisted(() => ({
     token: vi.fn(),
@@ -1522,6 +1523,18 @@ describe("investigateFromBrowser", () => {
             const outcome = resultOutcome({ ...answer, projection_budget: budget });
             expect(outcome.kind, name).toBe("failed");
             expect(failureOf(outcome).code, name).toBe("acr_contract_violation");
+        }
+        // Every omission count, one at a time (the rule must not skip one).
+        for (const key of OMISSION_COUNTS) {
+            const cut = { ...nothingCut, [key]: 1 };
+            expect(
+                resultOutcome({ ...answer, projection_budget: { ...cut, truncated: false } }).kind,
+                key,
+            ).toBe("failed");
+            expect(
+                resultOutcome({ ...answer, projection_budget: { ...cut, truncated: true } }).kind,
+                key,
+            ).toBe("bounded");
         }
         expect(
             resultOutcome({ ...answer, projection_budget: { ...nothingCut, truncated: false } })

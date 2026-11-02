@@ -50,6 +50,15 @@ describe("BoundedAnswerView", () => {
         }
     });
 
+    it("draws the rows of every fact it kept, as the whole answer's fact panels do", () => {
+        const table = boundedAnswerScenarios["bounded-partial-table"];
+        expect(table.render_shapes ?? []).toHaveLength(0);
+        const { unmount } = render(<BoundedAnswerView projection={table} />);
+        // A date from the kept rows (ACR's real projector output), drawn by the row panel.
+        expect(screen.getAllByText(/2026-08-25/).length).toBeGreaterThan(0);
+        unmount();
+    });
+
     it("draws no completeness (CHAOS-12245)", () => {
         const { container } = render(<BoundedAnswerView projection={answer} />);
         expect(screen.queryByRole("heading", { name: "Completeness" })).not.toBeInTheDocument();

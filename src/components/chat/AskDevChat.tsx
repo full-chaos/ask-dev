@@ -1228,9 +1228,21 @@ function ChatSurface({
                                                 </EvidenceOpenProvider>
                                             ) : null}
                                             {turn.outcome.kind === "bounded" ? (
-                                                <BoundedAnswerView
-                                                    projection={turn.outcome.projection}
-                                                />
+                                                // The same host integrations as a whole answer:
+                                                // evidence opens through the host, charts go to its
+                                                // slot.
+                                                <EvidenceOpenProvider
+                                                    evidence={chat.evidence}
+                                                    resultId={turn.outcome.projection.result_id}
+                                                >
+                                                    <ShapeSlotContext.Provider
+                                                        value={chat.slots?.shape ?? null}
+                                                    >
+                                                        <BoundedAnswerView
+                                                            projection={turn.outcome.projection}
+                                                        />
+                                                    </ShapeSlotContext.Provider>
+                                                </EvidenceOpenProvider>
                                             ) : null}
                                             {turn.outcome.kind === "answered" &&
                                             chat.feedback !== undefined &&
