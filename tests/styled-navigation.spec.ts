@@ -32,8 +32,10 @@ test.describe("a navigation the layout checks can trust", () => {
         await gotoStyled(page, "/");
         expect(aborted).toBe(1);
         expect(await unstyledSheets(page)).toEqual([]);
+        // The planted failure is the first retry. On a shared host a real abort can add one more.
         const retries = testInfo.annotations.filter((note) => note.type === "stylesheet-retry");
-        expect(retries).toHaveLength(1);
+        expect(retries.length).toBeGreaterThanOrEqual(1);
+        expect(retries[0]!.description).toContain("reload 1: ");
         expect(retries[0]!.description).toContain("net::ERR_INTERNET_DISCONNECTED");
         // Styled, the page does not scroll sideways at phone width.
         const sideways = await page.evaluate(
@@ -42,16 +44,25 @@ test.describe("a navigation the layout checks can trust", () => {
         expect(sideways).toBe(0);
     });
 
-    test("gotoStyled fails, with the browser's error, when the stylesheet fails twice", async ({
+    test("gotoStyled fails, with the browser's error, when every load's stylesheet fails", async ({
         page,
-    }) => {
-        await page.route(STYLESHEET, (route) => route.abort("internetdisconnected"));
+    }, testInfo) => {
+        let aborted = 0;
+        await page.route(STYLESHEET, (route) => {
+            aborted += 1;
+            return route.abort("internetdisconnected");
+        });
         await page.setViewportSize(PHONE);
         const failure = await gotoStyled(page, "/").then(
             () => "passed",
             (error: unknown) => (error instanceof Error ? error.message : String(error)),
         );
         expect(failure).toContain("net::ERR_INTERNET_DISCONNECTED");
+        // The first load and two reloads: no more, then it fails.
+        expect(aborted).toBe(3);
+        expect(
+            testInfo.annotations.filter((note) => note.type === "stylesheet-retry"),
+        ).toHaveLength(2);
     });
 
     test("gotoStyled on a healthy page changes nothing and records no retry", async ({
@@ -60,8 +71,6 @@ test.describe("a navigation the layout checks can trust", () => {
         await page.setViewportSize(PHONE);
         await gotoStyled(page, "/");
         expect(await unstyledSheets(page)).toEqual([]);
-        expect(testInfo.annotations.filter((note) => note.type === "stylesheet-retry")).toEqual(
-            [],
-        );
+        expect(testInfo.annotations.filter((note) => note.type === "stylesheet-retry")).toEqual([]);
     });
 });
