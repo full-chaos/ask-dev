@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 /**
@@ -32,6 +35,27 @@ beforeEach(() => {
 afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+});
+
+function sourceFiles(directory: string): string[] {
+    return readdirSync(directory).flatMap((name) => {
+        const full = path.join(directory, name);
+        if (statSync(full).isDirectory()) return name === "__tests__" ? [] : sourceFiles(full);
+        return /\.tsx?$/u.test(name) && !/\.test\.tsx?$/u.test(name) ? [full] : [];
+    });
+}
+
+/**
+ * A clear from another tab cannot reach a tab that is away at ACR, so its pending start would
+ * outlive that clear. Web has the clear and no redirect; this app has the redirect and no clear.
+ * A sign-out added here must first make a clear end a pending start.
+ */
+it("offers no cross-tab clear in the app that redirects", () => {
+    const root = path.resolve(import.meta.dirname, "../..");
+    const callers = sourceFiles(root)
+        .filter((file) => readFileSync(file, "utf8").includes("clearAcrTokensInAllTabs"))
+        .map((file) => path.relative(root, file));
+    expect(callers).toEqual([path.join("acr-client", "auth.ts")]);
 });
 
 it("starts the redirect on the Workbench's own client, with no session route", async () => {

@@ -42,6 +42,34 @@ const files = [...filesUnder(path.join(ROOT, "src")), path.join(ROOT, "package.j
     (file) => path.relative(ROOT, file) !== SELF,
 );
 
+/** What this app must not name anywhere: the words of the old key, identity and route. */
+const IDENTITY = FORBIDDEN.slice(0, 7);
+const AROUND_THE_SOURCE = [
+    ...["tests", "scripts", "docs", "ci", ".github"].flatMap((name) =>
+        filesUnder(path.join(ROOT, name)),
+    ),
+    path.join(ROOT, "README.md"),
+    path.join(ROOT, "AGENTS.md"),
+    path.join(ROOT, ".env.example"),
+];
+/** The local ACR's own config for web's assertions: it is ACR's, and this app holds none of it. */
+const LOCAL_ACR_ENV = path.join("scripts", "dev-launch.sh");
+
+describe("no key, identity or old route around the source", () => {
+    it("reads those files, so a pass is not an empty scan", () => {
+        expect(AROUND_THE_SOURCE.length).toBeGreaterThan(20);
+        expect(AROUND_THE_SOURCE).toContain(path.join(ROOT, "README.md"));
+        expect(AROUND_THE_SOURCE).toContain(path.join(ROOT, "scripts", "dev-launch.sh"));
+    });
+
+    it.each(IDENTITY)("no test, script, doc or example holds %s", (word) => {
+        const holders = AROUND_THE_SOURCE.map((file) => path.relative(ROOT, file))
+            .filter((relative) => relative !== LOCAL_ACR_ENV || word !== "ACR_WEB_ASSERTION")
+            .filter((relative) => readFileSync(path.join(ROOT, relative), "utf8").includes(word));
+        expect(holders).toEqual([]);
+    });
+});
+
 describe("no secret, assertion or server identity remains", () => {
     it("reads the whole tree, so a pass is not an empty scan", () => {
         expect(files.length).toBeGreaterThan(100);
