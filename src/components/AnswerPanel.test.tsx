@@ -243,6 +243,44 @@ describe("AnswerPanel — the scope fields ACR serves words for", () => {
     });
 });
 
+/** CHAOS-12530: the `temporal` of ACR's historical example. */
+describe("AnswerPanel — the time a past answer speaks for", () => {
+    const SENTENCE = "This answer speaks for 2026-02-28, not the 2026-03-01 you asked about.";
+    const temporal = {
+        requested: { axis: "valid_time", as_of: "2026-03-01T00:00:00Z" },
+        effective: { axis: "valid_time", as_of: "2026-02-28T00:00:00Z" },
+        grain: "day",
+        coverage_complete: false,
+    };
+    const past = { ...base, temporal } as InvestigationResult;
+    const line = () => screen.queryByTestId("answer-line-temporal");
+    const raw = () => screen.queryByTestId("answer-scope-temporal");
+
+    it("shows ACR's sentence on the page, and leaves no raw copy", () => {
+        render(
+            <AnswerPanel result={{ ...past, vocabulary_labels: { "temporal:note": SENTENCE } }} />,
+        );
+        expect(line()).toHaveTextContent(SENTENCE);
+        expect(line()!.closest("details")).toBeNull();
+        expect(raw()).toBeNull();
+    });
+
+    it("keeps the label raw in the fold with no word", () => {
+        render(<AnswerPanel result={past} />);
+        expect(line()).toBeNull();
+        expect(raw()).toHaveTextContent("2026-02-28");
+        expect(raw()!.closest("details")).not.toHaveAttribute("open");
+    });
+
+    it("shows nothing for a current answer, even with a stray word", () => {
+        render(
+            <AnswerPanel result={{ ...base, vocabulary_labels: { "temporal:note": SENTENCE } }} />,
+        );
+        expect(line()).toBeNull();
+        expect(raw()).toBeNull();
+    });
+});
+
 describe("AnswerPanel — the scope fields ACR serves no words for", () => {
     const fold = () => screen.getByTestId("answer-scope-details");
     const raw = (name: string) => within(fold()).queryByTestId(`answer-scope-${name}`);
