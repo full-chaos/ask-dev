@@ -1,0 +1,1327 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_landscape_quadrant",
+    "request_id": "request_landscape_quadrant",
+    "generated_at": "2026-11-02T19:15:55.211492767Z",
+    "status": "complete",
+    "question": "Where do these teams stand on churn and delivery?",
+    "interpretation": {
+        "shape": "explicit_cohort",
+        "requested_judgment": "compare",
+        "subject_terms": ["Identity", "Delivery", "Payments", "Checkout", "Mobile"],
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "landscape"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [
+            {
+                "receipt_id": "receipt_landscape_quadrant_0",
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:gh:identity",
+                    "label": "Identity"
+                },
+                "state": "committed",
+                "matched_terms": ["Identity"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            },
+            {
+                "receipt_id": "receipt_landscape_quadrant_1",
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:gl:chaos-gl",
+                    "label": "Delivery"
+                },
+                "state": "committed",
+                "matched_terms": ["Delivery"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            },
+            {
+                "receipt_id": "receipt_landscape_quadrant_2",
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                    "label": "Payments"
+                },
+                "state": "committed",
+                "matched_terms": ["Payments"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            },
+            {
+                "receipt_id": "receipt_landscape_quadrant_3",
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:linear:CHK",
+                    "label": "Checkout"
+                },
+                "state": "committed",
+                "matched_terms": ["Checkout"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            },
+            {
+                "receipt_id": "receipt_landscape_quadrant_4",
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:linear:MOB",
+                    "label": "Mobile"
+                },
+                "state": "committed",
+                "matched_terms": ["Mobile"],
+                "match_reasons": ["Exact canonical subject label match."],
+                "confidence": 1,
+                "match_mechanisms": ["exact"]
+            }
+        ],
+        "committed": [
+            {
+                "kind": "team",
+                "canonical_id": "team:gh:identity",
+                "label": "Identity"
+            },
+            {
+                "kind": "team",
+                "canonical_id": "team:gl:chaos-gl",
+                "label": "Delivery"
+            },
+            {
+                "kind": "team",
+                "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                "label": "Payments"
+            },
+            {
+                "kind": "team",
+                "canonical_id": "team:linear:CHK",
+                "label": "Checkout"
+            },
+            {
+                "kind": "team",
+                "canonical_id": "team:linear:MOB",
+                "label": "Mobile"
+            }
+        ],
+        "commit_decision_digests": [
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:gh:identity",
+                    "label": "Identity"
+                }
+            },
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:gl:chaos-gl",
+                    "label": "Delivery"
+                }
+            },
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                    "label": "Payments"
+                }
+            },
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:linear:CHK",
+                    "label": "Checkout"
+                }
+            },
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:linear:MOB",
+                    "label": "Mobile"
+                }
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "explicit_comparison",
+        "family_source": "model",
+        "family_version": "question-family.v5",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["table", "quadrant"],
+        "fact_kinds": [
+            "landscape",
+            "health",
+            "workload",
+            "readiness",
+            "operational_deficiencies",
+            "investment"
+        ],
+        "axes": [
+            "expected_kind",
+            "subject_anchor",
+            "subject_handle",
+            "subject_candidate",
+            "window"
+        ],
+        "budget": {
+            "max_items": 0,
+            "max_serialized_bytes": 1048576,
+            "max_members": 50,
+            "synthesis_headroom": 12,
+            "narrowing_basis": "canonical_id_lexical"
+        },
+        "requirements": [
+            {
+                "requirement": "state/operand/team",
+                "obligation": "state",
+                "role": "operand",
+                "subject": "team",
+                "kind": "read",
+                "fact_kinds": [
+                    "flow",
+                    "health",
+                    "investment",
+                    "landscape",
+                    "readiness",
+                    "workload"
+                ],
+                "scope": "each_operand",
+                "quantifier": "corroborated"
+            }
+        ]
+    },
+    "direct_judgment": "Landscape. Principal driver: Landscape; Landscape; Landscape; Landscape.",
+    "current_state": "Current observed values: churn loc 30d: 2400 (Identity); delivery units 30d: 18 (Identity); churn loc 30d: 900 (Delivery, Mobile); delivery units 30d: 42 (Delivery); churn loc 30d: 0 (Payments); delivery units 30d: 24 (Payments); churn loc 30d: 4800 (Checkout); delivery units 30d: 62 (Checkout); delivery units 30d: 40 (Mobile).",
+    "strongest_pressures": [],
+    "drivers": [
+        {
+            "driver_id": "driver_landscape_quadrant_00",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Landscape",
+            "summary": "Where the team stands.",
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:gh:identity",
+                    "label": "Identity"
+                }
+            ],
+            "evidence_ref_ids": ["acr:v1:team:gh:identity"],
+            "claimed_fact_ids": [
+                "claim_landscape_quadrant_00_churn_loc_30d",
+                "claim_landscape_quadrant_00_delivery_units_30d"
+            ],
+            "derivation": "canonical_structured",
+            "epistemic_status": "observed",
+            "confidence": 0.9,
+            "current": true
+        },
+        {
+            "driver_id": "driver_landscape_quadrant_01",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Landscape",
+            "summary": "Where the team stands.",
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:gl:chaos-gl",
+                    "label": "Delivery"
+                }
+            ],
+            "evidence_ref_ids": ["acr:v1:team:gl:chaos-gl"],
+            "claimed_fact_ids": [
+                "claim_landscape_quadrant_01_churn_loc_30d",
+                "claim_landscape_quadrant_01_delivery_units_30d"
+            ],
+            "derivation": "canonical_structured",
+            "epistemic_status": "observed",
+            "confidence": 0.9,
+            "current": true
+        },
+        {
+            "driver_id": "driver_landscape_quadrant_02",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Landscape",
+            "summary": "Where the team stands.",
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                    "label": "Payments"
+                }
+            ],
+            "evidence_ref_ids": ["acr:v1:team:jira:9a1f0c3e-0000-4000-8000-0000000d0001"],
+            "claimed_fact_ids": [
+                "claim_landscape_quadrant_02_churn_loc_30d",
+                "claim_landscape_quadrant_02_delivery_units_30d"
+            ],
+            "derivation": "canonical_structured",
+            "epistemic_status": "observed",
+            "confidence": 0.9,
+            "current": true
+        },
+        {
+            "driver_id": "driver_landscape_quadrant_03",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Landscape",
+            "summary": "Where the team stands.",
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:linear:CHK",
+                    "label": "Checkout"
+                }
+            ],
+            "evidence_ref_ids": ["acr:v1:team:linear:CHK"],
+            "claimed_fact_ids": [
+                "claim_landscape_quadrant_03_churn_loc_30d",
+                "claim_landscape_quadrant_03_delivery_units_30d"
+            ],
+            "derivation": "canonical_structured",
+            "epistemic_status": "observed",
+            "confidence": 0.9,
+            "current": true
+        },
+        {
+            "driver_id": "driver_landscape_quadrant_04",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Landscape",
+            "summary": "Where the team stands.",
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:linear:MOB",
+                    "label": "Mobile"
+                }
+            ],
+            "evidence_ref_ids": ["acr:v1:team:linear:MOB"],
+            "claimed_fact_ids": [
+                "claim_landscape_quadrant_04_churn_loc_30d",
+                "claim_landscape_quadrant_04_delivery_units_30d"
+            ],
+            "derivation": "canonical_structured",
+            "epistemic_status": "observed",
+            "confidence": 0.9,
+            "current": true
+        }
+    ],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [
+        "The quadrant shows where each team stood on churn and delivery units on one day. It locates the teams; it does not explain why a team stands where it does."
+    ],
+    "evidence_ref_ids": [
+        "acr:v1:team:gh:identity",
+        "acr:v1:team:gl:chaos-gl",
+        "acr:v1:team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+        "acr:v1:team:linear:CHK",
+        "acr:v1:team:linear:MOB"
+    ],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_landscape_quadrant_00_churn_loc_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:gh:identity",
+                "label": "Identity"
+            },
+            "field": "churn_loc_30d",
+            "value": {
+                "integer": 2400
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 2400
+                        },
+                        "delivery_units_30d": {
+                            "integer": 18
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 2400
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 18
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_00_delivery_units_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:gh:identity",
+                "label": "Identity"
+            },
+            "field": "delivery_units_30d",
+            "value": {
+                "integer": 18
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 2400
+                        },
+                        "delivery_units_30d": {
+                            "integer": 18
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 2400
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 18
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_01_churn_loc_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:gl:chaos-gl",
+                "label": "Delivery"
+            },
+            "field": "churn_loc_30d",
+            "value": {
+                "integer": 900
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "delivery_units_30d": {
+                            "integer": 42
+                        },
+                        "identity_count": {
+                            "integer": 3
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 42
+                        },
+                        "identity_count": {
+                            "integer": 3
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_01_delivery_units_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:gl:chaos-gl",
+                "label": "Delivery"
+            },
+            "field": "delivery_units_30d",
+            "value": {
+                "integer": 42
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "delivery_units_30d": {
+                            "integer": 42
+                        },
+                        "identity_count": {
+                            "integer": 3
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 42
+                        },
+                        "identity_count": {
+                            "integer": 3
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_02_churn_loc_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                "label": "Payments"
+            },
+            "field": "churn_loc_30d",
+            "value": {
+                "integer": 0
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 0
+                        },
+                        "delivery_units_30d": {
+                            "integer": 24
+                        },
+                        "identity_count": {
+                            "integer": 4
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 0
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 24
+                        },
+                        "identity_count": {
+                            "integer": 4
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_02_delivery_units_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+                "label": "Payments"
+            },
+            "field": "delivery_units_30d",
+            "value": {
+                "integer": 24
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 0
+                        },
+                        "delivery_units_30d": {
+                            "integer": 24
+                        },
+                        "identity_count": {
+                            "integer": 4
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 0
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 24
+                        },
+                        "identity_count": {
+                            "integer": 4
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_03_churn_loc_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:linear:CHK",
+                "label": "Checkout"
+            },
+            "field": "churn_loc_30d",
+            "value": {
+                "integer": 4800
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 4800
+                        },
+                        "delivery_units_30d": {
+                            "integer": 62
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 4800
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 62
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_03_delivery_units_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:linear:CHK",
+                "label": "Checkout"
+            },
+            "field": "delivery_units_30d",
+            "value": {
+                "integer": 62
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 4800
+                        },
+                        "delivery_units_30d": {
+                            "integer": 62
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 4800
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 62
+                        },
+                        "identity_count": {
+                            "integer": 2
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_04_churn_loc_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:linear:MOB",
+                "label": "Mobile"
+            },
+            "field": "churn_loc_30d",
+            "value": {
+                "integer": 900
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "delivery_units_30d": {
+                            "integer": 40
+                        },
+                        "identity_count": {
+                            "integer": 1
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 40
+                        },
+                        "identity_count": {
+                            "integer": 1
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        },
+        {
+            "claim_id": "claim_landscape_quadrant_04_delivery_units_30d",
+            "kind": "landscape",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:linear:MOB",
+                "label": "Mobile"
+            },
+            "field": "delivery_units_30d",
+            "value": {
+                "integer": 40
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "as_of_day": {
+                            "string": "2026-10-31"
+                        },
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "delivery_units_30d": {
+                            "integer": 40
+                        },
+                        "identity_count": {
+                            "integer": 1
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "area_breakdown",
+                "shape": "breakdown",
+                "key": ["as_of_day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ]
+            },
+            "time_series_rows": [
+                {
+                    "fields": {
+                        "churn_loc_30d": {
+                            "integer": 900
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "delivery_units_30d": {
+                            "integer": 40
+                        },
+                        "identity_count": {
+                            "integer": 1
+                        }
+                    }
+                }
+            ],
+            "time_series_table": {
+                "field": "daily_landscape",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": ["identity_count", "churn_loc_30d", "delivery_units_30d"],
+                "measure_units": [
+                    {
+                        "measure": "identity_count",
+                        "unit": "count"
+                    },
+                    {
+                        "measure": "delivery_units_30d",
+                        "unit": "count"
+                    }
+                ],
+                "cadence": "day"
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [
+            {
+                "source": "canonical_fact:landscape",
+                "state": "available",
+                "label": "Canonical facts — landscape",
+                "state_label": "available"
+            }
+        ],
+        "partial": false
+    },
+    "evidence_ref_labels": {
+        "acr:v1:team:gh:identity": "Team: gh:identity",
+        "acr:v1:team:gl:chaos-gl": "Team: gl:chaos-gl",
+        "acr:v1:team:jira:9a1f0c3e-0000-4000-8000-0000000d0001": "Team: jira:9a1f0c3e-0000-4000-8000-0000000d0001",
+        "acr:v1:team:linear:CHK": "Team: linear:CHK",
+        "acr:v1:team:linear:MOB": "Team: linear:MOB"
+    },
+    "versions": {
+        "service_version": "landscape-quadrant",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "v1",
+        "query_version": "v1",
+        "interpretation_version": "v1",
+        "synthesis_version": "v1+v1",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "test-provider/test-model",
+        "interpretation_source": "server",
+        "interpretation_model_identity": "test-provider/test-model",
+        "synthesis_source": "server"
+    },
+    "deterministic_answer": "Landscape. Principal driver(s): Landscape; Landscape; Landscape; Landscape.",
+    "warnings": [],
+    "reused": false,
+    "effective_evidence_window": {
+        "start": "2026-08-04T00:00:00Z",
+        "end": "2026-11-02T00:00:00Z",
+        "relative_id": "trailing_90d",
+        "provenance": "question_stated"
+    },
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "quadrant",
+            "selected_by": "landscape_position",
+            "title": "Churn and delivery units, 30 days to Oct 31, 2026",
+            "axis_kind": "category",
+            "axis_label": "Lines of churn, last 30 days",
+            "value_label": "Delivery units, last 30 days",
+            "series": [
+                {
+                    "key": "churn_loc_30d",
+                    "label": "Lines of churn, last 30 days",
+                    "points": [
+                        {
+                            "label": "Identity",
+                            "value": 2400,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_00_churn_loc_30d",
+                                "field": "churn_loc_30d"
+                            }
+                        },
+                        {
+                            "label": "Delivery",
+                            "value": 900,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_01_churn_loc_30d",
+                                "field": "churn_loc_30d"
+                            }
+                        },
+                        {
+                            "label": "Payments",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_02_churn_loc_30d",
+                                "field": "churn_loc_30d"
+                            }
+                        },
+                        {
+                            "label": "Checkout",
+                            "value": 4800,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_03_churn_loc_30d",
+                                "field": "churn_loc_30d"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "delivery_units_30d",
+                    "label": "Delivery units, last 30 days",
+                    "points": [
+                        {
+                            "label": "Identity",
+                            "value": 18,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_00_delivery_units_30d",
+                                "field": "delivery_units_30d"
+                            }
+                        },
+                        {
+                            "label": "Delivery",
+                            "value": 42,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_01_delivery_units_30d",
+                                "field": "delivery_units_30d"
+                            }
+                        },
+                        {
+                            "label": "Payments",
+                            "value": 24,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_02_delivery_units_30d",
+                                "field": "delivery_units_30d"
+                            }
+                        },
+                        {
+                            "label": "Checkout",
+                            "value": 62,
+                            "source": {
+                                "kind": "claimed_fact_value",
+                                "claim_id": "claim_landscape_quadrant_03_delivery_units_30d",
+                                "field": "delivery_units_30d"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 10,
+        "rows_count": 10,
+        "state": "partial",
+        "outcomes": [
+            {
+                "stage": "planning",
+                "requirement": "state/operand/team",
+                "obligation": "state",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "state/operand/team",
+                "obligation": "state",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_coverage": "fact_narrowed",
+                "cause_observed": false,
+                "served": 1,
+                "declared": 2
+            }
+        ]
+    }
+}

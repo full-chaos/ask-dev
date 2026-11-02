@@ -512,6 +512,95 @@ function isRepositoryFlow(shape: RenderShape, facts: readonly ClaimedFact[]): bo
     return plotted === linksWithEffort;
 }
 
+/** The rule of where teams stand on two landscape measures on one day (CHAOS-12623): its own panel draws it, through the host. */
+export const LANDSCAPE_POSITION_RULE: RenderShapeRule = "landscape_position";
+
+/**
+ * The quadrant's one allowed field pair and its row (acr's `ContextFabricRenderLandscape*Field`):
+ * raw values only, never a normalized coordinate, percentile or score.
+ */
+const LANDSCAPE_X_FIELD = "churn_loc_30d";
+const LANDSCAPE_Y_FIELD = "delivery_units_30d";
+const LANDSCAPE_TABLE_FIELD = "area_breakdown";
+const LANDSCAPE_DAY_FIELD = "as_of_day";
+
+/**
+ * A quadrant point's team and day, when its claim is one a quadrant may plot: a stated landscape
+ * claim of the series' field, about a team, whose one declared `area_breakdown` row (keyed
+ * `as_of_day`) holds the point's value as its raw integer cell, and whose label is the point's.
+ * Mirrors acr's `quadrantPointClaim` and `landscapeAreaRow`: the rows are the claim's `rows`, as acr
+ * reads them.
+ */
+function landscapePointClaim(
+    point: RenderShape["series"][number]["points"][number],
+    field: string,
+    facts: readonly ClaimedFact[],
+): { readonly team: string; readonly day: string } | undefined {
+    const { source } = point;
+    if (source.kind !== "claimed_fact_value") return undefined;
+    const claim = claimFor(facts, source.claim_id);
+    if (claim === undefined || claim.field !== field) return undefined;
+    if (claim.kind !== "landscape" || claim.subject.kind !== "team") return undefined;
+    if (!(point.value >= 0)) return undefined;
+    const { table } = claim;
+    const rows = claim.rows ?? [];
+    if (table?.field !== LANDSCAPE_TABLE_FIELD || rows.length !== 1) return undefined;
+    if (table.key.length !== 1 || table.key[0] !== LANDSCAPE_DAY_FIELD) return undefined;
+    const day = rows[0]!.fields[LANDSCAPE_DAY_FIELD]?.string;
+    if (day === undefined || day === "") return undefined;
+    // A field the table does not declare has no cell. The landscape measures are counts, so a cell
+    // that is not an integer is refused, and the value is that cell, not only the claim's scalar.
+    if (!(table.measures ?? []).includes(field)) return undefined;
+    const cell = rows[0]!.fields[field]?.integer;
+    if (typeof cell !== "number" || !Number.isInteger(cell) || cell !== point.value) {
+        return undefined;
+    }
+    // The wire requires a subject label, so the team's label is its word: a chart never shows a
+    // team's numbers under another name.
+    if (point.label !== claim.subject.label) return undefined;
+    return { team: claim.subject.canonical_id, day };
+}
+
+/**
+ * True when a quadrant places teams on one day: mirrors acr's `validateQuadrantShape`. Two series, x
+ * then y, keyed by the one allowed field pair; the same labels in the same order on both, at least 2
+ * of them; each point a team claim's own raw cell; the x and y of one label about one team, and no
+ * team two points; and every cited row names one `as_of_day`. A quadrant of different days places
+ * teams that were never measured together.
+ *
+ * One clause is acr's alone: that a series label is its field's served word. The word map is acr's,
+ * and a copy here would be a consumer table (CHAOS-4690), so this trusts acr's validator for that
+ * clause, as the treemap does. It holds the part it can: each word is there, and it is its axis's
+ * word. `verifyRenderShape`'s own checks cover the rest: exact values, the source's address, one
+ * label per position, and a claim that is not derived.
+ */
+function isLandscapePosition(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    // A category axis: a time axis needs the line presentation (`verifyRenderShape`'s own check),
+    // and a quadrant has none.
+    if (shape.kind !== "quadrant") return false;
+    if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
+    const [x, y, ...more] = shape.series;
+    if (x === undefined || y === undefined || more.length > 0) return false;
+    if (x.key !== LANDSCAPE_X_FIELD || y.key !== LANDSCAPE_Y_FIELD) return false;
+    if (nonBlank(x.label) === undefined || nonBlank(y.label) === undefined) return false;
+    if (shape.axis_label !== x.label || shape.value_label !== y.label) return false;
+    if (x.points.length < 2 || x.points.length !== y.points.length) return false;
+    const placed = new Set<string>();
+    let day: string | undefined;
+    for (const [index, xPoint] of x.points.entries()) {
+        const yPoint = y.points[index]!;
+        if (xPoint.label !== yPoint.label) return false;
+        const xClaim = landscapePointClaim(xPoint, x.key, facts);
+        const yClaim = landscapePointClaim(yPoint, y.key, facts);
+        if (xClaim === undefined || yClaim === undefined) return false;
+        if (xClaim.team !== yClaim.team || placed.has(xClaim.team)) return false;
+        placed.add(xClaim.team);
+        day ??= xClaim.day;
+        if (xClaim.day !== day || yClaim.day !== day) return false;
+    }
+    return true;
+}
+
 /**
  * True when a score bar stands on a ranking row: the member was ranked, has an outcome, and has at
  * least one driver to explain the score (check 8: never a bare score). The table withholds a score
@@ -619,6 +708,8 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
         if (!isSideBySide(shape, result.claimed_facts)) return false;
     } else if (shape.selected_by === REPOSITORY_FLOW_RULE) {
         if (!isRepositoryFlow(shape, result.claimed_facts)) return false;
+    } else if (shape.selected_by === LANDSCAPE_POSITION_RULE) {
+        if (!isLandscapePosition(shape, result.claimed_facts)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }
