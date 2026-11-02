@@ -7,15 +7,17 @@ export type MeasureUnit = NonNullable<ClaimedFactTable["measure_units"]>[number]
 /**
  * The unit a table declares for one of its measures (CHAOS-12570), or `undefined`. ACR states a
  * unit only from the producer's own declaration, so this is the only source: a column the table
- * does not list as a measure gets none, and so does a measure with no entry. No name, no
- * neighbour's unit, no guess.
+ * does not list as a measure gets none, and so does a measure with no entry or more than one. No
+ * name, no neighbour's unit, no guess.
  */
 export function declaredUnit(
     table: ClaimedFactTable | undefined,
     measure: string,
 ): MeasureUnit | undefined {
     if (table?.measures?.includes(measure) !== true) return undefined;
-    return table.measure_units?.find((entry) => entry.measure === measure)?.unit;
+    // A measure declared more than once is not one declaration: no unit (codex r3 P2).
+    const entries = (table.measure_units ?? []).filter((entry) => entry.measure === measure);
+    return entries.length === 1 ? entries[0]!.unit : undefined;
 }
 
 /**
