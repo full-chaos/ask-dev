@@ -49,6 +49,25 @@ function driver(fact: ClaimedFact) {
     return screen.getByTestId("driver-claimed-fact");
 }
 
+describe("a derived number equal to a table's cell", () => {
+    const table = {
+        ...observed,
+        claim_id: "claim_table",
+        field: "rollup",
+        value: { string: "x" },
+        rows: [{ fields: { total_activity: { integer: 43 } } }],
+    } as unknown as ClaimedFact;
+
+    it("keeps its own line: the cell does not say how it was made", () => {
+        render(
+            <VocabularyLabelsContext.Provider value={WORDS}>
+                <ScalarFactsPanel facts={[table, derived]} result={undefined} />
+            </VocabularyLabelsContext.Provider>,
+        );
+        expect(screen.getByTestId("claim-derivation")).toHaveTextContent("operation: sum");
+    });
+});
+
 describe.each([
     ["the scalar panel's fold", scalar],
     ["a driver's claimed facts", driver],
