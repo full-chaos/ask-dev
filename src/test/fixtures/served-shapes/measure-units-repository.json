@@ -8,9 +8,7 @@
     "interpretation": {
         "shape": "discovered_cohort",
         "requested_judgment": "release_readiness_and_current_drivers",
-        "subject_terms": [
-            "Ask Dev"
-        ],
+        "subject_terms": ["Ask Dev"],
         "time_context": {
             "axis": "current"
         },
@@ -58,19 +56,11 @@
                     "label": "Ask Dev"
                 },
                 "state": "committed",
-                "matched_terms": [
-                    "Ask Dev"
-                ],
-                "match_reasons": [
-                    "Exact canonical project label."
-                ],
+                "matched_terms": ["Ask Dev"],
+                "match_reasons": ["Exact canonical project label."],
                 "confidence": 1,
-                "evidence_ref_ids": [
-                    "evidence_project_identity"
-                ],
-                "match_mechanisms": [
-                    "exact"
-                ]
+                "evidence_ref_ids": ["evidence_project_identity"],
+                "match_mechanisms": ["exact"]
             }
         ],
         "committed": [
@@ -96,12 +86,8 @@
                     "label": "CHAOS"
                 },
                 "rank": 1,
-                "inclusion_reasons": [
-                    "Matched by kind census over the org's team roster."
-                ],
-                "evidence_ref_ids": [
-                    "evidence_team_chaos_roster"
-                ],
+                "inclusion_reasons": ["Matched by kind census over the org's team roster."],
+                "evidence_ref_ids": ["evidence_team_chaos_roster"],
                 "ranking_computed": true,
                 "attention_rank": 1,
                 "score": 43.5,
@@ -130,9 +116,7 @@
                         "weight": 25,
                         "weight_contributed": 12.5,
                         "window": "current",
-                        "source_claimed_fact_ids": [
-                            "claim_cohort_ff977441fb1cb96f9023dcff28d4a624"
-                        ]
+                        "source_claimed_fact_ids": ["claim_cohort_ff977441fb1cb96f9023dcff28d4a624"]
                     },
                     {
                         "signal": "operational_deficiencies.severity",
@@ -140,9 +124,7 @@
                         "weight": 20,
                         "weight_contributed": 20,
                         "window": "current",
-                        "source_claimed_fact_ids": [
-                            "claim_cohort_88cad88367c815eae568ce1f979c1471"
-                        ]
+                        "source_claimed_fact_ids": ["claim_cohort_88cad88367c815eae568ce1f979c1471"]
                     },
                     {
                         "signal": "readiness.coverage_gap",
@@ -150,9 +132,7 @@
                         "weight": 15,
                         "weight_contributed": 6,
                         "window": "current",
-                        "source_claimed_fact_ids": [
-                            "claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"
-                        ]
+                        "source_claimed_fact_ids": ["claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"]
                     },
                     {
                         "signal": "workload.forecast_pressure",
@@ -170,12 +150,8 @@
                     "label": "Platform"
                 },
                 "rank": 2,
-                "inclusion_reasons": [
-                    "Matched by kind census over the org's team roster."
-                ],
-                "evidence_ref_ids": [
-                    "evidence_team_platform_roster"
-                ]
+                "inclusion_reasons": ["Matched by kind census over the org's team roster."],
+                "evidence_ref_ids": ["evidence_team_platform_roster"]
             }
         ],
         "rationale": "Matched every team owning at least one repository in the org.",
@@ -185,9 +161,7 @@
     },
     "direct_judgment": "Ask Dev is not release-ready even though most tracked implementation work is closed.",
     "current_state": "Implementation completion and release readiness diverge because required product acceptance remains open.",
-    "strongest_pressures": [
-        "Release acceptance remains incomplete."
-    ],
+    "strongest_pressures": ["Release acceptance remains incomplete."],
     "drivers": [
         {
             "driver_id": "driver_12345678",
@@ -202,15 +176,9 @@
                     "label": "Ask Dev"
                 }
             ],
-            "path_ids": [
-                "path_12345678"
-            ],
-            "evidence_ref_ids": [
-                "evidence_release_acceptance"
-            ],
-            "claimed_fact_ids": [
-                "claim_readiness_ask_dev"
-            ],
+            "path_ids": ["path_12345678"],
+            "evidence_ref_ids": ["evidence_release_acceptance"],
+            "claimed_fact_ids": ["claim_readiness_ask_dev"],
             "derivation": "rule_inferred",
             "epistemic_status": "inferred",
             "confidence": 0.96,
@@ -230,12 +198,8 @@
                     "label": "CHAOS"
                 }
             ],
-            "evidence_ref_ids": [
-                "evidence_team_chaos_roster"
-            ],
-            "claimed_fact_ids": [
-                "claim_cohort_88cad88367c815eae568ce1f979c1471"
-            ],
+            "evidence_ref_ids": ["evidence_team_chaos_roster"],
+            "claimed_fact_ids": ["claim_cohort_88cad88367c815eae568ce1f979c1471"],
             "derivation": "rule_inferred",
             "epistemic_status": "inferred",
             "confidence": 0.95,
@@ -254,12 +218,8 @@
                     "label": "CHAOS"
                 }
             ],
-            "evidence_ref_ids": [
-                "evidence_team_chaos_roster"
-            ],
-            "claimed_fact_ids": [
-                "claim_cohort_ff977441fb1cb96f9023dcff28d4a624"
-            ],
+            "evidence_ref_ids": ["evidence_team_chaos_roster"],
+            "claimed_fact_ids": ["claim_cohort_ff977441fb1cb96f9023dcff28d4a624"],
             "derivation": "rule_inferred",
             "epistemic_status": "inferred",
             "confidence": 0.95,
@@ -278,12 +238,8 @@
                     "label": "CHAOS"
                 }
             ],
-            "evidence_ref_ids": [
-                "evidence_team_chaos_roster"
-            ],
-            "claimed_fact_ids": [
-                "claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"
-            ],
+            "evidence_ref_ids": ["evidence_team_chaos_roster"],
+            "claimed_fact_ids": ["claim_cohort_fbf801c96f78b58f7f50eb3d6c2f57a2"],
             "derivation": "rule_inferred",
             "epistemic_status": "inferred",
             "confidence": 0.95,
@@ -307,9 +263,7 @@
                     "label": "Release acceptance"
                 }
             ],
-            "evidence_ref_ids": [
-                "evidence_release_acceptance"
-            ]
+            "evidence_ref_ids": ["evidence_release_acceptance"]
         }
     ],
     "readiness_gaps": [],
@@ -344,15 +298,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "evidence_release_acceptance"
-                    ]
+                    "evidence_ref_ids": ["evidence_release_acceptance"]
                 }
             ],
             "why_relevant": "The open acceptance work directly prevents release readiness.",
-            "evidence_ref_ids": [
-                "evidence_release_acceptance"
-            ],
+            "evidence_ref_ids": ["evidence_release_acceptance"],
             "truncated": false
         },
         {
@@ -385,15 +335,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:pull-request:repo_1:42"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:pull-request:repo_1:42"]
                 }
             ],
             "why_relevant": "The pull request belongs to this repository.",
-            "evidence_ref_ids": [
-                "acr:v1:pull-request:repo_1:42"
-            ],
+            "evidence_ref_ids": ["acr:v1:pull-request:repo_1:42"],
             "truncated": false
         },
         {
@@ -426,15 +372,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:review:review_1"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:review:review_1"]
                 }
             ],
             "why_relevant": "The review belongs to this pull request.",
-            "evidence_ref_ids": [
-                "acr:v1:review:review_1"
-            ],
+            "evidence_ref_ids": ["acr:v1:review:review_1"],
             "truncated": false
         },
         {
@@ -467,15 +409,11 @@
                     "derivation": "rule_inferred",
                     "epistemic_status": "source_asserted",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:deployment-incident:edge_1"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:deployment-incident:edge_1"]
                 }
             ],
             "why_relevant": "The deployment is correlated in time with this incident. Correlation is not causation.",
-            "evidence_ref_ids": [
-                "acr:v1:deployment-incident:edge_1"
-            ],
+            "evidence_ref_ids": ["acr:v1:deployment-incident:edge_1"],
             "truncated": false
         },
         {
@@ -508,15 +446,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:work-item-dependency:CHAOS-2001:CHAOS-2002"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2001:CHAOS-2002"]
                 }
             ],
             "why_relevant": "The graph associated the two work items through related_to.",
-            "evidence_ref_ids": [
-                "acr:v1:work-item-dependency:CHAOS-2001:CHAOS-2002"
-            ],
+            "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2001:CHAOS-2002"],
             "truncated": false
         },
         {
@@ -549,15 +483,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:work-item-hierarchy:CHAOS-2005:CHAOS-2000"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:work-item-hierarchy:CHAOS-2005:CHAOS-2000"]
                 }
             ],
             "why_relevant": "CHAOS-2005 is part of CHAOS-2000.",
-            "evidence_ref_ids": [
-                "acr:v1:work-item-hierarchy:CHAOS-2005:CHAOS-2000"
-            ],
+            "evidence_ref_ids": ["acr:v1:work-item-hierarchy:CHAOS-2005:CHAOS-2000"],
             "truncated": false
         },
         {
@@ -590,15 +520,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:work-item-dependency:CHAOS-2006:CHAOS-2007"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2006:CHAOS-2007"]
                 }
             ],
             "why_relevant": "The source work item dependency row states relates_to.",
-            "evidence_ref_ids": [
-                "acr:v1:work-item-dependency:CHAOS-2006:CHAOS-2007"
-            ],
+            "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2006:CHAOS-2007"],
             "truncated": false
         },
         {
@@ -631,15 +557,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:work-item-dependency:CHAOS-2008:CHAOS-2009"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2008:CHAOS-2009"]
                 }
             ],
             "why_relevant": "CHAOS-2009 is recorded as a duplicate of CHAOS-2008.",
-            "evidence_ref_ids": [
-                "acr:v1:work-item-dependency:CHAOS-2008:CHAOS-2009"
-            ],
+            "evidence_ref_ids": ["acr:v1:work-item-dependency:CHAOS-2008:CHAOS-2009"],
             "truncated": false
         },
         {
@@ -672,15 +594,11 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:document:doc_1"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:document:doc_1"]
                 }
             ],
             "why_relevant": "This document is authoritatively about the project.",
-            "evidence_ref_ids": [
-                "acr:v1:document:doc_1"
-            ],
+            "evidence_ref_ids": ["acr:v1:document:doc_1"],
             "truncated": false
         },
         {
@@ -713,26 +631,17 @@
                     "derivation": "canonical_structured",
                     "epistemic_status": "observed",
                     "observed_at": "2026-08-11T15:59:00Z",
-                    "evidence_ref_ids": [
-                        "acr:v1:episode:episode_1"
-                    ]
+                    "evidence_ref_ids": ["acr:v1:episode:episode_1"]
                 }
             ],
             "why_relevant": "This episode is authoritatively about the project.",
-            "evidence_ref_ids": [
-                "acr:v1:episode:episode_1"
-            ],
+            "evidence_ref_ids": ["acr:v1:episode:episode_1"],
             "truncated": false
         }
     ],
     "conflicts": [],
-    "limitations": [
-        "No production user-adoption evidence was available for this investigation."
-    ],
-    "evidence_ref_ids": [
-        "evidence_project_identity",
-        "evidence_release_acceptance"
-    ],
+    "limitations": ["No production user-adoption evidence was available for this investigation."],
+    "evidence_ref_ids": ["evidence_project_identity", "evidence_release_acceptance"],
     "claimed_facts": [
         {
             "claim_id": "claim_readiness_ask_dev",
@@ -790,13 +699,8 @@
             "table": {
                 "field": "daily_readiness",
                 "shape": "time_series",
-                "key": [
-                    "day"
-                ],
-                "measures": [
-                    "coverage_ratio",
-                    "open_requirements"
-                ],
+                "key": ["day"],
+                "measures": ["coverage_ratio", "open_requirements"],
                 "cadence": "day"
             }
         },
@@ -843,15 +747,9 @@
             "table": {
                 "field": "daily_health",
                 "shape": "time_series",
-                "key": [
-                    "day"
-                ],
-                "measures": [
-                    "compounding_risk"
-                ],
-                "observations": [
-                    "severity"
-                ],
+                "key": ["day"],
+                "measures": ["compounding_risk"],
+                "observations": ["severity"],
                 "cadence": "day"
             }
         },
@@ -915,12 +813,8 @@
             "table": {
                 "field": "daily_metrics",
                 "shape": "time_series",
-                "key": [
-                    "day"
-                ],
-                "measures": [
-                    "commits_count"
-                ],
+                "key": ["day"],
+                "measures": ["commits_count"],
                 "measure_units": [
                     {
                         "measure": "commits_count",
@@ -969,12 +863,7 @@
             "table": {
                 "field": "team_breakdown",
                 "shape": "breakdown",
-                "key": [
-                    "team_id",
-                    "team_name",
-                    "work_scope_id",
-                    "computed_at"
-                ],
+                "key": ["team_id", "team_name", "work_scope_id", "computed_at"],
                 "measures": [
                     "throughput_mean",
                     "throughput_stddev",
@@ -1027,14 +916,8 @@
             "time_series_table": {
                 "field": "daily_workload",
                 "shape": "time_series",
-                "key": [
-                    "day"
-                ],
-                "measures": [
-                    "backlog_size",
-                    "throughput_mean",
-                    "throughput_stddev"
-                ],
+                "key": ["day"],
+                "measures": ["backlog_size", "throughput_mean", "throughput_stddev"],
                 "measure_units": [
                     {
                         "measure": "backlog_size",
