@@ -111,8 +111,8 @@ export function ShapeDataTable({
 }) {
     return (
         <div className={visible ? undefined : "sr-only"}>
-            <table>
-                <caption>{shape.title}</caption>
+            <table className={visible ? "fact-table" : undefined}>
+                <caption className={visible ? "sr-only" : undefined}>{shape.title}</caption>
                 <thead>
                     <tr>
                         <th scope="col">{shape.axis_label}</th>

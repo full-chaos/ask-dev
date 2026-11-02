@@ -40,7 +40,7 @@
             "max_serialized_bytes": 262144,
             "max_members": 1,
             "synthesis_headroom": 40,
-            "narrowing_basis": ""
+            "narrowing_basis": "canonical_id_lexical"
         }
     },
     "direct_judgment": "Effort leans to feature delivery.",

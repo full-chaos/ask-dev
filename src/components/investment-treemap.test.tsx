@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { ShapeSlotContext, type ShapeSlot } from "@/components/ShapeSlotContext";
+import { validateContract } from "@/lib/acr/validate";
 import type { InvestigationResult, RenderShape } from "@/lib/contracts";
 import { renderShapesFor, verifyRenderShape } from "@/lib/render-shapes";
 import { cohortMemberScenarios } from "@/test/fixtures/cohort-members";
@@ -33,6 +34,15 @@ describe("the verifier reads a treemap as one whole (CHAOS-12496)", () => {
         expect(treemap.selected_by).toBe("investment_theme_share");
         expect(treemap.value_unit).toBe("ratio");
         expect(points(treemap).map((point) => point.value)).toContain(0);
+    });
+
+    it("the fixture passes the result contract the server route holds it to", () => {
+        const verdict = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            answer,
+        );
+        expect(verdict.errors ?? []).toEqual([]);
+        expect(verdict.valid).toBe(true);
     });
 
     it("accepts the served shape", () => {

@@ -12,7 +12,9 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  *
  * `category-order` is two ranked teams whose first driver family omits the top-ranked team.
  * `zone-less-trend` plots zone-less date-times across the Los Angeles spring gap. `edge-words` is
- * the contract example served at acr `da2efe68`, with the `relationship_type` words. `dateOracle` is
+ * the contract example served at acr `da2efe68`, with the `relationship_type` words.
+ * `investment-treemap` is the real selector with the flag on, at the producer commit `ab88349f`
+ * (`served-shapes/generate-treemap.go.txt`). `dateOracle` is
  * what ACR's own `parseRenderDate` reads: `millis` is null where it refuses the value.
  */
 export const servedShapeScenarios = {

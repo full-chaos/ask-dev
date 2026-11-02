@@ -50,7 +50,7 @@ func ZZTreemapResult(shares []float64) InvestigationResult {
 		Warnings:            []string{},
 		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
 			Family: QuestionFamilyInvestmentAllocation, FamilyVersion: QuestionFamilyTableVersion,
-			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40},
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40, NarrowingBasis: contractsv1.ContextFabricNarrowingBasisCanonicalIDLexical},
 			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindTreemap, contractsv1.ContextFabricRenderKindTable},
 		},
 		ClaimedFacts: []ClaimedFact{{
