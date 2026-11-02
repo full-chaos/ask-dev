@@ -739,6 +739,28 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             expect(other()).toHaveTextContent('value {"unexpected":1}');
         });
 
+        it("keeps a repeated signal: the schema does not make signals unique", () => {
+            const [first, second, third] = drivers;
+            const repeated = [
+                first!,
+                second!,
+                third!,
+                { ...third!, value: 0.25, weight_contributed: 1 },
+                { ...third!, value: 0.125, weight_contributed: 0.5 },
+            ];
+            const restored = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: repeated }],
+            } as unknown as Cohort;
+            const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+            render(
+                <CohortRankingPanel cohort={restored} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(within(other()).getAllByRole("listitem")).toHaveLength(3);
+            expect(spy).not.toHaveBeenCalled();
+            spy.mockRestore();
+        });
+
         it("draws no fold for a member with two drivers or fewer", () => {
             const two = {
                 ...ranked,

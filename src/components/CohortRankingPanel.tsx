@@ -318,11 +318,11 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                                         >
                                             <summary>Other drivers</summary>
                                             <ul className="ranking__drivers">
-                                                {row.otherDrivers.map((driver) => (
-                                                    <DriverCell
-                                                        driver={driver}
-                                                        key={driver.signal}
-                                                    />
+                                                {row.otherDrivers.map((driver, index) => (
+                                                    // Index key: the contract does not promise
+                                                    // unique signals, and this list is never
+                                                    // reordered.
+                                                    <DriverCell driver={driver} key={index} />
                                                 ))}
                                             </ul>
                                         </details>
