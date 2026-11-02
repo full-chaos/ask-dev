@@ -1,6 +1,7 @@
 import type { Cohort, RenderShape } from "../lib/contracts";
 import { parseIsoDate } from "../lib/fact-rows";
 import { axisLabels } from "../lib/render-shapes";
+import { ScrollRegion } from "./ScrollRegion";
 
 export type RenderShapeChartProps = {
     readonly shape: RenderShape;
@@ -109,44 +110,47 @@ export function ShapeDataTable({
     /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
     readonly visible?: boolean;
 }) {
-    return (
-        <div className={visible ? undefined : "sr-only"}>
-            <table className={visible ? "fact-table" : undefined}>
-                <caption className={visible ? "sr-only" : undefined}>{shape.title}</caption>
-                <thead>
-                    <tr>
-                        <th scope="col">{shape.axis_label}</th>
-                        {shape.series.map((series) => (
-                            <th key={series.key} scope="col">
-                                {series.label}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {labels.map((label) => (
-                        <tr key={label}>
-                            <th scope="row">{label}</th>
-                            {shape.series.map((series, seriesIndex) => {
-                                const value = valueAt(shape, seriesIndex, label);
-                                return (
-                                    <td key={series.key}>
-                                        {
-                                            // An em dash, never a zero: acr
-                                            // omits a point for something it
-                                            // did not measure, and writing 0
-                                            // here would state a measurement
-                                            // the answer never made.
-                                            value === undefined ? "—" : formatValue(value)
-                                        }
-                                    </td>
-                                );
-                            })}
-                        </tr>
+    const table = (
+        <table className={visible ? "fact-table" : undefined}>
+            <caption className={visible ? "sr-only" : undefined}>{shape.title}</caption>
+            <thead>
+                <tr>
+                    <th scope="col">{shape.axis_label}</th>
+                    {shape.series.map((series) => (
+                        <th key={series.key} scope="col">
+                            {series.label}
+                        </th>
                     ))}
-                </tbody>
-            </table>
-        </div>
+                </tr>
+            </thead>
+            <tbody>
+                {labels.map((label) => (
+                    <tr key={label}>
+                        <th scope="row">{label}</th>
+                        {shape.series.map((series, seriesIndex) => {
+                            const value = valueAt(shape, seriesIndex, label);
+                            return (
+                                <td key={series.key}>
+                                    {
+                                        // An em dash, never a zero: acr
+                                        // omits a point for something it
+                                        // did not measure, and writing 0
+                                        // here would state a measurement
+                                        // the answer never made.
+                                        value === undefined ? "—" : formatValue(value)
+                                    }
+                                </td>
+                            );
+                        })}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+    return visible ? (
+        <ScrollRegion label={shape.title}>{table}</ScrollRegion>
+    ) : (
+        <div className="sr-only">{table}</div>
     );
 }
 

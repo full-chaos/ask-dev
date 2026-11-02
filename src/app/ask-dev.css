@@ -2122,6 +2122,16 @@
         font-variant-numeric: tabular-nums;
     }
 
+    /* A side by side holds long words, a measure's and a subject's. They wrap, so a narrow panel
+       still shows values. A value never wraps. */
+    .comparison-table .fact-table {
+        min-width: 0;
+    }
+
+    .comparison-table .fact-table th {
+        white-space: normal;
+    }
+
     .work-item-status__observations {
         display: grid;
         gap: 2px;

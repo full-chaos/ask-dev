@@ -9,7 +9,7 @@ function ComparisonTable({ shape }: { readonly shape: RenderShape }) {
     return (
         <section
             aria-labelledby={titleId}
-            className="panel"
+            className="panel comparison-table"
             data-testid="comparison-table"
             role="group"
         >
