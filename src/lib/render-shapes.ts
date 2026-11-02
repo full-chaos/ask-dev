@@ -281,7 +281,7 @@ export const FACT_PANEL_RULES: readonly RenderShapeRule[] = ["dated_fact_trend",
 function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
     if (shape.kind !== "treemap" || shape.presentation !== undefined) return false;
     if (shape.series.length !== 1 || shape.value_unit !== "ratio") return false;
-    const points = shape.series[0]!.points;
+    const points = shape.series[0].points;
     const claimId = points[0]?.source.claim_id;
     const matches = facts.filter((fact) => fact.claim_id === claimId);
     if (matches.length !== 1) return false;

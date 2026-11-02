@@ -45,7 +45,7 @@ describe("a rich shape reaches the host's chart through one seam (CHAOS-12496)",
         draw(() => <div>chart</div>);
         const table = screen.getByRole("table", { hidden: true });
         expect(table.closest(".sr-only")).not.toBeNull();
-        expect(rows()).toHaveLength(shape.series[0]!.points.length);
+        expect(rows()).toHaveLength(shape.series[0].points.length);
     });
 
     it("names the shape with its served title", () => {
@@ -62,12 +62,12 @@ describe("no chart is never a silent absence (CHAOS-12496)", () => {
         draw(slot);
         expect(screen.getByText(NOT_SHOWN)).toBeVisible();
         expect(screen.getByRole("table").closest(".sr-only")).toBeNull();
-        expect(rows()).toHaveLength(shape.series[0]!.points.length);
+        expect(rows()).toHaveLength(shape.series[0].points.length);
     });
 
     it("shows each value exactly as served", () => {
         draw(null);
-        const points = shape.series[0]!.points;
+        const points = shape.series[0].points;
         expect(rows()).toEqual(points.map((point) => `${point.label}${String(point.value)}`));
     });
 });
