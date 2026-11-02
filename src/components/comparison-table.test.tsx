@@ -35,6 +35,23 @@ const derivedInputs: NonNullable<InvestigationResult["claimed_facts"][number]["d
     { fact_id: "fact_one", field: "window_pr_count" },
     { fact_id: "fact_two", field: "window_pr_count" },
 ];
+/** Sides up to `count`, each a copy of side two on a subject and claims of its own. */
+function withSides(shape: RenderShape, result: InvestigationResult, count: number) {
+    const sides = shape.series as RenderShape["series"][number][];
+    const template = sides[1]!;
+    for (let side = sides.length; side < count; side += 1) {
+        const copy = structuredClone(template);
+        copy.key = `repository:side-${String(side)}`;
+        for (const point of copy.points) {
+            const claim = structuredClone(factOf(result, point.source.claim_id));
+            claim.claim_id = `${claim.claim_id}_${String(side)}`;
+            claim.subject.canonical_id = copy.key;
+            result.claimed_facts.push(claim);
+            point.source.claim_id = claim.claim_id;
+        }
+        sides.push(copy);
+    }
+}
 /** The row both sides hold: side two's claim is a real other measure, under the same label. */
 function labelTwoFields(shape: RenderShape, result: InvestigationResult) {
     const label = points(shape, 0)[0].label;
@@ -61,6 +78,13 @@ describe("the verifier reads a side-by-side table (CHAOS-12513)", () => {
 
     it("accepts the shape, with a gap", () => {
         expect(verifyRenderShape(table, answer)).toBe(true);
+    });
+
+    it("takes eight sides, the most a shape may hold, and refuses nine", () => {
+        const eight = changed((s, r) => void withSides(s, r, 8));
+        expect(verifyRenderShape(eight.shape, eight.result)).toBe(true);
+        const nine = changed((s, r) => void withSides(s, r, 9));
+        expect(verifyRenderShape(nine.shape, nine.result)).toBe(false);
     });
 
     it.each<[string, Change]>([

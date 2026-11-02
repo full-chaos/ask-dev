@@ -183,6 +183,9 @@ function sourceAddressMatchesKind(
  */
 const EXACT_INTEGER_BOUND = 2 ** 53;
 
+/** The most series a shape may hold, mirroring acr's `ContextFabricRenderSeriesMaxCount`. */
+const SERIES_MAX_COUNT = 8;
+
 /**
  * The one duplicate-identity rule, in one place.
  *
@@ -469,6 +472,7 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // The renderer's own "nothing to draw": with no point there is no chart, so the shape cannot be
     // admitted as drawn.
     if (axisLabels(shape).length === 0) return false;
+    if (shape.series.length > SERIES_MAX_COUNT) return false;
     // A time axis is drawn by elapsed time only on a line; every other
     // presentation routes through category (index) spacing, which would place
     // a January and a December point one band apart. acr only ever emits
