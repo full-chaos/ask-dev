@@ -40,9 +40,13 @@ const LEFT_OUT: readonly (readonly [keyof ProjectionBudget, string, string])[] =
     ["render_shapes_omitted", "chart", "charts"],
 ];
 
+const ASK_NARROWER = "Ask about a narrower scope to see more.";
+
 /**
  * The sentence that says this answer was shortened, and what it left out, from the counts alone.
- * `undefined` when nothing was left out and the whole result was not withheld.
+ * A value ACR shortened (`values_clamped`) is disclosed like an omission, as ACR's contract says.
+ * `undefined` only when nothing was left out or shortened, the whole result was not withheld, and
+ * the budget does not say it was truncated.
  */
 export function leftOutSentence(budget: ProjectionBudget): string | undefined {
     const parts: string[] = [];
@@ -51,14 +55,20 @@ export function leftOutSentence(budget: ProjectionBudget): string | undefined {
         if (typeof count === "number" && count > 0)
             parts.push(`${count} ${count === 1 ? one : many}`);
     }
-    if (parts.length === 0) {
-        return budget.full_result_omitted
-            ? "This answer was shortened to fit. Ask about a narrower scope to see more."
+    const clamped = budget.values_clamped ?? 0;
+    const clauses: string[] = [];
+    if (parts.length > 0) {
+        const list =
+            parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
+        clauses.push(`${list} left out`);
+    }
+    if (clamped > 0) clauses.push(`${clamped} ${clamped === 1 ? "value" : "values"} shortened`);
+    if (clauses.length === 0) {
+        return budget.full_result_omitted || budget.truncated
+            ? `This answer was shortened to fit. ${ASK_NARROWER}`
             : undefined;
     }
-    const list =
-        parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
-    return `This answer was shortened to fit: ${list} left out. Ask about a narrower scope to see more.`;
+    return `This answer was shortened to fit: ${clauses.join("; ")}. ${ASK_NARROWER}`;
 }
 
 /**
@@ -93,6 +103,8 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
     const facts = scalarFactsOf(projection);
     const shapes: readonly RenderShape[] = projection.render_shapes ?? [];
     const drivers = projection.principal_drivers;
+    const limitations = identityLimitations(projection.limitations);
+    const limitationsOmitted = (projection.projection_budget.limitations_omitted ?? 0) > 0;
     return (
         <VocabularyLabelsContext.Provider value={projection.vocabulary_labels}>
             <section aria-label="Shortened answer" className="answer bounded-answer">
@@ -152,10 +164,13 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
                         ))}
                     </section>
                 ) : null}
-                <LimitationsPanel
-                    limitations={identityLimitations(projection.limitations)}
-                    warnings={projection.warnings}
-                />
+                {limitations.length > 0 || projection.warnings.length > 0 || !limitationsOmitted ? (
+                    <LimitationsPanel
+                        limitations={limitations}
+                        limitationsOmitted={limitationsOmitted}
+                        warnings={projection.warnings}
+                    />
+                ) : null}
             </section>
         </VocabularyLabelsContext.Provider>
     );

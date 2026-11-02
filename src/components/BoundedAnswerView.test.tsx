@@ -49,6 +49,42 @@ describe("BoundedAnswerView", () => {
         }
     });
 
+    it("draws no completeness (CHAOS-12245)", () => {
+        const { container } = render(<BoundedAnswerView projection={answer} />);
+        expect(screen.queryByRole("heading", { name: "Completeness" })).not.toBeInTheDocument();
+        expect(container.querySelector("[data-completeness-state]")).toBeNull();
+    });
+
+    it("never says the service reported no limitations when it left them out", () => {
+        const allLeftOut = {
+            ...answer,
+            limitations: [],
+            warnings: [],
+            projection_budget: { ...answer.projection_budget, limitations_omitted: 2 },
+        };
+        const { unmount } = render(<BoundedAnswerView projection={allLeftOut} />);
+        expect(screen.queryByText("The service reported no limitations.")).not.toBeInTheDocument();
+        expect(screen.getByRole("note")).toHaveTextContent("2 limitations");
+        // Nothing of it is held, so no empty Limitations panel stands beside the note.
+        expect(screen.queryByRole("group", { name: "Limitations" })).not.toBeInTheDocument();
+        unmount();
+
+        const warned = { ...allLeftOut, warnings: ["A served warning."] };
+        render(<BoundedAnswerView projection={warned} />);
+        expect(screen.getByText("A served warning.")).toBeInTheDocument();
+        expect(screen.queryByText("The service reported no limitations.")).not.toBeInTheDocument();
+    });
+
+    it("still says the service reported no limitations when it sent none", () => {
+        const none = {
+            ...answer,
+            limitations: [],
+            projection_budget: { ...answer.projection_budget, limitations_omitted: 0 },
+        };
+        render(<BoundedAnswerView projection={none} />);
+        expect(screen.getByText("The service reported no limitations.")).toBeInTheDocument();
+    });
+
     it("draws every scenario ACR's projector produced without failing", () => {
         for (const projection of Object.values(boundedAnswerScenarios)) {
             const { unmount } = render(<BoundedAnswerView projection={projection} />);
@@ -67,11 +103,59 @@ describe("leftOutSentence", () => {
         drivers_omitted: 0,
         withheld_drivers_omitted: 0,
         cohort_members_omitted: 0,
+        cohort_groups_omitted: 0,
         facts_omitted: 0,
         candidates_omitted: 0,
         evidence_refs_omitted: 0,
+        limitations_omitted: 0,
+        warnings_omitted: 0,
+        coverage_omitted: 0,
+        reasons_omitted: 0,
+        values_clamped: 0,
         render_shapes_omitted: 0,
     };
+
+    // Written out here, not imported, so a count dropped from the view's table is caught.
+    const NOUNS = [
+        ["drivers_omitted", "driver", "drivers"],
+        ["withheld_drivers_omitted", "withheld driver", "withheld drivers"],
+        ["cohort_members_omitted", "member", "members"],
+        ["cohort_groups_omitted", "group", "groups"],
+        ["facts_omitted", "fact", "facts"],
+        ["candidates_omitted", "option", "options"],
+        ["evidence_refs_omitted", "evidence reference", "evidence references"],
+        ["limitations_omitted", "limitation", "limitations"],
+        ["warnings_omitted", "warning", "warnings"],
+        ["coverage_omitted", "coverage line", "coverage lines"],
+        ["reasons_omitted", "reason", "reasons"],
+        ["render_shapes_omitted", "chart", "charts"],
+    ] as const;
+
+    it.each(NOUNS)("names %s in the singular and the plural", (key, one, many) => {
+        expect(leftOutSentence({ ...none, truncated: true, [key]: 1 })).toBe(
+            `This answer was shortened to fit: 1 ${one} left out. Ask about a narrower scope to see more.`,
+        );
+        expect(leftOutSentence({ ...none, truncated: true, [key]: 2 })).toBe(
+            `This answer was shortened to fit: 2 ${many} left out. Ask about a narrower scope to see more.`,
+        );
+    });
+
+    it("discloses a shortened value like an omission, as ACR's contract says", () => {
+        expect(leftOutSentence({ ...none, truncated: true, values_clamped: 2 })).toBe(
+            "This answer was shortened to fit: 2 values shortened. Ask about a narrower scope to see more.",
+        );
+        expect(
+            leftOutSentence({ ...none, truncated: true, facts_omitted: 1, values_clamped: 1 }),
+        ).toBe(
+            "This answer was shortened to fit: 1 fact left out; 1 value shortened. Ask about a narrower scope to see more.",
+        );
+    });
+
+    it("says the answer was shortened when the budget says truncated and no count is set", () => {
+        expect(leftOutSentence({ ...none, truncated: true, full_result_omitted: false })).toBe(
+            "This answer was shortened to fit. Ask about a narrower scope to see more.",
+        );
+    });
 
     it("names one count in the singular", () => {
         expect(leftOutSentence({ ...none, facts_omitted: 1, full_result_omitted: true })).toBe(

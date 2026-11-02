@@ -51,6 +51,31 @@ describe("SafeAnswerText", () => {
         expect(screen.getByTestId("host")).toHaveTextContent("See https://example.com/report.");
     });
 
+    it("strips a mixed trailing run and keeps the same characters inside the URL", () => {
+        render(
+            <p data-testid="host">
+                <SafeAnswerText text="See https://example.com/a,b;c:d.e,;:. now" />
+            </p>,
+        );
+
+        expect(screen.getByRole("link", { name: "https://example.com/a,b;c:d.e" })).toHaveAttribute(
+            "href",
+            "https://example.com/a,b;c:d.e",
+        );
+    });
+
+    it("links a URL with a long run of commas inside it in linear time (CHAOS-12559, CodeQL)", () => {
+        // The old `/[.,;:]+$/` is quadratic on this: over 30 s on a loaded machine, past the timeout.
+        const url = `https://example.com/${",".repeat(200_000)}x`;
+        const { container } = render(
+            <p>
+                <SafeAnswerText text={url} />
+            </p>,
+        );
+
+        expect(container.querySelector("a")?.getAttribute("href")).toBe(url);
+    });
+
     it("keeps a balanced parenthetical inside the URL path, not just before it (codex round 1)", () => {
         render(
             <p data-testid="host">

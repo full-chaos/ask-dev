@@ -21,7 +21,18 @@ const URL_PATTERN = /https?:\/\/[^\s<>"]+/g;
 // segment), and stripping them on the strength of a regex guess broke a URL
 // that legitimately ended in `!` (codex review round 1, finding 2). `.` `,`
 // `;` `:` essentially never end a real URL, so those stay safe to strip.
-const TRAILING_PUNCTUATION = /[.,;:]+$/;
+const TRAILING_PUNCTUATION = ".,;:";
+
+/**
+ * The length of the run of `TRAILING_PUNCTUATION` at the end of `url`. A loop from the end, not
+ * the regex `/[.,;:]+$/`: that one tries every start of a run and scans it to the end, so it is
+ * quadratic in a long run of those characters inside a URL (CodeQL js/polynomial-redos, CHAOS-12559).
+ */
+function trailingPunctuationLength(url: string): number {
+    let end = url.length;
+    while (end > 0 && TRAILING_PUNCTUATION.includes(url.charAt(end - 1))) end -= 1;
+    return url.length - end;
+}
 
 /**
  * Peels sentence-level noise off the end of a matched URL: an unbalanced
@@ -40,9 +51,9 @@ function stripTrailingNoise(matchedUrl: string): string {
                 continue;
             }
         }
-        const trailing = TRAILING_PUNCTUATION.exec(url);
-        if (trailing !== null) {
-            url = url.slice(0, url.length - trailing[0].length);
+        const trailing = trailingPunctuationLength(url);
+        if (trailing > 0) {
+            url = url.slice(0, url.length - trailing);
             continue;
         }
         break;

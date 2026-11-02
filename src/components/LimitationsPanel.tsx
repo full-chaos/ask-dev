@@ -14,6 +14,11 @@ export type LimitationsPanelProps = {
      */
     readonly limitations: readonly DedupedLimitation[];
     readonly warnings: InvestigationResult["warnings"];
+    /**
+     * CHAOS-12559: the service sent limitations this view does not hold (a bounded answer left
+     * them out). "The service reported no limitations" would then be false, so it is not drawn.
+     */
+    readonly limitationsOmitted?: boolean;
 };
 
 /**
@@ -27,7 +32,11 @@ export type LimitationsPanelProps = {
  * `useId()`-derived instance, so this component owns its own heading id too
  * — CHAOS-4510 discipline, matching `AnswerPanel`/`CoveragePanel`.
  */
-export function LimitationsPanel({ limitations, warnings }: LimitationsPanelProps) {
+export function LimitationsPanel({
+    limitations,
+    warnings,
+    limitationsOmitted = false,
+}: LimitationsPanelProps) {
     const idPrefix = useId();
     return (
         <section
@@ -39,7 +48,9 @@ export function LimitationsPanel({ limitations, warnings }: LimitationsPanelProp
                 Limitations
             </h2>
             {limitations.length === 0 ? (
-                <p className="panel__empty">The service reported no limitations.</p>
+                limitationsOmitted ? null : (
+                    <p className="panel__empty">The service reported no limitations.</p>
+                )
             ) : (
                 <ul className="stack stack--tight">
                     {limitations.map((limitation) =>
