@@ -1,6 +1,6 @@
+import { useVocabularyWord } from "./VocabularyWordContext";
 import type { ClaimedFactRow } from "../lib/contracts";
 import { cellValue, parseIsoDate, type ChartAxis } from "../lib/fact-rows";
-import { humanizeTerm } from "../lib/presentation";
 
 export type FactChartProps = {
     readonly rows: readonly ClaimedFactRow[];
@@ -154,6 +154,7 @@ function SeriesChart({
     maxAxisLabels,
     showTitle,
 }: SeriesChartProps) {
+    const word = useVocabularyWord();
     // Time rows are ordered — and, when every axis value parses as a real
     // date, POSITIONED — by actual elapsed time, not lexical string order
     // or row index (codex round 1: index spacing implies evenly-spaced
@@ -220,7 +221,8 @@ function SeriesChart({
     const points = indexedPoints.map((p) => p.point);
     const segments = contiguousSegments(indexedPoints);
 
-    const axisDescription = `${humanizeTerm(column)} by ${humanizeTerm(axis.column)}`;
+    const columnWord = word("fact_field", column);
+    const axisDescription = `${columnWord} by ${word("fact_field", axis.column)}`;
 
     return (
         <div className="fact-chart__cell">
@@ -230,7 +232,7 @@ function SeriesChart({
                         className="fact-chart__legend-swatch"
                         style={{ background: color, display: "inline-block", marginRight: 6 }}
                     />
-                    {humanizeTerm(column)}
+                    {columnWord}
                 </p>
             ) : null}
             <svg
