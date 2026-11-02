@@ -3,6 +3,7 @@ import type { InvestigationResult, RenderShape } from "./contracts";
 import { factsWithAPanel } from "./fact-rows";
 import {
     COHORT_SHAPE_RULES,
+    COMPARISON_RULE,
     FACT_PANEL_RULES,
     renderShapesFor,
     shapeMentionsClaim,
@@ -18,6 +19,7 @@ import {
  *   check, so a chart that passes is left over here.
  * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows`, on no
  *   person, has a panel. That panel draws it or says it was withheld.
+ * - A side-by-side table has a panel of its own, which draws it or says it was withheld.
  * - Every other shape has no reader.
  */
 export function shapesNoPanelTakes(result: InvestigationResult): readonly RenderShape[] {
@@ -32,6 +34,7 @@ export function shapesNoPanelTakes(result: InvestigationResult): readonly Render
         if (COHORT_SHAPE_RULES.includes(shape.selected_by)) {
             return !rankingTakesItsCharts && verifiedCohortCharts.includes(shape);
         }
+        if (shape.selected_by === COMPARISON_RULE) return false;
         return !(
             FACT_PANEL_RULES.includes(shape.selected_by) &&
             claimsWithAPanel.some((claimId) => shapeMentionsClaim(shape, claimId))
