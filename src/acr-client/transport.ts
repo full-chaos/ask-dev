@@ -179,7 +179,8 @@ function isNotLeased(body: ACRErrorV1): boolean {
 /** ACR's `Retry-After` in whole seconds, when it is one. */
 function retryAfterOf(response: Response): number | undefined {
     const raw = response.headers.get("Retry-After");
-    if (raw === null || !/^\d{1,6}$/u.test(raw.trim())) return undefined;
+    // Up to 8 digits: ACR's monthly allowance answers up to a month ahead (CHAOS-12564).
+    if (raw === null || !/^\d{1,8}$/u.test(raw.trim())) return undefined;
     return Number(raw.trim());
 }
 
