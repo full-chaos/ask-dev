@@ -72,6 +72,13 @@ describe.each([
         expect(within(draw(odd)).queryByTestId("claim-derivation")).toBeNull();
     });
 
+    it("shows an odd operation as it came, and does not throw", () => {
+        const odd = { ...derived, operation: { unexpected: 1 } } as unknown as ClaimedFact;
+        expect(within(draw(odd)).getByTestId("claim-derivation")).toHaveTextContent(
+            'operation: {"unexpected":1}',
+        );
+    });
+
     it("names no operation when the claim has none", () => {
         const { operation: _gone, ...noOperation } = derived;
         const line = within(draw(noOperation)).getByTestId("claim-derivation");

@@ -1,5 +1,6 @@
 import { useVocabularyWord } from "./VocabularyWordContext";
 import type { ClaimedFact } from "../lib/contracts";
+import { rawText } from "../lib/presentation";
 
 /**
  * How a derived number was made (CHAOS-12516): its operation and each input. ACR's rule attaches no
@@ -18,7 +19,9 @@ export function DerivationInputs({ claim }: { readonly claim: ClaimedFact }) {
         <span data-testid="claim-derivation">
             {" "}
             <code>
-                {claim.operation === undefined ? null : <>operation: {claim.operation}; </>}
+                {claim.operation === undefined ? null : (
+                    <>operation: {rawText(claim.operation)}; </>
+                )}
                 derived_from: {fields.map((field) => word("fact_field", field)).join(", ")}
             </code>
         </span>
