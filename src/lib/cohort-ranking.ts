@@ -67,6 +67,8 @@ export type RankedCohortRow = {
     readonly score: number | null;
     /** The member's strongest drivers, already ordered. May be empty. */
     readonly topDrivers: readonly CohortMemberDriver[];
+    /** The rest of the served drivers, in the same order, so every driver has a place. */
+    readonly otherDrivers: readonly CohortMemberDriver[];
     /** The row-level window summary; see `rowWindow` below. */
     readonly window: CohortDriverWindow;
     /**
@@ -166,6 +168,9 @@ export function rankingTable(members: readonly CohortMember[]): readonly RankedC
                 attentionRank: member.attention_rank,
                 score,
                 topDrivers: topDriversByWeightContributed(drivers, RANKING_TABLE_TOP_DRIVERS),
+                otherDrivers: topDriversByWeightContributed(drivers, drivers.length).slice(
+                    RANKING_TABLE_TOP_DRIVERS,
+                ),
                 window: rowWindow(drivers),
                 scoreWithheld: score !== null && drivers.length === 0,
             };
