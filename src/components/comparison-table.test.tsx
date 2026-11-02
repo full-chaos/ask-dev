@@ -119,6 +119,7 @@ describe("the verifier reads a side-by-side table (CHAOS-12513)", () => {
                 point.source = { ...point.source, kind: "claimed_fact_row", row_index: 0 };
             },
         ],
+        ["a side with no name", (s) => void (s.series[1]!.label = " ")],
         ["one side", (s) => void (s.series as unknown[]).pop()],
         ["a key that is not the subject", (s) => void (s.series[0].key = "repository:other")],
         [

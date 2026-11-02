@@ -28,6 +28,7 @@ import type {
     ScalarValue,
 } from "./contracts";
 import { aboutNoPerson, cellValue, parseIsoDate } from "./fact-rows";
+import { nonBlank } from "./presentation";
 
 /** The selection rule that produced a shape (acr's closed vocabulary). */
 export type RenderShapeRule = RenderShape["selected_by"];
@@ -308,6 +309,8 @@ function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolea
     const measures = new Map<string, string>();
     const sides = new Map<string, number>();
     for (const series of shape.series) {
+        // The label names the column. With none, a reader cannot tell whose the values are.
+        if (nonBlank(series.label) === undefined) return false;
         for (const { label, source } of series.points) {
             if (source.kind !== "claimed_fact_value") return false;
             const claim = claimFor(facts, source.claim_id);
