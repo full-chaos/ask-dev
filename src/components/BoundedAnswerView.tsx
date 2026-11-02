@@ -145,9 +145,13 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
                     </section>
                 ) : null}
                 <ScalarFactsPanel facts={facts} result={undefined} />
-                {shapes.map((shape) => (
-                    <RichShape key={shape.shape_id} shape={shape} />
-                ))}
+                {shapes.length > 0 ? (
+                    <section aria-label="Charts" className="panel" role="group">
+                        {shapes.map((shape) => (
+                            <RichShape key={shape.shape_id} shape={shape} />
+                        ))}
+                    </section>
+                ) : null}
                 <LimitationsPanel
                     limitations={identityLimitations(projection.limitations)}
                     warnings={projection.warnings}

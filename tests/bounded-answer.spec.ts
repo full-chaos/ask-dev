@@ -36,10 +36,11 @@ test.describe("A bounded answer", () => {
                 () => document.documentElement.scrollWidth - window.innerWidth,
             );
             expect(sideways).toBe(0);
-            await page.screenshot({
-                path: testInfo.outputPath(`bounded-answer-${name}.png`),
-                fullPage: true,
-            });
+            // The answer is taller than a phone screen: the capture uses a viewport tall enough
+            // for the whole answer, so the screenshot shows it from its first line.
+            await page.setViewportSize({ width, height: 2400 });
+            await view.evaluate((node) => node.scrollIntoView({ block: "start" }));
+            await page.screenshot({ path: testInfo.outputPath(`bounded-answer-${name}.png`) });
         });
     }
 });
