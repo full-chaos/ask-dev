@@ -67,7 +67,9 @@ const NEUTRAL_ANSWER_WORD = "Answer";
  * status word. With no served word an answered status reads the neutral "Answer" (lead's ruling on
  * CHAOS-12417), and a result that did not answer has no pill: "Answer" would be untrue for it.
  */
-export function answerStatusWord(result: InvestigationResult): string | undefined {
+export function answerStatusWord(
+    result: Pick<InvestigationResult, "status"> & { readonly vocabulary_labels?: VocabularyLabels },
+): string | undefined {
     const served = servedWord(result.vocabulary_labels, "answer_status", result.status);
     if (served !== undefined) return served;
     return result.status === "no_match" || result.status === "clarification_required"

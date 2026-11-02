@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { CanonicalResultInspector } from "@/components/CanonicalResultInspector";
+import { BoundedAnswerView } from "@/components/BoundedAnswerView";
 import { DeterministicAnswerView } from "@/components/DeterministicAnswerView";
 import { FailurePanel } from "@/components/FailurePanel";
 import { QuestionForm } from "@/components/QuestionForm";
@@ -18,7 +19,12 @@ import { ViewSwitcher, type WorkbenchView } from "@/components/ViewSwitcher";
 import { AppHeader } from "@/components/shell/AppHeader";
 import type { WorkbenchFailure } from "@/lib/acr/errors";
 import { choiceDisposition, subjectForReceipt } from "@/lib/clarification";
-import type { BoundStructureReceipt, InvestigationResult, SubjectRef } from "@/lib/contracts";
+import type {
+    AnswerProjection,
+    BoundStructureReceipt,
+    InvestigationResult,
+    SubjectRef,
+} from "@/lib/contracts";
 import { literalKindNounsInQuestion } from "@/lib/kind-nouns";
 import {
     buildStructureReceiptFields,
@@ -47,6 +53,7 @@ type Outcome =
           readonly result: InvestigationResult;
           readonly rankingWithheld?: RankingWithheld;
       }
+    | { readonly kind: "bounded"; readonly projection: AnswerProjection }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 // `enriched` joins this list in M3, behind its fail-closed validator.
@@ -143,6 +150,10 @@ export default function WorkbenchPage() {
             });
             if (answer.kind === "failed") {
                 setOutcome({ kind: "failed", failure: answer.failure });
+                return;
+            }
+            if (answer.kind === "bounded") {
+                setOutcome({ kind: "bounded", projection: answer.projection });
                 return;
             }
             const boundary = withholdUnrankableRankings(answer.result);
@@ -287,6 +298,15 @@ export default function WorkbenchPage() {
                 ) : null}
 
                 {outcome.kind === "failed" ? <FailurePanel failure={outcome.failure} /> : null}
+
+                {outcome.kind === "bounded" ? (
+                    <>
+                        <div className="result__head">
+                            <h2 className="result__question">{outcome.projection.question}</h2>
+                        </div>
+                        <BoundedAnswerView projection={outcome.projection} />
+                    </>
+                ) : null}
 
                 {outcome.kind === "answered" ? (
                     <>

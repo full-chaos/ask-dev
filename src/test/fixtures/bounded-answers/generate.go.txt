@@ -1,0 +1,52 @@
+// Scratch only (CHAOS-12559): ask-dev's bounded-answer fixtures, from ACR's real
+// projector at the pin. Each input is a result ACR's real encoder served (ask-dev's
+// served-words and served-shapes fixtures); each output is the bounded form the API
+// serves when an answer is over the caller's max_serialized_bytes:
+// answerprojection.Project, then MarkFullResultOmitted, then Validate, then
+// json.Marshal, as projectToCallerOption does. The counts are small, so the
+// projection drops rows and declares each drop in projection_budget.
+//
+// To rebuild: copy to cmd/zz12559fixture/main.go in an acr checkout at the pin and
+// run `go run ./cmd/zz12559fixture <ask-dev src/test/fixtures> <this directory>`.
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric/answerprojection"
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	in, out := os.Args[1], os.Args[2]
+	budget := answerprojection.Budget{MaxDrivers: 1, MaxCohortMembers: 1, MaxCandidates: 1, MaxFacts: 2, MaxEvidenceRefs: 2, MaxSerializedBytes: 262144}
+	for _, c := range []struct{ name, source string }{
+		{"bounded-answer", "served-words/full-answer.json"},
+		{"bounded-partial-table", "served-shapes/comparison-table-served.json"},
+		{"bounded-no-match", "served-words/no-match.json"},
+	} {
+		raw, err := os.ReadFile(filepath.Join(in, c.source))
+		must(err)
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		var result contractsv1.ContextFabricInvestigationResult
+		must(decoder.Decode(&result))
+		projection := answerprojection.Project(result, budget)
+		answerprojection.MarkFullResultOmitted(&projection)
+		must(projection.Validate())
+		encoded, err := json.MarshalIndent(projection, "", "  ")
+		must(err)
+		must(os.WriteFile(filepath.Join(out, c.name+".json"), append(encoded, '\n'), 0o644))
+		fmt.Println(c.name, len(encoded))
+	}
+}

@@ -470,8 +470,8 @@ const SCHEMA_PATHS = [
     "contracts/jsonschema/v1/context_fabric_investigation_result.v2.schema.json",
     "contracts/jsonschema/v1/error.v1.schema.json",
     // CHAOS-12106: the Workbench reads ACR's event stream in the browser, so its checks need the
-    // event, its result forms and the submission status. No generated types: the client's are
-    // generic, and these are read by the validators only.
+    // event, its result forms and the submission status. The projection has a generated type
+    // (CHAOS-12559, the render draws it); the others are read by the validators only.
     "contracts/jsonschema/v1/context_fabric_answer_projection.v1.schema.json",
     "contracts/jsonschema/v1/context_fabric_investigation_event.v1.schema.json",
     "contracts/jsonschema/v1/context_fabric_investigation_response.v1.schema.json",
@@ -530,6 +530,12 @@ const GENERATED_MODULES = [
         artifact: "generated/error.ts",
         schema: "error.v1.schema.json",
         typeName: "AcrError",
+    },
+    // CHAOS-12559: the render draws ACR's bounded answer from its own fields.
+    {
+        artifact: "generated/answer-projection.ts",
+        schema: "context_fabric_answer_projection.v1.schema.json",
+        typeName: "ContextFabricAnswerProjection",
     },
 ];
 

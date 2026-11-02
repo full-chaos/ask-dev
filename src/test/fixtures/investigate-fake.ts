@@ -1,3 +1,4 @@
+import { resultOutcome } from "@/lib/acr/investigate";
 import type { StandaloneInvestigate } from "@/render/standalone-source";
 
 /**
@@ -29,6 +30,14 @@ export function investigateFromFetch(fetchImpl: typeof fetch): StandaloneInvesti
         }
         if (reply.result === undefined || reply.result === null) {
             throw new Error("the fake answered neither a result nor a failure");
+        }
+        // ACR's bounded form goes through the app's own classifier (CHAOS-12559): it is drawn only
+        // when it meets its schema, as on the real stream.
+        if (
+            (reply.result as { schema_version?: unknown }).schema_version ===
+            "context_fabric_answer_projection.v1"
+        ) {
+            return resultOutcome(reply.result);
         }
         return {
             kind: "answered",

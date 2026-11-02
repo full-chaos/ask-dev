@@ -25,6 +25,7 @@ import {
 } from "./ChatThreadState";
 import { ClarificationPopup } from "./ClarificationPopup";
 import { InspectorRail } from "./InspectorRail";
+import { BoundedAnswerView } from "../BoundedAnswerView";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
 import { EvidenceOpenContext, type EvidenceOpen } from "../EvidenceOpenContext";
 import { FailurePanel } from "../FailurePanel";
@@ -1223,6 +1224,11 @@ function ChatSurface({
                                                         />
                                                     </ShapeSlotContext.Provider>
                                                 </EvidenceOpenProvider>
+                                            ) : null}
+                                            {turn.outcome.kind === "bounded" ? (
+                                                <BoundedAnswerView
+                                                    projection={turn.outcome.projection}
+                                                />
                                             ) : null}
                                             {turn.outcome.kind === "answered" &&
                                             chat.feedback !== undefined &&

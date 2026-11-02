@@ -83,14 +83,18 @@ function scopeFields(result: InvestigationResult): readonly ScopeField[] {
     return fields;
 }
 
-export function AnswerPanel({ result }: AnswerPanelProps) {
-    // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
-    // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
-    // hardcoded heading id collided across turns and every later turn's
-    // `aria-labelledby` resolved to the FIRST turn's heading.
-    const idPrefix = useId();
-    const scope = scopeFields(result);
-    const raw = scope.filter(({ line }) => line === undefined);
+export type AnswerTextProps = {
+    readonly deterministicAnswer: string | undefined;
+    readonly directJudgment: string;
+    readonly currentState: string;
+};
+
+/**
+ * The answer's own words: the service's non-model answer, the judgment, and the current state
+ * behind "More detail". One part, drawn by the whole answer (`AnswerPanel`) and by ACR's bounded
+ * answer (`BoundedAnswerView`, CHAOS-12559), which carries the same three fields verbatim.
+ */
+export function AnswerText({ deterministicAnswer, directJudgment, currentState }: AnswerTextProps) {
     // Displayed text is COSMETICALLY trimmed (leading/trailing ASCII
     // whitespace only, matching the field's own pre-4691 display
     // convention) — a purely visual tidy-up, independent of the render
@@ -100,13 +104,47 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
     // per-field `.trim() !== ""` reimplementation that would miss the
     // same zero-width/combining-mark categories `nonBlank` already
     // covers).
-    const deterministicAnswer = result.deterministic_answer.trim();
-    const directJudgment = result.direct_judgment.trim();
-    const hasDeterministicAnswer = nonBlank(result.deterministic_answer) !== undefined;
-    const hasJudgment = nonBlank(result.direct_judgment) !== undefined;
-    const hasCurrentState = nonBlank(result.current_state) !== undefined;
+    const answer = (deterministicAnswer ?? "").trim();
+    const judgment = directJudgment.trim();
+    const hasDeterministicAnswer = nonBlank(deterministicAnswer ?? "") !== undefined;
+    const hasJudgment = nonBlank(directJudgment) !== undefined;
+    const hasCurrentState = nonBlank(currentState) !== undefined;
     // The same words in both fields read once (a withheld answer's fixed sentence is one such).
-    const judgmentRepeatsAnswer = hasDeterministicAnswer && directJudgment === deterministicAnswer;
+    const judgmentRepeatsAnswer = hasDeterministicAnswer && judgment === answer;
+    return (
+        <>
+            {hasDeterministicAnswer ? (
+                <p className="answer__judgment">
+                    <SafeAnswerText text={answer} />
+                </p>
+            ) : null}
+            {judgmentRepeatsAnswer ? null : hasJudgment ? (
+                <p className="answer__body">
+                    <SafeAnswerText text={judgment} />
+                </p>
+            ) : (
+                <p className="panel__empty">The service returned no direct judgment.</p>
+            )}
+            {hasCurrentState ? (
+                <details className="disclosure">
+                    <summary>More detail</summary>
+                    <p className="answer__body">
+                        <SafeAnswerText text={currentState} />
+                    </p>
+                </details>
+            ) : null}
+        </>
+    );
+}
+
+export function AnswerPanel({ result }: AnswerPanelProps) {
+    // CHAOS-4510 (fixed here — in scope because this panel is rewritten by
+    // CHAOS-4581): the chat surface keeps every answered turn mounted, so a
+    // hardcoded heading id collided across turns and every later turn's
+    // `aria-labelledby` resolved to the FIRST turn's heading.
+    const idPrefix = useId();
+    const scope = scopeFields(result);
+    const raw = scope.filter(({ line }) => line === undefined);
     return (
         <section
             role="group"
@@ -117,26 +155,11 @@ export function AnswerPanel({ result }: AnswerPanelProps) {
             <h2 className="panel__title" id={`${idPrefix}-answer-title`}>
                 Answer
             </h2>
-            {hasDeterministicAnswer ? (
-                <p className="answer__judgment">
-                    <SafeAnswerText text={deterministicAnswer} />
-                </p>
-            ) : null}
-            {judgmentRepeatsAnswer ? null : hasJudgment ? (
-                <p className="answer__body">
-                    <SafeAnswerText text={directJudgment} />
-                </p>
-            ) : (
-                <p className="panel__empty">The service returned no direct judgment.</p>
-            )}
-            {hasCurrentState ? (
-                <details className="disclosure">
-                    <summary>More detail</summary>
-                    <p className="answer__body">
-                        <SafeAnswerText text={result.current_state} />
-                    </p>
-                </details>
-            ) : null}
+            <AnswerText
+                currentState={result.current_state}
+                deterministicAnswer={result.deterministic_answer}
+                directJudgment={result.direct_judgment}
+            />
             {scope.map(({ name, line }) =>
                 line === undefined ? null : (
                     <p className="record__meta" data-testid={`answer-line-${name}`} key={name}>

@@ -35,6 +35,7 @@ import {
     type BoundStructureReceipt,
     type ConversationTurn,
     type InvestigationRequest,
+    type AnswerProjection,
     type InvestigationResult,
     type StructureSubjectKind,
     type SubjectHint,
@@ -59,8 +60,8 @@ import {
  * The `result` event carries the investigation RESPONSE: the result's fields plus an optional
  * `synthesis_input`, under the same `schema_version`. The result schemas close their properties, so
  * they would refuse that extra field; the response schemas are the result schemas plus it.
- * The bounded answer projection (`context_fabric_answer_projection.v1`) has no entry: this app has
- * no view for it.
+ * The bounded answer projection (`context_fabric_answer_projection.v1`) is not a result form here:
+ * it is validated against its own schema and drawn as itself (`resultOutcome`, CHAOS-12559).
  */
 const RESULT_SCHEMAS = {
     "context_fabric_investigation_result.v1":
@@ -645,6 +646,7 @@ export function failureFor(status: number, upstream: UpstreamError): WorkbenchFa
 
 export type InvestigateOutcome =
     | { kind: "answered"; result: InvestigationResult }
+    | { kind: "bounded"; projection: AnswerProjection }
     | { kind: "failed"; failure: WorkbenchFailure };
 
 const failed = (failure: WorkbenchFailure): InvestigateOutcome => ({ kind: "failed", failure });
@@ -713,11 +715,21 @@ export const TRANSPORT_FAILURES: Readonly<Record<TransportFailureReason, Workben
 export function resultOutcome(payload: unknown): InvestigateOutcome {
     const form = (payload as { schema_version?: unknown } | null)?.schema_version;
     if (form === "context_fabric_answer_projection.v1") {
-        return failed({
-            code: "acr_answer_too_large",
-            message: "This answer is too large to show here. Ask about a narrower scope.",
-            retryable: false,
-        });
+        // ACR's bounded answer (CHAOS-12559): drawn as itself, once it meets its own contract.
+        const bounded = validateContract(
+            "context_fabric_answer_projection.v1.schema.json",
+            payload,
+        );
+        if (!bounded.valid) {
+            return failed({
+                code: "acr_contract_violation",
+                message: "Ask Dev returned a result that does not meet the required format.",
+                details: bounded.errors,
+                retryable: false,
+            });
+        }
+        // The cast is honest: the projection schema declares these fields, and it just passed.
+        return { kind: "bounded", projection: payload as AnswerProjection };
     }
     const schema = resultSchemaFor(payload);
     if (schema === undefined) {

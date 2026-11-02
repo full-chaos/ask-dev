@@ -1,0 +1,395 @@
+{
+    "schema_version": "context_fabric_answer_projection.v1",
+    "result_id": "res_render_shapes_0001",
+    "request_id": "req_render_shapes_0001",
+    "generated_at": "2026-08-11T16:00:03Z",
+    "status": "complete",
+    "question": "Which teams are struggling right now, and why?",
+    "reused": false,
+    "direct_judgment": "Ask Dev is not release-ready even though most tracked implementation work is closed.",
+    "current_state": "Implementation completion and release readiness diverge because required product acceptance remains open.",
+    "strongest_pressures": ["Release acceptance remains incomplete."],
+    "deterministic_answer": "Ask Dev is not release-ready. The principal current driver is incomplete release acceptance, despite most tracked implementation work being closed.",
+    "committed_subjects": [
+        {
+            "kind": "project",
+            "canonical_id": "project_ask_dev",
+            "label": "Ask Dev"
+        }
+    ],
+    "cohort": {
+        "kind": "team",
+        "total": 2,
+        "rationale": "Matched every team owning at least one repository in the org.",
+        "complete": true,
+        "members": [
+            {
+                "subject": {
+                    "kind": "team",
+                    "canonical_id": "team:CHAOS",
+                    "label": "CHAOS"
+                },
+                "rank": 1,
+                "inclusion_reasons": ["Matched by kind census over the org's team roster."],
+                "evidence_ref_ids": ["evidence_team_chaos_roster"],
+                "ranking_computed": true,
+                "attention_rank": 1,
+                "score": 43.5,
+                "ranking_basis": [
+                    "investment_mix",
+                    "health.compounding_risk",
+                    "operational_deficiencies.severity",
+                    "readiness.coverage_gap",
+                    "workload.forecast_pressure"
+                ],
+                "data_completeness": "complete",
+                "outcome": "qualified"
+            }
+        ],
+        "score_meaning": "attention",
+        "ranking_table": [
+            {
+                "fields": {
+                    "attention_rank": {
+                        "integer": 1
+                    },
+                    "driver_1_signal": {
+                        "string": "operational_deficiencies.severity"
+                    },
+                    "driver_1_value": {
+                        "number": 1
+                    },
+                    "driver_1_weight_contributed": {
+                        "number": 20
+                    },
+                    "driver_2_signal": {
+                        "string": "health.compounding_risk"
+                    },
+                    "driver_2_value": {
+                        "number": 0.5
+                    },
+                    "driver_2_weight_contributed": {
+                        "number": 12.5
+                    },
+                    "outcome": {
+                        "string": "qualified"
+                    },
+                    "score": {
+                        "number": 43.5
+                    },
+                    "subject_canonical_id": {
+                        "string": "team:CHAOS"
+                    },
+                    "subject_kind": {
+                        "string": "team"
+                    },
+                    "subject_label": {
+                        "string": "CHAOS"
+                    },
+                    "team_canonical_id": {
+                        "string": "team:CHAOS"
+                    },
+                    "team_label": {
+                        "string": "CHAOS"
+                    },
+                    "window": {
+                        "string": "current"
+                    }
+                }
+            }
+        ]
+    },
+    "principal_drivers": [
+        {
+            "driver_id": "cohort-driver-01-1",
+            "standing": "principal",
+            "category": "operational_deficiency",
+            "title": "CHAOS: operational deficiencies",
+            "summary": "operational deficiencies (weight 20, value 1.00) contributed 20.0 points to CHAOS's a 43.5 attention score.",
+            "confidence": 0.95,
+            "evidence_ref_ids": ["evidence_team_chaos_roster"],
+            "claimed_fact_ids": ["claim_cohort_88cad88367c815eae568ce1f979c1471"],
+            "affected_subjects": [
+                {
+                    "kind": "team",
+                    "canonical_id": "team:CHAOS",
+                    "label": "CHAOS"
+                }
+            ]
+        }
+    ],
+    "key_facts": [
+        {
+            "claim_id": "claim_cohort_88cad88367c815eae568ce1f979c1471",
+            "kind": "operational_deficiencies",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:CHAOS",
+                "label": "CHAOS"
+            },
+            "field": "severity",
+            "value": {
+                "string": "critical"
+            }
+        }
+    ],
+    "coverage_summary": [
+        {
+            "source": "dev-health-ops:status",
+            "state": "available",
+            "label": "Dev Health — status",
+            "state_label": "available"
+        },
+        {
+            "source": "dev-health-ops:readiness",
+            "state": "available",
+            "label": "Dev Health — readiness",
+            "state_label": "available"
+        },
+        {
+            "source": "canonical_fact:workload",
+            "state": "available",
+            "label": "Canonical facts — workload",
+            "state_label": "available"
+        }
+    ],
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer, not fully covered",
+        "candidate_state:committed": "selected",
+        "driver_standing:contributing": "contributing",
+        "driver_standing:principal": "main driver",
+        "driver_window:current": "current period",
+        "fact_kind:health": "health",
+        "fact_kind:metrics": "metrics",
+        "fact_kind:narrative": "narrative",
+        "fact_kind:operational_deficiencies": "operational deficiency",
+        "fact_kind:readiness": "readiness",
+        "fact_kind:workload": "workload",
+        "member_outcome:qualified": "qualified",
+        "ranking_signal:health.compounding_risk": "health risk",
+        "ranking_signal:investment_mix": "investment mix",
+        "ranking_signal:operational_deficiencies.severity": "operational deficiencies",
+        "ranking_signal:readiness.coverage_gap": "readiness gap",
+        "ranking_signal:workload.forecast_pressure": "workload pressure",
+        "requirement_outcome:satisfied": "met",
+        "structure_disposition:applied": "used",
+        "subject_kind:team": "team",
+        "subject_kind_plural:team": "teams"
+    },
+    "coverage_partial": false,
+    "limitations": ["No production user-adoption evidence was available for this investigation."],
+    "warnings": [],
+    "evidence_ref_ids": ["evidence_team_chaos_roster"],
+    "subject_receipts": [
+        {
+            "result_id": "res_render_shapes_0001",
+            "receipt_id": "receipt_12345678"
+        }
+    ],
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "projection_budget": {
+        "truncated": true,
+        "drivers_omitted": 3,
+        "withheld_drivers_omitted": 0,
+        "cohort_members_omitted": 1,
+        "cohort_groups_omitted": 0,
+        "facts_omitted": 3,
+        "candidates_omitted": 0,
+        "evidence_refs_omitted": 2,
+        "limitations_omitted": 0,
+        "warnings_omitted": 0,
+        "coverage_omitted": 0,
+        "reasons_omitted": 0,
+        "values_clamped": 0,
+        "render_shapes_omitted": 3,
+        "full_result_omitted": true
+    },
+    "confirmed_structure": [
+        {
+            "member": "expected_kind",
+            "applied_value": "project",
+            "source": "receipt",
+            "prior_result_id": "result_prior_ask_dev1",
+            "receipt_id": "kindr_ask_dev_9012",
+            "provenance": "clarification_confirmed",
+            "disposition": "applied"
+        },
+        {
+            "member": "window",
+            "applied_value": "trailing_90d",
+            "source": "carried",
+            "prior_result_id": "result_prior_ask_dev1",
+            "provenance": "clarification_confirmed",
+            "disposition": "applied"
+        }
+    ],
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "series",
+            "presentation": "bars",
+            "selected_by": "cohort_attention_score",
+            "title": "Attention score by team",
+            "axis_kind": "category",
+            "axis_label": "team",
+            "value_label": "attention score",
+            "series": [
+                {
+                    "key": "attention_score",
+                    "label": "Attention score",
+                    "points": [
+                        {
+                            "label": "CHAOS",
+                            "value": 43.5,
+                            "source": {
+                                "kind": "cohort_member_score",
+                                "subject_canonical_id": "team:CHAOS"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 6,
+        "rows_count": 8,
+        "state": "partial",
+        "outcomes": [
+            {
+                "stage": "assembled_result",
+                "requirement": "state/subject/team",
+                "obligation": "state",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 1,
+                "declared": 1
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "health/subject/team",
+                "obligation": "health",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 1,
+                "declared": 1
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "scope",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 3,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 3,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 3,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 3,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 2,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 2,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 3,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 3,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            }
+        ]
+    }
+}

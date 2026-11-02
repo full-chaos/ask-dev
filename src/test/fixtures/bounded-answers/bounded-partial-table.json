@@ -1,0 +1,3192 @@
+{
+    "schema_version": "context_fabric_answer_projection.v1",
+    "result_id": "result_9425be123ea7808cd7afd6f4b70a703c",
+    "request_id": "req_fe5b04dc4076c87e58f04087b6ac602f",
+    "generated_at": "2026-11-02T06:52:59.375651626Z",
+    "status": "partial",
+    "question": "Compare full-chaos/dev-health-acr and full-chaos/dev-health-ops on pull request delivery, kind proof p1 kind?",
+    "reused": false,
+    "direct_judgment": "Side 1 (truncated: the source read was cut). Some canonical or graph coverage was unavailable. Principal driver: Side 2 (truncated: the source read was cut).",
+    "current_state": "Current observed values: window pr cycle hours median: 1.66 (full-chaos/dev-health-acr); window pr count: 1608 (full-chaos/dev-health-acr); window pr cycle hours median: 1.57 (full-chaos/dev-health-ops); window pr count: 3790 (full-chaos/dev-health-ops). Limited read: narrative (truncated: the source read was cut); narrative (truncated: the source read was cut).",
+    "strongest_pressures": [],
+    "deterministic_answer": "Side 1 (truncated: the source read was cut). Some canonical or graph coverage was unavailable. Principal driver(s): Side 2 (truncated: the source read was cut).",
+    "committed_subjects": [
+        {
+            "kind": "repository",
+            "canonical_id": "repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7",
+            "label": "full-chaos/dev-health-acr"
+        },
+        {
+            "kind": "repository",
+            "canonical_id": "repository:920f9442-07df-4217-4dc4-c5833c0b8268",
+            "label": "full-chaos/dev-health-ops"
+        }
+    ],
+    "principal_drivers": [
+        {
+            "driver_id": "driver_proof_0",
+            "standing": "principal",
+            "category": "narrative",
+            "title": "Side 1",
+            "summary": "Scripted measure: no model wrote this.",
+            "source_state": "truncated",
+            "source_state_note": "The service marks this driver as truncated: the source read was cut.",
+            "summary_corrected": true,
+            "confidence": 0.8,
+            "evidence_ref_ids": ["acr:v1:repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7"],
+            "claimed_fact_ids": [
+                "claim_proof_000123456789abcdef",
+                "claim_proof_010123456789abcdef"
+            ],
+            "affected_subjects": [
+                {
+                    "kind": "repository",
+                    "canonical_id": "repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7",
+                    "label": "full-chaos/dev-health-acr"
+                }
+            ]
+        }
+    ],
+    "key_facts": [
+        {
+            "claim_id": "claim_proof_000123456789abcdef",
+            "kind": "metrics",
+            "subject": {
+                "kind": "repository",
+                "canonical_id": "repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7",
+                "label": "full-chaos/dev-health-acr"
+            },
+            "field": "window_pr_cycle_hours_median",
+            "value": {
+                "number": 1.6618055555555555
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 57
+                        },
+                        "day": {
+                            "string": "2026-11-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.2927777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 57
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 48
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.9530555555555558
+                        },
+                        "prs_merged": {
+                            "integer": 48
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 39
+                        },
+                        "day": {
+                            "string": "2026-10-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.545
+                        },
+                        "prs_merged": {
+                            "integer": 39
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 1
+                        },
+                        "day": {
+                            "string": "2026-10-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.96
+                        },
+                        "prs_merged": {
+                            "integer": 1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 5
+                        },
+                        "day": {
+                            "string": "2026-10-26"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.3961111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-10-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.6108333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 62
+                        },
+                        "day": {
+                            "string": "2026-10-24"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.9301388888888888
+                        },
+                        "prs_merged": {
+                            "integer": 62
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 45
+                        },
+                        "day": {
+                            "string": "2026-10-23"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.1269444444444445
+                        },
+                        "prs_merged": {
+                            "integer": 45
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 18
+                        },
+                        "day": {
+                            "string": "2026-10-22"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0163888888888888
+                        },
+                        "prs_merged": {
+                            "integer": 18
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994887545165345
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-10-21"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.6633333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999502368105777
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-10-20"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 7.3116666666666665
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999495554574689
+                        },
+                        "commits_count": {
+                            "integer": 22
+                        },
+                        "day": {
+                            "string": "2026-10-19"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 10.174722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 22
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999503725162995
+                        },
+                        "commits_count": {
+                            "integer": 24
+                        },
+                        "day": {
+                            "string": "2026-10-18"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 8.459722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 24
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994967433000803
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-10-17"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.4375
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999495298707459
+                        },
+                        "commits_count": {
+                            "integer": 35
+                        },
+                        "day": {
+                            "string": "2026-10-16"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.097222222222222
+                        },
+                        "prs_merged": {
+                            "integer": 35
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999490322498439
+                        },
+                        "commits_count": {
+                            "integer": 34
+                        },
+                        "day": {
+                            "string": "2026-10-15"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.716666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 34
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999500946330522
+                        },
+                        "commits_count": {
+                            "integer": 39
+                        },
+                        "day": {
+                            "string": "2026-10-14"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 6.811388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 39
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994530849427443
+                        },
+                        "commits_count": {
+                            "integer": 62
+                        },
+                        "day": {
+                            "string": "2026-10-13"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.5880555555555556
+                        },
+                        "prs_merged": {
+                            "integer": 62
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999377137197989
+                        },
+                        "commits_count": {
+                            "integer": 56
+                        },
+                        "day": {
+                            "string": "2026-10-12"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.1691666666666665
+                        },
+                        "prs_merged": {
+                            "integer": 56
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999341498748848
+                        },
+                        "commits_count": {
+                            "integer": 50
+                        },
+                        "day": {
+                            "string": "2026-10-11"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.6544444444444446
+                        },
+                        "prs_merged": {
+                            "integer": 50
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999344667312169
+                        },
+                        "commits_count": {
+                            "integer": 19
+                        },
+                        "day": {
+                            "string": "2026-10-10"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.012777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 19
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993434723093033
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-10-09"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.08
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993492125471817
+                        },
+                        "commits_count": {
+                            "integer": 19
+                        },
+                        "day": {
+                            "string": "2026-10-08"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.3380555555555556
+                        },
+                        "prs_merged": {
+                            "integer": 19
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993027520377065
+                        },
+                        "commits_count": {
+                            "integer": 23
+                        },
+                        "day": {
+                            "string": "2026-10-07"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.7961111111111112
+                        },
+                        "prs_merged": {
+                            "integer": 23
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999307248947018
+                        },
+                        "commits_count": {
+                            "integer": 21
+                        },
+                        "day": {
+                            "string": "2026-10-06"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.7869444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 21
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999317668130838
+                        },
+                        "commits_count": {
+                            "integer": 25
+                        },
+                        "day": {
+                            "string": "2026-10-05"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.421111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999306947676283
+                        },
+                        "commits_count": {
+                            "integer": 60
+                        },
+                        "day": {
+                            "string": "2026-10-04"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.9872222222222222
+                        },
+                        "prs_merged": {
+                            "integer": 60
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999306684600424
+                        },
+                        "commits_count": {
+                            "integer": 29
+                        },
+                        "day": {
+                            "string": "2026-10-03"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.3719444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 29
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49992963742163377
+                        },
+                        "commits_count": {
+                            "integer": 14
+                        },
+                        "day": {
+                            "string": "2026-10-02"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.4138888888888888
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49992988643355085
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-10-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.2666666666666666
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999297906884901
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-09-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.227777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999279384450197
+                        },
+                        "commits_count": {
+                            "integer": 25
+                        },
+                        "day": {
+                            "string": "2026-09-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.6558333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.499928507596068
+                        },
+                        "commits_count": {
+                            "integer": 4
+                        },
+                        "day": {
+                            "string": "2026-09-28"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.471388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999368402769553
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.7143055555555557
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993781809928595
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-24"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0486111111111112
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999385271725265
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-23"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.8688888888888889
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993862140609147
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-22"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.4680555555555554
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 18
+                        },
+                        "day": {
+                            "string": "2026-09-21"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.1993055555555556
+                        },
+                        "prs_merged": {
+                            "integer": 18
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-09-19"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0669444444444445
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-18"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 5.679166666666666
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-17"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.30375
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-16"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 5.179722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-15"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 11.449583333333333
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-14"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.7868055555555555
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 14
+                        },
+                        "day": {
+                            "string": "2026-09-13"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.226944444444444
+                        },
+                        "prs_merged": {
+                            "integer": 14
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 23
+                        },
+                        "day": {
+                            "string": "2026-09-12"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.5175
+                        },
+                        "prs_merged": {
+                            "integer": 23
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-09-11"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 6.394166666666667
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-10"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 8.104027777777777
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-09"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.2115277777777775
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 1
+                        },
+                        "day": {
+                            "string": "2026-09-08"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 41.84444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 5
+                        },
+                        "day": {
+                            "string": "2026-09-07"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.2172222222222224
+                        },
+                        "prs_merged": {
+                            "integer": 5
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 20
+                        },
+                        "day": {
+                            "string": "2026-09-06"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0625
+                        },
+                        "prs_merged": {
+                            "integer": 20
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-05"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.4130555555555557
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-04"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.0941666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-09-03"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.352777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 22
+                        },
+                        "day": {
+                            "string": "2026-09-02"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.8868055555555556
+                        },
+                        "prs_merged": {
+                            "integer": 22
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 16
+                        },
+                        "day": {
+                            "string": "2026-09-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.5358333333333334
+                        },
+                        "prs_merged": {
+                            "integer": 16
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-31"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.3844444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 11
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-08-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.4651388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.3241666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 11
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-08-28"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.6172222222222221
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-27"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.7711111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 12
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-08-26"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.21333333333333335
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 12
+                        },
+                        "day": {
+                            "string": "2026-08-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.365
+                        },
+                        "prs_merged": {
+                            "integer": 12
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "daily_metrics",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": [
+                    "commits_count",
+                    "prs_merged",
+                    "median_pr_cycle_hours",
+                    "revert_rate",
+                    "bus_factor",
+                    "code_ownership_gini",
+                    "mttr_hours"
+                ]
+            }
+        },
+        {
+            "claim_id": "claim_proof_010123456789abcdef",
+            "kind": "metrics",
+            "subject": {
+                "kind": "repository",
+                "canonical_id": "repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7",
+                "label": "full-chaos/dev-health-acr"
+            },
+            "field": "window_pr_count",
+            "value": {
+                "integer": 1608
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 57
+                        },
+                        "day": {
+                            "string": "2026-11-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.2927777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 57
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 48
+                        },
+                        "day": {
+                            "string": "2026-10-31"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.9530555555555558
+                        },
+                        "prs_merged": {
+                            "integer": 48
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 39
+                        },
+                        "day": {
+                            "string": "2026-10-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.545
+                        },
+                        "prs_merged": {
+                            "integer": 39
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 1
+                        },
+                        "day": {
+                            "string": "2026-10-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.96
+                        },
+                        "prs_merged": {
+                            "integer": 1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 5
+                        },
+                        "day": {
+                            "string": "2026-10-26"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.3961111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-10-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.6108333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 62
+                        },
+                        "day": {
+                            "string": "2026-10-24"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.9301388888888888
+                        },
+                        "prs_merged": {
+                            "integer": 62
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 45
+                        },
+                        "day": {
+                            "string": "2026-10-23"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.1269444444444445
+                        },
+                        "prs_merged": {
+                            "integer": 45
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 18
+                        },
+                        "day": {
+                            "string": "2026-10-22"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0163888888888888
+                        },
+                        "prs_merged": {
+                            "integer": 18
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994887545165345
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-10-21"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.6633333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999502368105777
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-10-20"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 7.3116666666666665
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999495554574689
+                        },
+                        "commits_count": {
+                            "integer": 22
+                        },
+                        "day": {
+                            "string": "2026-10-19"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 10.174722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 22
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999503725162995
+                        },
+                        "commits_count": {
+                            "integer": 24
+                        },
+                        "day": {
+                            "string": "2026-10-18"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 8.459722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 24
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994967433000803
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-10-17"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.4375
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999495298707459
+                        },
+                        "commits_count": {
+                            "integer": 35
+                        },
+                        "day": {
+                            "string": "2026-10-16"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.097222222222222
+                        },
+                        "prs_merged": {
+                            "integer": 35
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999490322498439
+                        },
+                        "commits_count": {
+                            "integer": 34
+                        },
+                        "day": {
+                            "string": "2026-10-15"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.716666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 34
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999500946330522
+                        },
+                        "commits_count": {
+                            "integer": 39
+                        },
+                        "day": {
+                            "string": "2026-10-14"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 6.811388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 39
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49994530849427443
+                        },
+                        "commits_count": {
+                            "integer": 62
+                        },
+                        "day": {
+                            "string": "2026-10-13"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.5880555555555556
+                        },
+                        "prs_merged": {
+                            "integer": 62
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999377137197989
+                        },
+                        "commits_count": {
+                            "integer": 56
+                        },
+                        "day": {
+                            "string": "2026-10-12"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.1691666666666665
+                        },
+                        "prs_merged": {
+                            "integer": 56
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999341498748848
+                        },
+                        "commits_count": {
+                            "integer": 50
+                        },
+                        "day": {
+                            "string": "2026-10-11"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.6544444444444446
+                        },
+                        "prs_merged": {
+                            "integer": 50
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999344667312169
+                        },
+                        "commits_count": {
+                            "integer": 19
+                        },
+                        "day": {
+                            "string": "2026-10-10"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.012777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 19
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993434723093033
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-10-09"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.08
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993492125471817
+                        },
+                        "commits_count": {
+                            "integer": 19
+                        },
+                        "day": {
+                            "string": "2026-10-08"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.3380555555555556
+                        },
+                        "prs_merged": {
+                            "integer": 19
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993027520377065
+                        },
+                        "commits_count": {
+                            "integer": 23
+                        },
+                        "day": {
+                            "string": "2026-10-07"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.7961111111111112
+                        },
+                        "prs_merged": {
+                            "integer": 23
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999307248947018
+                        },
+                        "commits_count": {
+                            "integer": 21
+                        },
+                        "day": {
+                            "string": "2026-10-06"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.7869444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 21
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999317668130838
+                        },
+                        "commits_count": {
+                            "integer": 25
+                        },
+                        "day": {
+                            "string": "2026-10-05"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.421111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999306947676283
+                        },
+                        "commits_count": {
+                            "integer": 60
+                        },
+                        "day": {
+                            "string": "2026-10-04"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.9872222222222222
+                        },
+                        "prs_merged": {
+                            "integer": 60
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999306684600424
+                        },
+                        "commits_count": {
+                            "integer": 29
+                        },
+                        "day": {
+                            "string": "2026-10-03"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.3719444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 29
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49992963742163377
+                        },
+                        "commits_count": {
+                            "integer": 14
+                        },
+                        "day": {
+                            "string": "2026-10-02"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.4138888888888888
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49992988643355085
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-10-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.2666666666666666
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999297906884901
+                        },
+                        "commits_count": {
+                            "integer": 31
+                        },
+                        "day": {
+                            "string": "2026-09-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.227777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 31
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999279384450197
+                        },
+                        "commits_count": {
+                            "integer": 25
+                        },
+                        "day": {
+                            "string": "2026-09-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.6558333333333333
+                        },
+                        "prs_merged": {
+                            "integer": 25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.499928507596068
+                        },
+                        "commits_count": {
+                            "integer": 4
+                        },
+                        "day": {
+                            "string": "2026-09-28"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.471388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999368402769553
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.7143055555555557
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993781809928595
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-24"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0486111111111112
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.4999385271725265
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-23"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.8688888888888889
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0.49993862140609147
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-22"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.4680555555555554
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 18
+                        },
+                        "day": {
+                            "string": "2026-09-21"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.1993055555555556
+                        },
+                        "prs_merged": {
+                            "integer": 18
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-09-19"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0669444444444445
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-18"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 5.679166666666666
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-17"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.30375
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 9
+                        },
+                        "day": {
+                            "string": "2026-09-16"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 5.179722222222222
+                        },
+                        "prs_merged": {
+                            "integer": 9
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-15"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 11.449583333333333
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-14"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.7868055555555555
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 14
+                        },
+                        "day": {
+                            "string": "2026-09-13"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.226944444444444
+                        },
+                        "prs_merged": {
+                            "integer": 14
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 23
+                        },
+                        "day": {
+                            "string": "2026-09-12"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.5175
+                        },
+                        "prs_merged": {
+                            "integer": 23
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-09-11"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 6.394166666666667
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 6
+                        },
+                        "day": {
+                            "string": "2026-09-10"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 8.104027777777777
+                        },
+                        "prs_merged": {
+                            "integer": 6
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-09-09"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 4.2115277777777775
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 1
+                        },
+                        "day": {
+                            "string": "2026-09-08"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 41.84444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 5
+                        },
+                        "day": {
+                            "string": "2026-09-07"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.2172222222222224
+                        },
+                        "prs_merged": {
+                            "integer": 5
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 20
+                        },
+                        "day": {
+                            "string": "2026-09-06"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.0625
+                        },
+                        "prs_merged": {
+                            "integer": 20
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-05"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 3.4130555555555557
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 17
+                        },
+                        "day": {
+                            "string": "2026-09-04"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.0941666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 17
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-09-03"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.352777777777778
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 22
+                        },
+                        "day": {
+                            "string": "2026-09-02"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.8868055555555556
+                        },
+                        "prs_merged": {
+                            "integer": 22
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 16
+                        },
+                        "day": {
+                            "string": "2026-09-01"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.5358333333333334
+                        },
+                        "prs_merged": {
+                            "integer": 16
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-31"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.3844444444444444
+                        },
+                        "prs_merged": {
+                            "integer": 11
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 10
+                        },
+                        "day": {
+                            "string": "2026-08-30"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.4651388888888889
+                        },
+                        "prs_merged": {
+                            "integer": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-29"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 2.3241666666666667
+                        },
+                        "prs_merged": {
+                            "integer": 11
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 15
+                        },
+                        "day": {
+                            "string": "2026-08-28"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 1.6172222222222221
+                        },
+                        "prs_merged": {
+                            "integer": 15
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 11
+                        },
+                        "day": {
+                            "string": "2026-08-27"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.7711111111111111
+                        },
+                        "prs_merged": {
+                            "integer": 12
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 27
+                        },
+                        "day": {
+                            "string": "2026-08-26"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.21333333333333335
+                        },
+                        "prs_merged": {
+                            "integer": 27
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "bus_factor": {
+                            "integer": 1
+                        },
+                        "code_ownership_gini": {
+                            "number": 0
+                        },
+                        "commits_count": {
+                            "integer": 12
+                        },
+                        "day": {
+                            "string": "2026-08-25"
+                        },
+                        "median_pr_cycle_hours": {
+                            "number": 0.365
+                        },
+                        "prs_merged": {
+                            "integer": 12
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "daily_metrics",
+                "shape": "time_series",
+                "key": ["day"],
+                "measures": [
+                    "commits_count",
+                    "prs_merged",
+                    "median_pr_cycle_hours",
+                    "revert_rate",
+                    "bus_factor",
+                    "code_ownership_gini",
+                    "mttr_hours"
+                ]
+            }
+        }
+    ],
+    "coverage_summary": [
+        {
+            "source": "canonical_fact:metrics",
+            "state": "truncated",
+            "reason": "revert_rate not applicable on 172 of 172 days; canonical fact result was truncated",
+            "label": "Canonical facts — metrics",
+            "state_label": "partly included"
+        },
+        {
+            "source": "canonical_fact:pull_requests",
+            "state": "pruned",
+            "reason": "no resolved subject has a kind this capability supports (resolved kinds: repositories; supported kinds: pull requests, teams, projects)",
+            "label": "Canonical facts — pull request",
+            "state_label": "not needed for this question"
+        },
+        {
+            "source": "context-fabric:graph",
+            "state": "available",
+            "label": "Relationship graph",
+            "state_label": "available"
+        }
+    ],
+    "coverage_details": [
+        {
+            "detail_id": "cov-01",
+            "source": "context-fabric:graph",
+            "code": "graph_hop_walk_truncated",
+            "degrading": true,
+            "label": "The read of linked subjects was cut at its limit, so some may exist that were not read",
+            "raw": "hop_walk_truncated"
+        },
+        {
+            "detail_id": "cov-02",
+            "source": "canonical_fact:metrics",
+            "code": "fact_provider_reported",
+            "degrading": true,
+            "fact_kind": "metrics",
+            "source_state": "truncated",
+            "supported_kinds": ["repository", "team", "project"],
+            "label": "Only part of the metrics facts could be included",
+            "raw": "Metrics: revert_rate not applicable on 172 of 172 days; canonical fact result was truncated"
+        },
+        {
+            "detail_id": "cov-03",
+            "source": "canonical_fact:pull_requests",
+            "code": "fact_pruned",
+            "degrading": false,
+            "fact_kind": "pull_requests",
+            "source_state": "pruned",
+            "supported_kinds": ["pull_request", "team", "project"],
+            "label": "Pull request facts do not apply to what was asked",
+            "raw": "no resolved subject has a kind this capability supports (resolved kinds: repositories; supported kinds: pull requests, teams, projects)"
+        }
+    ],
+    "evidence_ref_labels": {
+        "acr:v1:repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7": "Repository: 7b9583ee-4d24-2be7-4d09-34f815bebdd7"
+    },
+    "vocabulary_labels": {
+        "answer_status:partial": "Partial answer",
+        "candidate_state:committed": "selected",
+        "driver_source_state:truncated": "partly included",
+        "driver_standing:principal": "main driver",
+        "fact_field:bus_factor": "Bus factor",
+        "fact_field:code_ownership_gini": "Code ownership Gini (ratio)",
+        "fact_field:commits_count": "Commits",
+        "fact_field:day": "Day",
+        "fact_field:median_pr_cycle_hours": "Median pull request cycle time (hours)",
+        "fact_field:prs_merged": "Pull requests merged",
+        "fact_field:window_pr_count": "Pull requests with a cycle time in the window",
+        "fact_field:window_pr_cycle_hours_median": "Median pull request cycle time in the window (hours)",
+        "fact_kind:metrics": "metrics",
+        "generated_at:note": "Answered",
+        "relationship_type:BELONGS_TO_REPOSITORY": "belongs to repository",
+        "relationship_type:OWNED_BY_TEAM": "belongs to team",
+        "requirement_outcome:narrowed": "narrowed",
+        "requirement_outcome:satisfied": "met",
+        "structure_disposition:applied": "used",
+        "summary_corrected:note": "The service corrected this driver's source state, so its summary may not reflect it.",
+        "window_provenance:question_stated": "stated in the question",
+        "window_relative_id:trailing_90d": "last 90 days"
+    },
+    "coverage_partial": true,
+    "limitations": [
+        "The read of this subject's links stopped at its limit, so this answer may leave out links that were not read."
+    ],
+    "warnings": [],
+    "evidence_ref_ids": ["acr:v1:repository:7b9583ee-4d24-2be7-4d09-34f815bebdd7"],
+    "subject_receipts": [
+        {
+            "result_id": "result_9425be123ea7808cd7afd6f4b70a703c",
+            "receipt_id": "79c49c63-ce5a-5d41-8983-4bd8f37b3052"
+        },
+        {
+            "result_id": "result_9425be123ea7808cd7afd6f4b70a703c",
+            "receipt_id": "2434000c-49f7-52e9-b62e-4f132236164b"
+        }
+    ],
+    "versions": {
+        "service_version": "0.1.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "projection_version": "devhealthsource.clickhouse.v19+devhealthsource.episodes.v1+devhealthsource.teams_projects.v23",
+        "query_version": "devhealthfacts.clickhouse.v261",
+        "interpretation_version": "context-fabric-model-output.v12",
+        "synthesis_version": "context-fabric-synthesis.v28",
+        "canonical_service_version": "context-fabric-facts.v2",
+        "model_identity": "client-supplied/scripted-proof",
+        "interpretation_source": "client",
+        "interpretation_model_identity": "client-supplied/scripted-proof",
+        "synthesis_source": "client"
+    },
+    "projection_budget": {
+        "truncated": true,
+        "drivers_omitted": 1,
+        "withheld_drivers_omitted": 0,
+        "cohort_members_omitted": 0,
+        "cohort_groups_omitted": 0,
+        "facts_omitted": 2,
+        "candidates_omitted": 0,
+        "evidence_refs_omitted": 1,
+        "limitations_omitted": 0,
+        "warnings_omitted": 0,
+        "coverage_omitted": 0,
+        "reasons_omitted": 0,
+        "values_clamped": 0,
+        "render_shapes_omitted": 1,
+        "full_result_omitted": true
+    },
+    "effective_evidence_window": {
+        "start": "2026-08-04T00:00:00Z",
+        "end": "2026-11-02T00:00:00Z",
+        "relative_id": "trailing_90d",
+        "provenance": "question_stated"
+    },
+    "confirmed_structure": [
+        {
+            "member": "expected_kind",
+            "applied_value": "repository",
+            "source": "explicit",
+            "provenance": "question_stated",
+            "disposition": "applied"
+        }
+    ],
+    "completeness": {
+        "terminal_status": "partial",
+        "terminal_reason": "degraded_reason_disclosed",
+        "claimed_facts_count": 4,
+        "rows_count": 256,
+        "state": "partial",
+        "outcomes": [
+            {
+                "stage": "planning",
+                "requirement": "state/operand/repository",
+                "obligation": "state",
+                "outcome": "satisfied",
+                "impact": "none",
+                "cause_observed": false,
+                "served": 0,
+                "declared": 0
+            },
+            {
+                "stage": "assembled_result",
+                "requirement": "state/operand/repository",
+                "obligation": "state",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_coverage": "fact_provider_reported",
+                "cause_observed": true,
+                "served": 1,
+                "declared": 2,
+                "refinements": [
+                    {
+                        "stage": "assembled_result",
+                        "coverage": "fact_provider_reported",
+                        "before": 2,
+                        "after": 1
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 2,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 2,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            },
+            {
+                "stage": "projection",
+                "outcome": "narrowed",
+                "impact": "depth",
+                "cause_overrun": "bytes",
+                "cause_observed": true,
+                "served": 0,
+                "declared": 1,
+                "refinements": [
+                    {
+                        "stage": "projection",
+                        "overrun": "bytes",
+                        "before": 1,
+                        "after": 0
+                    }
+                ]
+            }
+        ]
+    }
+}

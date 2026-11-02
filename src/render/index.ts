@@ -19,6 +19,8 @@ export {
     DeterministicAnswerView,
     type DeterministicAnswerViewProps,
 } from "../components/DeterministicAnswerView";
+export { BoundedAnswerView, type BoundedAnswerViewProps } from "../components/BoundedAnswerView";
+export type { AnswerProjection } from "../lib/contracts";
 export type { ShapeSlot } from "../components/ShapeSlotContext";
 export type { WorkbenchFailure } from "../lib/acr/errors";
 export type { RenderShape } from "../lib/contracts";
@@ -41,6 +43,7 @@ export {
     isNonAnswer,
     type AnsweredOutcome,
     type AskIntent,
+    type BoundedOutcome,
     type AssistantOutcome,
     type BatchItem,
     type ChatAssistantTurn,

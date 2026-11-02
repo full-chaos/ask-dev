@@ -37,6 +37,7 @@ import {
 } from "@/test/fixtures/budget-refusal";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
+import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
 
 const auth = vi.hoisted(() => ({
     token: vi.fn(),
@@ -1465,16 +1466,21 @@ describe("investigateFromBrowser", () => {
         vi.restoreAllMocks();
     });
 
-    it("says an answer was too large when ACR sends its bounded form", () => {
+    // CHAOS-12559: ACR's bounded form is an answer, drawn as itself, not a failure.
+    it("returns ACR's bounded form as a bounded answer when it meets its own schema", () => {
+        for (const projection of Object.values(boundedAnswerScenarios)) {
+            const outcome = resultOutcome(projection);
+            expect(outcome).toEqual({ kind: "bounded", projection });
+        }
+    });
+
+    it("is a contract violation when ACR's bounded form fails its own schema", () => {
         const outcome = resultOutcome({
             schema_version: "context_fabric_answer_projection.v1",
             result_id: "result_1",
         });
-        expect(failureOf(outcome)).toEqual({
-            code: "acr_answer_too_large",
-            message: "This answer is too large to show here. Ask about a narrower scope.",
-            retryable: false,
-        });
+        expect(failureOf(outcome).code).toBe("acr_contract_violation");
+        expect(failureOf(outcome).retryable).toBe(false);
     });
 
     it("is a contract violation when an event fails the event schema", async () => {

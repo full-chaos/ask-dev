@@ -124,14 +124,37 @@ function ClaimedFacts({
     );
 }
 
-function DriverCard({
+/**
+ * What a driver card reads. A whole answer's driver carries every field; ACR's bounded answer
+ * (CHAOS-12559) carries a projected driver with no derivation, epistemic status or path ids, so
+ * those are optional here and the card states only what the driver has.
+ */
+export type DriverCardInput = Pick<
+    DriverJudgment,
+    "driver_id" | "standing" | "category" | "title" | "summary" | "confidence" | "evidence_ref_ids"
+> &
+    Partial<
+        Pick<
+            DriverJudgment,
+            | "qualification"
+            | "source_state"
+            | "source_state_note"
+            | "summary_corrected"
+            | "claimed_fact_ids"
+            | "path_ids"
+            | "epistemic_status"
+            | "derivation"
+        >
+    > & { readonly affected_subjects?: readonly SubjectRef[] };
+
+export function DriverCard({
     driver,
     membersWithFootnote,
     evidenceRefLabels,
     claims,
     paths,
 }: {
-    readonly driver: DriverJudgment;
+    readonly driver: DriverCardInput;
     readonly membersWithFootnote: ReadonlySet<string>;
     readonly evidenceRefLabels: EvidenceRefLabels;
     /** The answer's claimed facts: a cited owning-team roll-up claim is labelled (CHAOS-12178). */
@@ -149,10 +172,15 @@ function DriverCard({
     const correctedNote = note("summary_corrected");
     const rollups = rollupsOfClaims(claims, driver.claimed_fact_ids ?? []);
     const isPrincipal = driver.standing === "principal";
+    const affectedSubjects = driver.affected_subjects ?? [];
     const isWithheld =
         driver.standing === "withheld" &&
-        driver.affected_subjects.every((subject) => membersWithFootnote.has(subjectKey(subject)));
-    const affected = driver.affected_subjects.map((subject) => subject.label).join(", ");
+        affectedSubjects.length > 0 &&
+        affectedSubjects.every((subject) => membersWithFootnote.has(subjectKey(subject)));
+    const affected = affectedSubjects.map((subject) => subject.label).join(", ");
+    const terms = [driver.category, driver.epistemic_status, driver.derivation].flatMap((term) =>
+        term === undefined ? [] : [humanizeTerm(term)],
+    );
     return (
         <li className={`record record--card${isPrincipal ? " record--principal" : ""}`}>
             <div className="record__head">
@@ -205,21 +233,21 @@ function DriverCard({
                     </p>
                 ) : null}
                 <p className="record__meta">
-                    {humanizeTerm(driver.category)} · {humanizeTerm(driver.epistemic_status)} ·{" "}
-                    {humanizeTerm(driver.derivation)} · confidence{" "}
-                    {formatConfidence(driver.confidence)}
+                    {terms.join(" · ")} · confidence {formatConfidence(driver.confidence)}
                 </p>
                 {driver.qualification !== undefined ? (
                     <p className="record__meta">
                         <SafeAnswerText text={driver.qualification} />
                     </p>
                 ) : null}
-                <p className="record__meta" data-testid="driver-affected-subjects">
-                    Affected:{" "}
-                    {driver.affected_subjects
-                        .map((subject) => `${subject.label} (${subject.kind})`)
-                        .join(", ")}
-                </p>
+                {affectedSubjects.length === 0 ? null : (
+                    <p className="record__meta" data-testid="driver-affected-subjects">
+                        Affected:{" "}
+                        {affectedSubjects
+                            .map((subject) => `${subject.label} (${subject.kind})`)
+                            .join(", ")}
+                    </p>
+                )}
                 <EvidenceReferences
                     evidenceRefIds={driver.evidence_ref_ids}
                     evidenceRefLabels={evidenceRefLabels}
@@ -233,6 +261,26 @@ function DriverCard({
                 />
             </details>
         </li>
+    );
+}
+
+/**
+ * The answer's strongest pressures, verbatim. One part, drawn by the whole answer and by ACR's
+ * bounded answer (CHAOS-12559). With none, nothing is drawn.
+ */
+export function StrongestPressures({ pressures }: { readonly pressures: readonly string[] }) {
+    if (pressures.length === 0) return null;
+    return (
+        <>
+            <h3 className="panel__title">Strongest pressures</h3>
+            <ul className="stack stack--tight" style={{ marginBottom: 14 }}>
+                {pressures.map((pressure) => (
+                    <li className="record" key={pressure}>
+                        {pressure}
+                    </li>
+                ))}
+            </ul>
+        </>
     );
 }
 
@@ -279,18 +327,7 @@ export function DriversPanel({ result, rankingWithheld }: DriversPanelProps) {
                 Drivers
             </h2>
             {withheld ? <WithheldPart label="Strongest pressures and drivers" /> : null}
-            {withheld ? null : result.strongest_pressures.length > 0 ? (
-                <>
-                    <h3 className="panel__title">Strongest pressures</h3>
-                    <ul className="stack stack--tight" style={{ marginBottom: 14 }}>
-                        {result.strongest_pressures.map((pressure) => (
-                            <li className="record" key={pressure}>
-                                {pressure}
-                            </li>
-                        ))}
-                    </ul>
-                </>
-            ) : null}
+            {withheld ? null : <StrongestPressures pressures={result.strongest_pressures} />}
             {withheld ? null : result.drivers.length === 0 ? (
                 <p className="panel__empty">No drivers were reported.</p>
             ) : (
