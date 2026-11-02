@@ -1,6 +1,6 @@
 import { askedForCohort, cohortRanking } from "./cohort-ranking";
 import type { InvestigationResult, RenderShape } from "./contracts";
-import { factsWithRows } from "./fact-rows";
+import { factsWithAPanel } from "./fact-rows";
 import {
     COHORT_SHAPE_RULES,
     FACT_PANEL_RULES,
@@ -16,8 +16,8 @@ import {
  * - A cohort chart belongs to the ranking, which draws it or says it was withheld. "Ranking not
  *   shown" says it too. With no ranking, `CohortMembersPanel` says only the charts that fail their
  *   check, so a chart that passes is left over here.
- * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows` has a
- *   panel. That panel draws it or says it was withheld.
+ * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows`, on no
+ *   person, has a panel. That panel draws it or says it was withheld.
  * - Every other shape has no reader.
  */
 export function shapesNoPanelTakes(result: InvestigationResult): readonly RenderShape[] {
@@ -27,7 +27,7 @@ export function shapesNoPanelTakes(result: InvestigationResult): readonly Render
     );
     const rankingTakesItsCharts = state === "rows" || state === "kind_not_ranked";
     const verifiedCohortCharts = renderShapesFor(result, COHORT_SHAPE_RULES).shapes;
-    const claimsWithAPanel = factsWithRows(result.claimed_facts).map((fact) => fact.claim_id);
+    const claimsWithAPanel = factsWithAPanel(result.claimed_facts).map((fact) => fact.claim_id);
     return (result.render_shapes ?? []).filter((shape) => {
         if (COHORT_SHAPE_RULES.includes(shape.selected_by)) {
             return !rankingTakesItsCharts && verifiedCohortCharts.includes(shape);

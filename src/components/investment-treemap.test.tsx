@@ -195,6 +195,14 @@ describe("a served treemap on the answer (CHAOS-12496)", () => {
         expect(screen.queryByTestId("render-shapes-not-drawn")).toBeNull();
     });
 
+    it("says it when its fact is on a person, because no table draws one", () => {
+        const { result } = changed((_, r) => void (fact(r).subject.kind = "person"));
+        const slot = vi.fn<ShapeSlot>(() => <div>chart</div>);
+        draw(result, slot);
+        expect(slot).not.toHaveBeenCalled();
+        expect(screen.getByTestId("render-shapes-not-drawn")).toHaveTextContent(treemap.title);
+    });
+
     it("says it when its claim has no table to sit on", () => {
         const { result } = changed((_, r) => void delete fact(r).rows);
         draw(result);

@@ -54,6 +54,29 @@ describe("a rich shape reaches the host's chart through one seam (CHAOS-12496)",
     });
 });
 
+describe("a host's chart cannot take the answer down (CHAOS-12538)", () => {
+    function Broken(): never {
+        throw new Error("host chart failure");
+    }
+
+    it.each<[string, ShapeSlot]>([
+        [
+            "the slot throws",
+            () => {
+                throw new Error("host chart failure");
+            },
+        ],
+        ["the chart throws as it renders", () => <Broken />],
+    ])("shows the value table and the line when %s", (_, slot) => {
+        const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        draw(slot);
+        quiet.mockRestore();
+        expect(screen.getByText(NOT_SHOWN)).toBeVisible();
+        expect(screen.getByRole("table").closest(".sr-only")).toBeNull();
+        expect(rows()).toHaveLength(shape.series[0].points.length);
+    });
+});
+
 describe("no chart is never a silent absence (CHAOS-12496)", () => {
     it.each<[string, ShapeSlot | null]>([
         ["with no slot, as in standalone and the Workbench", null],

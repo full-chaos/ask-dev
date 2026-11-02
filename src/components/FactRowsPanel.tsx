@@ -5,11 +5,11 @@ import { FactTable } from "./FactTable";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { RenderShapeChart } from "./RenderShapeChart";
 import { RichShape } from "./RichShape";
-import { aboutNoPerson, ScalarFactsPanel } from "./ScalarFactsPanel";
+import { ScalarFactsPanel } from "./ScalarFactsPanel";
 import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
     factRowTiles,
-    factsWithRows,
+    factsWithAPanel,
     findRollupBasis,
     groupFactsByTable,
     selectPresentation,
@@ -45,7 +45,7 @@ export type FactRowsPanelsProps = {
  * the others as references rather than re-plotting their identical rows.
  */
 export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
-    const groups = groupFactsByTable(factsWithRows(facts).filter(aboutNoPerson));
+    const groups = groupFactsByTable(factsWithAPanel(facts));
     return (
         <>
             {groups.map((group) => (
