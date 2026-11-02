@@ -76,6 +76,17 @@ describe("SafeAnswerText", () => {
         expect(container.querySelector("a")?.getAttribute("href")).toBe(url);
     });
 
+    it("strips a long run of unbalanced closing parentheses in linear time (CHAOS-12559)", () => {
+        // Recounting the parentheses per peeled `)` is quadratic on this.
+        const { container } = render(
+            <p>
+                <SafeAnswerText text={`https://example.com/a${")".repeat(200_000)}`} />
+            </p>,
+        );
+
+        expect(container.querySelector("a")?.getAttribute("href")).toBe("https://example.com/a");
+    });
+
     it("keeps a balanced parenthetical inside the URL path, not just before it (codex round 1)", () => {
         render(
             <p data-testid="host">

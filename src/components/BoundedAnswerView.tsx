@@ -2,6 +2,7 @@ import { useId } from "react";
 
 import { AnswerText } from "./AnswerPanel";
 import { Badge } from "./Badge";
+import { ClarificationView } from "./ClarificationPanel";
 import { DriverCard, StrongestPressures } from "./DriversPanel";
 import { LimitationsPanel } from "./LimitationsPanel";
 import { RichShape } from "./RichShape";
@@ -9,51 +10,56 @@ import { ScalarFactsPanel } from "./ScalarFactsPanel";
 import { VocabularyLabelsContext } from "./VocabularyWordContext";
 import type { AnswerProjection, ClaimedFact, RenderShape } from "../lib/contracts";
 import { identityLimitations } from "../lib/fact-dedup";
+import {
+    OMISSION_COUNTS,
+    type OmissionCount,
+    type ProjectionBudget,
+} from "../lib/projection-budget";
 import { statusTone } from "../lib/presentation";
 import { answerStatusWord } from "../lib/vocabulary-labels";
 
 /**
  * ACR's bounded answer (`context_fabric_answer_projection.v1`, CHAOS-12559): the answer ACR serves
  * when the whole result is over the caller's byte option. The projection selects and drops; it
- * never rewords. So this view draws it with the whole answer's own parts (`AnswerText`,
- * `StrongestPressures`, `DriverCard`, `ScalarFactsPanel`, `RichShape`, `LimitationsPanel`), under the
+ * never rewords. So this view draws it with the whole answer's own parts (`ClarificationView`,
+ * `AnswerText`, `StrongestPressures`, `DriverCard`, `ScalarFactsPanel`, `RichShape`,
+ * `LimitationsPanel`), under the
  * words ACR served for it, and adds only what the whole answer has no part for: the line that says
  * what was left out, from `projection_budget`'s counts. Completeness is not drawn (CHAOS-12245).
  */
 export type BoundedAnswerViewProps = { readonly projection: AnswerProjection };
 
-type ProjectionBudget = AnswerProjection["projection_budget"];
-
 /** What one count names, in the sentence that says what was left out. */
-const LEFT_OUT: readonly (readonly [keyof ProjectionBudget, string, string])[] = [
-    ["drivers_omitted", "driver", "drivers"],
-    ["withheld_drivers_omitted", "withheld driver", "withheld drivers"],
-    ["cohort_members_omitted", "member", "members"],
-    ["cohort_groups_omitted", "group", "groups"],
-    ["facts_omitted", "fact", "facts"],
-    ["candidates_omitted", "option", "options"],
-    ["evidence_refs_omitted", "evidence reference", "evidence references"],
-    ["limitations_omitted", "limitation", "limitations"],
-    ["warnings_omitted", "warning", "warnings"],
-    ["coverage_omitted", "coverage line", "coverage lines"],
-    ["reasons_omitted", "reason", "reasons"],
-    ["render_shapes_omitted", "chart", "charts"],
-];
+const NOUNS: Readonly<Record<OmissionCount, readonly [string, string]>> = {
+    drivers_omitted: ["driver", "drivers"],
+    withheld_drivers_omitted: ["withheld driver", "withheld drivers"],
+    cohort_members_omitted: ["member", "members"],
+    cohort_groups_omitted: ["group", "groups"],
+    facts_omitted: ["fact", "facts"],
+    candidates_omitted: ["option", "options"],
+    evidence_refs_omitted: ["evidence reference", "evidence references"],
+    limitations_omitted: ["limitation", "limitations"],
+    warnings_omitted: ["warning", "warnings"],
+    coverage_omitted: ["coverage line", "coverage lines"],
+    reasons_omitted: ["reason", "reasons"],
+    render_shapes_omitted: ["chart", "charts"],
+};
 
 const ASK_NARROWER = "Ask about a narrower scope to see more.";
 
 /**
  * The sentence that says this answer was shortened, and what it left out, from the counts alone.
  * A value ACR shortened (`values_clamped`) is disclosed like an omission, as ACR's contract says.
- * `undefined` only when nothing was left out or shortened, the whole result was not withheld, and
- * the budget does not say it was truncated.
+ * `undefined` when nothing was left out or shortened and the whole result was not withheld. The
+ * classifier refuses a budget whose `truncated` contradicts its counts (`budgetIsConsistent`), so
+ * the counts are the whole story here.
  */
 export function leftOutSentence(budget: ProjectionBudget): string | undefined {
     const parts: string[] = [];
-    for (const [key, one, many] of LEFT_OUT) {
-        const count = budget[key];
-        if (typeof count === "number" && count > 0)
-            parts.push(`${count} ${count === 1 ? one : many}`);
+    for (const key of OMISSION_COUNTS) {
+        const count = budget[key] ?? 0;
+        const [one, many] = NOUNS[key];
+        if (count > 0) parts.push(`${count} ${count === 1 ? one : many}`);
     }
     const clamped = budget.values_clamped ?? 0;
     const clauses: string[] = [];
@@ -64,7 +70,7 @@ export function leftOutSentence(budget: ProjectionBudget): string | undefined {
     }
     if (clamped > 0) clauses.push(`${clamped} ${clamped === 1 ? "value" : "values"} shortened`);
     if (clauses.length === 0) {
-        return budget.full_result_omitted || budget.truncated
+        return budget.full_result_omitted
             ? `This answer was shortened to fit. ${ASK_NARROWER}`
             : undefined;
     }
@@ -115,6 +121,18 @@ export function BoundedAnswerView({ projection }: BoundedAnswerViewProps) {
                     <p className="record__meta bounded-answer__left-out" role="note">
                         {leftOut}
                     </p>
+                ) : null}
+                {projection.clarification !== undefined ? (
+                    // A clarification in bounded form: its prompt and the options it kept, drawn by
+                    // the clarification panel's own body. No choice is offered: re-asking from a
+                    // projection's receipts is not proved, so the panel says it cannot choose here.
+                    <ClarificationView
+                        candidates={projection.clarification.candidates}
+                        evidenceRefLabels={projection.evidence_ref_labels}
+                        prompt={projection.clarification.prompt}
+                        reason={undefined}
+                        resultId={projection.result_id}
+                    />
                 ) : null}
                 <section
                     aria-labelledby={`${idPrefix}-answer-title`}

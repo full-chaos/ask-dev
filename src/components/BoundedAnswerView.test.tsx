@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { BoundedAnswerView, leftOutSentence } from "@/components/BoundedAnswerView";
+import { resultOutcome } from "@/lib/acr/investigate";
 import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
 
 // CHAOS-12559: ACR's bounded answer, drawn from its own fields, verbatim, with what it left out
@@ -73,6 +74,45 @@ describe("BoundedAnswerView", () => {
         render(<BoundedAnswerView projection={warned} />);
         expect(screen.getByText("A served warning.")).toBeInTheDocument();
         expect(screen.queryByText("The service reported no limitations.")).not.toBeInTheDocument();
+    });
+
+    it("draws every limitation it holds when it left others out", () => {
+        const some = {
+            ...answer,
+            limitations: ["A held limitation."],
+            projection_budget: { ...answer.projection_budget, limitations_omitted: 2 },
+        };
+        render(<BoundedAnswerView projection={some} />);
+        expect(screen.getByText("A held limitation.")).toBeInTheDocument();
+        expect(screen.queryByText("The service reported no limitations.")).not.toBeInTheDocument();
+    });
+
+    it("draws a clarification's prompt and the options it kept, with no choice offered", () => {
+        const noMatch = boundedAnswerScenarios["bounded-no-match"];
+        const clarification = {
+            ...noMatch,
+            status: "clarification_required",
+            clarification: {
+                prompt: "Which team did you mean?",
+                candidates: [
+                    {
+                        receipt_id: "receipt_12345678",
+                        subject: { kind: "team", canonical_id: "team:chaos", label: "Chaos" },
+                        state: "ambiguous",
+                        confidence: 0.5,
+                        match_reasons: ["The name matched."],
+                    },
+                ],
+            },
+        };
+        // The form passes ACR's own contract, so this is what a user would get.
+        expect(resultOutcome(clarification).kind).toBe("bounded");
+        render(<BoundedAnswerView projection={clarification as typeof noMatch} />);
+        expect(screen.getByText("Which team did you mean?")).toBeInTheDocument();
+        expect(screen.getByText("Chaos")).toBeInTheDocument();
+        expect(screen.getByText("The name matched.")).toBeInTheDocument();
+        expect(screen.getByTestId("cannot-choose-here")).toBeInTheDocument();
+        expect(screen.queryByRole("button", { name: /Select Chaos/ })).not.toBeInTheDocument();
     });
 
     it("still says the service reported no limitations when it sent none", () => {
@@ -148,12 +188,6 @@ describe("leftOutSentence", () => {
             leftOutSentence({ ...none, truncated: true, facts_omitted: 1, values_clamped: 1 }),
         ).toBe(
             "This answer was shortened to fit: 1 fact left out; 1 value shortened. Ask about a narrower scope to see more.",
-        );
-    });
-
-    it("says the answer was shortened when the budget says truncated and no count is set", () => {
-        expect(leftOutSentence({ ...none, truncated: true, full_result_omitted: false })).toBe(
-            "This answer was shortened to fit. Ask about a narrower scope to see more.",
         );
     });
 

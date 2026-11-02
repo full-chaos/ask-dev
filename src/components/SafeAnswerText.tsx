@@ -24,41 +24,33 @@ const URL_PATTERN = /https?:\/\/[^\s<>"]+/g;
 const TRAILING_PUNCTUATION = ".,;:";
 
 /**
- * The length of the run of `TRAILING_PUNCTUATION` at the end of `url`. A loop from the end, not
- * the regex `/[.,;:]+$/`: that one tries every start of a run and scans it to the end, so it is
- * quadratic in a long run of those characters inside a URL (CodeQL js/polynomial-redos, CHAOS-12559).
- */
-function trailingPunctuationLength(url: string): number {
-    let end = url.length;
-    while (end > 0 && TRAILING_PUNCTUATION.includes(url.charAt(end - 1))) end -= 1;
-    return url.length - end;
-}
-
-/**
  * Peels sentence-level noise off the end of a matched URL: an unbalanced
  * trailing `)` (closing a sentence's own parenthetical, not the URL's own),
  * then unambiguous trailing punctuation — repeated, since either can expose
  * the other (`"...(mathematics))."` needs both peeled, more than once).
  */
 function stripTrailingNoise(matchedUrl: string): string {
-    let url = matchedUrl;
-    for (;;) {
-        if (url.endsWith(")")) {
-            const opens = (url.match(/\(/g) ?? []).length;
-            const closes = (url.match(/\)/g) ?? []).length;
-            if (closes > opens) {
-                url = url.slice(0, -1);
-                continue;
-            }
-        }
-        const trailing = trailingPunctuationLength(url);
-        if (trailing > 0) {
-            url = url.slice(0, url.length - trailing);
-            continue;
-        }
-        break;
+    // One pass to count the parentheses, then one step back per peeled character, so the work is
+    // linear in the URL's length. Recounting per peeled `)`, or the regex `/[.,;:]+$/`, is
+    // quadratic on a long run inside a URL (CodeQL js/polynomial-redos, CHAOS-12559).
+    let opens = 0;
+    let closes = 0;
+    for (let index = 0; index < matchedUrl.length; index += 1) {
+        const char = matchedUrl.charAt(index);
+        if (char === "(") opens += 1;
+        else if (char === ")") closes += 1;
     }
-    return url;
+    let end = matchedUrl.length;
+    while (end > 0) {
+        const last = matchedUrl.charAt(end - 1);
+        if (last === ")" && closes > opens) {
+            closes -= 1;
+        } else if (!TRAILING_PUNCTUATION.includes(last)) {
+            break;
+        }
+        end -= 1;
+    }
+    return matchedUrl.slice(0, end);
 }
 
 function linkifyLine(line: string, keyPrefix: string) {

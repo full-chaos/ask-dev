@@ -28,6 +28,7 @@ import {
 } from "@/lib/acr/upstream-vocabulary";
 import { loadStreamValidators, streamEnvelopeValidators } from "@/lib/acr/stream-validators";
 import { validateContract, type ContractSchemaName } from "@/lib/acr/validate";
+import { budgetIsConsistent } from "@/lib/projection-budget";
 import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
 import { CHAT_STATUS_COPY, NOT_RUN_COPY } from "@/render/chat-copy";
 import {
@@ -729,7 +730,18 @@ export function resultOutcome(payload: unknown): InvestigateOutcome {
             });
         }
         // The cast is honest: the projection schema declares these fields, and it just passed.
-        return { kind: "bounded", projection: payload as AnswerProjection };
+        const projection = payload as AnswerProjection;
+        if (!budgetIsConsistent(projection.projection_budget)) {
+            return failed({
+                code: "acr_contract_violation",
+                message: "Ask Dev returned a result that does not meet the required format.",
+                details: [
+                    "projection_budget: truncated does not match its counts and full_result_omitted",
+                ],
+                retryable: false,
+            });
+        }
+        return { kind: "bounded", projection };
     }
     const schema = resultSchemaFor(payload);
     if (schema === undefined) {

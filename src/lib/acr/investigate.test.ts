@@ -1483,6 +1483,52 @@ describe("investigateFromBrowser", () => {
         expect(failureOf(outcome).retryable).toBe(false);
     });
 
+    // ACR's own rule (acr validate_context_fabric_answer_projection.go): truncated iff a count is
+    // above zero or the whole result was withheld. The JSON Schema cannot state it.
+    it("is a contract violation when the budget's truncated contradicts its counts", () => {
+        const answer = boundedAnswerScenarios["bounded-answer"];
+        const nothingCut = {
+            ...answer.projection_budget,
+            drivers_omitted: 0,
+            withheld_drivers_omitted: 0,
+            cohort_members_omitted: 0,
+            cohort_groups_omitted: 0,
+            facts_omitted: 0,
+            candidates_omitted: 0,
+            evidence_refs_omitted: 0,
+            limitations_omitted: 0,
+            warnings_omitted: 0,
+            coverage_omitted: 0,
+            reasons_omitted: 0,
+            values_clamped: 0,
+            render_shapes_omitted: 0,
+            full_result_omitted: false,
+        };
+        const cases = {
+            "truncated with nothing cut": { ...nothingCut, truncated: true },
+            "not truncated with a count": { ...nothingCut, truncated: false, facts_omitted: 1 },
+            "not truncated with a shortened value": {
+                ...nothingCut,
+                truncated: false,
+                values_clamped: 1,
+            },
+            "not truncated with the whole result withheld": {
+                ...nothingCut,
+                truncated: false,
+                full_result_omitted: true,
+            },
+        };
+        for (const [name, budget] of Object.entries(cases)) {
+            const outcome = resultOutcome({ ...answer, projection_budget: budget });
+            expect(outcome.kind, name).toBe("failed");
+            expect(failureOf(outcome).code, name).toBe("acr_contract_violation");
+        }
+        expect(
+            resultOutcome({ ...answer, projection_budget: { ...nothingCut, truncated: false } })
+                .kind,
+        ).toBe("bounded");
+    });
+
     it("is a contract violation when an event fails the event schema", async () => {
         serve((init) =>
             streamFor(init, {
