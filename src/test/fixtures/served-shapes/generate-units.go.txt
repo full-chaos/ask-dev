@@ -1,6 +1,7 @@
-// Scratch generator of the measure-units*.json fixtures, not built by this repo. From a detached acr
-// worktree at 4eb93cf9: add the first file below as internal/contextfabric/zz_units_export.go and the
-// second as cmd/zzunits/main.go, then `go run ./cmd/zzunits <this directory>`.
+// Scratch generator of the measure-units*.json and cadence-*.json fixtures, not built by this repo.
+// From a detached acr worktree at 4eb93cf9: add the first file below as
+// internal/contextfabric/zz_units_export.go and the second as cmd/zzunits/main.go, then
+// `go run ./cmd/zzunits <this directory>`.
 
 // internal/contextfabric/zz_units_export.go
 package contextfabric
@@ -59,6 +60,26 @@ func select_(result contextfabric.InvestigationResult) contextfabric.Investigati
 	return result
 }
 
+// withDays writes days, in order, into the "day" field of a claim's rows and time_series_rows.
+func withDays(result contextfabric.InvestigationResult, claimID string, days []string) contextfabric.InvestigationResult {
+	for index := range result.ClaimedFacts {
+		fact := &result.ClaimedFacts[index]
+		if fact.ClaimID != claimID {
+			continue
+		}
+		for _, rows := range [][]contextfabric.ClaimedFactRow{fact.Rows, fact.TimeSeriesRows} {
+			if len(rows) != len(days) || rows[0].Fields["day"].String == nil {
+				continue
+			}
+			for row := range rows {
+				day := days[row]
+				rows[row].Fields["day"] = contextfabric.ScalarValue{String: &day}
+			}
+		}
+	}
+	return result
+}
+
 func main() {
 	out := os.Args[1]
 	var capabilities []contextfabric.FactCapability
@@ -66,18 +87,29 @@ func main() {
 		capabilities = append(capabilities, provider.Capability())
 	}
 	declared := select_(contextfabric.ZZWithDeclared(load(), capabilities))
-	// The example's commits claim, about a repository instead of a project: the repository's own
-	// daily_metrics declaration then states its unit and cadence.
-	repository := load()
-	for index := range repository.ClaimedFacts {
-		fact := &repository.ClaimedFacts[index]
-		if fact.ClaimID == "claim_metrics_ask_dev_commits" {
-			fact.Subject = contextfabric.SubjectRef{Kind: contextfabric.SubjectRepository, CanonicalID: "repository:full-chaos/ask-dev", Label: "full-chaos/ask-dev"}
-		}
-	}
-	repository.SubjectResolution.Committed = append(repository.SubjectResolution.Committed, contextfabric.SubjectRef{Kind: contextfabric.SubjectRepository, CanonicalID: "repository:full-chaos/ask-dev", Label: "full-chaos/ask-dev"})
-	repositoryDeclared := select_(contextfabric.ZZWithDeclared(repository, capabilities))
 	undeclared := select_(contextfabric.ZZWithDeclared(load(), nil))
+	// The example's commits claim, about a repository instead of a project: the repository's own
+	// daily_metrics declaration then states its unit and cadence. A fresh load each time: rows are
+	// shared slices, so no case may write into another's.
+	aboutRepository := func() contextfabric.InvestigationResult {
+		result := load()
+		repository := contextfabric.SubjectRef{Kind: contextfabric.SubjectRepository, CanonicalID: "repository:full-chaos/ask-dev", Label: "full-chaos/ask-dev"}
+		for index := range result.ClaimedFacts {
+			if result.ClaimedFacts[index].ClaimID == "claim_metrics_ask_dev_commits" {
+				result.ClaimedFacts[index].Subject = repository
+			}
+		}
+		result.SubjectResolution.Committed = append(result.SubjectResolution.Committed, repository)
+		return result
+	}
+	repositoryDeclared := select_(contextfabric.ZZWithDeclared(aboutRepository(), capabilities))
+	// CHAOS-12571: daily series with one day missing, and with every day, through the real cadence.
+	daily := func(days []string) contextfabric.InvestigationResult {
+		result := withDays(withDays(aboutRepository(), "claim_workload_ask_dev_backlog", days), "claim_metrics_ask_dev_commits", days)
+		return select_(contextfabric.ZZWithDeclared(result, capabilities))
+	}
+	missingDay := daily([]string{"2026-08-28", "2026-08-29", "2026-08-31"})
+	everyDay := daily([]string{"2026-08-28", "2026-08-29", "2026-08-30"})
 	cases := []struct {
 		name   string
 		result contextfabric.InvestigationResult
@@ -87,6 +119,8 @@ func main() {
 		{"measure-units-labels-off", declared, false},
 		{"measure-units-undeclared", undeclared, true},
 		{"measure-units-repository", repositoryDeclared, true},
+		{"cadence-missing-day", missingDay, true},
+		{"cadence-every-day", everyDay, true},
 	}
 	for _, c := range cases {
 		served, tier := contextfabric.ServeVocabularyLabels(c.result, c.labels, maxBytes)

@@ -1,4 +1,9 @@
-import type { ClaimedFactTable, InvestigationResult, RenderShape } from "./contracts";
+import type {
+    ClaimedFactTable,
+    InvestigationResult,
+    RenderPointSource,
+    RenderShape,
+} from "./contracts";
 import { renderableRowsSource } from "./render-shapes";
 
 /** ACR's closed unit vocabulary (CHAOS-11984): count, ratio, hours, days, points. */
@@ -19,6 +24,23 @@ export function declaredUnit(
 }
 
 /**
+ * The table that declares the row a point cites: the claim's `time_series_table` when the shapes
+ * of that claim plot `time_series_rows`, else its `table` (`renderableRowsSource`, the same choice
+ * the verifier resolves points with). `undefined` for a point that cites no claimed-fact row.
+ */
+export function citedTable(
+    source: RenderPointSource,
+    result: InvestigationResult,
+): ClaimedFactTable | undefined {
+    if (source.kind !== "claimed_fact_row") return undefined;
+    const claim = result.claimed_facts.find((fact) => fact.claim_id === source.claim_id);
+    if (claim === undefined) return undefined;
+    return renderableRowsSource(claim) === "time_series_rows"
+        ? claim.time_series_table
+        : claim.table;
+}
+
+/**
  * The one unit every point of a shape cites (CHAOS-12570), or `undefined`. A point names a claim's
  * row and field; the table that declares that row is the claim's `time_series_table` when the
  * shape plots `time_series_rows`, else its `table` (`renderableRowsSource`, the same choice the
@@ -32,14 +54,8 @@ export function shapeMeasureUnit(
     let unit: MeasureUnit | undefined;
     for (const series of shape.series) {
         for (const { source } of series.points) {
-            if (source.kind !== "claimed_fact_row" || source.field === undefined) return undefined;
-            const claim = result.claimed_facts.find((fact) => fact.claim_id === source.claim_id);
-            if (claim === undefined) return undefined;
-            const table =
-                renderableRowsSource(claim) === "time_series_rows"
-                    ? claim.time_series_table
-                    : claim.table;
-            const pointUnit = declaredUnit(table, source.field);
+            if (source.field === undefined) return undefined;
+            const pointUnit = declaredUnit(citedTable(source, result), source.field);
             if (pointUnit === undefined || (unit !== undefined && pointUnit !== unit)) {
                 return undefined;
             }

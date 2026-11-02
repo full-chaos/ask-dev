@@ -1,3 +1,4 @@
+import { type Cadence, missingDayBreaks } from "../lib/cadence";
 import type { Cohort, RenderShape } from "../lib/contracts";
 import { parseIsoDate } from "../lib/fact-rows";
 import { axisLabels } from "../lib/render-shapes";
@@ -12,6 +13,11 @@ export type RenderShapeChartProps = {
      * nothing. It follows `value_label` wherever that is said, and is the y-axis caption.
      */
     readonly unit?: string | undefined;
+    /**
+     * CHAOS-12571: the cadence of the tables every point cites (`shapeCadence`). With `day`, the
+     * time line breaks at a missing day.
+     */
+    readonly cadence?: Cadence | undefined;
 };
 
 /** `value_label`, and the served unit word after it when there is one. */
@@ -382,10 +388,13 @@ function TimeLines({
     shape,
     labels,
     unit,
+    breaks,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
     readonly unit?: string | undefined;
+    /** Whether the line breaks between two consecutive served labels (`missingDayBreaks`). */
+    readonly breaks?: ((before: string, after: string) => boolean) | undefined;
 }) {
     const valueLabel = valueLabelOf(shape, unit);
     const times = labels.map((label) => parseIsoDate(label) ?? Number.NaN);
@@ -436,17 +445,23 @@ function TimeLines({
                     .filter((point): point is NonNullable<typeof point> => point !== null);
                 // A line never bridges a gap it does not cover: a break in
                 // the run of labels ends the polyline instead of drawing
-                // continuity the observations do not support.
+                // continuity the observations do not support. With a day
+                // cadence, so does a missing day between two served days
+                // (CHAOS-12571): each point keeps its marker below.
                 const segments: (typeof points)[] = [];
                 let current: typeof points = [];
-                let previous: number | null = null;
+                let previous: (typeof points)[number] | null = null;
                 for (const point of points) {
-                    if (previous !== null && point.index !== previous + 1) {
+                    if (
+                        previous !== null &&
+                        (point.index !== previous.index + 1 ||
+                            (breaks?.(previous.label, point.label) ?? false))
+                    ) {
                         if (current.length > 0) segments.push(current);
                         current = [];
                     }
                     current.push(point);
-                    previous = point.index;
+                    previous = point;
                 }
                 if (current.length > 0) segments.push(current);
                 const color = `var(${SERIES_VARS[seriesIndex]!})`;
@@ -525,10 +540,14 @@ function TimeLines({
  * component has never seen is how a chart starts claiming something the
  * answer does not.
  */
-export function RenderShapeChart({ shape, cohort, unit }: RenderShapeChartProps) {
+export function RenderShapeChart({ shape, cohort, unit, cadence }: RenderShapeChartProps) {
     if (shape.kind !== "series") return null;
     const labels = axisLabels(shape, cohort);
     if (labels.length === 0) return null;
+    const breaks =
+        shape.presentation === "line"
+            ? missingDayBreaks(cadence, labels, `render shape ${shape.shape_id}`)
+            : undefined;
     return (
         <figure className="render-shape">
             <figcaption className="render-shape__title">{shape.title}</figcaption>
@@ -539,7 +558,7 @@ export function RenderShapeChart({ shape, cohort, unit }: RenderShapeChartProps)
                 </p>
             )}
             {shape.presentation === "line" ? (
-                <TimeLines labels={labels} shape={shape} unit={unit} />
+                <TimeLines breaks={breaks} labels={labels} shape={shape} unit={unit} />
             ) : (
                 <CategoryBars labels={labels} shape={shape} unit={unit} />
             )}

@@ -1,5 +1,6 @@
 import { MeasureUnitWord } from "./MeasureUnitWord";
 import { useVocabularyWord } from "./VocabularyWordContext";
+import { missingDayBreaks } from "../lib/cadence";
 import type { ClaimedFactRow, ClaimedFactTable } from "../lib/contracts";
 import { cellValue, parseIsoDate, type ChartAxis } from "../lib/fact-rows";
 import { declaredUnit } from "../lib/measure-units";
@@ -107,23 +108,36 @@ type Point = {
     readonly row: ClaimedFactRow;
 };
 
+/** Whether a line breaks between two consecutive served axis keys (`missingDayBreaks`). */
+type Breaks = (before: string, after: string) => boolean;
+
 /**
  * Splits points into contiguous runs by their original row index. A missing
  * value breaks the run — connecting across it with one polyline would
  * visually claim continuity the data does not have (codex round 1,
- * CHAOS-4355).
+ * CHAOS-4355). With a day cadence, so does a missing day between two served
+ * days (CHAOS-12571).
  */
-function contiguousSegments(indexed: readonly { point: Point; rowIndex: number }[]): Point[][] {
+function contiguousSegments(
+    indexed: readonly { point: Point; rowIndex: number }[],
+    key: (point: Point) => string,
+    breaks: Breaks | undefined,
+): Point[][] {
     const segments: Point[][] = [];
     let current: Point[] = [];
-    let previousRowIndex: number | null = null;
-    for (const { point, rowIndex } of indexed) {
-        if (previousRowIndex !== null && rowIndex !== previousRowIndex + 1) {
+    let previous: { point: Point; rowIndex: number } | null = null;
+    for (const entry of indexed) {
+        const { point, rowIndex } = entry;
+        if (
+            previous !== null &&
+            (rowIndex !== previous.rowIndex + 1 ||
+                (breaks?.(key(previous.point), key(point)) ?? false))
+        ) {
             if (current.length > 0) segments.push(current);
             current = [];
         }
         current.push(point);
-        previousRowIndex = rowIndex;
+        previous = entry;
     }
     if (current.length > 0) segments.push(current);
     return segments;
@@ -140,6 +154,7 @@ type SeriesChartProps = {
     readonly maxAxisLabels: number;
     readonly showTitle: boolean;
     readonly table: ClaimedFactTable | undefined;
+    readonly breaks: Breaks | undefined;
 };
 
 /**
@@ -159,6 +174,7 @@ function SeriesChart({
     maxAxisLabels,
     showTitle,
     table,
+    breaks,
 }: SeriesChartProps) {
     const word = useVocabularyWord();
     // Time rows are ordered — and, when every axis value parses as a real
@@ -225,7 +241,11 @@ function SeriesChart({
         })
         .filter((p): p is { point: Point; rowIndex: number } => p !== null);
     const points = indexedPoints.map((p) => p.point);
-    const segments = contiguousSegments(indexedPoints);
+    const segments = contiguousSegments(
+        indexedPoints,
+        (point) => axisLabel(point.row, axis),
+        breaks,
+    );
 
     const columnWord = word("fact_field", column);
     const axisDescription = `${columnWord} by ${word("fact_field", axis.column)}`;
@@ -401,6 +421,15 @@ function SeriesChart({
  * underlying numbers are never SVG-only (codex round 1, CHAOS-4355).
  */
 export function FactChart({ rows, axis, seriesColumns, chartKind, table }: FactChartProps) {
+    // CHAOS-12571: a day cadence breaks each line at a missing day.
+    const breaks =
+        chartKind === "line"
+            ? missingDayBreaks(
+                  table?.cadence,
+                  rows.map((row) => axisLabel(row, axis)),
+                  `fact table ${table?.field ?? ""}`,
+              )
+            : undefined;
     if (seriesColumns.length <= 1) {
         const column = seriesColumns[0];
         if (column === undefined) return null;
@@ -413,6 +442,7 @@ export function FactChart({ rows, axis, seriesColumns, chartKind, table }: FactC
                     height={SINGLE_HEIGHT}
                     maxAxisLabels={MAX_AXIS_LABELS_SINGLE}
                     rows={rows}
+                    breaks={breaks}
                     showTitle={false}
                     table={table}
                     width={SINGLE_WIDTH}
@@ -433,6 +463,7 @@ export function FactChart({ rows, axis, seriesColumns, chartKind, table }: FactC
                     key={column}
                     maxAxisLabels={MAX_AXIS_LABELS_MULTIPLE}
                     rows={rows}
+                    breaks={breaks}
                     showTitle
                     table={table}
                     width={MULTIPLE_WIDTH}

@@ -16,6 +16,7 @@ import {
     selectPresentation,
 } from "../lib/fact-rows";
 import { rollupsOfClaims } from "../lib/investment-rollup";
+import { shapeCadence } from "../lib/cadence";
 import { declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
 import { factShapesForClaim, THEME_SHARE_RULE } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
@@ -230,6 +231,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
             ) : null}
             {trends.shapes.map((trend) => (
                 <RenderShapeChart
+                    cadence={result === undefined ? undefined : shapeCadence(trend, result)}
                     key={trend.shape_id}
                     shape={trend}
                     unit={
