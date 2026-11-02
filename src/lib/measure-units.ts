@@ -45,7 +45,8 @@ export function citedTable(
  * P2). Claims share a panel when their rows are byte-identical (CHAOS-4672), so the panel's numbers
  * are every claim's: a unit is stated only where every claim's table states the same one. This is
  * the first table, with each measure whose unit another claim states differently, or not at all,
- * taken out of `measure_units`.
+ * taken out of `measure_units`. The same holds for a day cadence (CHAOS-12571): a break claims a
+ * missing day, so the cadence stays only when every claim's table states it.
  */
 export function agreedTable(
     tables: readonly (ClaimedFactTable | undefined)[],
@@ -56,9 +57,14 @@ export function agreedTable(
     const agreed = declared.filter(({ measure, unit }) =>
         others.every((table) => declaredUnit(table, measure) === unit),
     );
-    if (agreed.length === declared.length) return primary;
-    const { measure_units: _disagreed, ...rest } = primary;
-    return agreed.length === 0 ? rest : { ...rest, measure_units: agreed };
+    const cadenceAgrees = others.every((table) => table?.cadence === primary.cadence);
+    if (agreed.length === declared.length && cadenceAgrees) return primary;
+    const { measure_units: _disagreed, cadence: _cadence, ...rest } = primary;
+    return {
+        ...rest,
+        ...(agreed.length === 0 ? {} : { measure_units: agreed }),
+        ...(cadenceAgrees && primary.cadence !== undefined ? { cadence: primary.cadence } : {}),
+    };
 }
 
 /**

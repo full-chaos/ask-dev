@@ -159,6 +159,29 @@ describe("the fact panel chart with cadence day (CHAOS-12571)", () => {
         expect(lines(panelChart(everyDay))).toEqual([3]);
     });
 
+    it("breaks only where every claim of a grouped panel states the cadence", () => {
+        // Two claims with byte-identical rows share the panel (CHAOS-4672): a break claims a
+        // missing day, so every claim's table must state the day cadence.
+        const grouped = (siblingCadence: "day" | undefined, siblingUnits = true) => {
+            const result = structuredClone(missingDay);
+            const claim = result.claimed_facts.find(
+                (fact) => fact.claim_id === "claim_metrics_ask_dev_commits",
+            )!;
+            const sibling = structuredClone(claim);
+            sibling.claim_id = "claim_metrics_ask_dev_commits_again";
+            if (siblingCadence === undefined) delete sibling.table!.cadence;
+            if (!siblingUnits) delete sibling.table!.measure_units;
+            result.claimed_facts.push(sibling);
+            return result;
+        };
+        expect(lines(panelChart(grouped("day")))).toEqual([2, 1]);
+        cleanup();
+        expect(lines(panelChart(grouped(undefined)))).toEqual([3]);
+        cleanup();
+        // Units that disagree do not take the agreed cadence with them.
+        expect(lines(panelChart(grouped("day", false)))).toEqual([2, 1]);
+    });
+
     it("joins as before and logs it when the rows do not keep the cadence", () => {
         const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
         const repeated = metricsDays(missingDay, ["2026-08-28", "2026-08-28", "2026-08-31"]);
