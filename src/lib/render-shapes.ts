@@ -430,7 +430,9 @@ function isRepositoryFlow(shape: RenderShape, facts: readonly ClaimedFact[]): bo
     const claimId = shape.series[0]?.points[0]?.source.claim_id;
     const fact = claimFor(facts, claimId);
     if (fact === undefined || !holdsRepositoryFlowTable(fact)) return false;
-    if (fact.subject.kind !== "team") return false;
+    // The flows are a team's investment: the table alone does not say what was measured, so a
+    // claim of another kind carrying it is refused (codex r1 on #164).
+    if (fact.kind !== "investment" || fact.subject.kind !== "team") return false;
     const words = new Map<string, string>();
     const themeEffort = new Map<string, number>();
     const linkedThemes = new Set<string>();

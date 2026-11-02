@@ -138,6 +138,9 @@ describe("the verifier reads a sankey as one team's flows (CHAOS-12579)", () => 
         ["the rule on another kind", (s) => void (s.kind = "treemap")],
         ["a time axis", (s) => void (s.axis_kind = "time")],
         ["a presentation", (s) => void (s.presentation = "bars")],
+        // Codex r1 on #164: the table alone does not say what was measured. A health claim
+        // carrying this table is not the team's investment.
+        ["a claim of another kind", (_, r) => void (fact(r).kind = "health")],
         ["a table of another name", (_, r) => void (fact(r).table!.field = "theme_breakdown")],
         ["no declared table", (_, r) => void delete fact(r).table],
         [
