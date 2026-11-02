@@ -8,6 +8,7 @@ import type { InvestigationResult, RenderShape } from "@/lib/contracts";
 import { renderShapesFor, shapeDetail, verifyRenderShape } from "@/lib/render-shapes";
 import { shapesNoPanelTakes } from "@/lib/shape-account";
 import { servedShapeScenarios } from "@/test/fixtures/served-shapes";
+import curveDetail from "@/test/fixtures/served-shapes/forecast-curve.detail.json";
 
 afterEach(cleanup);
 
@@ -217,6 +218,10 @@ describe("the host gets the forecast's served detail (CHAOS-4613)", () => {
                 cumulativeShare: row.fields.cumulative_share!.number,
             })),
         );
+    });
+
+    it("the published detail fixture is exactly what the host gets: a host reads it from the pin", () => {
+        expect(shapeDetail(curve, curveAnswer.claimed_facts)).toEqual(curveDetail);
     });
 
     it("leaves a run count the row does not carry absent, never 0", () => {
