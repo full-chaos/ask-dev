@@ -161,6 +161,57 @@ describe("a dated_fact_trend shape (CHAOS-12570)", () => {
     });
 });
 
+describe("a panel that stands for several claims (CHAOS-12570, codex r1 P2)", () => {
+    // Two claims with byte-identical rows share one panel (CHAOS-4672). The panel's numbers are
+    // every claim's, so a unit shows only when every claim declares the same one.
+    const grouped = (siblingUnits: { measure: string; unit: "count" | "days" }[]) => {
+        const result = structuredClone(declared);
+        const claim = result.claimed_facts.find(
+            (fact) => fact.claim_id === "claim_workload_ask_dev_backlog",
+        )!;
+        const sibling = structuredClone(claim);
+        sibling.claim_id = "claim_workload_ask_dev_backlog_again";
+        sibling.field = "throughput_mean";
+        sibling.table!.measure_units = siblingUnits;
+        delete sibling.time_series_rows;
+        delete sibling.time_series_table;
+        result.claimed_facts.push(sibling);
+        return result;
+    };
+
+    it("is a schema-valid answer that groups the two claims into one panel", () => {
+        const result = grouped([{ measure: "backlog_size", unit: "days" }]);
+        const verdict = validateContract(
+            "context_fabric_investigation_result.v1.schema.json",
+            result,
+        );
+        expect(verdict.errors ?? []).toEqual([]);
+        show(result);
+        expect(within(workloadPanel()).getByTestId("fact-also-referenced")).toBeDefined();
+    });
+
+    it("draws no unit where the claims declare different units for a measure", () => {
+        show(grouped([{ measure: "backlog_size", unit: "days" }]));
+        const root = workloadPanel();
+        expect(within(headerOf(root, "Backlog size")!).queryByTestId("measure-unit")).toBeNull();
+        expect(within(tileOf(root, "Backlog size")!).queryByTestId("measure-unit")).toBeNull();
+    });
+
+    it("draws no unit where one of the claims declares none", () => {
+        show(grouped([]));
+        const root = workloadPanel();
+        expect(within(headerOf(root, "Backlog size")!).queryByTestId("measure-unit")).toBeNull();
+    });
+
+    it("draws the unit where every claim declares the same one", () => {
+        show(grouped([{ measure: "backlog_size", unit: "count" }]));
+        const root = workloadPanel();
+        expect(
+            within(headerOf(root, "Backlog size")!).getByTestId("measure-unit").textContent,
+        ).toBe("count");
+    });
+});
+
 describe("no word, no unit (CHAOS-12570)", () => {
     it("draws nothing for a unit when the answer has no word map, never the raw token", () => {
         show(labelsOff);
@@ -171,6 +222,12 @@ describe("no word, no unit (CHAOS-12570)", () => {
             .find((node) => /Backlog size over time/u.test(node.textContent ?? ""))!;
         expect(trend.querySelector("svg")!.getAttribute("aria-label")).not.toMatch(/\(count\)/u);
         expect(units(workloadPanel())).toEqual([]);
+        // What a reader sees, whatever the markup: the served value and the column word, alone.
+        const root = workloadPanel();
+        // With no word map the column word is the generic path: "backlog size".
+        expect(tileOf(root, "backlog size")!.querySelector(".tile__value")!.textContent).toBe("12");
+        expect(headerOf(root, "backlog size")!.textContent).toBe("backlog size");
+        expect(trend.textContent).not.toMatch(/\bcount\b/u);
     });
 
     it("draws no unit anywhere when no measure declares one", () => {
