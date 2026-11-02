@@ -34,10 +34,7 @@
         "family_version": "question-family.v5",
         "require_drivers": false,
         "require_ranking": false,
-        "render_kinds": [
-            "sankey",
-            "table"
-        ],
+        "render_kinds": ["sankey", "table"],
         "budget": {
             "max_items": 400,
             "max_serialized_bytes": 262144,
@@ -207,17 +204,9 @@
             "table": {
                 "field": "repository_theme_breakdown",
                 "shape": "breakdown",
-                "key": [
-                    "repository",
-                    "theme"
-                ],
-                "measures": [
-                    "weighted_effort",
-                    "theme_weighted_effort"
-                ],
-                "observations": [
-                    "repository_label"
-                ]
+                "key": ["repository", "theme"],
+                "measures": ["weighted_effort", "theme_weighted_effort"],
+                "observations": ["repository_label"]
             }
         }
     ],

@@ -1,5 +1,7 @@
 // Scratch generator of repository-flow-sankey.json, not built by this repo. From a detached acr
-// worktree at the contract commit, then `go run ./cmd/zzsankey <this directory>`.
+// worktree at the contract commit, then `go run ./cmd/zzsankey <this directory>`, then
+// `prettier --write` on the output (whitespace only; the JSON is unchanged). Ran at acr 271ce38b
+// (#1939's merge, the pin of record).
 //
 // No producer emits this rule yet (CHAOS-12582), so the shape is built here the way acr's own
 // contract test builds it (`chaos12578_sankey_shape_test.go`): one series per theme with effort,
