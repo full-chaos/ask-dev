@@ -67,6 +67,9 @@ export const CHAT_STATUS_COPY = {
     mismatch: "This question could not be sent again as it was first sent. Ask again.",
     // CHAOS-12593: no "ask again": the same answer is refused the same way until the page updates.
     unreadable:
+        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Tell your administrator this page needs an update.",
+    /** The same, when the turn has a reference to show (codex r1 P2: never ask for one not shown). */
+    unreadableWithReference:
         "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
     unsaved: "The answer was shown but not saved — ask again",
     abandoned: "An earlier run of this question ended without an answer. Ask again.",
@@ -91,6 +94,7 @@ export const CHAT_STATUS_COPY = {
 } & Record<
     | Exclude<ChatStatus["kind"], "deadline" | "limited" | "not_run" | "stopped">
     | "failedRetry"
+    | "unreadableWithReference"
     | "reference"
     | "loadAgain"
     | "questionNotRecorded",
@@ -274,6 +278,10 @@ export function chatStatusWords(status: ChatStatus, retry: boolean): string {
             return NOT_RUN_COPY[status.reason];
         case "stopped":
             return STOPPED_COPY[status.reason];
+        case "unreadable":
+            return status.reference === undefined
+                ? CHAT_STATUS_COPY.unreadable
+                : CHAT_STATUS_COPY.unreadableWithReference;
         default:
             return CHAT_STATUS_COPY[status.kind];
     }

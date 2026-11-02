@@ -949,6 +949,7 @@ describe("submissionStatus and readResult", () => {
         await expect(transport().readResult("result_x", signal)).rejects.toMatchObject({
             status: 404,
         });
+        // The checks pass it, but it is no result the views can read: no schema refusal.
         fetchMock.mockResolvedValueOnce(jsonResponse({ status: "complete" }, 200));
         await expect(transport().readResult("result_x", signal)).rejects.toEqual(
             new TransportFailure("invalid_upstream"),
@@ -964,7 +965,7 @@ describe("submissionStatus and readResult", () => {
             ),
         );
         await expect(refusing.readResult("result_x", signal)).rejects.toEqual(
-            new TransportFailure("invalid_upstream"),
+            new TransportFailure("invalid_upstream", "schema"),
         );
     });
 });
@@ -1230,6 +1231,53 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
             ].sort(),
         );
     });
+
+    it("a replayed result both pinned result schemas refuse ends the same way (codex r1 P2)", async () => {
+        const result = (resultEvent(9) as unknown as { result: { result_id: string } }).result;
+        fetchMock.mockResolvedValue(jsonResponse(result, 200));
+        const replay = transportChecking(streamEnvelopeValidators, {
+            ...streamValidators,
+            validateInvestigationResultV1: refusing(),
+            validateInvestigationResultV2: Object.assign((_value: unknown) => false, {
+                errors: [{ instancePath: "", keyword: "const", schemaPath: "#/schema_version" }],
+            }),
+        }).readResult(result.result_id, new AbortController().signal);
+        const failure = await replay.then(
+            () => undefined,
+            (error: unknown) => error,
+        );
+        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "schema" });
+        expect(log.error).toHaveBeenCalledWith(
+            {
+                call: "replay",
+                path: "/claimed_facts/0/table",
+                keyword: "additionalProperties",
+                schema_path: "#/$defs/ContextFabricClaimedFactTable/additionalProperties",
+                additional_property: "measure_units",
+                error_count: 9,
+            },
+            REFUSED,
+        );
+    });
+
+    it.each([[[]], ["not an answer"], [7]])(
+        "a replayed body that is not an object (%j) keeps plain invalid_upstream",
+        async (body) => {
+            fetchMock.mockResolvedValue(jsonResponse(body, 200));
+            const failure = await transportChecking(streamEnvelopeValidators, {
+                ...streamValidators,
+                validateInvestigationResultV1: refusing(),
+                validateInvestigationResultV2: refusing(),
+            })
+                .readResult("result_x", new AbortController().signal)
+                .then(
+                    () => undefined,
+                    (error: unknown) => error,
+                );
+            expect(failure).toEqual(new TransportFailure("invalid_upstream"));
+            expect(log.error).not.toHaveBeenCalled();
+        },
+    );
 
     it("a grammar break that is not a schema refusal keeps its reason and its warning", async () => {
         const body = sseBody();

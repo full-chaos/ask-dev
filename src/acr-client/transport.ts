@@ -768,10 +768,19 @@ export function createAcrCalls<TResult, TStatus>(
             const { response, body } = await callJson(path, "replay", signal);
             if (!response.ok) return refuse(response, "replay", signal);
             const validators = await full;
+            if (body === undefined) throw new TransportFailure("invalid_upstream");
             const valid =
-                body !== undefined &&
-                (validators.validateInvestigationResultV1(body) ||
-                    validators.validateInvestigationResultV2(body));
+                validators.validateInvestigationResultV1(body) ||
+                validators.validateInvestigationResultV2(body);
+            if (!valid && typeof body === "object" && body !== null && !Array.isArray(body)) {
+                // CHAOS-12593 (codex r1 P2): a stored answer the pinned contract refuses, as on the
+                // stream. The v1 refusal is the one named: the answer schema both versions share.
+                logger.error(
+                    { call: "replay", ...schemaRefusal(validators.validateInvestigationResultV1) },
+                    CONTRACT_REFUSED,
+                );
+                throw new TransportFailure("invalid_upstream", "schema");
+            }
             if (!valid || !dependencies.isResult(body)) {
                 throw new TransportFailure("invalid_upstream");
             }

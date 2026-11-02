@@ -174,8 +174,9 @@ const PLAIN_WORDS: Record<
     restore_failed: "This answer could not be loaded.",
     unconfirmed: "The current state could not be confirmed. Check back later.",
     // CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (CHAOS-12590).
+    // With no reference to quote, the words ask for none (codex r1 P2).
     unreadable:
-        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
+        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Tell your administrator this page needs an update.",
 };
 
 function rows<K extends string>(
@@ -457,6 +458,21 @@ describe("AskDevChat with a host source: status", () => {
         const line = screen.getByTestId("chat-status-reference");
         expect(line.textContent).toBe("Reference: req_abc123");
         expect(line.querySelector("code")?.textContent).toBe("req_abc123");
+    });
+
+    it("asks to quote the reference of an unreadable answer only when it shows one (codex r1 P2)", () => {
+        render(
+            <AskDevChat
+                source={hostSource(statusSnapshot({ kind: "unreadable", reference: "req_abc123" }))}
+            />,
+        );
+        const words = screen.getByTestId("chat-status").querySelector(".chat__status-words");
+        expect(words?.textContent).toBe(
+            "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
+        );
+        expect(screen.getByTestId("chat-status-reference").textContent).toBe(
+            "Reference: req_abc123",
+        );
     });
 
     it("shows no reference line without a reference", () => {

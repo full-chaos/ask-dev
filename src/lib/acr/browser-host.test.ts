@@ -24,6 +24,19 @@ afterEach(() => {
     window.history.replaceState(null, "", "/");
 });
 
+describe("the client's log sink (CHAOS-12593, codex r1 P2)", () => {
+    it("sends the client's error line to console.error, not warn", async () => {
+        const { logger } = await import("@/acr-client/logger");
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        logger.error({ seq: 2 }, "refused");
+        expect(error).toHaveBeenCalledWith("refused", { seq: 2 });
+        expect(warn).not.toHaveBeenCalled();
+        error.mockRestore();
+        warn.mockRestore();
+    });
+});
+
 describe("safeReturnPath", () => {
     it.each(["/", "/workbench", "/a/b"])("keeps %s", (path) => {
         expect(safeReturnPath(path)).toBe(path);

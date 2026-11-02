@@ -46,6 +46,8 @@ setAcrLogger({
     // The lines are content-free: ids, statuses and closed reason codes.
     info: (fields, message) => console.info(message, fields),
     warn: (fields, message) => console.warn(message, fields),
+    // CHAOS-12593: a schema refusal is an error, not a warning.
+    error: (fields, message) => console.error(message, fields),
 });
 
 configureAcrAuth({
