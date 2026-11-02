@@ -20,7 +20,12 @@ import type {
 } from "../lib/contracts";
 import { cellText } from "../lib/fact-rows";
 import { formatConfidence, humanizeTerm, nonBlank } from "../lib/presentation";
-import { useServedNote, useServedWord, useVocabularyWord } from "./VocabularyWordContext";
+import {
+    useClaimFieldWord,
+    useServedNote,
+    useServedWord,
+    useVocabularyWord,
+} from "./VocabularyWordContext";
 
 /**
  * A subject's identity for set/map membership: `(kind, canonical_id)`, never
@@ -97,6 +102,7 @@ function ClaimedFacts({
     readonly claims: readonly ClaimedFact[];
 }) {
     const word = useVocabularyWord();
+    const fieldWord = useClaimFieldWord();
     const cited = claims.filter((claim) => claimIds?.includes(claim.claim_id));
     if (cited.length === 0) return null;
     return (
@@ -106,7 +112,7 @@ function ClaimedFacts({
                 {cited.map((claim, index) => (
                     // Index key: the contract does not promise a unique claim id.
                     <li className="record__meta" data-testid="driver-claimed-fact" key={index}>
-                        {word("fact_kind", claim.kind)} · {humanizeTerm(claim.field)}
+                        {word("fact_kind", claim.kind)} · {fieldWord(claim)}
                         {claim.value === undefined
                             ? " · shown in its table on this answer"
                             : `: ${cellText(claim.value)}`}
