@@ -1,0 +1,81 @@
+{
+    "source": {
+        "what": "Responses captured from a running acr-api, the real producer, for the browser OAuth mock (CHAOS-12303). Nothing here is hand-written: each entry is the status, the selected headers and the body acr-api returned.",
+        "acr_api": "kiac askdev-1, image docker.io/askdev/acr-api@sha256:71053013aecca294e9135f51b4d3d9d23664e72fbd6c63db46bbecedca6b8991 (acr main 33ada20a), reached at http://acr.localhost:3000; issuer https://acr.localhost; ACR_ENVIRONMENT=development (the dev browser client).",
+        "captured_at": "2026-10-31T17:52Z",
+        "commands": {
+            "metadata": "curl -H 'Origin: http://localhost:3000' http://acr.localhost:3000/.well-known/oauth-authorization-server",
+            "authorize_error": "curl 'http://acr.localhost:3000/authorize?response_type=code&client_id=https%3A%2F%2Flocalhost%2Facr%2Fdev-browser-client&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fask-dev%2Foauth%2Fcallback&code_challenge=tooshort&code_challenge_method=S256&state=capturestate0000000000000000000000000000000&resource=https%3A%2F%2Facr.localhost&scope=context%3Aread%20evidence%3Aread'",
+            "token_invalid_grant": "curl -H 'Origin: http://localhost:3000' --data 'grant_type=authorization_code&code=capturecode00000000000000000000000000000000&redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fask-dev%2Foauth%2Fcallback&client_id=https%3A%2F%2Flocalhost%2Facr%2Fdev-browser-client&code_verifier=captureverifier000000000000000000000000000000&resource=https%3A%2F%2Facr.localhost' http://acr.localhost:3000/token",
+            "refresh_invalid_grant": "curl -H 'Origin: http://localhost:3000' --data 'grant_type=refresh_token&refresh_token=acrrt_capturerefresh00000000000000000000000000000&client_id=https%3A%2F%2Flocalhost%2Facr%2Fdev-browser-client' http://acr.localhost:3000/token"
+        },
+        "not_captured": "A successful /token body needs an approved consent, which askdev-1 cannot give a browser today (CHAOS-12313). Its shape is acr's producer at the web pin bd92be5a: internal/api/oauth_routes.go:764-771 (oauthTokenBody: access_token, token_type, expires_in, scope, refresh_token omitempty) and :837-840 (token_type \"Bearer\"); internal/auth/types.go:23 (access prefix fcacr_); internal/auth/browser_refresh.go:30-35 (refresh prefix acrrt_, 32 random bytes, 30 s grace) and :65-74 (successors are base64url HMAC-SHA256, 43 characters). The success redirect uses the same encoder as the captured error redirect (Go url.Values: keys sorted), with code in place of error."
+    },
+    "metadata": {
+        "status": 200,
+        "headers": {
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Expose-Headers": "Retry-After, X-Request-ID",
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
+        },
+        "body": {
+            "issuer": "https://acr.localhost",
+            "authorization_endpoint": "https://acr.localhost/authorize",
+            "token_endpoint": "https://acr.localhost/token",
+            "registration_endpoint": "https://acr.localhost/register",
+            "device_authorization_endpoint": "https://acr.localhost/device_authorization",
+            "scopes_supported": ["context:read", "evidence:read", "data:read"],
+            "response_types_supported": ["code"],
+            "response_modes_supported": ["query"],
+            "grant_types_supported": [
+                "authorization_code",
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "refresh_token"
+            ],
+            "token_endpoint_auth_methods_supported": ["none"],
+            "code_challenge_methods_supported": ["S256"],
+            "authorization_response_iss_parameter_supported": true,
+            "client_id_metadata_document_supported": false,
+            "revocation_endpoint": "https://acr.localhost/revoke",
+            "revocation_endpoint_auth_methods_supported": ["none"]
+        }
+    },
+    "authorize_error": {
+        "status": 303,
+        "headers": {
+            "Cache-Control": "no-store",
+            "Location": "http://localhost:3000/ask-dev/oauth/callback?error=invalid_request&iss=https%3A%2F%2Facr.localhost&state=capturestate0000000000000000000000000000000"
+        }
+    },
+    "token_invalid_grant": {
+        "status": 400,
+        "headers": {
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Expose-Headers": "Retry-After, X-Request-ID",
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
+        },
+        "body": {
+            "error": "invalid_grant"
+        }
+    },
+    "refresh_invalid_grant": {
+        "status": 400,
+        "headers": {
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Expose-Headers": "Retry-After, X-Request-ID",
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff"
+        },
+        "body": {
+            "error": "invalid_grant"
+        }
+    }
+}
