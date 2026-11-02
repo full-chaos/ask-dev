@@ -1,5 +1,5 @@
 {
-  "source_commit": "4eb93cf9e47d10cdd63e7c4bddbe8f6884c7ee92",
+  "source_commit": "237f2feca3ff6a3af3aa9184fbbe6ad6da20c09c",
   "source_repository": "full-chaos/dev-health-acr",
   "files": [
     {
@@ -48,11 +48,11 @@
     },
     {
       "path": "schemas/context_fabric_answer_projection.v1.schema.json",
-      "sha256": "9a2a842f5e690dbf0140b094dbe76286b45b051047c149268b868028ebe98fa5"
+      "sha256": "0f33b0e583d1f71205502a5674b2612af3f2e06896cd8863ad2126b767b38357"
     },
     {
       "path": "schemas/context_fabric_common.v1.schema.json",
-      "sha256": "4ae7d4c024c509eb5c6d8769f29525c0bfc41961a3e17884b3501d0561392b6e"
+      "sha256": "fbebe5e4e778329b03ffcbe99453ab2b9e455a097424a69b5fe982a4a7359119"
     },
     {
       "path": "schemas/context_fabric_investigation_event.v1.schema.json",
