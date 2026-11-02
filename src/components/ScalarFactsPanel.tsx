@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { DerivationInputs } from "./DerivationInputs";
 import { ScrollRegion } from "./ScrollRegion";
 import { useServedWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
@@ -184,6 +185,7 @@ export function ScalarFactsPanel({ facts, result }: ScalarFactsPanelProps) {
                             <code>
                                 {fact.field}: {valueText(fact)}
                             </code>
+                            <DerivationInputs claim={fact} />
                         </p>
                     ))}
                 </details>

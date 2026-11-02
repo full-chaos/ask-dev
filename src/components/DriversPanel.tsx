@@ -1,3 +1,4 @@
+import { DerivationInputs } from "./DerivationInputs";
 import type { RankingWithheld } from "../lib/ranking-withheld";
 import { WithheldPart } from "./WithheldPart";
 import { useId } from "react";
@@ -109,6 +110,7 @@ function ClaimedFacts({
                         {claim.value === undefined
                             ? " · shown in its table on this answer"
                             : `: ${cellText(claim.value)}`}
+                        <DerivationInputs claim={claim} />
                     </li>
                 ))}
             </ul>
