@@ -1,0 +1,165 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_forecast_0001",
+    "request_id": "request_forecast_0001",
+    "generated_at": "2026-11-02T12:00:00Z",
+    "status": "complete",
+    "question": "When will CHAOS finish its backlog?",
+    "interpretation": {
+        "shape": "single_subject",
+        "requested_judgment": "completion",
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "workload"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [],
+        "committed": [
+            {
+                "kind": "team",
+                "canonical_id": "team:chaos",
+                "label": "CHAOS"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "subject_investigation",
+        "family_source": "model",
+        "family_version": "question-family.v5",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": [
+            "forecast",
+            "table",
+            "series"
+        ],
+        "budget": {
+            "max_items": 400,
+            "max_serialized_bytes": 262144,
+            "max_members": 1,
+            "synthesis_headroom": 40,
+            "narrowing_basis": "canonical_id_lexical"
+        }
+    },
+    "direct_judgment": "The work appears likely to finish within the forecast range.",
+    "current_state": "The stored forecast suggests a completion range.",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_workload_team",
+            "kind": "workload",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:chaos",
+                "label": "CHAOS"
+            },
+            "field": "forecast_p50_days",
+            "value": {
+                "integer": 40
+            },
+            "completion_forecast": {
+                "work_scope_id": "linear:CHAOS",
+                "state": "not_stored",
+                "computed_at": "2026-11-02 04:00:00.000",
+                "simulation_count": 10000,
+                "forecast_p50_days": 40,
+                "forecast_p85_days": 55,
+                "forecast_p95_days": 70,
+                "forecast_p50_date": "2026-12-12",
+                "forecast_p85_date": "2026-12-27",
+                "forecast_p95_date": "2027-01-11"
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [],
+        "partial": false
+    },
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer",
+        "completion_distribution_state:not_stored": "No distribution stored for this forecast",
+        "fact_field:forecast_p50_days": "Median forecast (days)",
+        "fact_kind:workload": "workload",
+        "generated_at:note": "Answered"
+    },
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "deterministic_answer": "The stored forecast gives a completion range.",
+    "warnings": [],
+    "reused": false,
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "table",
+            "selected_by": "completion_forecast_percentiles",
+            "title": "Completion forecast percentiles",
+            "axis_kind": "category",
+            "axis_label": "Percentile",
+            "value_label": "Days to complete",
+            "series": [
+                {
+                    "key": "claim_workload_team",
+                    "label": "linear:CHAOS",
+                    "points": [
+                        {
+                            "label": "Median forecast (days)",
+                            "value": 40,
+                            "source": {
+                                "kind": "claimed_fact_forecast_summary",
+                                "claim_id": "claim_workload_team",
+                                "field": "forecast_p50_days"
+                            }
+                        },
+                        {
+                            "label": "85th percentile forecast (days)",
+                            "value": 55,
+                            "source": {
+                                "kind": "claimed_fact_forecast_summary",
+                                "claim_id": "claim_workload_team",
+                                "field": "forecast_p85_days"
+                            }
+                        },
+                        {
+                            "label": "95th percentile forecast (days)",
+                            "value": 70,
+                            "source": {
+                                "kind": "claimed_fact_forecast_summary",
+                                "claim_id": "claim_workload_team",
+                                "field": "forecast_p95_days"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 1,
+        "rows_count": 0,
+        "state": "not_derived"
+    }
+}

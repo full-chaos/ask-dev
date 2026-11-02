@@ -1,0 +1,171 @@
+// Scratch generator of forecast-curve.json, forecast-no-run.json and forecast-not-stored.json, not built
+// by this repo (CHAOS-4613). From a detached acr worktree at the producer commit, add the three files
+// below, then `go run ./cmd/zzforecast <this directory>`. Each stored forecast row goes through the
+// real team workload field writer (distribution switch on), the real claim attach
+// (attachCanonicalRows), the real summary (discloseCompletionForecast), the real selector with the
+// forecast flag on, ServeVocabularyLabels, Validate and the real encoder.
+
+// internal/contextfabric/devhealthfacts/zz_forecast_export.go
+
+import (
+	"github.com/full-chaos/dev-health-go/readers"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+// Scratch only (CHAOS-4613 ask-dev fixtures), never committed: the team
+// workload fact of one stored forecast row, through the real field writer
+// with the distribution switch on.
+func ZZTeamWorkloadFact(row readers.CompletionForecastRow, label string) contextfabric.CanonicalFact {
+	fields := map[string]contextfabric.FactValue{
+		"basis":        contextfabric.StringFactValue("capacity_forecast"),
+		"backlog_size": contextfabric.IntegerFactValue(row.BacklogSize),
+		"computed_at":  contextfabric.StringFactValue(row.ComputedAt),
+	}
+	if row.WorkScopeID != "" {
+		fields["work_scope_id"] = contextfabric.StringFactValue(row.WorkScopeID)
+	}
+	if row.HasP50Days != 0 {
+		fields["forecast_p50_days"] = contextfabric.IntegerFactValue(row.P50Days)
+	}
+	addTeamCompletionForecastFields(fields, row.WorkScopeID, []readers.CompletionForecastRow{row}, row.ComputedAt, true)
+	return contextfabric.CanonicalFact{
+		Kind:           contextfabric.FactWorkload,
+		Subject:        contextfabric.SubjectRef{Kind: contextfabric.SubjectTeam, CanonicalID: "team:" + row.TeamID, Label: label},
+		Fields:         fields,
+		EvidenceRefIDs: []string{},
+		SourceState:    contextfabric.SourceAvailable,
+		Source:         "capacity_forecasts",
+		SourceVersion:  "test",
+	}
+}
+
+// internal/contextfabric/zz_forecast_export.go
+package contextfabric
+
+import (
+	"time"
+
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+// Scratch only (CHAOS-4613 ask-dev fixtures), never committed: a full result
+// for a team completion question. The model's part is the claim's identity
+// and scalar; the server's part runs as in Synthesize: the claim's rows and
+// table from its grounding fact, then its completion forecast summary, then
+// the real selector with the forecast flag on.
+func ZZForecastResult(fact CanonicalFact, question string) InvestigationResult {
+	p50 := fact.Fields["forecast_p50_days"]
+	claim := ClaimedFact{ClaimID: "claim_workload_team", Kind: FactWorkload, Field: "forecast_p50_days", Subject: fact.Subject}
+	if p50.Integer != nil {
+		claim.Value = ScalarValue{Integer: p50.Integer}
+	} else {
+		basis := "capacity_forecast"
+		claim.Field, claim.Value = "basis", ScalarValue{String: &basis}
+	}
+	facts := []CanonicalFact{fact}
+	claims, _, _, _ := attachCanonicalRows([]ClaimedFact{claim}, facts)
+	claims = discloseCompletionForecast(claims, facts)
+	result := InvestigationResult{
+		SchemaVersion: InvestigationResultSchemaV1, ResultID: "result_forecast_0001", RequestID: "request_forecast_0001",
+		GeneratedAt: time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC), Status: InvestigationComplete,
+		Question: question,
+		Interpretation: InterpretedQuestion{
+			Shape: ShapeSingleSubject, RequestedJudgment: "completion",
+			TimeContext:      TimeContext{Axis: TemporalCurrent},
+			FactRequirements: []FactRequirement{{Kind: FactWorkload}},
+		},
+		SubjectResolution:   SubjectResolution{Candidates: []SubjectCandidate{}, Committed: []SubjectRef{fact.Subject}},
+		DirectJudgment:      "The work appears likely to finish within the forecast range.",
+		CurrentState:        "The stored forecast suggests a completion range.",
+		StrongestPressures:  []string{},
+		Drivers:             []DriverJudgment{},
+		RemainingWork:       []Finding{},
+		ReadinessGaps:       []Finding{},
+		Paths:               []RelationshipPath{},
+		Conflicts:           []Finding{},
+		Limitations:         []string{},
+		EvidenceRefIDs:      []string{},
+		Coverage:            Coverage{Sources: []SourceObservation{}, DegradedReasons: []string{}},
+		Versions:            VersionSet{ServiceVersion: "test-v1", ContractVersion: InvestigationResultSchemaV1, Backend: "test"},
+		DeterministicAnswer: "The stored forecast gives a completion range.",
+		Warnings:            []string{},
+		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
+			Family: QuestionFamilySubjectInvestigation, FamilyVersion: QuestionFamilyTableVersion,
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40, NarrowingBasis: contractsv1.ContextFabricNarrowingBasisCanonicalIDLexical},
+			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindForecast, contractsv1.ContextFabricRenderKindTable, contractsv1.ContextFabricRenderKindSeries},
+		},
+		ClaimedFacts: claims,
+	}
+	frame := &QuestionFrame{Goals: []InvestigationGoal{GoalAssessState}, Obligations: []AnswerObligation{ObligationCompletion}}
+	result.RenderShapes, _ = selectRenderShapes(result, frame, RenderShapeOptions{CompletionForecast: true})
+	result.Completeness = ComputeAnswerCompleteness(result)
+	return result
+}
+
+// cmd/zzforecast/main.go
+// Scratch only (CHAOS-4613 ask-dev fixtures): stored forecast rows through the
+// real fact writer, claim attach, summary, selector and encoder.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-go/readers"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric/devhealthfacts"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func row(p50, p85, p95 int64, dates [3]string, values []uint16, counts []uint32) readers.CompletionForecastRow {
+	r := readers.CompletionForecastRow{
+		TeamID: "chaos", HasWorkScope: 1, WorkScopeID: "linear:CHAOS", ComputedAt: "2026-11-02 04:00:00.000",
+		SimulationCount: 10000, BacklogSize: 40,
+		HasP50Days: 1, P50Days: p50, HasP85Days: 1, P85Days: p85, HasP95Days: 1, P95Days: p95,
+		P50Date: dates[0], P85Date: dates[1], P95Date: dates[2],
+		CompletionDayBins: uint64(len(values)), CompletionCountBins: uint64(len(counts)),
+		CompletionDaysValues: values, CompletionDaysCounts: counts,
+	}
+	return r
+}
+
+func main() {
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var example contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &example))
+	cases := map[string]readers.CompletionForecastRow{
+		// A real curve, with 500 runs stopped at the 365-day horizon.
+		"forecast-curve.json": row(15, 21, 30, [3]string{"2026-11-17", "2026-11-23", "2026-12-02"},
+			[]uint16{9, 12, 15, 21, 30, 365}, []uint32{1000, 2500, 3000, 2000, 1000, 500}),
+		// Every run at the horizon: no curve, the percentiles table.
+		"forecast-no-run.json": row(365, 365, 365, [3]string{"2027-11-02", "2027-11-02", "2027-11-02"},
+			[]uint16{365}, []uint32{10000}),
+		// No stored distribution: no curve, the percentiles table.
+		"forecast-not-stored.json": row(40, 55, 70, [3]string{"2026-12-12", "2026-12-27", "2027-01-11"}, nil, nil),
+	}
+	for name, r := range cases {
+		fact := devhealthfacts.ZZTeamWorkloadFact(r, "CHAOS")
+		result := contextfabric.ZZForecastResult(fact, "When will CHAOS finish its backlog?")
+		result.Versions = example.Versions
+		served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
+		must(served.Validate())
+		encoded, err := json.MarshalIndent(served, "", "    ")
+		must(err)
+		must(os.WriteFile(filepath.Join(os.Args[1], name), append(encoded, '\n'), 0o644))
+		kinds := []string{}
+		for _, shape := range served.RenderShapes {
+			kinds = append(kinds, string(shape.Kind)+"/"+string(shape.SelectedBy))
+		}
+		fmt.Printf("%s tier=%s shapes=%v bytes=%d\n", name, tier, kinds, len(encoded))
+	}
+}

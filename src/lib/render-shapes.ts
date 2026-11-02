@@ -152,6 +152,7 @@ function sourceAddressMatchesKind(
                 !has(source.field)
             );
         case "claimed_fact_row":
+        case "claimed_fact_table_row":
             return (
                 has(source.claim_id) &&
                 has(source.row_index) &&
@@ -160,6 +161,7 @@ function sourceAddressMatchesKind(
                 !has(source.signal)
             );
         case "claimed_fact_value":
+        case "claimed_fact_forecast_summary":
             return (
                 has(source.claim_id) &&
                 has(source.field) &&
@@ -276,12 +278,22 @@ export function axisLabels(shape: RenderShape, cohort?: Cohort): readonly string
 /** The rule of a fact's part-of-whole chart: its panel draws it, through the host (CHAOS-12496). */
 export const THEME_SHARE_RULE: RenderShapeRule = "investment_theme_share";
 
+/** The rule of a completion curve: its fact's panel draws it, through the host (CHAOS-4613). */
+export const COMPLETION_FORECAST_RULE: RenderShapeRule = "completion_forecast";
+
 /** The rules whose shape belongs to the panel of a fact it cites. */
 export const FACT_PANEL_RULES: readonly RenderShapeRule[] = [
     "dated_fact_trend",
     THEME_SHARE_RULE,
     "investment_repository_flow",
+    COMPLETION_FORECAST_RULE,
 ];
+
+/**
+ * The rule of the forecast percentiles table: its own panel draws it, with no host chart. acr serves
+ * it only when no curve is drawn (CHAOS-4613).
+ */
+export const FORECAST_PERCENTILES_RULE: RenderShapeRule = "completion_forecast_percentiles";
 
 /** The rule of a side-by-side table: its own panel draws it, with no host chart (CHAOS-12513). */
 export const COMPARISON_RULE: RenderShapeRule = "comparison_side_by_side";
@@ -328,6 +340,165 @@ function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolea
         }
     }
     return subjectKinds.size === 1 && [...sides.values()].includes(shape.series.length);
+}
+
+/** A claim's completion forecast summary (CHAOS-4613): set by acr, never by the model. */
+export type CompletionForecastSummary = NonNullable<ClaimedFact["completion_forecast"]>;
+
+/** The forecast's table, mirroring acr's `ContextFabricRenderForecast*Field`. */
+const FORECAST_TABLE_FIELD = "completion_distribution";
+const FORECAST_AXIS_FIELD = "completion_days";
+const FORECAST_SHARE_FIELD = "cumulative_share";
+const FORECAST_RUNS_FIELD = "runs";
+
+/** The summary's numeric fields a point may cite, mirroring acr's `ClaimedCompletionForecast.Number`. */
+const SUMMARY_NUMBER_FIELDS = [
+    "forecast_p50_days",
+    "forecast_p85_days",
+    "forecast_p95_days",
+    "simulation_count",
+    "horizon_days",
+    "unfinished_runs",
+] as const;
+type SummaryNumberField = (typeof SUMMARY_NUMBER_FIELDS)[number];
+
+/** The percentiles a percentiles table states, mirroring acr's `ContextFabricForecastPercentileLabel`. */
+const PERCENTILE_FIELDS: readonly string[] = [
+    "forecast_p50_days",
+    "forecast_p85_days",
+    "forecast_p95_days",
+];
+
+/** A summary's number for a field, or undefined when it carries none. An absent value is not 0. */
+function summaryNumber(
+    summary: CompletionForecastSummary | undefined,
+    field: string | undefined,
+): number | undefined {
+    if (summary === undefined || !SUMMARY_NUMBER_FIELDS.includes(field as SummaryNumberField)) {
+        return undefined;
+    }
+    const value = summary[field as SummaryNumberField];
+    return typeof value === "number" ? value : undefined;
+}
+
+/** True when a claim's `rows` are its declared completion distribution: acr's `holdsCompletionDistribution`. */
+function holdsCompletionDistribution(fact: ClaimedFact): boolean {
+    const table = fact.table;
+    return (
+        table?.field === FORECAST_TABLE_FIELD &&
+        table.shape === "distribution" &&
+        table.key.length === 1 &&
+        table.key[0] === FORECAST_AXIS_FIELD &&
+        (table.measures ?? []).includes(FORECAST_SHARE_FIELD)
+    );
+}
+
+/**
+ * True when a forecast is the WHOLE completion distribution of ONE claim, in order. Mirrors acr's
+ * `validateForecastShape` clause by clause: a category axis and a `ratio` unit; one series,
+ * `cumulative_share`; a claim whose rows are its declared distribution and whose summary says the
+ * distribution is `available` and gives the horizon; not every share 0 (no run finished is no curve,
+ * never a flat 0% line); every row once, in row order, each point labelled with its own row's
+ * completion day; and a day at or past the horizon only as the last point.
+ */
+function isCompletionCurve(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    if (shape.kind !== "forecast" || shape.presentation !== undefined) return false;
+    if (shape.axis_kind !== "category" || shape.value_unit !== "ratio") return false;
+    if (shape.series.length !== 1 || shape.series[0].key !== FORECAST_SHARE_FIELD) return false;
+    const points = shape.series[0].points;
+    const claimId = points[0]?.source.claim_id;
+    const fact = claimFor(facts, claimId);
+    if (fact === undefined || !holdsCompletionDistribution(fact)) return false;
+    const summary = fact.completion_forecast;
+    if (summary?.state !== "available") return false;
+    const horizon = summary.horizon_days;
+    if (horizon === undefined) return false;
+    if (points.every((point) => point.value === 0)) return false;
+    const rows = fact.rows ?? [];
+    if (points.length !== rows.length) return false;
+    return points.every(({ label, source }, index) => {
+        if (source.kind !== "claimed_fact_table_row" || source.claim_id !== claimId) return false;
+        if (source.field !== FORECAST_SHARE_FIELD || source.row_index !== index) return false;
+        const day = rows[index]?.fields[FORECAST_AXIS_FIELD]?.integer;
+        if (day === undefined || label !== String(day)) return false;
+        return day < horizon || index === points.length - 1;
+    });
+}
+
+/**
+ * True when a percentiles table restates its claims' P50/P85/P95 days: mirrors acr's
+ * `validateForecastPercentilesShape`. One series per claim, each point one of that claim's
+ * percentiles cited to its summary. A percentile the summary does not carry is no point. A table
+ * declares no unit and no presentation.
+ *
+ * One clause is acr's alone: that a label is the served word of its percentile. The word map is
+ * acr's, and a copy here would be a consumer table (CHAOS-4690), so this trusts acr's validator for
+ * that clause, as the treemap does. It holds the part it can: the field is a percentile.
+ */
+function isForecastPercentiles(shape: RenderShape): boolean {
+    if (shape.kind !== "table" || shape.axis_kind !== "category") return false;
+    if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
+    const claims = new Set<string>();
+    for (const series of shape.series) {
+        let claim: string | undefined;
+        for (const { source } of series.points) {
+            if (source.kind !== "claimed_fact_forecast_summary") return false;
+            if (!PERCENTILE_FIELDS.includes(source.field ?? "")) return false;
+            claim ??= source.claim_id;
+            if (source.claim_id !== claim) return false;
+        }
+        if (claim === undefined || claims.has(claim)) return false;
+        claims.add(claim);
+    }
+    return true;
+}
+
+/**
+ * What a host needs beside a verified forecast to draw it as the capacity page does (CHAOS-4613):
+ * the claim's served summary and, for each point in order, its row's completion day, run count and
+ * share. Every value is served on the claim the curve cites; nothing is computed. A run count the row
+ * does not carry is absent, never 0.
+ */
+export type ForecastShapeDetail = {
+    readonly kind: "forecast";
+    readonly summary: CompletionForecastSummary;
+    readonly rows: ReadonlyArray<{
+        readonly day: number;
+        readonly runs?: number;
+        readonly cumulativeShare: number;
+    }>;
+};
+
+/** The detail of a shape kind that needs one, for the host's slot. */
+export type ShapeDetail = ForecastShapeDetail;
+
+/**
+ * The detail of a VERIFIED shape, or undefined when its kind needs none. Call it only on a shape
+ * `verifyRenderShape` admitted: it reads the cells that check already proved.
+ */
+export function shapeDetail(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+): ShapeDetail | undefined {
+    if (shape.selected_by !== COMPLETION_FORECAST_RULE) return undefined;
+    const fact = claimFor(facts, shape.series[0]?.points[0]?.source.claim_id);
+    const summary = fact?.completion_forecast;
+    if (fact === undefined || summary === undefined) return undefined;
+    const rows = fact.rows ?? [];
+    const detailRows: Array<ForecastShapeDetail["rows"][number]> = [];
+    for (const [index, point] of shape.series[0].points.entries()) {
+        const fields = rows[index]?.fields;
+        const day = fields?.[FORECAST_AXIS_FIELD]?.integer;
+        // Not a verified curve: no detail, so the host draws nothing it cannot cite.
+        if (day === undefined) return undefined;
+        const runs = fields?.[FORECAST_RUNS_FIELD]?.integer;
+        detailRows.push({
+            day,
+            ...(runs === undefined ? {} : { runs }),
+            cumulativeShare: point.value,
+        });
+    }
+    return { kind: "forecast", summary, rows: detailRows };
 }
 
 /** The canonical themes are fixed (AGENTS.md), so a whole table holds this many rows. */
@@ -663,6 +834,17 @@ function resolvePointSource(
             if (row === undefined || source.field === undefined) return undefined;
             return numericCell(row.fields[source.field]);
         }
+        case "claimed_fact_table_row": {
+            // Always the claim's `rows`, never its time series (acr's `tableRows`).
+            if (source.row_index === undefined || source.field === undefined) return undefined;
+            const row = claimFor(facts, source.claim_id)?.rows?.[source.row_index];
+            return row === undefined ? undefined : numericCell(row.fields[source.field]);
+        }
+        case "claimed_fact_forecast_summary":
+            return summaryNumber(
+                claimFor(facts, source.claim_id)?.completion_forecast,
+                source.field,
+            );
         case "claimed_fact_value": {
             const fact = claimFor(facts, source.claim_id);
             if (fact === undefined || fact.field !== source.field) return undefined;
@@ -710,6 +892,10 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
         if (!isRepositoryFlow(shape, result.claimed_facts)) return false;
     } else if (shape.selected_by === LANDSCAPE_POSITION_RULE) {
         if (!isLandscapePosition(shape, result.claimed_facts)) return false;
+    } else if (shape.selected_by === COMPLETION_FORECAST_RULE) {
+        if (!isCompletionCurve(shape, result.claimed_facts)) return false;
+    } else if (shape.selected_by === FORECAST_PERCENTILES_RULE) {
+        if (!isForecastPercentiles(shape)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }

@@ -13,6 +13,7 @@ export type VocabularyLabels = InvestigationResult["vocabulary_labels"];
 export type Vocabulary =
     | "answer_status"
     | "candidate_state"
+    | "completion_distribution_state"
     | "cohort_score_meaning"
     | "driver_source_state"
     | "driver_standing"

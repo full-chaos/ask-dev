@@ -13,6 +13,7 @@ import { CohortMembersPanel } from "./CohortMembersPanel";
 import { RankingWithheldNotice } from "./RankingWithheldNotice";
 import { CohortRankingPanel } from "./CohortRankingPanel";
 import { ComparisonTablePanel } from "./ComparisonTablePanel";
+import { ForecastPercentilesPanel } from "./ForecastPercentilesPanel";
 import { CompletenessPanel } from "./CompletenessPanel";
 import { CoveragePanel } from "./CoveragePanel";
 import { DriversPanel } from "./DriversPanel";
@@ -489,6 +490,7 @@ function AnswerView({
             <CohortGroupsPanel cohort={result.cohort} />
             <ComparisonTablePanel result={result} />
             <LandscapeQuadrantPanel result={result} />
+            <ForecastPercentilesPanel result={result} />
             <WorkItemStatusPanel result={result} />
             {cohortRanking(askedForCohort(result.interpretation.shape, result), result.cohort)
                 .state === "rows" ? (
