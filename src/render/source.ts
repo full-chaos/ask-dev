@@ -88,8 +88,9 @@ export type ChatStatus =
     | { readonly kind: "stream_unavailable" }
     | { readonly kind: "mismatch"; readonly reference?: string }
     /**
-     * CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (a field newer
-     * than the pin, CHAOS-12590). Asking again gives the same result, so it is never retried.
+     * CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (for example a
+     * field newer than the pin, CHAOS-12590). Asking again gives the same result, so it is never
+     * retried. A host sets it only for `TransportFailure.unreadableAnswer`.
      */
     | { readonly kind: "unreadable"; readonly reference?: string }
     | { readonly kind: "unsaved" }

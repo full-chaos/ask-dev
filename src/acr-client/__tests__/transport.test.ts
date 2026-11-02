@@ -445,7 +445,7 @@ describe("investigate: the full checks load in parallel (option (c))", () => {
             (async () => {
                 for await (const event of t.investigate(call())) events.push(event);
             })(),
-        ).rejects.toEqual(new TransportFailure("invalid_upstream", "schema"));
+        ).rejects.toEqual(new TransportFailure("invalid_upstream", "schema", true));
         expect(events.map((event) => event.type)).toEqual(["accepted"]);
     });
 
@@ -965,7 +965,7 @@ describe("submissionStatus and readResult", () => {
             ),
         );
         await expect(refusing.readResult("result_x", signal)).rejects.toEqual(
-            new TransportFailure("invalid_upstream", "schema"),
+            new TransportFailure("invalid_upstream", "schema", true),
         );
     });
 });
@@ -1162,7 +1162,11 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
             }),
         );
         expect(failure).toBeInstanceOf(TransportFailure);
-        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "schema" });
+        expect(failure).toMatchObject({
+            reason: "invalid_upstream",
+            grammar: "schema",
+            unreadableAnswer: true,
+        });
         expect(log.error).toHaveBeenCalledWith(
             {
                 submission_id: SUBMISSION,
@@ -1196,7 +1200,11 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
             ),
         };
         const failure = await failureOf(transportChecking(envelope, streamValidators));
-        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "schema" });
+        expect(failure).toMatchObject({
+            reason: "invalid_upstream",
+            grammar: "schema",
+            unreadableAnswer: true,
+        });
         expect(log.error).toHaveBeenCalledWith(
             expect.objectContaining({
                 seq: 2,
@@ -1206,6 +1214,31 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
                 additional_property: "measure_units",
                 error_count: 9,
             }),
+            REFUSED,
+        );
+    });
+
+    it("a progress event the schema refuses is loud, but no unreadable answer (codex r3 P2)", async () => {
+        const body = sseBody();
+        fetchMock.mockResolvedValue(sseResponse(body.stream));
+        body.push(stream(accepted(), stageEvent(2, "interpreting", "started", 5)));
+        const envelope = {
+            ...streamEnvelopeValidators,
+            validateInvestigationEventEnvelope: Object.assign(
+                (value: unknown) =>
+                    (value as { type?: string }).type !== "stage" &&
+                    streamEnvelopeValidators.validateInvestigationEventEnvelope(value),
+                { errors },
+            ),
+        };
+        const failure = await failureOf(transportChecking(envelope, streamValidators));
+        expect(failure).toMatchObject({
+            reason: "invalid_upstream",
+            grammar: "schema",
+            unreadableAnswer: false,
+        });
+        expect(log.error).toHaveBeenCalledWith(
+            expect.objectContaining({ seq: 2, event_type: "stage" }),
             REFUSED,
         );
     });
@@ -1311,7 +1344,11 @@ describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
         fetchMock.mockResolvedValue(sseResponse(body.stream));
         body.push(stream(accepted(), stageEvent(3, "interpreting", "started", 5)));
         const failure = await failureOf(transport());
-        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "seq_gap" });
+        expect(failure).toMatchObject({
+            reason: "invalid_upstream",
+            grammar: "seq_gap",
+            unreadableAnswer: false,
+        });
         expect(log.error).not.toHaveBeenCalled();
         expect(log.warn).toHaveBeenCalledWith(
             expect.objectContaining({ reason: "seq_gap", seq: 3 }),

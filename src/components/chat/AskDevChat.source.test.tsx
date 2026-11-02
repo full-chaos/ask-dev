@@ -176,7 +176,7 @@ const PLAIN_WORDS: Record<
     // CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (CHAOS-12590).
     // With no reference to quote, the words ask for none (codex r1 P2).
     unreadable:
-        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Tell your administrator this page needs an update.",
+        "Ask Dev finished, but this page cannot read its answer: the answer does not match the form this page knows. Asking again gives the same result. Tell your administrator.",
 };
 
 function rows<K extends string>(
@@ -468,7 +468,7 @@ describe("AskDevChat with a host source: status", () => {
         );
         const words = screen.getByTestId("chat-status").querySelector(".chat__status-words");
         expect(words?.textContent).toBe(
-            "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
+            "Ask Dev finished, but this page cannot read its answer: the answer does not match the form this page knows. Asking again gives the same result. Quote the reference to your administrator.",
         );
         expect(screen.getByTestId("chat-status-reference").textContent).toBe(
             "Reference: req_abc123",

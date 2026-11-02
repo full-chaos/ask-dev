@@ -141,19 +141,26 @@ export function isTransportFailureReason(value: unknown): value is TransportFail
 
 /**
  * The browser transport ended the run itself, for `reason`. For `invalid_upstream` from the event
- * grammar, `grammar` names which rule the stream broke (CHAOS-12593): `schema` is an answer the
- * page's pinned contract refuses, which a host words as unreadable, not as a run that did not
- * finish (CHAOS-12590).
+ * grammar, `grammar` names which rule the stream broke (CHAOS-12593). `unreadableAnswer` is true
+ * only when the page's pinned contract refused a finished answer: a `result` event, or a stored
+ * result read back. A host words that as unreadable, not as a run that did not finish
+ * (CHAOS-12590). A refused progress event is a `schema` break too, but no answer (codex r3 P2).
  */
 export class TransportFailure extends Error {
     readonly reason: TransportFailureReason;
     readonly grammar: InvalidEventReason | undefined;
+    readonly unreadableAnswer: boolean;
 
-    constructor(reason: TransportFailureReason, grammar?: InvalidEventReason) {
+    constructor(
+        reason: TransportFailureReason,
+        grammar?: InvalidEventReason,
+        unreadableAnswer = false,
+    ) {
         super(`the Ask Dev transport ended the run: ${reason}`);
         this.name = "TransportFailure";
         this.reason = reason;
         this.grammar = grammar;
+        this.unreadableAnswer = unreadableAnswer;
     }
 }
 

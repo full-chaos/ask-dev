@@ -33,8 +33,14 @@ function safely(write: () => void): void {
 export const logger: Required<AcrLogger> = {
     info: (fields, message) => safely(() => sink.info(fields, message)),
     warn: (fields, message) => safely(() => sink.warn(fields, message)),
+    // A sink with no error, or one whose error throws, still gets the line at warn (codex r3 P2).
     error: (fields, message) =>
-        safely(() =>
-            sink.error === undefined ? sink.warn(fields, message) : sink.error(fields, message),
-        ),
+        safely(() => {
+            if (sink.error === undefined) return sink.warn(fields, message);
+            try {
+                sink.error(fields, message);
+            } catch {
+                sink.warn(fields, message);
+            }
+        }),
 };

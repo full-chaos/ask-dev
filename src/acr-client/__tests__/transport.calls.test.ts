@@ -273,7 +273,7 @@ describe("attach", () => {
                 validators.rejecting(validators.full, "validateInvestigationEvent"),
         });
         await expect(collect(attach(undefined, strict))).rejects.toEqual(
-            new TransportFailure("invalid_upstream", "schema"),
+            new TransportFailure("invalid_upstream", "schema", true),
         );
     });
 

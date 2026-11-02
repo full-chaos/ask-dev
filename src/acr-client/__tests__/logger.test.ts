@@ -29,6 +29,19 @@ describe("logger.error", () => {
         },
     );
 
+    it("falls back to warn when the host sink's error throws (codex r3 P2)", () => {
+        const warn = vi.fn();
+        setAcrLogger({
+            info: vi.fn(),
+            warn,
+            error: () => {
+                throw new Error("sink down");
+            },
+        });
+        expect(() => logger.error({ seq: 2 }, "refused")).not.toThrow();
+        expect(warn).toHaveBeenCalledWith({ seq: 2 }, "refused");
+    });
+
     it("falls back to warn for a sink with no error", () => {
         const sink = { info: vi.fn(), warn: vi.fn() };
         setAcrLogger(sink);

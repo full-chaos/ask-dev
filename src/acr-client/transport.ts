@@ -701,7 +701,11 @@ export function createAcrCalls<TResult, TStatus>(
                                 },
                                 CONTRACT_REFUSED,
                             );
-                            throw new TransportFailure("invalid_upstream", "schema");
+                            throw new TransportFailure(
+                                "invalid_upstream",
+                                "schema",
+                                verdict.eventType === "result",
+                            );
                         }
                         logger.warn(
                             {
@@ -732,7 +736,7 @@ export function createAcrCalls<TResult, TStatus>(
                                 },
                                 CONTRACT_REFUSED,
                             );
-                            throw new TransportFailure("invalid_upstream", "schema");
+                            throw new TransportFailure("invalid_upstream", "schema", true);
                         }
                     }
                     yield verdict.event;
@@ -782,7 +786,7 @@ export function createAcrCalls<TResult, TStatus>(
                         ? validators.validateInvestigationResultV2
                         : validators.validateInvestigationResultV1;
                 logger.error({ call: "replay", ...schemaRefusal(refusing) }, CONTRACT_REFUSED);
-                throw new TransportFailure("invalid_upstream", "schema");
+                throw new TransportFailure("invalid_upstream", "schema", true);
             }
             if (!valid || !dependencies.isResult(body)) {
                 throw new TransportFailure("invalid_upstream");

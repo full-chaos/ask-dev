@@ -217,10 +217,12 @@ So, on every environment: the web whose ACR pin accepts a new ACR wire field is 
 the ACR build that serves it (here: web pin 4eb93cf9 or later before acr e84ac54f or later). The
 merge train (web pin, ask-dev pin, then renders) orders merges; this rule orders deploys.
 
-When a pinned contract does refuse an answer, the transport ends the run as `invalid_upstream` with
+When a pinned contract refuses an event, the transport ends the run as `invalid_upstream` with
 `grammar: "schema"` and logs `ask-dev refused an answer its pinned contract does not accept` at
-error level, with the path, the keyword, the schema path and the error count (never a value). A
-host words it as the `unreadable` status, never as a run to ask again (CHAOS-12593).
+error level, with the path, the keyword, the schema path and the error count (never a value). When
+the refused event is a finished answer (a `result` event, or a stored result read back),
+`unreadableAnswer` is true, and a host words it as the `unreadable` status, never as a run to ask
+again (CHAOS-12593).
 
 ### Bumping the pin
 

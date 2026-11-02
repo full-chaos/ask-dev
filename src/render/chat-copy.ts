@@ -65,12 +65,13 @@ export const CHAT_STATUS_COPY = {
     stream_unavailable:
         "Ask Dev cannot stream answers on this deployment right now. Contact your administrator.",
     mismatch: "This question could not be sent again as it was first sent. Ask again.",
-    // CHAOS-12593: no "ask again": the same answer is refused the same way until the page updates.
+    // CHAOS-12593: no "ask again": the same answer is refused the same way. The words name no cause
+    // (codex r3 P2): a newer form and a broken one are refused alike.
     unreadable:
-        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Tell your administrator this page needs an update.",
+        "Ask Dev finished, but this page cannot read its answer: the answer does not match the form this page knows. Asking again gives the same result. Tell your administrator.",
     /** The same, when the turn has a reference to show (codex r1 P2: never ask for one not shown). */
     unreadableWithReference:
-        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
+        "Ask Dev finished, but this page cannot read its answer: the answer does not match the form this page knows. Asking again gives the same result. Quote the reference to your administrator.",
     unsaved: "The answer was shown but not saved — ask again",
     abandoned: "An earlier run of this question ended without an answer. Ask again.",
     interrupted: "Interrupted — ask again",
