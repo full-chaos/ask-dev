@@ -1,4 +1,9 @@
-import type { ClaimedFactTable, InvestigationResult, RenderShape } from "./contracts";
+import type {
+    ClaimedFactTable,
+    InvestigationResult,
+    RenderPointSource,
+    RenderShape,
+} from "./contracts";
 import { renderableRowsSource } from "./render-shapes";
 
 /** ACR's closed unit vocabulary (CHAOS-11984): count, ratio, hours, days, points. */
@@ -21,11 +26,29 @@ export function declaredUnit(
 }
 
 /**
+ * The table that declares the row a point cites: the claim's `time_series_table` when the shapes
+ * of that claim plot `time_series_rows`, else its `table` (`renderableRowsSource`, the same choice
+ * the verifier resolves points with). `undefined` for a point that cites no claimed-fact row.
+ */
+export function citedTable(
+    source: RenderPointSource,
+    result: InvestigationResult,
+): ClaimedFactTable | undefined {
+    if (source.kind !== "claimed_fact_row") return undefined;
+    const claim = result.claimed_facts.find((fact) => fact.claim_id === source.claim_id);
+    if (claim === undefined) return undefined;
+    return renderableRowsSource(claim) === "time_series_rows"
+        ? claim.time_series_table
+        : claim.table;
+}
+
+/**
  * The declaration a panel that stands for several claims reads units from (CHAOS-12570, codex r1
  * P2). Claims share a panel when their rows are byte-identical (CHAOS-4672), so the panel's numbers
  * are every claim's: a unit is stated only where every claim's table states the same one. This is
  * the first table, with each measure whose unit another claim states differently, or not at all,
- * taken out of `measure_units`.
+ * taken out of `measure_units`. The same holds for a day cadence (CHAOS-12571): a break claims a
+ * missing day, so the cadence stays only when every claim's table states it.
  */
 export function agreedTable(
     tables: readonly (ClaimedFactTable | undefined)[],
@@ -36,9 +59,14 @@ export function agreedTable(
     const agreed = declared.filter(({ measure, unit }) =>
         others.every((table) => declaredUnit(table, measure) === unit),
     );
-    if (agreed.length === declared.length) return primary;
-    const { measure_units: _disagreed, ...rest } = primary;
-    return agreed.length === 0 ? rest : { ...rest, measure_units: agreed };
+    const cadenceAgrees = others.every((table) => table?.cadence === primary.cadence);
+    if (agreed.length === declared.length && cadenceAgrees) return primary;
+    const { measure_units: _disagreed, cadence: _cadence, ...rest } = primary;
+    return {
+        ...rest,
+        ...(agreed.length === 0 ? {} : { measure_units: agreed }),
+        ...(cadenceAgrees && primary.cadence !== undefined ? { cadence: primary.cadence } : {}),
+    };
 }
 
 /**
@@ -55,14 +83,8 @@ export function shapeMeasureUnit(
     let unit: MeasureUnit | undefined;
     for (const series of shape.series) {
         for (const { source } of series.points) {
-            if (source.kind !== "claimed_fact_row" || source.field === undefined) return undefined;
-            const claim = result.claimed_facts.find((fact) => fact.claim_id === source.claim_id);
-            if (claim === undefined) return undefined;
-            const table =
-                renderableRowsSource(claim) === "time_series_rows"
-                    ? claim.time_series_table
-                    : claim.table;
-            const pointUnit = declaredUnit(table, source.field);
+            if (source.field === undefined) return undefined;
+            const pointUnit = declaredUnit(citedTable(source, result), source.field);
             if (pointUnit === undefined || (unit !== undefined && pointUnit !== unit)) {
                 return undefined;
             }

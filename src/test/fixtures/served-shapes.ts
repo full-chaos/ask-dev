@@ -1,5 +1,7 @@
 import type { InvestigationResult } from "@/lib/contracts";
 
+import cadenceEveryDay from "./served-shapes/cadence-every-day.json";
+import cadenceMissingDay from "./served-shapes/cadence-missing-day.json";
 import categoryOrder from "./served-shapes/category-order.json";
 import comparisonTableServed from "./served-shapes/comparison-table-served.json";
 import comparisonTable from "./served-shapes/comparison-table.json";
@@ -30,9 +32,13 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * `measure-units*` are the contract example through ACR's real declared units and cadence, selector
  * and encoder at 4eb93cf9 (`served-shapes/generate-units.go.txt`): with words, with the labels flag
  * off, with no declaration at all, and with the commits claim about a repository, whose daily
- * metrics declare a unit and a cadence (CHAOS-12570, CHAOS-12571).
+ * metrics declare a unit and a cadence (CHAOS-12570, CHAOS-12571). `cadence-missing-day` and
+ * `cadence-every-day` are that last case with the workload and commits days set to 28, 29 and 31
+ * August, and to 28, 29 and 30 August, through the same real cadence (CHAOS-12571).
  */
 export const servedShapeScenarios = {
+    "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
+    "cadence-missing-day": cadenceMissingDay as unknown as InvestigationResult,
     "category-order": categoryOrder as unknown as InvestigationResult,
     "comparison-table": comparisonTable as unknown as InvestigationResult,
     "comparison-table-served": comparisonTableServed as unknown as InvestigationResult,
