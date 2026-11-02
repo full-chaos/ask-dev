@@ -70,6 +70,11 @@ export const workbenchFailureCodes = [
     /** ACR rejected the request payload. */
     "acr_rejected_request",
     /**
+     * ACR's answer did not fit the size this app asks for, so it sent its bounded form, which this
+     * app does not draw (CHAOS-12106). A valid answer, not a broken one.
+     */
+    "acr_answer_too_large",
+    /**
      * ACR's own validator rejected the answer it derived.
      *
      * A legitimate, classified NON-ANSWER outcome (422 `interpretation_rejected`

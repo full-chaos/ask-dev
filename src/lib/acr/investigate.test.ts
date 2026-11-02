@@ -1465,6 +1465,18 @@ describe("investigateFromBrowser", () => {
         vi.restoreAllMocks();
     });
 
+    it("says an answer was too large when ACR sends its bounded form", () => {
+        const outcome = resultOutcome({
+            schema_version: "context_fabric_answer_projection.v1",
+            result_id: "result_1",
+        });
+        expect(failureOf(outcome)).toEqual({
+            code: "acr_answer_too_large",
+            message: "This answer is too large to show here. Ask about a narrower scope.",
+            retryable: false,
+        });
+    });
+
     it("is a contract violation when an event fails the event schema", async () => {
         serve((init) =>
             streamFor(init, {

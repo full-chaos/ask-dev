@@ -711,6 +711,14 @@ export const TRANSPORT_FAILURES: Readonly<Record<TransportFailureReason, Workben
  * failure, reported as one.
  */
 export function resultOutcome(payload: unknown): InvestigateOutcome {
+    const form = (payload as { schema_version?: unknown } | null)?.schema_version;
+    if (form === "context_fabric_answer_projection.v1") {
+        return failed({
+            code: "acr_answer_too_large",
+            message: "This answer is too large to show here. Ask about a narrower scope.",
+            retryable: false,
+        });
+    }
     const schema = resultSchemaFor(payload);
     if (schema === undefined) {
         const seen = (payload as { schema_version?: unknown } | null)?.schema_version;

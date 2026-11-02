@@ -279,6 +279,32 @@ describe("completeAcrRedirect", () => {
         expect(tokenBodies).toEqual([]);
     });
 
+    it("gives a copied tab nothing: the copy cannot spend the original's start", async () => {
+        const auth = await store();
+        const { state } = await started(auth);
+        const tab = window.sessionStorage.getItem(auth.ACR_TAB_KEY);
+        expect(window.sessionStorage.getItem(KEY)).not.toBeNull();
+        // A new page load in a tab whose id another tab already holds.
+        auth.setAcrAuthDependenciesForTest();
+        let hear: (message: unknown) => void = () => undefined;
+        auth.setAcrAuthDependenciesForTest({
+            channel: () => ({
+                post: (message) => {
+                    if (message.type === "hello") hear({ type: "taken", tabId: message.tabId });
+                },
+                onMessage: (handler) => {
+                    hear = handler;
+                },
+            }),
+        });
+        await expect(
+            auth.completeAcrRedirect(query({ code: "the-code", state, iss: ISSUER })),
+        ).resolves.toEqual({ kind: "failed", reason: "expired" });
+        expect(tokenBodies).toEqual([]);
+        expect(window.sessionStorage.getItem(KEY)).toBeNull();
+        expect(window.sessionStorage.getItem(auth.ACR_TAB_KEY)).not.toBe(tab);
+    });
+
     it("is off with no client", async () => {
         const auth = await import("../auth");
         await expect(auth.completeAcrRedirect("?code=c")).resolves.toEqual({ kind: "off" });

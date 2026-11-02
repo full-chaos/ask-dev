@@ -1057,6 +1057,8 @@ export async function completeAcrRedirect(search: string): Promise<AcrSilentOutc
     const storage = dependencies.storage();
     if (dependencies.config() === undefined || storage === null) return { kind: "off" };
     listenForAcrTabs();
+    // A duplicated tab holds a copy of the entry: the check drops it there, before it is read.
+    await checkClone(storage);
     const pending = pendingFrom(readJson(storage, ACR_PENDING_AUTHORIZATION_KEY));
     storage.removeItem(ACR_PENDING_AUTHORIZATION_KEY);
     if (pending === null) return failed("expired");
