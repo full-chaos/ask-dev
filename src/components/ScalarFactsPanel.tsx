@@ -6,11 +6,15 @@ import { useServedWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
 import { askedForCohort } from "../lib/cohort-ranking";
 import type { ClaimedFact, InvestigationResult } from "../lib/contracts";
-import { cellText, cellValue, factsWithRows, findRollupBasis, sameSubject } from "../lib/fact-rows";
+import {
+    aboutNoPerson,
+    cellText,
+    cellValue,
+    factsWithRows,
+    findRollupBasis,
+    sameSubject,
+} from "../lib/fact-rows";
 import { nonBlank } from "../lib/presentation";
-
-/** No table draws a fact on a person, and `ScalarFactsPanel` says one is held. */
-export const aboutNoPerson = (fact: ClaimedFact): boolean => fact.subject.kind !== "person";
 
 /** A restored answer is not validated, so a claim that lacks a part draws no row. */
 function readable(fact: ClaimedFact): boolean {

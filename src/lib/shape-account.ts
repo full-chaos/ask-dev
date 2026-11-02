@@ -1,7 +1,12 @@
 import { askedForCohort, cohortRanking } from "./cohort-ranking";
 import type { InvestigationResult, RenderShape } from "./contracts";
-import { factsWithRows } from "./fact-rows";
-import { COHORT_SHAPE_RULES, renderShapesFor, shapeMentionsClaim } from "./render-shapes";
+import { factsWithAPanel } from "./fact-rows";
+import {
+    COHORT_SHAPE_RULES,
+    FACT_PANEL_RULES,
+    renderShapesFor,
+    shapeMentionsClaim,
+} from "./render-shapes";
 
 /**
  * The one account of every served shape (rich views plan, section 4): the shapes no panel draws or
@@ -11,8 +16,8 @@ import { COHORT_SHAPE_RULES, renderShapesFor, shapeMentionsClaim } from "./rende
  * - A cohort chart belongs to the ranking, which draws it or says it was withheld. "Ranking not
  *   shown" says it too. With no ranking, `CohortMembersPanel` says only the charts that fail their
  *   check, so a chart that passes is left over here.
- * - A trend belongs to the panel of a fact it cites, and only a fact with `rows` has a panel. That
- *   panel draws it or says it was withheld.
+ * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows`, on no
+ *   person, has a panel. That panel draws it or says it was withheld.
  * - Every other shape has no reader.
  */
 export function shapesNoPanelTakes(result: InvestigationResult): readonly RenderShape[] {
@@ -22,13 +27,13 @@ export function shapesNoPanelTakes(result: InvestigationResult): readonly Render
     );
     const rankingTakesItsCharts = state === "rows" || state === "kind_not_ranked";
     const verifiedCohortCharts = renderShapesFor(result, COHORT_SHAPE_RULES).shapes;
-    const claimsWithAPanel = factsWithRows(result.claimed_facts).map((fact) => fact.claim_id);
+    const claimsWithAPanel = factsWithAPanel(result.claimed_facts).map((fact) => fact.claim_id);
     return (result.render_shapes ?? []).filter((shape) => {
         if (COHORT_SHAPE_RULES.includes(shape.selected_by)) {
             return !rankingTakesItsCharts && verifiedCohortCharts.includes(shape);
         }
         return !(
-            shape.selected_by === "dated_fact_trend" &&
+            FACT_PANEL_RULES.includes(shape.selected_by) &&
             claimsWithAPanel.some((claimId) => shapeMentionsClaim(shape, claimId))
         );
     });

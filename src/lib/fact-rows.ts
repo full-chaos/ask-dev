@@ -325,6 +325,14 @@ export function findRollupBasis(
     return bases.length === 1 ? bases[0] : undefined;
 }
 
+/** No table draws a fact on a person, and `ScalarFactsPanel` says one is held. */
+export const aboutNoPerson = (fact: ClaimedFact): boolean => fact.subject.kind !== "person";
+
+/** The facts that get a table panel: one list, so the panels and the shape account agree. */
+export function factsWithAPanel(facts: readonly ClaimedFact[]): ClaimedFact[] {
+    return factsWithRows(facts).filter(aboutNoPerson);
+}
+
 /** The claimed facts a per-fact panel actually renders: non-empty `rows` only. */
 export function factsWithRows(facts: readonly ClaimedFact[]): ClaimedFact[] {
     return facts.filter((fact) => fact.rows !== undefined && fact.rows.length > 0);

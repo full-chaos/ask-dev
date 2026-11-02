@@ -1,0 +1,281 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_treemap_0001",
+    "request_id": "request_treemap_0001",
+    "generated_at": "2026-11-01T12:00:00Z",
+    "status": "complete",
+    "question": "Where is effort going in full-chaos/dev-health-web?",
+    "interpretation": {
+        "shape": "single_subject",
+        "requested_judgment": "allocation",
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "investment"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [],
+        "committed": [
+            {
+                "kind": "repository",
+                "canonical_id": "repository:full-chaos/dev-health-web",
+                "label": "full-chaos/dev-health-web"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "investment_allocation",
+        "family_source": "model",
+        "family_version": "question-family.v5",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["treemap", "table"],
+        "budget": {
+            "max_items": 400,
+            "max_serialized_bytes": 262144,
+            "max_members": 1,
+            "synthesis_headroom": 40,
+            "narrowing_basis": "canonical_id_lexical"
+        }
+    },
+    "direct_judgment": "Effort leans to feature delivery.",
+    "current_state": "Most effort appears to go to feature delivery.",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_investment_web",
+            "kind": "investment",
+            "subject": {
+                "kind": "repository",
+                "canonical_id": "repository:full-chaos/dev-health-web",
+                "label": "full-chaos/dev-health-web"
+            },
+            "field": "attribution_basis",
+            "value": {
+                "string": "work_unit_investments"
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "attribution": {
+                            "string": "owned_repository"
+                        },
+                        "share": {
+                            "number": 0.4821
+                        },
+                        "source": {
+                            "string": "work_unit_investments"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "weighted_effort": {
+                            "number": 57.852
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "attribution": {
+                            "string": "owned_repository"
+                        },
+                        "share": {
+                            "number": 0.2264
+                        },
+                        "source": {
+                            "string": "work_unit_investments"
+                        },
+                        "theme": {
+                            "string": "operational"
+                        },
+                        "weighted_effort": {
+                            "number": 27.168
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "attribution": {
+                            "string": "owned_repository"
+                        },
+                        "share": {
+                            "number": 0.17535475272593534
+                        },
+                        "source": {
+                            "string": "work_unit_investments"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "weighted_effort": {
+                            "number": 21.04257032711224
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "attribution": {
+                            "string": "owned_repository"
+                        },
+                        "share": {
+                            "number": 0.11614524727406467
+                        },
+                        "source": {
+                            "string": "work_unit_investments"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "weighted_effort": {
+                            "number": 13.93742967288776
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "attribution": {
+                            "string": "owned_repository"
+                        },
+                        "share": {
+                            "number": 0
+                        },
+                        "source": {
+                            "string": "work_unit_investments"
+                        },
+                        "theme": {
+                            "string": "risk"
+                        },
+                        "weighted_effort": {
+                            "number": 0
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "theme_breakdown",
+                "shape": "breakdown",
+                "key": ["theme"],
+                "measures": ["share", "weighted_effort"],
+                "observations": ["source", "attribution"]
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [],
+        "partial": false
+    },
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer",
+        "fact_field:attribution": "Attribution",
+        "fact_field:attribution_basis": "Attribution basis",
+        "fact_field:share": "Share (ratio)",
+        "fact_field:source": "Source",
+        "fact_field:theme": "Theme",
+        "fact_field:weighted_effort": "Weighted effort",
+        "fact_kind:investment": "investment",
+        "generated_at:note": "Answered"
+    },
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "deterministic_answer": "Effort leans to feature delivery in this window.",
+    "warnings": [],
+    "reused": false,
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "treemap",
+            "selected_by": "investment_theme_share",
+            "title": "Effort share by theme",
+            "axis_kind": "category",
+            "axis_label": "Theme",
+            "value_label": "Share of effort (ratio)",
+            "value_unit": "ratio",
+            "series": [
+                {
+                    "key": "share",
+                    "label": "Share of effort",
+                    "points": [
+                        {
+                            "label": "Feature Delivery",
+                            "value": 0.4821,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_web",
+                                "row_index": 0,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Operational / Support",
+                            "value": 0.2264,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_web",
+                                "row_index": 1,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Maintenance / Tech Debt",
+                            "value": 0.17535475272593534,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_web",
+                                "row_index": 2,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Quality / Reliability",
+                            "value": 0.11614524727406467,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_web",
+                                "row_index": 3,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Risk / Security",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_web",
+                                "row_index": 4,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 1,
+        "rows_count": 5,
+        "state": "not_derived"
+    }
+}

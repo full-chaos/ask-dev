@@ -21,6 +21,7 @@ import type {
 import { createStandaloneSource } from "@/render/standalone-source";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
+import { servedShapeScenarios } from "@/test/fixtures/served-shapes";
 
 /**
  * CHAOS-12382: `AskDevChat` renders from a source. A fake host source (snapshots this file
@@ -1250,5 +1251,22 @@ describe("AskDevChat: the pin when a draft clears", () => {
 
         await waitFor(() => expect(box.value).toBe(""));
         await waitFor(() => expect(written).toBe(bottomWith.empty));
+    });
+});
+
+describe("a host's chart reaches the answer (CHAOS-12496)", () => {
+    const treemap = servedShapeScenarios["investment-treemap"];
+    const answered = snapshotOf(assistantTurn(1, { kind: "answered", result: treemap }));
+
+    it("gives a verified rich shape to the host's slot", () => {
+        const shape = vi.fn(() => <div data-testid="host-chart">chart</div>);
+        render(<AskDevChat source={hostSource(answered, { slots: { shape } })} />);
+        expect(screen.getByTestId("host-chart")).toBeInTheDocument();
+        expect(screen.queryByTestId("rich-shape-not-shown")).toBeNull();
+    });
+
+    it("says it when the host has no slot", () => {
+        render(<AskDevChat source={hostSource(answered)} />);
+        expect(screen.getByTestId("rich-shape-not-shown")).toBeInTheDocument();
     });
 });

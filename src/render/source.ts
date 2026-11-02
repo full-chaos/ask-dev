@@ -21,6 +21,7 @@
 import type { ReactNode } from "react";
 
 import type { ClarificationChoice } from "../components/ClarificationPanel";
+import type { ShapeSlot } from "../components/ShapeSlotContext";
 import type { WorkbenchFailure } from "../lib/acr/errors";
 import type { InvestigationResult, SubjectRef } from "../lib/contracts";
 import type { RankingWithheld } from "../lib/ranking-withheld";
@@ -545,6 +546,13 @@ export type ChatSource = {
          * the viewer's and no route to start one.
          */
         readonly connect?: () => ReactNode;
+        /**
+         * A chart for a verified rich shape (a treemap). ask-dev cannot hold these: the charts
+         * belong to the host (rich views plan, section 2, CHAOS-12496). It gets only a shape that
+         * passed verification. With no slot, or `null`, the render shows the value table and says
+         * so.
+         */
+        readonly shape?: ShapeSlot;
     };
     /** Present only when the host has saved conversations. Absent: no list and no toggle. */
     history?: ChatHistorySource;

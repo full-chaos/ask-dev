@@ -261,6 +261,51 @@ export function axisLabels(shape: RenderShape, cohort?: Cohort): readonly string
     );
 }
 
+/** The rule of a fact's part-of-whole chart: its panel draws it, through the host (CHAOS-12496). */
+export const THEME_SHARE_RULE: RenderShapeRule = "investment_theme_share";
+
+/** The rules whose shape belongs to the panel of a fact it cites. */
+export const FACT_PANEL_RULES: readonly RenderShapeRule[] = ["dated_fact_trend", THEME_SHARE_RULE];
+
+/**
+ * True when a treemap is ALL the parts of ONE whole: one claim's declared `theme_breakdown` table,
+ * every row once, the same measure, and a real split. Mirrors acr's `validateTreemapShape`. A row
+ * left out makes it a different claim, and one part above 0 says nothing the sentence does not.
+ * `verifyRenderShape`'s own checks cover the rest of acr's clauses: a kind with no rule here, a time
+ * axis, a point of another source kind, and a share below 0, which the `ratio` unit refuses.
+ *
+ * One clause is acr's alone: that a label is the served word of its row's theme. The word map is
+ * acr's (`ContextFabricInvestmentThemeLabel`), and a copy here would be a consumer table
+ * (CHAOS-4690). So this trusts acr's validator for that one clause, by the lead's ruling.
+ */
+function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    if (shape.kind !== "treemap" || shape.presentation !== undefined) return false;
+    if (shape.series.length !== 1 || shape.value_unit !== "ratio") return false;
+    const points = shape.series[0].points;
+    const claimId = points[0]?.source.claim_id;
+    const matches = facts.filter((fact) => fact.claim_id === claimId);
+    if (matches.length !== 1) return false;
+    const fact = matches[0]!;
+    // A claim with a time series resolves its rows to the series, not to this table.
+    if (fact.table?.field !== "theme_breakdown" || (fact.time_series_rows?.length ?? 0) > 0) {
+        return false;
+    }
+    const rows = fact.rows ?? [];
+    if (points.length !== rows.length) return false;
+    const seen = new Set<number>();
+    let above = 0;
+    for (const { source, value } of points) {
+        if (source.field !== "share") return false;
+        if (source.claim_id !== claimId || source.row_index === undefined) return false;
+        if (seen.has(source.row_index)) return false;
+        seen.add(source.row_index);
+        const theme = rows[source.row_index]?.fields.theme;
+        if (theme === undefined || typeof cellValue(theme) !== "string") return false;
+        if (value > 0) above += 1;
+    }
+    return above >= 2;
+}
+
 /**
  * True when a score bar stands on a ranking row: the member was ranked, has an outcome, and has at
  * least one driver to explain the score (check 8: never a bare score). The table withholds a score
@@ -355,7 +400,11 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // switch exhaustively; seven have no renderer here yet, and the honest
     // response to one arriving is "withheld", not a blank space. When a
     // renderer lands, its kind joins this list in the same change.
-    if (shape.kind !== "series") return false;
+    if (shape.selected_by === THEME_SHARE_RULE) {
+        if (!isThemeShareWhole(shape, result.claimed_facts)) return false;
+    } else if (shape.kind !== "series") {
+        return false;
+    }
     // The renderer's own "nothing to draw": with no point there is no chart, so the shape cannot be
     // admitted as drawn.
     if (axisLabels(shape).length === 0) return false;
@@ -368,6 +417,7 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // rendering an unspecified presentation as bars picks one of three
     // meanings on the reader's behalf.
     if (
+        shape.kind === "series" &&
         shape.presentation !== "bars" &&
         shape.presentation !== "stacked_bars" &&
         shape.presentation !== "line"
@@ -413,6 +463,8 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
             if (!Number.isFinite(point.value) || Math.abs(point.value) >= EXACT_INTEGER_BOUND) {
                 return false;
             }
+            // The unit is a claim about the numbers, and a host formats by it.
+            if (shape.value_unit === "ratio" && (point.value < 0 || point.value > 1)) return false;
             const resolved = resolvePointSource(point.source, result.cohort, result.claimed_facts);
             if (resolved === undefined || resolved !== point.value) return false;
         }
@@ -467,6 +519,15 @@ function admit(candidates: readonly RenderShape[], result: InvestigationResult):
  * field) keeps a single source of truth for what a trend is about.
  */
 export function trendShapesForClaim(result: InvestigationResult, claimId: string): VerifiedShapes {
+    return factShapesForClaim(result, claimId, "dated_fact_trend");
+}
+
+/** `trendShapesForClaim` for any rule whose chart sits on its fact's panel. */
+export function factShapesForClaim(
+    result: InvestigationResult,
+    claimId: string,
+    rule: RenderShapeRule,
+): VerifiedShapes {
     // A shape is a CANDIDATE for this claim if it cites the claim anywhere,
     // and is admitted only if it cites nothing else and verifies. Filtering
     // by "cites only this claim" FIRST was the round-2 defect: a trend
@@ -476,7 +537,7 @@ export function trendShapesForClaim(result: InvestigationResult, claimId: string
     // must be visibly withheld by whichever fact it names, never silently
     // absent from all of them.
     const candidates = (result.render_shapes ?? []).filter(
-        (shape) => shape.selected_by === "dated_fact_trend" && shapeMentionsClaim(shape, claimId),
+        (shape) => shape.selected_by === rule && shapeMentionsClaim(shape, claimId),
     );
     // Candidacy is "mentions this claim"; ownership is "cites only this
     // claim". A shape that mentions the claim but cites another too is a

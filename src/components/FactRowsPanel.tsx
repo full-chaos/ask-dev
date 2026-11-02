@@ -4,17 +4,18 @@ import { FactChart } from "./FactChart";
 import { FactTable } from "./FactTable";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
 import { RenderShapeChart } from "./RenderShapeChart";
-import { aboutNoPerson, ScalarFactsPanel } from "./ScalarFactsPanel";
+import { RichShape } from "./RichShape";
+import { ScalarFactsPanel } from "./ScalarFactsPanel";
 import type { ClaimedFact, InvestigationResult, RenderShape } from "../lib/contracts";
 import {
     factRowTiles,
-    factsWithRows,
+    factsWithAPanel,
     findRollupBasis,
     groupFactsByTable,
     selectPresentation,
 } from "../lib/fact-rows";
 import { rollupsOfClaims } from "../lib/investment-rollup";
-import { trendShapesForClaim } from "../lib/render-shapes";
+import { factShapesForClaim, THEME_SHARE_RULE } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
 import { useClaimFieldWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -44,7 +45,7 @@ export type FactRowsPanelsProps = {
  * the others as references rather than re-plotting their identical rows.
  */
 export function FactRowsPanels({ facts, result }: FactRowsPanelsProps) {
-    const groups = groupFactsByTable(factsWithRows(facts).filter(aboutNoPerson));
+    const groups = groupFactsByTable(factsWithAPanel(facts));
     return (
         <>
             {groups.map((group) => (
@@ -84,15 +85,16 @@ type FactRowsPanelProps = {
  * on the rare case a withheld candidate mentions more than one claim in the
  * group.
  */
-function trendsForGroup(
+function shapesForGroup(
     result: InvestigationResult | undefined,
     claimIds: readonly string[],
+    rule: RenderShape["selected_by"],
 ): { readonly shapes: readonly RenderShape[]; readonly withheld: number } {
     if (result === undefined) return { shapes: [], withheld: 0 };
     const shapeById = new Map<string, RenderShape>();
     let withheld = 0;
     for (const claimId of claimIds) {
-        const perClaim = trendShapesForClaim(result, claimId);
+        const perClaim = factShapesForClaim(result, claimId, rule);
         for (const shape of perClaim.shapes) shapeById.set(shape.shape_id, shape);
         withheld += perClaim.withheld;
     }
@@ -113,11 +115,12 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // this view can check. Where acr selected a trend, the heuristic chart is
     // replaced by it — never drawn beside it, which would show one fact's
     // numbers twice under two different selection rules.
-    const trends = trendsForGroup(result, [fact.claim_id, ...alsoClaims.map((c) => c.claim_id)]);
+    const claimIds = [fact.claim_id, ...alsoClaims.map((c) => c.claim_id)];
+    const trends = shapesForGroup(result, claimIds, "dated_fact_trend");
+    const treemaps = shapesForGroup(result, claimIds, THEME_SHARE_RULE);
+    const selected = trends.shapes.length + trends.withheld + treemaps.shapes.length;
     const presentation =
-        trends.shapes.length > 0 || trends.withheld > 0
-            ? { mode: "table" as const }
-            : selectPresentation(rows);
+        selected + treemaps.withheld > 0 ? { mode: "table" as const } : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
     // breakdown) was derived — see fact-rows.ts's `findRollupBasis` doc
     // comment. It is a SIBLING claim, not a property of this fact, and is
@@ -195,6 +198,14 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 // The table always follows: a chart is a reading of the rows,
                 // never a replacement for them.
             }
+            {treemaps.shapes.map((treemap) => (
+                <RichShape key={treemap.shape_id} shape={treemap} />
+            ))}
+            {treemaps.withheld > 0 ? (
+                <p className="fact-panel__caption" data-testid="rich-shape-withheld">
+                    A chart was withheld: it could not be checked against this fact&apos;s own rows.
+                </p>
+            ) : null}
             {trends.shapes.map((trend) => (
                 <RenderShapeChart key={trend.shape_id} shape={trend} />
             ))}
