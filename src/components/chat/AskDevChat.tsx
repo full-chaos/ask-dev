@@ -28,6 +28,7 @@ import { InspectorRail } from "./InspectorRail";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
 import { EvidenceOpenContext, type EvidenceOpen } from "../EvidenceOpenContext";
 import { FailurePanel } from "../FailurePanel";
+import { ShapeSlotContext } from "../ShapeSlotContext";
 import type { ClarificationChoice } from "../ClarificationPanel";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "../../lib/candidate-selections";
 import { subjectForReceipt } from "../../lib/clarification";
@@ -1163,62 +1164,66 @@ function ChatSurface({
                                                     evidence={chat.evidence}
                                                     resultId={turn.outcome.result.result_id}
                                                 >
-                                                    <DeterministicAnswerView
-                                                        chosenSubject={turn.chosenSubject}
-                                                        onConfirmCandidates={
-                                                            offersChoice
-                                                                ? chooseCandidates
-                                                                : undefined
-                                                        }
-                                                        onConfirmStructure={
-                                                            offersChoice
-                                                                ? chooseStructure
-                                                                : undefined
-                                                        }
-                                                        onRejectStructure={
-                                                            offersChoice
-                                                                ? structureSelections.reject
-                                                                : undefined
-                                                        }
-                                                        onToggleCandidate={
-                                                            offersChoice
-                                                                ? candidateSelections.toggle
-                                                                : undefined
-                                                        }
-                                                        onToggleStructure={
-                                                            offersChoice
-                                                                ? structureSelections.toggle
-                                                                : undefined
-                                                        }
-                                                        onToggleStructureCandidate={
-                                                            offersChoice
-                                                                ? structureCandidateSelections.toggle
-                                                                : undefined
-                                                        }
-                                                        rankingWithheld={
-                                                            turn.outcome.rankingWithheld
-                                                        }
-                                                        result={turn.outcome.result}
-                                                        selectedCandidateReceiptIds={
-                                                            offersChoice
-                                                                ? candidateSelections.batch
-                                                                : (turn.submittedCandidateReceiptIds ??
-                                                                  EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                        }
-                                                        selectedStructureCandidateReceiptIds={
-                                                            offersChoice
-                                                                ? structureCandidateSelections.batch
-                                                                : (turn.submittedStructureCandidateReceiptIds ??
-                                                                  EMPTY_CANDIDATE_SELECTION_BATCH)
-                                                        }
-                                                        offersPresentation="popup"
-                                                        pending={isPending}
-                                                        structureBatch={
-                                                            offersChoice
-                                                                ? structureSelections.batch
-                                                                : turn.submittedStructureBatch
-                                                        }
-                                                    />
+                                                    <ShapeSlotContext.Provider
+                                                        value={chat.slots?.shape ?? null}
+                                                    >
+                                                        <DeterministicAnswerView
+                                                            chosenSubject={turn.chosenSubject}
+                                                            onConfirmCandidates={
+                                                                offersChoice
+                                                                    ? chooseCandidates
+                                                                    : undefined
+                                                            }
+                                                            onConfirmStructure={
+                                                                offersChoice
+                                                                    ? chooseStructure
+                                                                    : undefined
+                                                            }
+                                                            onRejectStructure={
+                                                                offersChoice
+                                                                    ? structureSelections.reject
+                                                                    : undefined
+                                                            }
+                                                            onToggleCandidate={
+                                                                offersChoice
+                                                                    ? candidateSelections.toggle
+                                                                    : undefined
+                                                            }
+                                                            onToggleStructure={
+                                                                offersChoice
+                                                                    ? structureSelections.toggle
+                                                                    : undefined
+                                                            }
+                                                            onToggleStructureCandidate={
+                                                                offersChoice
+                                                                    ? structureCandidateSelections.toggle
+                                                                    : undefined
+                                                            }
+                                                            rankingWithheld={
+                                                                turn.outcome.rankingWithheld
+                                                            }
+                                                            result={turn.outcome.result}
+                                                            selectedCandidateReceiptIds={
+                                                                offersChoice
+                                                                    ? candidateSelections.batch
+                                                                    : (turn.submittedCandidateReceiptIds ??
+                                                                      EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                            }
+                                                            selectedStructureCandidateReceiptIds={
+                                                                offersChoice
+                                                                    ? structureCandidateSelections.batch
+                                                                    : (turn.submittedStructureCandidateReceiptIds ??
+                                                                      EMPTY_CANDIDATE_SELECTION_BATCH)
+                                                            }
+                                                            offersPresentation="popup"
+                                                            pending={isPending}
+                                                            structureBatch={
+                                                                offersChoice
+                                                                    ? structureSelections.batch
+                                                                    : turn.submittedStructureBatch
+                                                            }
+                                                        />
+                                                    </ShapeSlotContext.Provider>
                                                 </EvidenceOpenProvider>
                                             ) : null}
                                             {turn.outcome.kind === "answered" &&

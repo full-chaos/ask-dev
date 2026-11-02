@@ -27,9 +27,9 @@ const trend = pair.render_shapes!.find((s) => s.selected_by === "dated_fact_tren
 function unread(shape: RenderShape, title: string, id: string): RenderShape {
     return {
         ...shape,
-        kind: "treemap",
+        kind: "sunburst",
         presentation: undefined,
-        selected_by: "investment_theme_share",
+        selected_by: "a_rule_no_panel_reads",
         shape_id: id,
         title,
     } as unknown as RenderShape;

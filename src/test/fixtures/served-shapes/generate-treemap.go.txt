@@ -1,0 +1,101 @@
+// Scratch generator of investment-treemap.json, not built by this repo. From a detached acr worktree
+// at the producer commit, with the selector flag on, then `go run ./cmd/zztreemap <this directory>`.
+
+// internal/contextfabric/zz_treemap_export.go
+package contextfabric
+
+import (
+	"time"
+
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+// Scratch only (CHAOS-12496), never committed: a full result through the real selector, flag on.
+func ZZTreemapResult(shares []float64) InvestigationResult {
+	tokens := []string{ThemeFeatureDelivery, ThemeOperational, ThemeMaintenance, ThemeQuality, ThemeRisk}
+	rows := make([]ClaimedFactRow, 0, len(shares))
+	for index, share := range shares {
+		value, effort, theme := share, share*120, tokens[index]
+		source, attribution := "work_unit_investments", "owned_repository"
+		rows = append(rows, ClaimedFactRow{Fields: map[string]ScalarValue{
+			"theme": {String: &theme}, "share": {Number: &value}, "weighted_effort": {Number: &effort},
+			"source": {String: &source}, "attribution": {String: &attribution},
+		}})
+	}
+	basis := "work_unit_investments"
+	repository := SubjectRef{Kind: contractsv1.ContextFabricSubjectRepository, CanonicalID: "repository:full-chaos/dev-health-web", Label: "full-chaos/dev-health-web"}
+	result := InvestigationResult{
+		SchemaVersion: InvestigationResultSchemaV1, ResultID: "result_treemap_0001", RequestID: "request_treemap_0001",
+		GeneratedAt: time.Date(2026, 11, 1, 12, 0, 0, 0, time.UTC), Status: InvestigationComplete,
+		Question: "Where is effort going in full-chaos/dev-health-web?",
+		Interpretation: InterpretedQuestion{
+			Shape: ShapeSingleSubject, RequestedJudgment: "allocation",
+			TimeContext:      TimeContext{Axis: TemporalCurrent},
+			FactRequirements: []FactRequirement{{Kind: FactInvestment}},
+		},
+		SubjectResolution:   SubjectResolution{Candidates: []SubjectCandidate{}, Committed: []SubjectRef{repository}},
+		DirectJudgment:      "Effort leans to feature delivery.",
+		CurrentState:        "Most effort appears to go to feature delivery.",
+		StrongestPressures:  []string{},
+		Drivers:             []DriverJudgment{},
+		RemainingWork:       []Finding{},
+		ReadinessGaps:       []Finding{},
+		Paths:               []RelationshipPath{},
+		Conflicts:           []Finding{},
+		Limitations:         []string{},
+		EvidenceRefIDs:      []string{},
+		Coverage:            Coverage{Sources: []SourceObservation{}, DegradedReasons: []string{}},
+		Versions:            VersionSet{ServiceVersion: "test-v1", ContractVersion: InvestigationResultSchemaV1, Backend: "test"},
+		DeterministicAnswer: "Effort leans to feature delivery in this window.",
+		Warnings:            []string{},
+		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
+			Family: QuestionFamilyInvestmentAllocation, FamilyVersion: QuestionFamilyTableVersion,
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40},
+			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindTreemap, contractsv1.ContextFabricRenderKindTable},
+		},
+		ClaimedFacts: []ClaimedFact{{
+			ClaimID: "claim_investment_web", Kind: FactInvestment, Field: "attribution_basis", Value: ScalarValue{String: &basis}, Rows: rows, Subject: repository,
+			Table: &contractsv1.ContextFabricClaimedFactTable{
+				Field: "theme_breakdown", Shape: contractsv1.ContextFabricFactTableShapeBreakdown, Key: []string{"theme"},
+				Measures: []string{"share", "weighted_effort"}, Observations: []string{"source", "attribution"},
+			},
+		}},
+	}
+	result.RenderShapes, _ = selectRenderShapes(result, nil, RenderShapeOptions{InvestmentThemeShare: true})
+	result.Completeness = ComputeAnswerCompleteness(result)
+	return result
+}
+
+// cmd/zztreemap/main.go
+// Scratch only (CHAOS-12496): the real selector, flag on, then the real encoder.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	result := contextfabric.ZZTreemapResult([]float64{0.4821, 0.2264, 0.17535475272593534, 0.11614524727406466, 0})
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var example contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &example))
+	result.Versions = example.Versions
+	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
+	must(served.Validate())
+	encoded, err := json.MarshalIndent(served, "", "    ")
+	must(err)
+	must(os.WriteFile(filepath.Join(os.Args[1], "investment-treemap.json"), append(encoded, '\n'), 0o644))
+	fmt.Printf("tier=%s shapes=%d bytes=%d\n", tier, len(served.RenderShapes), len(encoded))
+}

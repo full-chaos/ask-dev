@@ -2,6 +2,7 @@ import type { InvestigationResult } from "@/lib/contracts";
 
 import categoryOrder from "./served-shapes/category-order.json";
 import dateTable from "./served-shapes/date-oracle.json";
+import investmentTreemap from "./served-shapes/investment-treemap.json";
 import zoneLessTrend from "./served-shapes/zone-less-trend.json";
 
 /**
@@ -14,6 +15,7 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  */
 export const servedShapeScenarios = {
     "category-order": categoryOrder as unknown as InvestigationResult,
+    "investment-treemap": investmentTreemap as unknown as InvestigationResult,
     "zone-less-trend": zoneLessTrend as unknown as InvestigationResult,
 } as const;
 
