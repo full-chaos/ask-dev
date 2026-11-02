@@ -1,4 +1,5 @@
 import { ACR_MAX_SILENCE_MS } from "./limits";
+import { schemaRefusal, type SchemaRefusal } from "./schemaRefusal";
 import type { SseEvent } from "./sseParser";
 import { INVESTIGATION_STAGES, type InvestigationEvent, type InvestigationStage } from "./types";
 
@@ -60,7 +61,15 @@ export type GateVerdict<TResult> =
       }
     | { readonly kind: "after_terminal"; readonly eventType: string }
     // `eventType` is one of the closed event types, or "unknown".
-    | { readonly kind: "invalid"; readonly reason: InvalidEventReason; readonly seq?: number };
+    | {
+          readonly kind: "invalid";
+          readonly reason: InvalidEventReason;
+          readonly seq?: number;
+          /** For `schema` only: the closed event type the frame named, or "unknown". */
+          readonly eventType?: string;
+          /** For `schema` only: where and by which rule the pinned contract refused it. */
+          readonly refusal?: SchemaRefusal;
+      };
 
 /**
  * What the request sent, which `accepted` must name back. An attach (CHAOS-12336) sends no thread,
@@ -144,7 +153,19 @@ export class InvestigationEventGate<TResult> {
         } catch {
             return { kind: "invalid", reason: "bad_json" };
         }
-        if (!this.validate(value)) return { kind: "invalid", reason: "schema" };
+        if (!this.validate(value)) {
+            const seq = (value as { readonly seq?: unknown } | null)?.seq;
+            return {
+                kind: "invalid",
+                reason: "schema",
+                ...(typeof seq === "number" ? { seq } : {}),
+                eventType:
+                    frame.event !== undefined && EVENT_TYPES.has(frame.event)
+                        ? frame.event
+                        : "unknown",
+                refusal: schemaRefusal(this.validate),
+            };
+        }
         const event = value as Wire;
         const { seq } = event;
         const invalid = (reason: InvalidEventReason): GateVerdict<TResult> => ({

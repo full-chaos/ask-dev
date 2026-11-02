@@ -39,7 +39,9 @@ export function ChatStatusPanel({
     connect,
 }: ChatStatusPanelProps) {
     const reference =
-        status.kind === "failed" || status.kind === "mismatch" ? status.reference : undefined;
+        status.kind === "failed" || status.kind === "mismatch" || status.kind === "unreadable"
+            ? status.reference
+            : undefined;
     const lastSeen = status.kind === "unconfirmed" ? status.lastSeenRunningAt : undefined;
     return (
         <section className="chat__status" data-status={status.kind} data-testid="chat-status">

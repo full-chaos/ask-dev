@@ -8,6 +8,8 @@ export type AcrLogFields = Readonly<Record<string, unknown>>;
 export type AcrLogger = {
     readonly info: (fields: AcrLogFields, message: string) => void;
     readonly warn: (fields: AcrLogFields, message: string) => void;
+    /** Optional: a sink written before the client's error line gets it at `warn` (CHAOS-12593). */
+    readonly error?: (fields: AcrLogFields, message: string) => void;
 };
 
 const SILENT: AcrLogger = { info: () => undefined, warn: () => undefined };
@@ -19,7 +21,26 @@ export function setAcrLogger(next: AcrLogger): void {
     sink = next;
 }
 
-export const logger: AcrLogger = {
-    info: (fields, message) => sink.info(fields, message),
-    warn: (fields, message) => sink.warn(fields, message),
+/** A line is never a reason for the client to fail: a sink that throws loses the line only. */
+function safely(write: () => void): void {
+    try {
+        write();
+    } catch {
+        // The host's sink failed; the client's own outcome stands (CHAOS-12593, codex r2 P2).
+    }
+}
+
+export const logger: Required<AcrLogger> = {
+    info: (fields, message) => safely(() => sink.info(fields, message)),
+    warn: (fields, message) => safely(() => sink.warn(fields, message)),
+    // A sink with no error, or one whose error throws, still gets the line at warn (codex r3 P2).
+    error: (fields, message) =>
+        safely(() => {
+            if (sink.error === undefined) return sink.warn(fields, message);
+            try {
+                sink.error(fields, message);
+            } catch {
+                sink.warn(fields, message);
+            }
+        }),
 };
