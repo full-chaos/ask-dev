@@ -1,0 +1,149 @@
+// Scratch generator of repository-flow-sankey.json, not built by this repo. From a detached acr
+// worktree at the contract commit, then `go run ./cmd/zzsankey <this directory>`, then
+// `prettier --write` on the output (whitespace only; the JSON is unchanged). Ran at acr 271ce38b
+// (#1939's merge, the pin of record).
+//
+// No producer emits this rule yet (CHAOS-12582), so the shape is built here the way acr's own
+// contract test builds it (`chaos12578_sankey_shape_test.go`): one series per theme with effort,
+// labelled with `ContextFabricInvestmentThemeLabel`, one point per link with effort, labelled with
+// the repository's word. What makes it served is the rest: acr's real `ServeVocabularyLabels`,
+// `Validate` (which runs `validateSankeyShape`) and `json.Marshal`. Refresh it from the real selector
+// when CHAOS-12582 lands.
+
+// internal/contextfabric/zz_sankey_export.go
+package contextfabric
+
+import (
+	"time"
+
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+type ZZSankeyLink struct {
+	Repository, Word, Theme string
+	Effort                  float64
+}
+
+// Scratch only (CHAOS-12579), never committed: a full team result whose claim holds a declared
+// repository_theme_breakdown table, and the sankey that plots it.
+func ZZSankeyResult(links []ZZSankeyLink) InvestigationResult {
+	totals := map[string]float64{}
+	for _, link := range links {
+		totals[link.Theme] += link.Effort
+	}
+	rows := make([]ClaimedFactRow, 0, len(links))
+	for _, link := range links {
+		repository, word, theme, effort, total := RepositoryCanonicalID(link.Repository), link.Word, link.Theme, link.Effort, totals[link.Theme]
+		rows = append(rows, ClaimedFactRow{Fields: map[string]ScalarValue{
+			"repository": {String: &repository}, "repository_label": {String: &word}, "theme": {String: &theme},
+			"weighted_effort": {Number: &effort}, "theme_weighted_effort": {Number: &total},
+		}})
+	}
+	const claim = "claim_investment_team_repositories"
+	series := []contractsv1.ContextFabricRenderSeries{}
+	for _, theme := range []string{ThemeFeatureDelivery, ThemeOperational, ThemeMaintenance, ThemeQuality, ThemeRisk} {
+		points := []contractsv1.ContextFabricRenderPoint{}
+		for index, link := range links {
+			if link.Theme != theme || !(link.Effort > 0) {
+				continue
+			}
+			row := index
+			points = append(points, contractsv1.ContextFabricRenderPoint{Label: link.Word, Value: link.Effort, Source: contractsv1.ContextFabricRenderPointSource{
+				Kind: contractsv1.ContextFabricRenderSourceClaimedFactRow, ClaimID: claim, RowIndex: &row, Field: "weighted_effort",
+			}})
+		}
+		if len(points) == 0 {
+			continue
+		}
+		word, _ := contractsv1.ContextFabricInvestmentThemeLabel(theme)
+		series = append(series, contractsv1.ContextFabricRenderSeries{Key: theme, Label: word, Points: points})
+	}
+	basis := "work_unit_investments"
+	team := SubjectRef{Kind: contractsv1.ContextFabricSubjectTeam, CanonicalID: TeamCanonicalID("platform"), Label: "Platform"}
+	result := InvestigationResult{
+		SchemaVersion: InvestigationResultSchemaV1, ResultID: "result_sankey_0001", RequestID: "request_sankey_0001",
+		GeneratedAt: time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC), Status: InvestigationComplete,
+		Question: "Where is the Platform team's effort going, by repository?",
+		Interpretation: InterpretedQuestion{
+			Shape: ShapeSingleSubject, RequestedJudgment: "allocation",
+			TimeContext:      TimeContext{Axis: TemporalCurrent},
+			FactRequirements: []FactRequirement{{Kind: FactInvestment}},
+		},
+		SubjectResolution:   SubjectResolution{Candidates: []SubjectCandidate{}, Committed: []SubjectRef{team}},
+		DirectJudgment:      "The team's effort leans to feature delivery in acme/web.",
+		CurrentState:        "Most of the team's effort appears to go to feature delivery.",
+		StrongestPressures:  []string{},
+		Drivers:             []DriverJudgment{},
+		RemainingWork:       []Finding{},
+		ReadinessGaps:       []Finding{},
+		Paths:               []RelationshipPath{},
+		Conflicts:           []Finding{},
+		Limitations:         []string{},
+		EvidenceRefIDs:      []string{},
+		Coverage:            Coverage{Sources: []SourceObservation{}, DegradedReasons: []string{}},
+		Versions:            VersionSet{ServiceVersion: "test-v1", ContractVersion: InvestigationResultSchemaV1, Backend: "test"},
+		DeterministicAnswer: "The team's effort leans to feature delivery in this window.",
+		Warnings:            []string{},
+		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
+			Family: QuestionFamilyInvestmentAllocation, FamilyVersion: QuestionFamilyTableVersion,
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40, NarrowingBasis: contractsv1.ContextFabricNarrowingBasisCanonicalIDLexical},
+			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindSankey, contractsv1.ContextFabricRenderKindTable},
+		},
+		ClaimedFacts: []ClaimedFact{{
+			ClaimID: claim, Kind: FactInvestment, Field: "attribution_basis", Value: ScalarValue{String: &basis}, Rows: rows, Subject: team,
+			Table: &contractsv1.ContextFabricClaimedFactTable{
+				Field: "repository_theme_breakdown", Shape: contractsv1.ContextFabricFactTableShapeBreakdown, Key: []string{"repository", "theme"},
+				Measures: []string{"weighted_effort", "theme_weighted_effort"}, Observations: []string{"repository_label"},
+			},
+		}},
+		RenderShapes: []contractsv1.ContextFabricRenderShape{{
+			ShapeID: "rs_1", Kind: contractsv1.ContextFabricRenderKindSankey, SelectedBy: contractsv1.ContextFabricRenderRuleInvestmentRepositoryFlow,
+			Title: "Effort by repository and theme", AxisKind: contractsv1.ContextFabricRenderAxisCategory,
+			AxisLabel: "Repository", ValueLabel: "Weighted effort", Series: series,
+		}},
+	}
+	result.Completeness = ComputeAnswerCompleteness(result)
+	return result
+}
+
+// cmd/zzsankey/main.go
+// Scratch only (CHAOS-12579): acr's real vocabulary labels, Validate and encoder.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	result := contextfabric.ZZSankeyResult([]contextfabric.ZZSankeyLink{
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001", "acme/web", "feature_delivery", 40},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001", "acme/web", "quality", 10},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002", "acme/api", "feature_delivery", 25},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002", "acme/api", "maintenance", 0},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002", "acme/api", "operational", 5},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0003", "acme/infra", "maintenance", 12.5},
+		{"0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0003", "acme/infra", "quality", 2.5},
+	})
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var example contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &example))
+	result.Versions = example.Versions
+	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
+	must(served.Validate())
+	encoded, err := json.MarshalIndent(served, "", "    ")
+	must(err)
+	must(os.WriteFile(filepath.Join(os.Args[1], "repository-flow-sankey.json"), append(encoded, '\n'), 0o644))
+	fmt.Printf("tier=%s shapes=%d bytes=%d\n", tier, len(served.RenderShapes), len(encoded))
+}

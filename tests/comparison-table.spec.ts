@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { readFileSync } from "node:fs";
 
-import { answerInvestigations, expect, test } from "./support/signed-in";
+import { answerInvestigations, expect, gotoStyled, test } from "./support/signed-in";
 
 const FIXTURE = "src/test/fixtures/served-shapes/comparison-table.json";
 
@@ -10,7 +10,7 @@ async function openTable(page: Page, width: number) {
     const result: unknown = JSON.parse(readFileSync(FIXTURE, "utf8"));
     await page.setViewportSize({ width, height: 844 });
     await answerInvestigations(page, result);
-    await page.goto("/");
+    await gotoStyled(page, "/");
     await page.getByLabel("Ask a question").fill("Compare the two repositories");
     await page.getByRole("button", { name: "Send" }).click();
     const panel = page.getByTestId("comparison-table");

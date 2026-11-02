@@ -1,0 +1,343 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_sankey_0001",
+    "request_id": "request_sankey_0001",
+    "generated_at": "2026-11-02T12:00:00Z",
+    "status": "complete",
+    "question": "Where is the Platform team's effort going, by repository?",
+    "interpretation": {
+        "shape": "single_subject",
+        "requested_judgment": "allocation",
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "investment"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [],
+        "committed": [
+            {
+                "kind": "team",
+                "canonical_id": "team:platform",
+                "label": "Platform"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "investment_allocation",
+        "family_source": "model",
+        "family_version": "question-family.v5",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["sankey", "table"],
+        "budget": {
+            "max_items": 400,
+            "max_serialized_bytes": 262144,
+            "max_members": 1,
+            "synthesis_headroom": 40,
+            "narrowing_basis": "canonical_id_lexical"
+        }
+    },
+    "direct_judgment": "The team's effort leans to feature delivery in acme/web.",
+    "current_state": "Most of the team's effort appears to go to feature delivery.",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_investment_team_repositories",
+            "kind": "investment",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:platform",
+                "label": "Platform"
+            },
+            "field": "attribution_basis",
+            "value": {
+                "string": "work_unit_investments"
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001"
+                        },
+                        "repository_label": {
+                            "string": "acme/web"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 65
+                        },
+                        "weighted_effort": {
+                            "number": 40
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001"
+                        },
+                        "repository_label": {
+                            "string": "acme/web"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 12.5
+                        },
+                        "weighted_effort": {
+                            "number": 10
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002"
+                        },
+                        "repository_label": {
+                            "string": "acme/api"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 65
+                        },
+                        "weighted_effort": {
+                            "number": 25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002"
+                        },
+                        "repository_label": {
+                            "string": "acme/api"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 12.5
+                        },
+                        "weighted_effort": {
+                            "number": 0
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0002"
+                        },
+                        "repository_label": {
+                            "string": "acme/api"
+                        },
+                        "theme": {
+                            "string": "operational"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 5
+                        },
+                        "weighted_effort": {
+                            "number": 5
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0003"
+                        },
+                        "repository_label": {
+                            "string": "acme/infra"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 12.5
+                        },
+                        "weighted_effort": {
+                            "number": 12.5
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "repository": {
+                            "string": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0003"
+                        },
+                        "repository_label": {
+                            "string": "acme/infra"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "theme_weighted_effort": {
+                            "number": 12.5
+                        },
+                        "weighted_effort": {
+                            "number": 2.5
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "repository_theme_breakdown",
+                "shape": "breakdown",
+                "key": ["repository", "theme"],
+                "measures": ["weighted_effort", "theme_weighted_effort"],
+                "observations": ["repository_label"]
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [],
+        "partial": false
+    },
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer",
+        "fact_field:attribution_basis": "Attribution basis",
+        "fact_field:theme": "Theme",
+        "fact_field:weighted_effort": "Weighted effort",
+        "fact_kind:investment": "investment",
+        "generated_at:note": "Answered"
+    },
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "deterministic_answer": "The team's effort leans to feature delivery in this window.",
+    "warnings": [],
+    "reused": false,
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "sankey",
+            "selected_by": "investment_repository_flow",
+            "title": "Effort by repository and theme",
+            "axis_kind": "category",
+            "axis_label": "Repository",
+            "value_label": "Weighted effort",
+            "series": [
+                {
+                    "key": "feature_delivery",
+                    "label": "Feature Delivery",
+                    "points": [
+                        {
+                            "label": "acme/web",
+                            "value": 40,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 0,
+                                "field": "weighted_effort"
+                            }
+                        },
+                        {
+                            "label": "acme/api",
+                            "value": 25,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 2,
+                                "field": "weighted_effort"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "operational",
+                    "label": "Operational / Support",
+                    "points": [
+                        {
+                            "label": "acme/api",
+                            "value": 5,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 4,
+                                "field": "weighted_effort"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "maintenance",
+                    "label": "Maintenance / Tech Debt",
+                    "points": [
+                        {
+                            "label": "acme/infra",
+                            "value": 12.5,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 5,
+                                "field": "weighted_effort"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "quality",
+                    "label": "Quality / Reliability",
+                    "points": [
+                        {
+                            "label": "acme/web",
+                            "value": 10,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 1,
+                                "field": "weighted_effort"
+                            }
+                        },
+                        {
+                            "label": "acme/infra",
+                            "value": 2.5,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_team_repositories",
+                                "row_index": 6,
+                                "field": "weighted_effort"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 1,
+        "rows_count": 7,
+        "state": "not_derived"
+    }
+}

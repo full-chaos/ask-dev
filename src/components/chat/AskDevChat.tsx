@@ -337,8 +337,10 @@ function ChatSurface({
     // wire fields (`prior_subject_receipts` vs `prior_candidate_receipts`),
     // different receipt namespaces, so a pick in one must never leak into
     // the other.
-    const candidateSelections = useCandidateSelections();
-    const structureCandidateSelections = useCandidateSelections();
+    // CHAOS-12146: several picks per axis only where the source fans them out (the Workbench).
+    const picksPerAxis = chat.multiPick === true ? "several" : "one";
+    const candidateSelections = useCandidateSelections(picksPerAxis);
+    const structureCandidateSelections = useCandidateSelections(picksPerAxis);
     // CHAOS-4671: the popup clarification flow's own two small pieces of
     // state — everything ELSE it needs (what to render, what a pick means)
     // stays derived from the three selection hooks above, exactly as the
