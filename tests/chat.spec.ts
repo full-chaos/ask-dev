@@ -5,6 +5,7 @@ import { configuredBaseURL } from "../playwright.config";
 import {
     abortInvestigations,
     expect,
+    gotoStyled,
     restoreInvestigations,
     signIn,
     test,
@@ -407,7 +408,7 @@ test.describe("the evidence window without the rail", () => {
     test.use({ baseURL: configuredBaseURL });
 
     async function ask(page: import("@playwright/test").Page) {
-        await page.goto("/");
+        await gotoStyled(page, "/");
         await page.getByLabel("Ask a question").fill(`How is it going? ${TRIGGER_WINDOW}`);
         await page.getByRole("button", { name: "Send" }).click();
         const turn = page.getByRole("article", { name: "Answer" });
