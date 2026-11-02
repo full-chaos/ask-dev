@@ -474,7 +474,7 @@ test.describe("clarification popup width (CHAOS-4695)", () => {
     test("the popup spans the same width as the chat composer, not a fixed intrinsic width", async ({
         page,
     }) => {
-        await page.goto("/");
+        await gotoStyled(page, "/");
 
         await page.getByLabel("Ask a question").fill(`Who owns this, ${TRIGGER_CLARIFICATION}?`);
         await page.getByRole("button", { name: "Send" }).click();
@@ -962,7 +962,7 @@ test.describe("narrow windows and the host rules", () => {
 
     test("fact tiles with long values fit a phone sheet", async ({ page }) => {
         await page.setViewportSize({ width: 334, height: 800 });
-        await page.goto("/");
+        await gotoStyled(page, "/");
         await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
         await expect(
             page.getByTestId("fact-tiles").filter({ hasText: "0.8333333333333334" }),
@@ -974,7 +974,7 @@ test.describe("narrow windows and the host rules", () => {
         for (const layout of LAYOUT_CASES) {
             test(`${width} px: ${layout.name} does not scroll sideways`, async ({ page }) => {
                 await page.setViewportSize({ width, height: 800 });
-                await page.goto("/");
+                await gotoStyled(page, "/");
                 await ask(page, layout.question);
                 await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(1);
                 await expect(page.getByRole("article", { name: "Answer" })).toHaveAttribute(
@@ -995,7 +995,7 @@ test.describe("narrow windows and the host rules", () => {
 
     test("a wide table scrolls inside its own named region", async ({ page }) => {
         await page.setViewportSize({ width: 334, height: 800 });
-        await page.goto("/");
+        await gotoStyled(page, "/");
         await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
         const ranking = page.getByRole("group", { name: "Ranking" });
         await expect(ranking).toBeVisible();
@@ -1016,7 +1016,7 @@ test.describe("narrow windows and the host rules", () => {
             page,
         }) => {
             await page.setViewportSize({ width, height: 800 });
-            await page.goto("/");
+            await gotoStyled(page, "/");
             await ask(page, `Which teams are struggling, ${TRIGGER_SHAPES}?`);
             await expect(page.getByRole("article", { name: "Answer" })).toHaveCount(1);
             await ask(page, `And which teams improved, ${TRIGGER_SHAPES}?`);
@@ -1028,7 +1028,7 @@ test.describe("narrow windows and the host rules", () => {
 
     test("every answer shows AI-written, and no visible text names a ticket", async ({ page }) => {
         await page.setViewportSize({ width: PANEL_WIDTH, height: 800 });
-        await page.goto("/");
+        await gotoStyled(page, "/");
         await ask(page, "Why is Ask Dev still not ready to ship?");
         const turn = page.getByRole("article", { name: "Answer" });
         await expect(turn.getByText("AI-written", { exact: true })).toBeVisible();
