@@ -119,9 +119,12 @@ export function ShapeDataTable({
     labels,
     visible = false,
     format = formatValue,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    /** CHAOS-12570: the served unit word of every value, under each value column's word. */
+    readonly unit?: string | undefined;
     /** How a cell prints a value. Exact unless the caller keeps the exact value elsewhere. */
     readonly format?: (value: number) => string;
     /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
@@ -136,6 +139,11 @@ export function ShapeDataTable({
                     {shape.series.map((series) => (
                         <th key={series.key} scope="col">
                             {series.label}
+                            {unit === undefined ? null : (
+                                <span className="fact-table__unit" data-testid="measure-unit">
+                                    {unit}
+                                </span>
+                            )}
                         </th>
                     ))}
                 </tr>
@@ -543,7 +551,7 @@ export function RenderShapeChart({ shape, cohort, unit }: RenderShapeChartProps)
             ) : (
                 <CategoryBars labels={labels} shape={shape} unit={unit} />
             )}
-            <ShapeDataTable labels={labels} shape={shape} />
+            <ShapeDataTable labels={labels} shape={shape} unit={unit} />
         </figure>
     );
 }
