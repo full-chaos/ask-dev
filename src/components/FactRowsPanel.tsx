@@ -3,6 +3,7 @@ import { useId } from "react";
 import { FactChart } from "./FactChart";
 import { FactTable } from "./FactTable";
 import { InvestmentRollupLabel } from "./InvestmentRollupLabel";
+import { useMeasureUnitWord } from "./MeasureUnitWord";
 import { RenderShapeChart } from "./RenderShapeChart";
 import { RichShape } from "./RichShape";
 import { ScalarFactsPanel } from "./ScalarFactsPanel";
@@ -15,6 +16,7 @@ import {
     selectPresentation,
 } from "../lib/fact-rows";
 import { rollupsOfClaims } from "../lib/investment-rollup";
+import { declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
 import { factShapesForClaim, THEME_SHARE_RULE } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
@@ -137,6 +139,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     const idPrefix = useId();
     const word = useVocabularyWord();
     const fieldWord = useClaimFieldWord();
+    const unitWord = useMeasureUnitWord();
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
     const rollups = rollupsOfClaims(allFacts, [
@@ -185,12 +188,31 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 // numeric columns, shown as tiles ABOVE the same table — the
                 // table below still carries every column, tiled or not.
                 <div className="tiles" data-testid="fact-tiles">
-                    {tiles.map((tile) => (
-                        <div className="tile" key={tile.label}>
-                            <span className="tile__value">{String(tile.value ?? "—")}</span>
-                            <span className="tile__label">{word("fact_field", tile.label)}</span>
-                        </div>
-                    ))}
+                    {tiles.map((tile) => {
+                        // CHAOS-12570: the served unit word after a served value only.
+                        const unit =
+                            tile.value === null
+                                ? undefined
+                                : unitWord(declaredUnit(fact.table, tile.label));
+                        return (
+                            <div className="tile" key={tile.label}>
+                                <span className="tile__value">
+                                    {String(tile.value ?? "—")}
+                                    {unit === undefined ? null : (
+                                        <>
+                                            {" "}
+                                            <span className="tile__unit" data-testid="measure-unit">
+                                                {unit}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <span className="tile__label">
+                                    {word("fact_field", tile.label)}
+                                </span>
+                            </div>
+                        );
+                    })}
                 </div>
             ) : null}
             {
@@ -207,7 +229,13 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 </p>
             ) : null}
             {trends.shapes.map((trend) => (
-                <RenderShapeChart key={trend.shape_id} shape={trend} />
+                <RenderShapeChart
+                    key={trend.shape_id}
+                    shape={trend}
+                    unit={
+                        result === undefined ? undefined : unitWord(shapeMeasureUnit(trend, result))
+                    }
+                />
             ))}
             {trends.withheld > 0 ? (
                 <p className="fact-panel__caption" data-testid="trend-shape-withheld">
@@ -224,6 +252,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                         chartKind={presentation.chartKind}
                         rows={rows}
                         seriesColumns={presentation.seriesColumns}
+                        table={fact.table}
                     />
                     {presentation.truncatedSeriesColumns.length > 0 ? (
                         <p className="fact-panel__caption">
@@ -248,11 +277,12 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                         <FactTable
                             focusable={presentation.truncatedSeriesColumns.length > 0}
                             rows={rows}
+                            table={fact.table}
                         />
                     </div>
                 </>
             ) : (
-                <FactTable rows={rows} />
+                <FactTable rows={rows} table={fact.table} />
             )}
         </section>
     );

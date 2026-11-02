@@ -1,0 +1,99 @@
+// Scratch generator of the measure-units*.json fixtures, not built by this repo. From a detached acr
+// worktree at 4eb93cf9: add the first file below as internal/contextfabric/zz_units_export.go and the
+// second as cmd/zzunits/main.go, then `go run ./cmd/zzunits <this directory>`.
+
+// internal/contextfabric/zz_units_export.go
+package contextfabric
+
+// Scratch only (CHAOS-12570, CHAOS-12571), never committed: the two steps finalizeResult runs before
+// shape selection (chaos4636_answer_plan.go), from the real fact declarations.
+func ZZWithDeclared(result InvestigationResult, capabilities []FactCapability) InvestigationResult {
+	result.ClaimedFacts = withDeclaredMeasureUnits(result.ClaimedFacts, declaredMeasureUnitsOf(capabilities))
+	result.ClaimedFacts = withDeclaredCadence(result.ClaimedFacts, declaredCadenceOf(capabilities))
+	return result
+}
+
+// cmd/zzunits/main.go
+// Scratch generator (CHAOS-12570, CHAOS-12571), never committed. From a detached acr worktree at
+// 4eb93cf9 with internal/contextfabric/zz_units_export.go beside it: `go run ./cmd/zzunits <dir>`.
+// The contract example, through the real declared units and cadence (the producers' own
+// declarations, via devhealthfacts.NewProviders), SelectRenderShapes, ServeVocabularyLabels,
+// Validate and json.Marshal.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric/devhealthfacts"
+)
+
+const maxBytes = 262144
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func load() contextfabric.InvestigationResult {
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var result contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &result))
+	return result
+}
+
+var frame = &contextfabric.QuestionFrame{SubjectExpression: contextfabric.SubjectExpression{
+	Kind:       contextfabric.SubjectExpressionDiscoveredKind,
+	Discovered: &contextfabric.DiscoveredSetExpression{MemberKind: contextfabric.SubjectTeam},
+}}
+
+func select_(result contextfabric.InvestigationResult) contextfabric.InvestigationResult {
+	result.RenderShapes = nil
+	result.RenderShapes, _ = contextfabric.SelectRenderShapes(result, frame)
+	result.Completeness = contextfabric.ComputeAnswerCompleteness(result)
+	return result
+}
+
+func main() {
+	out := os.Args[1]
+	var capabilities []contextfabric.FactCapability
+	for _, provider := range devhealthfacts.NewProviders(nil) {
+		capabilities = append(capabilities, provider.Capability())
+	}
+	declared := select_(contextfabric.ZZWithDeclared(load(), capabilities))
+	// The example's commits claim, about a repository instead of a project: the repository's own
+	// daily_metrics declaration then states its unit and cadence.
+	repository := load()
+	for index := range repository.ClaimedFacts {
+		fact := &repository.ClaimedFacts[index]
+		if fact.ClaimID == "claim_metrics_ask_dev_commits" {
+			fact.Subject = contextfabric.SubjectRef{Kind: contextfabric.SubjectRepository, CanonicalID: "repository:full-chaos/ask-dev", Label: "full-chaos/ask-dev"}
+		}
+	}
+	repository.SubjectResolution.Committed = append(repository.SubjectResolution.Committed, contextfabric.SubjectRef{Kind: contextfabric.SubjectRepository, CanonicalID: "repository:full-chaos/ask-dev", Label: "full-chaos/ask-dev"})
+	repositoryDeclared := select_(contextfabric.ZZWithDeclared(repository, capabilities))
+	undeclared := select_(contextfabric.ZZWithDeclared(load(), nil))
+	cases := []struct {
+		name   string
+		result contextfabric.InvestigationResult
+		labels bool
+	}{
+		{"measure-units", declared, true},
+		{"measure-units-labels-off", declared, false},
+		{"measure-units-undeclared", undeclared, true},
+		{"measure-units-repository", repositoryDeclared, true},
+	}
+	for _, c := range cases {
+		served, tier := contextfabric.ServeVocabularyLabels(c.result, c.labels, maxBytes)
+		must(served.Validate())
+		encoded, err := json.MarshalIndent(served, "", "    ")
+		must(err)
+		must(os.WriteFile(filepath.Join(out, c.name+".json"), append(encoded, '\n'), 0o644))
+		fmt.Printf("%-26s tier=%s shapes=%d bytes=%d\n", c.name, tier, len(served.RenderShapes), len(encoded))
+	}
+}
