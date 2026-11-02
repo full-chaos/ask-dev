@@ -565,6 +565,8 @@ describe("investigate: refusals", () => {
     // 2026-11-02. A longer wait, or any other form, is undefined; there is no HTTP-date parser.
     it.each([
         ["7", 7],
+        // CHAOS-12618: moved from web's duplicate (CHAOS-12613): spaces around the seconds.
+        [" 7 ", 7],
         ["2475944", 2_475_944],
         // ACR's longest wait is a month: 31 days is the bound, by value, not by digit count.
         ["2678400", 2_678_400],
@@ -576,9 +578,15 @@ describe("investigate: refusals", () => {
         ["-3", undefined],
         ["7s", undefined],
         ["", undefined],
+        // CHAOS-12618: moved from web's duplicate (CHAOS-12613): no header at all.
+        [undefined, undefined],
     ])("Retry-After %j is retryAfterSeconds %j", async (header, seconds) => {
         fetchMock.mockResolvedValue(
-            jsonResponse(errorEnvelope("allowance_exhausted", 429), 429, { "Retry-After": header }),
+            jsonResponse(
+                errorEnvelope("allowance_exhausted", 429),
+                429,
+                header === undefined ? {} : { "Retry-After": header },
+            ),
         );
         const refusal = await collect(transport().investigate(call())).catch((error) => error);
         expect(refusal).toBeInstanceOf(TransportRefusal);
