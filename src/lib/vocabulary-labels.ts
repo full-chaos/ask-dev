@@ -22,6 +22,7 @@ export type Vocabulary =
     | "member_outcome"
     | "prior_receipt_disposition"
     | "ranking_signal"
+    | "relationship_type"
     | "requirement_outcome"
     | "structure_disposition"
     | "subject_kind"

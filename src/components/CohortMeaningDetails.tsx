@@ -1,5 +1,6 @@
+import { EvidenceReferences } from "./EvidenceReferences";
 import { useVocabularyLabels } from "./VocabularyWordContext";
-import type { Cohort } from "../lib/contracts";
+import type { Cohort, CohortMember, EvidenceRefLabels } from "../lib/contracts";
 import { nonBlank, rawText } from "../lib/presentation";
 import { type VocabularyLabels, servedNote, servedWord } from "../lib/vocabulary-labels";
 
@@ -100,6 +101,12 @@ export function CohortMeaningLines({ cohort, ranked }: CohortMeaningProps) {
     );
 }
 
+export type CohortMeaningDetailsProps = CohortMeaningProps & {
+    readonly evidenceRefLabels: EvidenceRefLabels;
+    /** Members whose evidence another panel on the page draws. */
+    readonly evidenceElsewhere?: ReadonlySet<CohortMember>;
+};
+
 /**
  * What a cohort rests on, in one closed fold, under the ranked table or the member list. Every
  * member's reasons show: the status table draws its work items but not why they are here. A
@@ -107,15 +114,32 @@ export function CohortMeaningLines({ cohort, ranked }: CohortMeaningProps) {
  * A ranked panel's page has no room for the rationale and the exclusions, so they sit here. A member
  * list draws them on the page.
  */
-export function CohortMeaningDetails({ cohort, ranked }: CohortMeaningProps) {
+export function CohortMeaningDetails({
+    cohort,
+    ranked,
+    evidenceRefLabels,
+    evidenceElsewhere,
+}: CohortMeaningDetailsProps) {
     const fields = meaningFields(cohort, useVocabularyLabels(), ranked).filter(
         ({ line }) => line === undefined,
     );
     const members = cohort.members.filter((member) => Array.isArray(member.inclusion_reasons));
+    const cited = cohort.members.filter(
+        (member) =>
+            Array.isArray(member.evidence_ref_ids) &&
+            member.evidence_ref_ids.length > 0 &&
+            !evidenceElsewhere?.has(member),
+    );
     const rationale =
         ranked && typeof cohort.rationale === "string" ? nonBlank(cohort.rationale) : undefined;
     const excluded = ranked && readableExclusions(cohort).length > 0;
-    if (rationale === undefined && !excluded && members.length === 0 && fields.length === 0) {
+    if (
+        rationale === undefined &&
+        !excluded &&
+        members.length === 0 &&
+        cited.length === 0 &&
+        fields.length === 0
+    ) {
         return null;
     }
     return (
@@ -128,6 +152,16 @@ export function CohortMeaningDetails({ cohort, ranked }: CohortMeaningProps) {
                 <p className="record__meta" data-testid="cohort-inclusion-reasons" key={index}>
                     {member.subject.label}: {member.inclusion_reasons.join(" ")}
                 </p>
+            ))}
+            {cited.map((member, index) => (
+                // Index key: the contract does not promise a unique canonical id.
+                <div data-testid="cohort-member-evidence" key={index}>
+                    <EvidenceReferences
+                        evidenceRefIds={member.evidence_ref_ids}
+                        evidenceRefLabels={evidenceRefLabels}
+                        label={`Evidence: ${member.subject.label}`}
+                    />
+                </div>
             ))}
             {fields.map(({ name, value }) => (
                 <p className="record__meta" data-testid={`cohort-raw-${name}`} key={name}>

@@ -71,6 +71,7 @@ function scopeFields(result: InvestigationResult): readonly ScopeField[] {
     const fields: ScopeField[] = [
         { name: "generated_at", raw: result.generated_at, line: answeredLine(result) },
     ];
+    if (result.temporal) fields.push(field("temporal", rawText(result.temporal), true));
     if (result.reused) fields.push(field("reused", rawText(result.reused), result.reused === true));
     const displaced = result.limitations_displaced ?? 0;
     if (displaced !== 0) {

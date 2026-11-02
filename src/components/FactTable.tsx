@@ -1,7 +1,7 @@
 import { ScrollRegion } from "./ScrollRegion";
+import { useVocabularyWord } from "./VocabularyWordContext";
 import type { ClaimedFactRow } from "../lib/contracts";
 import { cellText, columnOrder } from "../lib/fact-rows";
-import { humanizeTerm } from "../lib/presentation";
 
 export type FactTableProps = {
     readonly rows: readonly ClaimedFactRow[];
@@ -16,6 +16,7 @@ export type FactTableProps = {
  * cell — the workbench never fills a gap with an inferred value.
  */
 export function FactTable({ rows, focusable }: FactTableProps) {
+    const word = useVocabularyWord();
     const columns = columnOrder(rows);
     return (
         <ScrollRegion focusable={focusable} label="Facts">
@@ -24,7 +25,7 @@ export function FactTable({ rows, focusable }: FactTableProps) {
                     <tr>
                         {columns.map((column) => (
                             <th key={column} scope="col">
-                                {humanizeTerm(column)}
+                                {word("fact_field", column)}
                             </th>
                         ))}
                     </tr>

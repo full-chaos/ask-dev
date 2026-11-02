@@ -1,6 +1,7 @@
 import { Details } from "./Details";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { SafeAnswerText } from "./SafeAnswerText";
+import { useServedWord } from "./VocabularyWordContext";
 import { askedForCohort, cohortRanking, isRankableSubjectKind } from "../lib/cohort-ranking";
 import type { EvidenceRefLabels, InvestigationResult, RelationshipPath } from "../lib/contracts";
 import { humanizeTerm } from "../lib/presentation";
@@ -9,10 +10,10 @@ import { humanizeTerm } from "../lib/presentation";
 const NOT_CAUSE = "A path shows how these are linked. It does not show cause.";
 
 /**
- * An edge's word. ACR serves no label for an edge type, so this is the generic path, always inside
+ * The generic path of an edge word: a type ACR served no word for, or a status-only tier. Always in
  * a fold (CHAOS-4690): no consumer table over the vocabulary.
  */
-function edgeWord(type: string): string {
+function genericEdgeWord(type: string): string {
     return humanizeTerm(type.toLowerCase());
 }
 
@@ -34,6 +35,7 @@ function PathList({
     readonly paths: readonly RelationshipPath[];
     readonly evidenceRefLabels: EvidenceRefLabels;
 }) {
+    const served = useServedWord();
     const drawn = paths.filter(isDrawable);
     const leftOut = paths.length - drawn.length;
     return (
@@ -49,8 +51,10 @@ function PathList({
                         <ol className="stack stack--tight">
                             {path.edges.map((edge, hop) => (
                                 <li className="record__meta" data-testid="path-hop" key={hop}>
-                                    {edge.from.label} — {edgeWord(edge.type)} → {edge.to.label} ·{" "}
-                                    {humanizeTerm(edge.epistemic_status)} ·{" "}
+                                    {edge.from.label} —{" "}
+                                    {served("relationship_type", edge.type) ??
+                                        genericEdgeWord(edge.type)}{" "}
+                                    → {edge.to.label} · {humanizeTerm(edge.epistemic_status)} ·{" "}
                                     {humanizeTerm(edge.derivation)}
                                 </li>
                             ))}

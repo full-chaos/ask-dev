@@ -1,5 +1,6 @@
 // Scratch generator, not built by this repo. Run from a detached acr worktree at d617cbd2 with one
 // extra scratch file that exports parseRenderDate: `go run ./cmd/zzshapes <this directory>`.
+// `edge-words.json` alone is from da2efe68: it needs the served `relationship_type` words.
 // Scratch only (CHAOS-11986): ask-dev's served-shape fixtures, from ACR's real SelectRenderShapes,
 // ServeVocabularyLabels and json.Marshal at the pin, plus a date table from ACR's real parseRenderDate.
 package main
@@ -115,6 +116,7 @@ func main() {
 	cases := map[string]contextfabric.InvestigationResult{
 		"category-order":  select_(order),
 		"zone-less-trend": select_(zoneless),
+		"edge-words":      select_(load()),
 	}
 	for name, result := range cases {
 		served, tier := contextfabric.ServeVocabularyLabels(result, true, maxBytes)
