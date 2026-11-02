@@ -1,4 +1,4 @@
-import { Component, useContext, type ReactNode } from "react";
+import { Component, isValidElement, useContext, type ReactNode } from "react";
 
 import { ShapeDataTable } from "./RenderShapeChart";
 import { ShapeSlotContext } from "./ShapeSlotContext";
@@ -19,8 +19,9 @@ function NoChart({ shape }: { readonly shape: RenderShape }) {
 
 function HostChart({ shape }: { readonly shape: RenderShape }) {
     const slot = useContext(ShapeSlotContext);
-    const chart = slot?.(shape) ?? null;
-    if (chart === null) return <NoChart shape={shape} />;
+    const chart: unknown = slot?.(shape);
+    // Only an element draws: `false`, `undefined` or "" would leave the reader nothing, and no notice.
+    if (!isValidElement(chart)) return <NoChart shape={shape} />;
     return (
         <>
             {chart}

@@ -1,9 +1,9 @@
-import { createContext, type ReactNode } from "react";
+import { createContext, type ReactElement } from "react";
 
 import type { RenderShape } from "../lib/contracts";
 
 /** A host's chart for one verified shape, or `null` when it has none. */
-export type ShapeSlot = (shape: RenderShape) => ReactNode | null;
+export type ShapeSlot = (shape: RenderShape) => ReactElement | null;
 
 /**
  * The host's charts, for every panel inside an answer. A context, as `EvidenceOpenContext` is: the

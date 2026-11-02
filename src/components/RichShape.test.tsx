@@ -81,6 +81,10 @@ describe("no chart is never a silent absence (CHAOS-12496)", () => {
     it.each<[string, ShapeSlot | null]>([
         ["with no slot, as in standalone and the Workbench", null],
         ["when the slot returns null", () => null],
+        // A host is not typed at the seam's runtime: each of these draws nothing in React.
+        ["when the slot returns false", (() => false) as unknown as ShapeSlot],
+        ["when the slot returns undefined", (() => undefined) as unknown as ShapeSlot],
+        ["when the slot returns an empty string", (() => "") as unknown as ShapeSlot],
     ])("shows the value table and one line %s", (_, slot) => {
         draw(slot);
         expect(screen.getByText(NOT_SHOWN)).toBeVisible();
