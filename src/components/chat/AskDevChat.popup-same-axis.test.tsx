@@ -113,14 +113,18 @@ async function pickTwoOnOneAxis(source: ChatSource) {
     return sent.slice(1);
 }
 
-/** Every receipt a request carries, as `result_id:receipt_id`. */
+/**
+ * Every receipt a request carries, as `result_id:receipt_id`: every `prior…Receipts` field the
+ * request has (subject, candidate, kind, anchor, handle, window), so no receipt family is skipped.
+ */
 function receiptsOf(body: Record<string, unknown>): string[] {
-    return ["priorSubjectReceipts", "priorCandidateReceipts", "priorKindReceipts"].flatMap(
-        (field) =>
-            ((body[field] as { result_id: string; receipt_id: string }[] | undefined) ?? []).map(
+    return Object.entries(body)
+        .filter(([field]) => /^prior[A-Z]\w*Receipts$/u.test(field))
+        .flatMap(([, receipts]) =>
+            ((receipts as { result_id: string; receipt_id: string }[] | undefined) ?? []).map(
                 (receipt) => `${receipt.result_id}:${receipt.receipt_id}`,
             ),
-    );
+        );
 }
 
 describe("two picks on one popup axis (CHAOS-12146)", () => {
