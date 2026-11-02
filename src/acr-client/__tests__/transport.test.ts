@@ -560,6 +560,31 @@ describe("investigate: refusals", () => {
         expect(refusal.error.error.code).toBe("submission_in_progress");
     });
 
+    // CHAOS-12564: ACR writes `Retry-After` as integer seconds only (CHAOS-12199 ruling). Its
+    // monthly allowance answers up to a month ahead: `2475944` is the value askdev-1 sent on
+    // 2026-11-02. A longer wait, or any other form, is undefined; there is no HTTP-date parser.
+    it.each([
+        ["7", 7],
+        ["2475944", 2_475_944],
+        // ACR's longest wait is a month: 31 days is the bound, by value, not by digit count.
+        ["2678400", 2_678_400],
+        ["2678401", undefined],
+        ["99999999", undefined],
+        ["123456789", undefined],
+        ["Wed, 21 Oct 2026 07:28:00 GMT", undefined],
+        ["1.5", undefined],
+        ["-3", undefined],
+        ["7s", undefined],
+        ["", undefined],
+    ])("Retry-After %j is retryAfterSeconds %j", async (header, seconds) => {
+        fetchMock.mockResolvedValue(
+            jsonResponse(errorEnvelope("allowance_exhausted", 429), 429, { "Retry-After": header }),
+        );
+        const refusal = await collect(transport().investigate(call())).catch((error) => error);
+        expect(refusal).toBeInstanceOf(TransportRefusal);
+        expect(refusal.retryAfterSeconds).toBe(seconds);
+    });
+
     it("a refusal with no error body is a dropped call (the store recovers it)", async () => {
         fetchMock.mockResolvedValue(new Response("upstream down", { status: 503 }));
         const error = await collect(transport().investigate(call())).catch((e) => e);
