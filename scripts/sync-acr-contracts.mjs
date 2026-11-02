@@ -439,7 +439,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // pattern-bounded string, so no schema changed; the only vendored file that
 // changed is `error_context_fabric_interpretation_rejected.v1.json` (one
 // line). The Workbench maps the four reasons itself (`failureFor`).
-export const SOURCE_COMMIT = "d617cbd2095820cf161a3852fc15f5d72147da94";
+// d617cbd2 -> da2efe68 (CHAOS-12520): the investment theme share train, the same SHA as web. The closed
+// rule vocabulary gains `investment_theme_share` and `RenderShape` gains an optional `value_unit`
+// (acr #1895, CHAOS-12496). No producer emits the rule yet.
+export const SOURCE_COMMIT = "da2efe686952f2c9dadb340ef5783d3b21f6a2e7";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
