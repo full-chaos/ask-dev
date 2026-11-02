@@ -1,4 +1,5 @@
 import type { ACRErrorV1 } from "../contracts/generated/error";
+import type { InvalidEventReason } from "./eventGate";
 
 /**
  * The types an ACR browser client call speaks in. A host names its own result and status types
@@ -138,14 +139,21 @@ export function isTransportFailureReason(value: unknown): value is TransportFail
     return (TRANSPORT_FAILURE_REASONS as readonly unknown[]).includes(value);
 }
 
-/** The browser transport ended the run itself, for `reason`. */
+/**
+ * The browser transport ended the run itself, for `reason`. For `invalid_upstream` from the event
+ * grammar, `grammar` names which rule the stream broke (CHAOS-12593): `schema` is an answer the
+ * page's pinned contract refuses, which a host words as unreadable, not as a run that did not
+ * finish (CHAOS-12590).
+ */
 export class TransportFailure extends Error {
     readonly reason: TransportFailureReason;
+    readonly grammar: InvalidEventReason | undefined;
 
-    constructor(reason: TransportFailureReason) {
+    constructor(reason: TransportFailureReason, grammar?: InvalidEventReason) {
         super(`the Ask Dev transport ended the run: ${reason}`);
         this.name = "TransportFailure";
         this.reason = reason;
+        this.grammar = grammar;
     }
 }
 

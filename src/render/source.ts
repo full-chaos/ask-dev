@@ -87,6 +87,11 @@ export type ChatStatus =
     | { readonly kind: "stopped"; readonly reason: StoppedReason }
     | { readonly kind: "stream_unavailable" }
     | { readonly kind: "mismatch"; readonly reference?: string }
+    /**
+     * CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (a field newer
+     * than the pin, CHAOS-12590). Asking again gives the same result, so it is never retried.
+     */
+    | { readonly kind: "unreadable"; readonly reference?: string }
     | { readonly kind: "unsaved" }
     | { readonly kind: "abandoned" }
     | { readonly kind: "interrupted" }

@@ -297,7 +297,7 @@ describe("investigate: the stream", () => {
             (async () => {
                 for await (const event of transport().investigate(call())) events.push(event);
             })(),
-        ).rejects.toEqual(new TransportFailure("invalid_upstream"));
+        ).rejects.toEqual(new TransportFailure("invalid_upstream", "seq_gap"));
         expect(events.map((event) => event.type)).toEqual(["accepted"]);
         const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
         expect(init.signal?.aborted).toBe(true);
@@ -445,7 +445,7 @@ describe("investigate: the full checks load in parallel (option (c))", () => {
             (async () => {
                 for await (const event of t.investigate(call())) events.push(event);
             })(),
-        ).rejects.toEqual(new TransportFailure("invalid_upstream"));
+        ).rejects.toEqual(new TransportFailure("invalid_upstream", "schema"));
         expect(events.map((event) => event.type)).toEqual(["accepted"]);
     });
 
@@ -1110,5 +1110,137 @@ describe("logs", () => {
         expect(text).not.toContain(TOKEN);
         expect(text).not.toContain("Which projects");
         expect(text).not.toContain(ISSUER);
+    });
+});
+
+/**
+ * CHAOS-12593 (CHAOS-12590): an answer the page's pinned contract refuses. ACR finished, and the
+ * page could not read the answer, so it must not be told to ask again. The error below is the
+ * first one web main's own compiled `validateInvestigationResultV1` gave for the stored
+ * result_978f8973… of reach run part 1 (ACR pin 7b0caff2 against acr e84ac54f's `measure_units`).
+ */
+describe("an answer the pinned contract refuses (CHAOS-12593)", () => {
+    const FIRST_ERROR = {
+        instancePath: "/claimed_facts/0/table",
+        schemaPath: "#/$defs/ContextFabricClaimedFactTable/additionalProperties",
+        keyword: "additionalProperties",
+        params: { additionalProperty: "measure_units" },
+        message: "must NOT have additional properties",
+    };
+    const errors = [
+        FIRST_ERROR,
+        ...Array.from({ length: 8 }, (_, index) => ({
+            ...FIRST_ERROR,
+            instancePath: `/claimed_facts/${index + 1}/table`,
+        })),
+    ];
+    /** A validator that refuses, with Ajv's own `errors` beside it. */
+    const refusing = () => Object.assign((_value: unknown) => false, { errors });
+    const REFUSED = "ask-dev refused an answer its pinned contract does not accept";
+
+    async function failureOf(t: Calls): Promise<unknown> {
+        try {
+            for await (const event of t.investigate(call())) void event;
+        } catch (error) {
+            return error;
+        }
+        return undefined;
+    }
+
+    it("a result the full schema refuses ends the run with grammar schema, logged as an error", async () => {
+        const body = sseBody();
+        fetchMock.mockResolvedValue(sseResponse(body.stream));
+        body.push(stream(accepted(), resultEvent(2)));
+        const failure = await failureOf(
+            transportChecking(streamEnvelopeValidators, {
+                ...streamValidators,
+                validateInvestigationEvent: refusing(),
+            }),
+        );
+        expect(failure).toBeInstanceOf(TransportFailure);
+        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "schema" });
+        expect(log.error).toHaveBeenCalledWith(
+            {
+                submission_id: SUBMISSION,
+                seq: 2,
+                event_type: "result",
+                path: "/claimed_facts/0/table",
+                keyword: "additionalProperties",
+                schema_path: "#/$defs/ContextFabricClaimedFactTable/additionalProperties",
+                additional_property: "measure_units",
+                error_count: 9,
+            },
+            REFUSED,
+        );
+        expect(log.warn).not.toHaveBeenCalledWith(
+            expect.anything(),
+            "ask-dev acr stream broke its grammar",
+        );
+    });
+
+    it("a frame the gate's schema refuses ends the run the same way", async () => {
+        const body = sseBody();
+        fetchMock.mockResolvedValue(sseResponse(body.stream));
+        body.push(stream(accepted(), resultEvent(2)));
+        const envelope = {
+            ...streamEnvelopeValidators,
+            validateInvestigationEventEnvelope: Object.assign(
+                (value: unknown) =>
+                    (value as { type?: string }).type !== "result" &&
+                    streamEnvelopeValidators.validateInvestigationEventEnvelope(value),
+                { errors },
+            ),
+        };
+        const failure = await failureOf(transportChecking(envelope, streamValidators));
+        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "schema" });
+        expect(log.error).toHaveBeenCalledWith(
+            expect.objectContaining({
+                seq: 2,
+                event_type: "result",
+                path: "/claimed_facts/0/table",
+                keyword: "additionalProperties",
+                additional_property: "measure_units",
+                error_count: 9,
+            }),
+            REFUSED,
+        );
+    });
+
+    it("logs no value from the refused answer, only the place and the rule", async () => {
+        const body = sseBody();
+        fetchMock.mockResolvedValue(sseResponse(body.stream));
+        body.push(stream(accepted(), resultEvent(2)));
+        await failureOf(
+            transportChecking(streamEnvelopeValidators, {
+                ...streamValidators,
+                validateInvestigationEvent: refusing(),
+            }),
+        );
+        const [fields] = log.error.mock.calls[0] as [Record<string, unknown>, string];
+        expect(Object.keys(fields).sort()).toEqual(
+            [
+                "additional_property",
+                "error_count",
+                "event_type",
+                "keyword",
+                "path",
+                "schema_path",
+                "seq",
+                "submission_id",
+            ].sort(),
+        );
+    });
+
+    it("a grammar break that is not a schema refusal keeps its reason and its warning", async () => {
+        const body = sseBody();
+        fetchMock.mockResolvedValue(sseResponse(body.stream));
+        body.push(stream(accepted(), stageEvent(3, "interpreting", "started", 5)));
+        const failure = await failureOf(transport());
+        expect(failure).toMatchObject({ reason: "invalid_upstream", grammar: "seq_gap" });
+        expect(log.error).not.toHaveBeenCalled();
+        expect(log.warn).toHaveBeenCalledWith(
+            expect.objectContaining({ reason: "seq_gap", seq: 3 }),
+            "ask-dev acr stream broke its grammar",
+        );
     });
 });

@@ -20,6 +20,10 @@ import {
     type InvestigationEvent,
     type TransportFailureReason,
 } from "./types";
+import { schemaRefusal } from "./schemaRefusal";
+
+/** CHAOS-12593: the line a schema refusal logs, at error level. */
+const CONTRACT_REFUSED = "ask-dev refused an answer its pinned contract does not accept";
 
 /**
  * The browser's ACR transport (CHAOS-12104, T14a; CHAOS-12336, T14b; design amendment §2.2, §4, §5,
@@ -685,6 +689,20 @@ export function createAcrCalls<TResult, TStatus>(
                 for (const frame of frames) {
                     const verdict = gate.accept(frame);
                     if (verdict.kind === "invalid") {
+                        if (verdict.reason === "schema") {
+                            // CHAOS-12593: the page's pinned contract refused the frame. Loud,
+                            // with the place and the rule, never a value.
+                            logger.error(
+                                {
+                                    submission_id: spec.submissionId,
+                                    seq: verdict.seq,
+                                    event_type: verdict.eventType,
+                                    ...verdict.refusal,
+                                },
+                                CONTRACT_REFUSED,
+                            );
+                            throw new TransportFailure("invalid_upstream", "schema");
+                        }
                         logger.warn(
                             {
                                 submission_id: spec.submissionId,
@@ -693,7 +711,7 @@ export function createAcrCalls<TResult, TStatus>(
                             },
                             "ask-dev acr stream broke its grammar",
                         );
-                        throw new TransportFailure("invalid_upstream");
+                        throw new TransportFailure("invalid_upstream", verdict.reason);
                     }
                     if (verdict.kind === "after_terminal") {
                         logger.warn(
@@ -705,15 +723,16 @@ export function createAcrCalls<TResult, TStatus>(
                     if (verdict.event.type === "result") {
                         const checks = await spec.full;
                         if (!checks.validateInvestigationEvent(verdict.event)) {
-                            logger.warn(
+                            logger.error(
                                 {
                                     submission_id: spec.submissionId,
-                                    reason: "schema",
                                     seq: verdict.event.seq,
+                                    event_type: "result",
+                                    ...schemaRefusal(checks.validateInvestigationEvent),
                                 },
-                                "ask-dev acr stream broke its grammar",
+                                CONTRACT_REFUSED,
                             );
-                            throw new TransportFailure("invalid_upstream");
+                            throw new TransportFailure("invalid_upstream", "schema");
                         }
                     }
                     yield verdict.event;

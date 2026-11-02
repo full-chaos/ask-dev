@@ -8,6 +8,8 @@ export type AcrLogFields = Readonly<Record<string, unknown>>;
 export type AcrLogger = {
     readonly info: (fields: AcrLogFields, message: string) => void;
     readonly warn: (fields: AcrLogFields, message: string) => void;
+    /** Optional: a sink written before the client's error line gets it at `warn` (CHAOS-12593). */
+    readonly error?: (fields: AcrLogFields, message: string) => void;
 };
 
 const SILENT: AcrLogger = { info: () => undefined, warn: () => undefined };
@@ -19,7 +21,9 @@ export function setAcrLogger(next: AcrLogger): void {
     sink = next;
 }
 
-export const logger: AcrLogger = {
+export const logger: Required<AcrLogger> = {
     info: (fields, message) => sink.info(fields, message),
     warn: (fields, message) => sink.warn(fields, message),
+    error: (fields, message) =>
+        sink.error === undefined ? sink.warn(fields, message) : sink.error(fields, message),
 };

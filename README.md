@@ -205,6 +205,23 @@ Import the types through `src/lib/contracts.ts`, never from
 schemas' `title` fields and change with the contracts; that file is the one
 place a rename has to be absorbed.
 
+### Deploy order: the client's pin before the ACR that serves a new field
+
+An ACR wire field that the contract calls additive and schema-optional is **not** additive for a
+client that pinned an earlier contract: the pinned schemas say `additionalProperties: false`, so
+the client refuses the whole answer. On 2026-11-02 askdev-1 ran acr e84ac54f (it serves
+`measure_units`) under a web pinned at 7b0caff2, and every answer with a declared unit was lost
+(CHAOS-12590).
+
+So, on every environment: the web whose ACR pin accepts a new ACR wire field is **deployed before**
+the ACR build that serves it (here: web pin 4eb93cf9 or later before acr e84ac54f or later). The
+merge train (web pin, ask-dev pin, then renders) orders merges; this rule orders deploys.
+
+When a pinned contract does refuse an answer, the transport ends the run as `invalid_upstream` with
+`grammar: "schema"` and logs `ask-dev refused an answer its pinned contract does not accept` at
+error level, with the path, the keyword, the schema path and the error count (never a value). A
+host words it as the `unreadable` status, never as a run to ask again (CHAOS-12593).
+
 ### Bumping the pin
 
 1. Park a clean `dev-health-acr` worktree on the new commit

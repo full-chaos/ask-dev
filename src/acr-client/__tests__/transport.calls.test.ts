@@ -254,7 +254,9 @@ describe("attach", () => {
     it("a break of the stream after the cursor is invalid_upstream", async () => {
         // The cursor is 3: the next event must be 4.
         fetchMock.mockResolvedValueOnce(sseResponse(frames(CAPTURED.slice(4))));
-        await expect(collect(attach(3))).rejects.toEqual(new TransportFailure("invalid_upstream"));
+        await expect(collect(attach(3))).rejects.toEqual(
+            new TransportFailure("invalid_upstream", "seq_gap"),
+        );
     });
 
     it("a result the full schema refuses is invalid_upstream (option (c))", async () => {
@@ -271,7 +273,7 @@ describe("attach", () => {
                 validators.rejecting(validators.full, "validateInvestigationEvent"),
         });
         await expect(collect(attach(undefined, strict))).rejects.toEqual(
-            new TransportFailure("invalid_upstream"),
+            new TransportFailure("invalid_upstream", "schema"),
         );
     });
 

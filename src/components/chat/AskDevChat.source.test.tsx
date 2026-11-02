@@ -173,6 +173,9 @@ const PLAIN_WORDS: Record<
     unavailable: "This answer is not available to you now.",
     restore_failed: "This answer could not be loaded.",
     unconfirmed: "The current state could not be confirmed. Check back later.",
+    // CHAOS-12593: ACR finished, and the page's pinned contract refused the answer (CHAOS-12590).
+    unreadable:
+        "Ask Dev finished, but this page cannot read its answer yet: the answer uses a newer form than this page knows. Asking again gives the same result. Quote the reference to your administrator.",
 };
 
 function rows<K extends string>(
@@ -420,8 +423,8 @@ describe("AskDevChat with a host source: status", () => {
     });
 
     it("the table reaches every kind, and every word of the sub-tables", () => {
-        expect(new Set(STATUS_WORDS.map(([status]) => status.kind)).size).toBe(18);
-        expect(STATUS_WORDS).toHaveLength(4 + 4 + 6 + 3 + 13 + 2);
+        expect(new Set(STATUS_WORDS.map(([status]) => status.kind)).size).toBe(19);
+        expect(STATUS_WORDS).toHaveLength(4 + 4 + 6 + 3 + 14 + 2);
     });
 
     const RETRYABLE = new Set<ChatStatus["kind"]>(["failed", "limited", "not_run"]);
@@ -448,6 +451,7 @@ describe("AskDevChat with a host source: status", () => {
     it.each([
         [{ kind: "failed", reference: "req_abc123" }],
         [{ kind: "mismatch", reference: "req_abc123" }],
+        [{ kind: "unreadable", reference: "req_abc123" }],
     ] as const)("shows the reference of %j in a code element", (status) => {
         render(<AskDevChat source={hostSource(statusSnapshot(status))} />);
         const line = screen.getByTestId("chat-status-reference");
