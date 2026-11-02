@@ -327,7 +327,11 @@ const browserDependencies: Dependencies = {
             // The admin's user id stays while impersonating: only this flag shows it (CHAOS-12306).
             if (session?.user?.is_impersonating) return { impersonating: true };
             const orgId = session?.user?.org_id;
-            return { userId, orgId: typeof orgId === "string" && orgId !== "" ? orgId : null };
+            if (orgId === undefined || orgId === null || orgId === "") {
+                return { userId, orgId: null };
+            }
+            // Any other shape is no known principal: two of them must never compare as equal.
+            return typeof orgId === "string" ? { userId, orgId } : null;
         } catch {
             return null;
         }

@@ -105,6 +105,35 @@ describe("the token store's host", () => {
         });
     });
 
+    it.each([7, true, ["org-1"], { id: "org-1" }])(
+        "reads an org id of %j as no known principal",
+        async (orgId) => {
+            stubFetch(SIGNED_IN);
+            const auth = await import("../auth");
+            auth.configureAcrAuth({
+                config: () => CONFIG,
+                session: () => Promise.resolve({ user: { id: "user-1", org_id: orgId } }),
+                routes: ROUTES,
+            });
+            await expect(auth.authorizeAcrSilently()).resolves.toEqual({
+                kind: "failed",
+                reason: "principal_unknown",
+            });
+            expect(calls).not.toContain(ROUTES.authorize);
+        },
+    );
+
+    it.each([null, undefined, ""])("reads an org id of %j as no organization", async (orgId) => {
+        stubFetch({});
+        const auth = await import("../auth");
+        auth.configureAcrAuth({
+            config: () => CONFIG,
+            session: () => Promise.resolve({ user: { id: "user-1", org_id: orgId } }),
+            routes: ROUTES,
+        });
+        await expect(auth.authorizeAcrSilently()).resolves.toEqual({ kind: "not_entitled" });
+    });
+
     it("keeps the host through the test seam and its reset", async () => {
         stubFetch({});
         const auth = await import("../auth");
