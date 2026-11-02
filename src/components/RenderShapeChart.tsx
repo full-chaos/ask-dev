@@ -62,10 +62,14 @@ function formatValue(value: number): string {
  * `aria-label` and `<title>`, and the accessible table prints it in full via
  * `formatValue`. What is never allowed is rounding being the ONLY form a
  * reader can get, which is why the table uses the exact value and this is
- * used for drawn text alone.
+ * used for drawn text alone. A table the reader sees may use it too, when
+ * the exact value stays in a fold beside it (`ComparisonTablePanel`).
  */
-function formatDisplay(value: number): string {
-    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+export function formatDisplay(value: number): string {
+    if (Number.isInteger(value)) return String(value);
+    const rounded = Number(value.toFixed(2));
+    // A real value near zero must not read as 0: see `formatCohortScore`.
+    return rounded === 0 ? value.toPrecision(1) : String(rounded);
 }
 
 /** A rect with the top two corners rounded, anchored at the baseline. */
@@ -104,9 +108,12 @@ export function ShapeDataTable({
     shape,
     labels,
     visible = false,
+    format = formatValue,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    /** How a cell prints a value. Exact unless the caller keeps the exact value elsewhere. */
+    readonly format?: (value: number) => string;
     /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
     readonly visible?: boolean;
 }) {
@@ -137,7 +144,7 @@ export function ShapeDataTable({
                                         // did not measure, and writing 0
                                         // here would state a measurement
                                         // the answer never made.
-                                        value === undefined ? "—" : formatValue(value)
+                                        value === undefined ? "—" : format(value)
                                     }
                                 </td>
                             );

@@ -164,7 +164,9 @@ describe("a side-by-side table on the answer (CHAOS-12513)", () => {
                 <DeterministicAnswerView offersPresentation="popup" result={result} />
             </ShapeSlotContext.Provider>,
         );
-    const grid = () => within(screen.getByTestId("comparison-table")).getByRole("table");
+    const grid = () => within(screen.getByTestId("comparison-table")).getAllByRole("table")[0]!;
+    const rowOf = (inside: HTMLElement, label: string) =>
+        within(inside).getByRole("rowheader", { name: label }).closest("tr")!;
     const cells = (row: HTMLElement) =>
         within(row)
             .getAllByRole("cell")
@@ -186,16 +188,40 @@ describe("a side-by-side table on the answer (CHAOS-12513)", () => {
         const lacking = points(table, 0).find(
             (point) => !points(table, 1).some((other) => other.label === point.label),
         )!;
-        const row = within(grid()).getByRole("rowheader", { name: lacking.label }).closest("tr")!;
-        expect(cells(row)).toEqual([String(lacking.value), "—"]);
+        expect(cells(rowOf(grid(), lacking.label))).toEqual([String(lacking.value), "—"]);
     });
 
-    it("shows every value exactly as served", () => {
+    it("rounds what it shows, and keeps the exact value in a closed fold", () => {
         draw(answer);
-        for (const point of points(table, 0)) {
-            const row = within(grid()).getByRole("rowheader", { name: point.label }).closest("tr")!;
-            expect(cells(row)[0]).toBe(String(point.value));
-        }
+        const point = points(table, 0)[0];
+        expect(point.value).toBe(1.9530555555555558);
+        expect(cells(rowOf(grid(), point.label))[0]).toBe("1.95");
+        const fold = screen.getByTestId("comparison-table-exact");
+        expect(fold).not.toHaveAttribute("open");
+        expect(cells(rowOf(within(fold).getByRole("table"), point.label))[0]).toBe(
+            "1.9530555555555558",
+        );
+    });
+
+    it("shows a real value near zero as itself, never as 0", () => {
+        const { result } = changed((s, r) => {
+            points(s)[0].value = 0.004;
+            first(s, r).value = { number: 0.004 };
+        });
+        draw(result);
+        expect(cells(rowOf(grid(), points(table, 0)[0].label))[0]).toBe("0.004");
+    });
+
+    it("has no fold when nothing rounds", () => {
+        const { result } = changed((s, r) => {
+            points(s)[0].value = 2;
+            first(s, r).value = { integer: 2 };
+            const other = points(s, 1)[0];
+            other.value = 2;
+            factOf(r, other.source.claim_id).value = { integer: 2 };
+        });
+        draw(result);
+        expect(screen.queryByTestId("comparison-table-exact")).toBeNull();
     });
 
     it("needs no host chart, so the host is not asked", () => {

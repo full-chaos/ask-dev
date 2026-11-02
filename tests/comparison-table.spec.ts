@@ -31,7 +31,7 @@ async function liesInside(inner: Locator, outer: Locator) {
     expect(a!.x + a!.width).toBeLessThanOrEqual(b!.x + b!.width + 0.5);
 }
 
-const region = (panel: Locator) => panel.locator(".fact-table-wrap");
+const region = (panel: Locator) => panel.locator(".fact-table-wrap").first();
 const lastRowCell = (panel: Locator, column: number) =>
     panel.getByRole("row").nth(1).getByRole("cell").nth(column);
 
@@ -55,5 +55,15 @@ test.describe("Side-by-side comparison", () => {
             () => document.documentElement.scrollWidth - window.innerWidth,
         );
         expect(sideways).toBe(0);
+    });
+
+    test("keeps the exact values in reach at phone width", async ({ page }) => {
+        const panel = await openTable(page, 390);
+        const fold = panel.getByTestId("comparison-table-exact");
+        await fold.getByText("Exact values").click();
+        const exact = fold.getByRole("row").nth(1).getByRole("cell").nth(0);
+        await expect(exact).toHaveText("1.9530555555555558");
+        await exact.scrollIntoViewIfNeeded();
+        await liesInside(exact, fold.locator(".fact-table-wrap"));
     });
 });
