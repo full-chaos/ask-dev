@@ -63,7 +63,7 @@ type HostSource = Omit<ChatSource, "ask" | "askBatch" | "retry" | "newConversati
 
 function hostSource(
     initial: ChatSnapshot,
-    extra: Pick<ChatSource, "stop" | "slots" | "reloadTurn"> = {},
+    extra: Pick<ChatSource, "stop" | "slots" | "reloadTurn" | "multiPick"> = {},
 ): HostSource {
     let snapshot = initial;
     const listeners = new Set<() => void>();
@@ -903,10 +903,10 @@ describe("AskDevChat with a host source: what the render sends", () => {
         );
     }
 
-    it("fans two subject picks out to two items; only the first carries the telemetry", async () => {
+    it("the Workbench fans two subject picks out to two items; only the first carries the telemetry", async () => {
         const user = userEvent.setup();
         const result = resultOf("clarification");
-        const source = hostSource(answered(result));
+        const source = hostSource(answered(result), { multiPick: true });
         render(<AskDevChat source={source} />);
 
         for (const option of within(popup()).getAllByRole("button", { name: /atlas/i })) {
@@ -922,6 +922,25 @@ describe("AskDevChat with a host source: what the render sends", () => {
         ]);
         expect(items[0]?.selectionEvents).toHaveLength(2);
         expect(items[1]?.selectionEvents).toEqual([]);
+    });
+
+    it("a host keeps the last of two subject picks: one item, with both taps' telemetry (CHAOS-12146)", async () => {
+        const user = userEvent.setup();
+        const result = resultOf("clarification");
+        const source = hostSource(answered(result));
+        render(<AskDevChat source={source} />);
+
+        for (const option of within(popup()).getAllByRole("button", { name: /atlas/i })) {
+            await user.click(option);
+        }
+        await user.click(screen.getByRole("button", { name: /^Continue with/ }));
+
+        await waitFor(() => expect(source.askBatch).toHaveBeenCalledTimes(1));
+        const [items] = source.askBatch.mock.calls[0]!;
+        expect(items.map((item) => item.priorSubjectReceipts)).toEqual([
+            [{ result_id: result.result_id, receipt_id: "receipt_atlas_repository" }],
+        ]);
+        expect(items[0]?.selectionEvents).toHaveLength(2);
     });
 
     it("a plain ask carries the telemetry of a pick never confirmed", async () => {

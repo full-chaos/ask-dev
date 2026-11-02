@@ -544,6 +544,14 @@ export type ChatSource = {
     reloadTurn?(turnId: number): void;
     /** Starts a fresh conversation: the next ask threads no prior turns. */
     newConversation(): void;
+    /**
+     * Present only on the standalone Workbench (CHAOS-12146): a popup axis takes several picks, and
+     * `askBatch` sends one request per pick, all at once (CHAOS-4343, "multi-select → multiple
+     * panels"). Absent (every host), each axis takes ONE pick and a second tap replaces the first:
+     * acr refuses two receipts of one structure member in one request, and a host that runs a
+     * batch in sequence would send a later pick after a newer result.
+     */
+    readonly multiPick?: true;
     slots?: {
         /**
          * The Connect affordance, rendered after the `connect` words of a turn, the history list

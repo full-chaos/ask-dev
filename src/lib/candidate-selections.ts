@@ -34,6 +34,17 @@ export function toggleCandidateSelection(
     return next;
 }
 
+/**
+ * Pure reducer for a single-select axis (CHAOS-12146): the tapped candidate replaces any other, and
+ * a second tap on it clears it. A host's popup uses this, so one Continue sends one request.
+ */
+export function chooseCandidateSelection(
+    batch: CandidateSelectionBatch,
+    receiptId: string,
+): CandidateSelectionBatch {
+    return batch.has(receiptId) ? EMPTY_CANDIDATE_SELECTION_BATCH : new Set([receiptId]);
+}
+
 export function candidateSelectionCount(batch: CandidateSelectionBatch): number {
     return batch.size;
 }
