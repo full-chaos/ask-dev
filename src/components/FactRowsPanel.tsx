@@ -18,7 +18,7 @@ import {
 import { rollupsOfClaims } from "../lib/investment-rollup";
 import { shapeCadence } from "../lib/cadence";
 import { agreedTable, declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
-import { factShapesForClaim, THEME_SHARE_RULE } from "../lib/render-shapes";
+import { factShapesForClaim, REPOSITORY_FLOW_RULE, THEME_SHARE_RULE } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
 import { useClaimFieldWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -120,10 +120,16 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // numbers twice under two different selection rules.
     const claimIds = [fact.claim_id, ...alsoClaims.map((c) => c.claim_id)];
     const trends = shapesForGroup(result, claimIds, "dated_fact_trend");
-    const treemaps = shapesForGroup(result, claimIds, THEME_SHARE_RULE);
-    const selected = trends.shapes.length + trends.withheld + treemaps.shapes.length;
+    // The host's charts: a treemap (CHAOS-12496) and a team's repository flow (CHAOS-12579).
+    const themeShares = shapesForGroup(result, claimIds, THEME_SHARE_RULE);
+    const flows = shapesForGroup(result, claimIds, REPOSITORY_FLOW_RULE);
+    const hostShapes = {
+        shapes: [...themeShares.shapes, ...flows.shapes],
+        withheld: themeShares.withheld + flows.withheld,
+    };
+    const selected = trends.shapes.length + trends.withheld + hostShapes.shapes.length;
     const presentation =
-        selected + treemaps.withheld > 0 ? { mode: "table" as const } : selectPresentation(rows);
+        selected + hostShapes.withheld > 0 ? { mode: "table" as const } : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
     // breakdown) was derived — see fact-rows.ts's `findRollupBasis` doc
     // comment. It is a SIBLING claim, not a property of this fact, and is
@@ -223,10 +229,10 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                 // The table always follows: a chart is a reading of the rows,
                 // never a replacement for them.
             }
-            {treemaps.shapes.map((treemap) => (
-                <RichShape key={treemap.shape_id} shape={treemap} />
+            {hostShapes.shapes.map((shape) => (
+                <RichShape key={shape.shape_id} shape={shape} />
             ))}
-            {treemaps.withheld > 0 ? (
+            {hostShapes.withheld > 0 ? (
                 <p className="fact-panel__caption" data-testid="rich-shape-withheld">
                     A chart was withheld: it could not be checked against this fact&apos;s own rows.
                 </p>
