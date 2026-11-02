@@ -164,7 +164,7 @@
             "completion_forecast": {
                 "work_scope_id": "linear:CHAOS",
                 "state": "available",
-                "computed_at": "2026-11-02 04:00:00.000",
+                "computed_at": "2026-11-02T04:00:00Z",
                 "simulation_count": 10000,
                 "horizon_days": 365,
                 "unfinished_runs": 500,

@@ -426,29 +426,42 @@ function isCompletionCurve(shape: RenderShape, facts: readonly ClaimedFact[]): b
 }
 
 /**
- * True when a percentiles table restates its claims' P50/P85/P95 days: mirrors acr's
- * `validateForecastPercentilesShape`. One series per claim, each point one of that claim's
- * percentiles cited to its summary. A percentile the summary does not carry is no point. A table
- * declares no unit and no presentation.
+ * The stored forecast a claim states: its team and its summary's work scope. Mirrors acr's
+ * `ContextFabricForecastScope`. Two claims of one fact state one forecast.
+ */
+function forecastScope(fact: ClaimedFact, summary: CompletionForecastSummary): string {
+    return `${fact.subject.canonical_id}\u0000${summary.work_scope_id ?? ""}`;
+}
+
+/**
+ * True when a percentiles table restates its forecasts' P50/P85/P95 days: mirrors acr's
+ * `validateForecastPercentilesShape`. Each series restates one claim, which carries a forecast
+ * summary; each point is one of that claim's percentiles cited to its summary; and one stored
+ * forecast (team and work scope) has one series, whichever of its claims it cites. A percentile the
+ * summary does not carry is no point. A table declares no unit and no presentation.
  *
  * One clause is acr's alone: that a label is the served word of its percentile. The word map is
  * acr's, and a copy here would be a consumer table (CHAOS-4690), so this trusts acr's validator for
  * that clause, as the treemap does. It holds the part it can: the field is a percentile.
  */
-function isForecastPercentiles(shape: RenderShape): boolean {
+function isForecastPercentiles(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
     if (shape.kind !== "table" || shape.axis_kind !== "category") return false;
     if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
-    const claims = new Set<string>();
+    const scopes = new Set<string>();
     for (const series of shape.series) {
-        let claim: string | undefined;
+        let claimId: string | undefined;
         for (const { source } of series.points) {
             if (source.kind !== "claimed_fact_forecast_summary") return false;
             if (!PERCENTILE_FIELDS.includes(source.field ?? "")) return false;
-            claim ??= source.claim_id;
-            if (source.claim_id !== claim) return false;
+            claimId ??= source.claim_id;
+            if (source.claim_id !== claimId) return false;
         }
-        if (claim === undefined || claims.has(claim)) return false;
-        claims.add(claim);
+        const fact = claimFor(facts, claimId);
+        const summary = fact?.completion_forecast;
+        if (fact === undefined || summary === undefined) return false;
+        const scope = forecastScope(fact, summary);
+        if (scopes.has(scope)) return false;
+        scopes.add(scope);
     }
     return true;
 }
@@ -895,7 +908,7 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     } else if (shape.selected_by === COMPLETION_FORECAST_RULE) {
         if (!isCompletionCurve(shape, result.claimed_facts)) return false;
     } else if (shape.selected_by === FORECAST_PERCENTILES_RULE) {
-        if (!isForecastPercentiles(shape)) return false;
+        if (!isForecastPercentiles(shape, result.claimed_facts)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }

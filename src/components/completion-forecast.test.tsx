@@ -155,6 +155,20 @@ describe("the verifier reads a forecast as one claim's whole distribution (CHAOS
 });
 
 describe("the verifier reads the percentiles table as its claims' own percentiles (CHAOS-4613)", () => {
+    it("accepts two stored forecasts of one team, one series each", () => {
+        const { shape, result } = changed((s, r) => {
+            const other = structuredClone(fact(r));
+            other.claim_id = "claim_other_scope";
+            other.completion_forecast!.work_scope_id = "linear:OTHER";
+            r.claimed_facts.push(other);
+            const again = structuredClone(s.series[0]);
+            again.key = "claim_other_scope";
+            for (const point of again.points) point.source.claim_id = "claim_other_scope";
+            (s.series as unknown[]).push(again);
+        }, notStoredAnswer);
+        expect(verifyRenderShape(shape, result)).toBe(true);
+    });
+
     it.each([
         ["every run at the horizon", noRunAnswer],
         ["no stored distribution", notStoredAnswer],
@@ -183,6 +197,20 @@ describe("the verifier reads the percentiles table as its claims' own percentile
                 r.claimed_facts.push({ ...structuredClone(fact(r)), claim_id: "claim_other_one" });
                 points(s)[1]!.source.claim_id = "claim_other_one";
             },
+        ],
+        [
+            "two claims of one stored forecast in two series",
+            (s, r) => {
+                r.claimed_facts.push({ ...structuredClone(fact(r)), claim_id: "claim_same_scope" });
+                const again = structuredClone(s.series[0]);
+                again.key = "claim_same_scope";
+                for (const point of again.points) point.source.claim_id = "claim_same_scope";
+                (s.series as unknown[]).push(again);
+            },
+        ],
+        [
+            "a series whose claim carries no summary",
+            (_, r) => void delete fact(r).completion_forecast,
         ],
         [
             "one claim in two series",
