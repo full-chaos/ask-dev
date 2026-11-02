@@ -1,5 +1,6 @@
 import { useId } from "react";
 
+import { DerivationInputs } from "./DerivationInputs";
 import { ScrollRegion } from "./ScrollRegion";
 import { useServedWord } from "./VocabularyWordContext";
 import { unrankedWorkItemMembers } from "./WorkItemStatusPanel";
@@ -24,6 +25,8 @@ function readable(fact: ClaimedFact): boolean {
 
 /** A claim of the same subject and kind draws this field and value as a table cell or a tile. */
 function isCell(fact: ClaimedFact, tables: readonly ClaimedFact[]): boolean {
+    // A cell does not say how a derived number was made, so that claim keeps its own line.
+    if ((fact.derived_from?.length ?? 0) > 0) return false;
     const value = cellValue(fact.value);
     return tables.some(
         (table) =>
@@ -72,6 +75,8 @@ const factIdentity = (fact: ClaimedFact): string =>
         fact.kind,
         fact.field,
         cellValue(fact.value),
+        // A derived number is its own fact, though its value equals an observed one.
+        fact.derived_from,
     ]);
 
 export type ScalarFacts = {
@@ -184,6 +189,7 @@ export function ScalarFactsPanel({ facts, result }: ScalarFactsPanelProps) {
                             <code>
                                 {fact.field}: {valueText(fact)}
                             </code>
+                            <DerivationInputs claim={fact} />
                         </p>
                     ))}
                 </details>

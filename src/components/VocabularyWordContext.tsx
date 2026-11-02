@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react";
 
+import type { ClaimedFact } from "../lib/contracts";
+import { humanizeTerm } from "../lib/presentation";
 import {
     type Vocabulary,
     type VocabularyLabels,
@@ -23,6 +25,16 @@ export function useVocabularyLabels(): VocabularyLabels {
 export function useVocabularyWord(): (vocabulary: Vocabulary, value: string) => string {
     const labels = useVocabularyLabels();
     return (vocabulary, value) => vocabularyWord(labels, vocabulary, value);
+}
+
+/**
+ * A claim's field: ACR's word, else the generic path. A derived claim's field is free text, even
+ * when it matches a declared name, so it never reads a served word (ACR's rule).
+ */
+export function useClaimFieldWord(): (claim: ClaimedFact) => string {
+    const word = useVocabularyWord();
+    return ({ field, derived_from }) =>
+        (derived_from?.length ?? 0) === 0 ? word("fact_field", field) : humanizeTerm(field);
 }
 
 /** `note("reused")`: the sentence ACR composes for one field of this answer, if it has one. */
