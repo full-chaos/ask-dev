@@ -33,6 +33,21 @@ describe("declaredUnit", () => {
         expect(declaredUnit(odd, "team_id")).toBeUndefined();
     });
 
+    it("gives no unit to a measure the table declares twice, even with one unit (codex r3 P2)", () => {
+        const twice = structuredClone(table);
+        twice.measure_units = [
+            { measure: "backlog_size", unit: "count" },
+            { measure: "backlog_size", unit: "days" },
+        ];
+        expect(declaredUnit(twice, "backlog_size")).toBeUndefined();
+        twice.measure_units = [
+            { measure: "backlog_size", unit: "count" },
+            { measure: "backlog_size", unit: "count" },
+        ];
+        expect(declaredUnit(twice, "backlog_size")).toBeUndefined();
+        expect(declaredUnit(twice, "forecast_p50_days")).toBeUndefined();
+    });
+
     it("gives no unit with no table or no units", () => {
         expect(declaredUnit(undefined, "backlog_size")).toBeUndefined();
         expect(
