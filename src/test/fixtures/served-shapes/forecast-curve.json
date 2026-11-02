@@ -31,14 +31,10 @@
     "answer_plan": {
         "family": "subject_investigation",
         "family_source": "model",
-        "family_version": "question-family.v5",
+        "family_version": "question-family.v6",
         "require_drivers": false,
         "require_ranking": false,
-        "render_kinds": [
-            "forecast",
-            "table",
-            "series"
-        ],
+        "render_kinds": ["forecast", "table", "series"],
         "budget": {
             "max_items": 400,
             "max_serialized_bytes": 262144,
@@ -153,13 +149,8 @@
             "table": {
                 "field": "completion_distribution",
                 "shape": "distribution",
-                "key": [
-                    "completion_days"
-                ],
-                "measures": [
-                    "runs",
-                    "cumulative_share"
-                ]
+                "key": ["completion_days"],
+                "measures": ["runs", "cumulative_share"]
             },
             "completion_forecast": {
                 "work_scope_id": "linear:CHAOS",
