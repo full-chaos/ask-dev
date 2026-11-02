@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { readFileSync } from "node:fs";
 
-import { answerInvestigations, expect, test } from "./support/signed-in";
+import { answerInvestigations, expect, gotoStyled, test } from "./support/signed-in";
 
 import type { InvestigationResult } from "../src/lib/contracts";
 
@@ -41,7 +41,7 @@ function resultWithoutStatus(result: InvestigationResult, canonicalId: string) {
 async function openResult(page: Page, result: InvestigationResult, width: number) {
     await page.setViewportSize({ width, height: 844 });
     await answerInvestigations(page, result);
-    await page.goto("/");
+    await gotoStyled(page, "/");
     await page.getByLabel("Ask a question").fill("What is the status of work items?");
     await page.getByRole("button", { name: "Send" }).click();
     const panel = page.getByTestId("work-item-status-panel");

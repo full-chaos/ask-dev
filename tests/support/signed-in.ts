@@ -88,3 +88,4 @@ export const test = base.extend<{ signedIn: undefined }>({
 
 export { expect };
 export type { Page };
+export { gotoStyled } from "./styled";
