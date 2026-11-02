@@ -504,6 +504,11 @@ const EXAMPLE_PATHS = [
     // reading `no_data`/`unavailable`.
     "contracts/examples/v1/context_fabric_investigation_result_origin_state.v1.json",
     "contracts/examples/v1/error_context_fabric_interpretation_rejected.v1.json",
+    // CHAOS-12106: the stream validators run against ACR's own documents, not a hand-made shape.
+    "contracts/examples/v1/context_fabric_investigation_event_accepted.v1.json",
+    "contracts/examples/v1/context_fabric_investigation_event_result.v1.json",
+    "contracts/examples/v1/context_fabric_investigation_event_error_budget_refusal.v1.json",
+    "contracts/examples/v1/context_fabric_submission_status.v1.json",
 ];
 export const SOURCE_PATHS = [...SCHEMA_PATHS, ...EXAMPLE_PATHS];
 

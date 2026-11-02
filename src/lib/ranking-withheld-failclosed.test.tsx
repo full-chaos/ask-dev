@@ -23,6 +23,16 @@ import {
 import { validateContract } from "@/lib/acr/validate";
 import { findRankReads, findRankReadsTyped } from "@/test/rank-read-scan";
 
+// CHAOS-12106: the pages ask ACR from the browser. These tests drive them through a fake `fetch`
+// that answers `{ result }` or `{ failure }`; the fake sees the call's options as the POST body.
+vi.mock("@/lib/acr/investigate", async (importOriginal) => {
+    const { investigateFromGlobalFetch } = await import("@/test/fixtures/investigate-fake");
+    return {
+        ...(await importOriginal<typeof import("@/lib/acr/investigate")>()),
+        investigateFromBrowser: investigateFromGlobalFetch,
+    };
+});
+
 const teamResult = shapesExample as unknown as InvestigationResult;
 
 function personResult(): InvestigationResult {

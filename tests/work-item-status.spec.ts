@@ -1,7 +1,8 @@
-import { expect, test } from "@playwright/test";
 import type { Locator, Page } from "@playwright/test";
 
 import { readFileSync } from "node:fs";
+
+import { answerInvestigations, expect, test } from "./support/signed-in";
 
 import type { InvestigationResult } from "../src/lib/contracts";
 
@@ -39,13 +40,7 @@ function resultWithoutStatus(result: InvestigationResult, canonicalId: string) {
 
 async function openResult(page: Page, result: InvestigationResult, width: number) {
     await page.setViewportSize({ width, height: 844 });
-    await page.route("**/api/investigations", (route) =>
-        route.fulfill({
-            status: 200,
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ result }),
-        }),
-    );
+    await answerInvestigations(page, result);
     await page.goto("/");
     await page.getByLabel("Ask a question").fill("What is the status of work items?");
     await page.getByRole("button", { name: "Send" }).click();

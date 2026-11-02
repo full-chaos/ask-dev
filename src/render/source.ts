@@ -3,9 +3,9 @@
  *
  * One render of Ask Dev exists, here in ask-dev. `AskDevChat` reads its conversation from a
  * `ChatSource` and asks through it; it never builds a request body and never calls the network
- * itself. The standalone app passes no source and gets `createStandaloneSource()` (today's
- * `/api/investigations` behaviour, moved out of the component). A host such as web passes its own
- * source, driven by its own store, and gets the same render.
+ * itself. The standalone app passes `createStandaloneSource(investigate)` (CHAOS-12106: the
+ * browser asks ACR directly). A host such as web passes its own source, driven by its own store,
+ * and gets the same render.
  *
  * What stays in the component is UI state only: the selection hooks, the clarification popup's
  * dismissal and auto-confirm, scroll pinning, the composer, the rails. What a source owns is the
@@ -121,7 +121,7 @@ export type AnsweredOutcome = {
      * it passes the marker here, because a second pass returns none.
      */
     readonly rankingWithheld?: RankingWithheld | undefined;
-    /** Built once, server side (the route); rendered here, never rebuilt. */
+    /** Built once, by the source; rendered here, never rebuilt. */
     readonly scopeLossNotice?: string;
 };
 

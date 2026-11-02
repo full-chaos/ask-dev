@@ -89,8 +89,12 @@ run_unit() {
   pnpm test:unit
 }
 
+# `next build` inlines NEXT_PUBLIC_ACR_OAUTH_ISSUER (CHAOS-12106). The default is the e2e fake ACR's
+# port (tests/support/fake-acr-server.mjs), because the e2e suite serves this very build. A deploy
+# sets its own issuer when it builds.
 run_build() {
-  NODE_ENV=production pnpm build
+  NEXT_PUBLIC_ACR_OAUTH_ISSUER="${NEXT_PUBLIC_ACR_OAUTH_ISSUER:-http://127.0.0.1:${FAKE_ACR_PORT:-4021}}" \
+    NODE_ENV=production pnpm build
 }
 
 install_playwright_browser() {

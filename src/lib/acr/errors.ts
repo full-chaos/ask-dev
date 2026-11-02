@@ -22,7 +22,7 @@ export const workbenchFailureCodes = [
      * the only honest handle for that.
      */
     "acr_runtime_unavailable",
-    /** ACR rejected our credential. */
+    /** ACR rejected the signed-in user's access. */
     "acr_unauthorized",
     /**
      * ACR's per-call access read refused the call (403 `access_denied`, acr
@@ -106,7 +106,12 @@ export const workbenchFailureCodes = [
     "acr_investigation_failed",
     /** ACR could not be reached at all. */
     "acr_unreachable",
-    /** The server hop is not configured (missing env, unreadable key). */
+    /**
+     * The user has no ACR token yet and the tab is going to sign in (CHAOS-12106). It is not a
+     * fault: the page returns to the question after consent, and asking again then works.
+     */
+    "acr_sign_in_required",
+    /** This page has no ACR client: `NEXT_PUBLIC_ACR_OAUTH_ISSUER` is missing or not valid. */
     "workbench_misconfigured",
 ] as const;
 
@@ -170,13 +175,3 @@ export type WorkbenchFailure = {
     /** `true` when ACR said nothing was left to cut from the refused answer. */
     readonly nothingLeftToCut?: boolean | undefined;
 };
-
-export class AcrRequestError extends Error {
-    override readonly name = "AcrRequestError";
-    readonly failure: WorkbenchFailure;
-
-    constructor(failure: WorkbenchFailure) {
-        super(failure.message);
-        this.failure = failure;
-    }
-}

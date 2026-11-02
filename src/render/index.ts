@@ -3,14 +3,14 @@
  * ask-dev; a host such as web imports it from this entry (`@full-chaos/ask-dev/render`, a git
  * dependency pinned to an ask-dev commit) and never copies or redraws it.
  *
- * `AskDevChat` takes an optional `source` (CHAOS-12382): a host passes its own `ChatSource`; with
- * none it runs on `createStandaloneSource()`. What only a host offers (saved conversations,
+ * `AskDevChat` takes a `source` (CHAOS-12382): a host passes its own `ChatSource`; the standalone
+ * app passes `createStandaloneSource(investigate)` (CHAOS-12106). What only a host offers (saved conversations,
  * feedback, page context, a conversation's own states; CHAOS-12387) renders from that source and
  * never in the standalone app.
  *
  * What this entry may reach is held by `render-entry.test.ts`: no `@/` import (a host resolves
- * `@/` against its own tree), no `next`, no `server-only`, no Node built-in, and no Workbench
- * library at run time. ask-dev's server code (`lib/acr/*`, the API routes) and its standalone
+ * `@/` against its own tree), no `next`, no server-side marker import, no Node built-in, and no Workbench
+ * library at run time. ask-dev's browser ACR host (`lib/acr/*`) and its standalone
  * chrome (`shell/AppHeader`) are not part of it. The stylesheet is exported beside it
  * (`@full-chaos/ask-dev/ask-dev.css`); a host renders inside an element with the class `ask-dev`.
  */
@@ -28,7 +28,12 @@ export {
     REFUSAL_COPY,
 } from "../lib/acr/narrower-continuation-copy";
 export { ChatEvidenceBody, type ChatEvidenceBodyProps } from "../components/chat/ChatEvidenceBody";
-export { createStandaloneSource } from "./standalone-source";
+export {
+    createStandaloneSource,
+    type StandaloneInvestigate,
+    type StandaloneInvestigateOutcome,
+    type StandaloneInvestigationOptions,
+} from "./standalone-source";
 export {
     composerLockOf,
     FEEDBACK_QUESTIONS,

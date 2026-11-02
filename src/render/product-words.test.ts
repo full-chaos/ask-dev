@@ -22,11 +22,7 @@ import { checkRenderGraph } from "../../scripts/render-entry-graph.mjs";
 const ROOT = path.resolve(import.meta.dirname, "../..");
 
 /** Outside the runtime graph, but `failure.message` strings written here reach a user. */
-const FAILURE_MESSAGE_FILES = [
-    "src/lib/acr/errors.ts",
-    "src/lib/acr/client.ts",
-    "src/app/api/investigations/route.ts",
-];
+const FAILURE_MESSAGE_FILES = ["src/lib/acr/errors.ts", "src/lib/acr/investigate.ts"];
 
 /** What a raw field is called: read straight into a user's view, it shows the raw value. */
 const RAW_FIELDS = new Set(["code", "details", "httpStatus", "upstreamCode"]);
@@ -322,7 +318,7 @@ describe("the guard", () => {
         ["an import path", 'import a from "./ACR said so";'],
         ["an export path", 'export { a } from "./ACR said so";'],
         ["a type", 'type A = "acr_timeout" | "acr_unreachable";'],
-        ["an object key", 'const a = { "X-ACR-Web-Assertion": 1 };'],
+        ["an object key", 'const a = { "X-Example-Header": 1 };'],
         ["a failure code", 'const a = { code: "acr_timeout" };'],
         ["a comparison", 'const a = failure.code === "acr_timeout";'],
         ["a case label", 'switch (a) { case "acr_timeout": break; }'],

@@ -29,8 +29,11 @@ describe("the render entry (CHAOS-12381)", () => {
         expect(breaks).toEqual([]);
         expect(files).toContain("src/components/chat/AskDevChat.tsx");
         expect(files).toContain("src/components/DeterministicAnswerView.tsx");
-        // ask-dev's server code and standalone chrome are not part of it.
-        expect(files.filter((file) => file.startsWith("src/lib/acr/client"))).toEqual([]);
+        // ask-dev's browser ACR host and standalone chrome are not part of it (CHAOS-12106).
+        for (const hostFile of ["investigate", "browser-host", "stream-validators", "validate"]) {
+            expect(files, hostFile).not.toContain(`src/lib/acr/${hostFile}.ts`);
+        }
+        expect(files.filter((file) => file.startsWith("src/acr-client/"))).toEqual([]);
         expect(files).not.toContain("src/components/shell/AppHeader.tsx");
     });
 

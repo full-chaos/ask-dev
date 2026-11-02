@@ -14,7 +14,6 @@ import errorSchema from "@/contracts/schemas/error.v1.schema.json";
 import { RANKABLE_SUBJECT_KINDS, RANKED_COHORT_KINDS } from "@/lib/cohort-ranking";
 import { SUBJECT_KIND_VOCABULARY } from "@/lib/contracts";
 import { candidateStateTone, coverageStateTone, type Tone } from "@/lib/presentation";
-import { TELEMETRY_VOCABULARIES } from "@/lib/telemetry/outcome";
 import { DECIDED_OPEN_VOCABULARIES } from "@/test/open-vocabulary-decisions";
 import { findRankReadsInFiles, findRankReadsTyped } from "@/test/rank-read-scan";
 
@@ -152,23 +151,6 @@ describe("open vocabulary guard: subject kinds (rank allowlist)", () => {
     });
 });
 
-describe("open vocabulary guard: telemetry bounds", () => {
-    it("each telemetry allowlist equals the documented vocabulary", () => {
-        expect(sorted(TELEMETRY_VOCABULARIES.questionShape)).toEqual(
-            sorted(decidedAt("/$defs/InterpretedQuestion/properties/shape")),
-        );
-        expect(sorted(TELEMETRY_VOCABULARIES.candidateState)).toEqual(
-            sorted(decidedAt("/$defs/SubjectCandidate/properties/state")),
-        );
-        expect(sorted(TELEMETRY_VOCABULARIES.subjectKind)).toEqual(
-            sorted(decidedAt("/$defs/SubjectRef/properties/kind")),
-        );
-        expect(sorted(TELEMETRY_VOCABULARIES.coverageState)).toEqual(
-            sorted(decidedAt("/$defs/SourceObservation/properties/state")),
-        );
-    });
-});
-
 describe("open vocabulary guard: tone maps", () => {
     const COVERAGE: Record<string, Tone> = {
         available: "ok",
@@ -232,8 +214,8 @@ describe("open vocabulary guard: semantic_reading.reason notice", () => {
  * Round 2 (P1): every consumer reads the WITHHELD form. Rank/score/driver
  * fields of a cohort member may be read only by the files that implement the
  * gated ranking (and the withholding boundary itself); a new reader fails here
- * until it is decided. The result boundary must be applied on the route and at
- * the client's entry point, and the route may never return a raw result.
+ * until it is decided. The result boundary must be applied where a result enters client
+ * state, on every surface, and none may store a raw result.
  */
 describe("ranking withheld boundary guard", () => {
     const SOURCE_FILE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
@@ -298,56 +280,57 @@ describe("ranking withheld boundary guard", () => {
     );
 
     // The chat page renders `AskDevChat`, which owns the chat's result state.
-    it.each(["app/workbench/page.tsx", "components/chat/AskDevChat.tsx"])(
-        "%s hands every result it stores from the withheld boundary, never a raw one",
-        (rel) => {
-            const text = readFileSync(path.join(root, rel), "utf8");
-            const file = ts.createSourceFile(
-                rel,
-                text,
-                ts.ScriptTarget.Latest,
-                true,
-                ts.ScriptKind.TSX,
-            );
-            let boundaryAt = -1;
-            let firstResultAt = -1;
-            const stored: string[] = [];
-            const visit = (node: ts.Node): void => {
-                if (
-                    ts.isVariableDeclaration(node) &&
-                    ts.isIdentifier(node.name) &&
-                    node.name.text === "boundary" &&
-                    node.initializer?.getText().startsWith("withholdUnrankableRankings(")
-                ) {
-                    boundaryAt = node.getStart();
-                }
-                if (
-                    (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
-                    node.name.getText() === "result"
-                ) {
-                    if (firstResultAt === -1) firstResultAt = node.getStart();
-                    stored.push(
-                        ts.isPropertyAssignment(node) ? node.initializer.getText() : "result",
-                    );
-                }
-                ts.forEachChild(node, visit);
-            };
-            visit(file);
-            expect(boundaryAt).toBeGreaterThan(-1);
-            expect(firstResultAt).toBeGreaterThan(boundaryAt);
-            expect(stored.length).toBeGreaterThan(0);
-            expect(new Set(stored)).toEqual(new Set(["boundary.result"]));
-        },
-    );
+    it.each([
+        "app/workbench/page.tsx",
+        "components/chat/AskDevChat.tsx",
+        "render/standalone-source.ts",
+    ])("%s hands every result it stores from the withheld boundary, never a raw one", (rel) => {
+        const text = readFileSync(path.join(root, rel), "utf8");
+        const file = ts.createSourceFile(
+            rel,
+            text,
+            ts.ScriptTarget.Latest,
+            true,
+            ts.ScriptKind.TSX,
+        );
+        let boundaryAt = -1;
+        let firstResultAt = -1;
+        const stored: string[] = [];
+        const visit = (node: ts.Node): void => {
+            if (
+                ts.isVariableDeclaration(node) &&
+                ts.isIdentifier(node.name) &&
+                node.name.text === "boundary" &&
+                node.initializer?.getText().startsWith("withholdUnrankableRankings(")
+            ) {
+                boundaryAt = node.getStart();
+            }
+            if (
+                (ts.isPropertyAssignment(node) || ts.isShorthandPropertyAssignment(node)) &&
+                node.name.getText() === "result"
+            ) {
+                if (firstResultAt === -1) firstResultAt = node.getStart();
+                stored.push(ts.isPropertyAssignment(node) ? node.initializer.getText() : "result");
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(file);
+        expect(boundaryAt).toBeGreaterThan(-1);
+        expect(firstResultAt).toBeGreaterThan(boundaryAt);
+        expect(stored.length).toBeGreaterThan(0);
+        expect(new Set(stored)).toEqual(new Set(["boundary.result"]));
+    });
 
-    it("applies the boundary on the route and at the client entry", () => {
-        const route = readFileSync(path.join(root, "app/api/investigations/route.ts"), "utf8");
+    it("applies the boundary where a result enters client state, on every surface", () => {
+        const source = readFileSync(path.join(root, "render/standalone-source.ts"), "utf8");
         const page = readFileSync(path.join(root, "components/chat/AskDevChat.tsx"), "utf8");
-        expect(route).toContain("withholdUnrankableRankings(result)");
-        expect(route).toContain("rankingWithheld: withheld.rankingWithheld");
+        expect(source).toContain("withholdUnrankableRankings(outcome.result)");
+        expect(source).toContain("rankingWithheld: boundary.rankingWithheld");
+        // The result is never stored as it came back.
+        expect(source).not.toMatch(/result:\s*outcome\.result\b/);
         const workbench = readFileSync(path.join(root, "app/workbench/page.tsx"), "utf8");
-        expect(workbench).toContain("withholdUnrankableRankings(result as InvestigationResult)");
-        expect(route).not.toMatch(/NextResponse\.json\(\{\s*result\s*[,}]/);
+        expect(workbench).toContain("withholdUnrankableRankings(answer.result)");
+        expect(workbench).not.toMatch(/result:\s*answer\.result\b/);
         expect(page).toContain("withholdUnrankableRankings(result as InvestigationResult)");
         expect(page).not.toMatch(/result:\s*result as InvestigationResult/);
     });

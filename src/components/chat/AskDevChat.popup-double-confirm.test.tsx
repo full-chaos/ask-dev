@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AskDevChat } from "@/components/chat/AskDevChat";
 import type { InvestigationResult } from "@/lib/contracts";
+import { createStandaloneSource } from "@/render/standalone-source";
+import { investigateFromGlobalFetch } from "@/test/fixtures/investigate-fake";
 import { mockScenarios } from "@/test/fixtures/investigations";
 
 /**
@@ -67,7 +69,7 @@ describe("popup final confirm (CHAOS-12003)", () => {
 
     it("sends exactly one request after the last Continue", async () => {
         const user = userEvent.setup();
-        render(<AskDevChat />);
+        render(<AskDevChat source={createStandaloneSource(investigateFromGlobalFetch)} />);
         await user.type(screen.getByPlaceholderText(/Ask about a project/), "Is Atlas on track?");
         await user.click(screen.getByRole("button", { name: "Send" }));
         await screen.findByText("Did you mean one of these?");

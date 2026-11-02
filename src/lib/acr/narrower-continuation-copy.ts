@@ -127,7 +127,7 @@ const kilobytes = (bytes: number): string =>
  * ACR reported one and its numbers. Built ONLY from a closed-vocabulary token
  * (`overrun`) and measured counts — never from ACR's own `error.message`,
  * which this Workbench never reads at all (see `UpstreamError` in
- * `@/lib/acr/client`).
+ * `@/lib/acr/investigate`).
  */
 export function describeBudgetOverrun(details: {
     readonly overrun?: string | undefined;

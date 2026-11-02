@@ -3,6 +3,18 @@
   "source_repository": "full-chaos/dev-health-acr",
   "files": [
     {
+      "path": "examples/context_fabric_investigation_event_accepted.v1.json",
+      "sha256": "cd87420792c4af7067029f53edbe7ef435cd92b72174a1fb96bb90bb8c5d7c7b"
+    },
+    {
+      "path": "examples/context_fabric_investigation_event_error_budget_refusal.v1.json",
+      "sha256": "187635b307c6f333b2cfa7f911ea5695c92daf416c100902224fc2a61c459534"
+    },
+    {
+      "path": "examples/context_fabric_investigation_event_result.v1.json",
+      "sha256": "4fd985e823ad4d5c9e16706c3ba852d61b144ca0f90338867cd9077d9b47e9a1"
+    },
+    {
       "path": "examples/context_fabric_investigation_request.v1.json",
       "sha256": "247aa56043088d66f59f53d02dd5600981cc1f888731526d350cec8456f92992"
     },
@@ -25,6 +37,10 @@
     {
       "path": "examples/context_fabric_investigation_result_unsupported.v1.json",
       "sha256": "634718996533bba786930a785f4eb71509480cabebc99e236e4293744b012ece"
+    },
+    {
+      "path": "examples/context_fabric_submission_status.v1.json",
+      "sha256": "a96c6e7782dc5d3cff8a52b9c0055f2a6cf59e79db43e90a69201854ee969383"
     },
     {
       "path": "examples/error_context_fabric_interpretation_rejected.v1.json",

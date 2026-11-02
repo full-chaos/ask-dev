@@ -19,6 +19,7 @@ import type {
     StoppedReason,
 } from "@/render/source";
 import { createStandaloneSource } from "@/render/standalone-source";
+import { investigateFromFetch } from "@/test/fixtures/investigate-fake";
 import { mockScenarios } from "@/test/fixtures/investigations";
 import { structureMockScenarios } from "@/test/fixtures/structure-needs";
 import { servedShapeScenarios } from "@/test/fixtures/served-shapes";
@@ -1107,7 +1108,7 @@ describe("AskDevChat on the standalone source: unchanged", () => {
                     resolve({ json: () => Promise.resolve(payload) });
                 };
             })) as unknown as typeof fetch;
-        render(<AskDevChat source={createStandaloneSource(fetchImpl)} />);
+        render(<AskDevChat source={createStandaloneSource(investigateFromFetch(fetchImpl))} />);
 
         await user.type(screen.getByPlaceholderText(/Ask about a project/), "Is Ask Dev ready?");
         await user.click(screen.getByRole("button", { name: "Send" }));
@@ -1140,7 +1141,7 @@ describe("AskDevChat on the standalone source: unchanged", () => {
             bodies.push(JSON.parse(init.body));
             return Promise.resolve({ json: () => Promise.resolve(replies.shift()) });
         }) as unknown as typeof fetch;
-        render(<AskDevChat source={createStandaloneSource(fetchImpl)} />);
+        render(<AskDevChat source={createStandaloneSource(investigateFromFetch(fetchImpl))} />);
         const composer = screen.getByPlaceholderText(/Ask about a project/);
 
         await user.type(composer, "Is Ask Dev ready?");
@@ -1165,22 +1166,6 @@ describe("AskDevChat on the standalone source: unchanged", () => {
                 ],
             },
         ]);
-    });
-
-    it("with no prop, runs on its own source over the global fetch", async () => {
-        const user = userEvent.setup();
-        const network = vi.fn(() =>
-            Promise.resolve({ json: () => Promise.resolve({ result: canonicalResult }) }),
-        );
-        vi.stubGlobal("fetch", network);
-        render(<AskDevChat />);
-        await user.type(screen.getByPlaceholderText(/Ask about a project/), "Is Ask Dev ready?");
-        await user.click(screen.getByRole("button", { name: "Send" }));
-        await waitFor(() =>
-            expect(screen.getByRole("log")).toHaveTextContent("Ask Dev is not release-ready."),
-        );
-        expect(network).toHaveBeenCalledTimes(1);
-        vi.unstubAllGlobals();
     });
 });
 
@@ -1227,7 +1212,7 @@ describe("AskDevChat: the pin when a draft clears", () => {
             Promise.resolve({
                 json: () => Promise.resolve({ result: canonicalResult }),
             })) as unknown as typeof fetch;
-        render(<AskDevChat source={createStandaloneSource(fetchImpl)} />);
+        render(<AskDevChat source={createStandaloneSource(investigateFromFetch(fetchImpl))} />);
         const log = screen.getByRole("log", { name: "Conversation" });
         const box = screen.getByPlaceholderText<HTMLTextAreaElement>(/Ask about a project/);
         // jsdom has no layout. In a browser the empty composer takes another height, which moves

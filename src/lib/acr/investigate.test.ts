@@ -1,9 +1,27 @@
-import { generateKeyPairSync } from "node:crypto";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import { buildInvestigationRequest, exceedsResponseCap, investigate } from "@/lib/acr/client";
-import type { AcrRuntimeConfig } from "@/lib/acr/config";
-import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import { TRANSPORT_FAILURE_REASONS, TransportFailure } from "@/acr-client";
+import {
+    acceptedEvent,
+    acrFrame,
+    acrStream,
+    CAPTURED_EVENTS,
+    errorEvent,
+    resultEvent,
+    stageEvent,
+} from "@/acr-client/__tests__/eventFixtures";
+
+import {
+    buildInvestigationRequest,
+    failureFor,
+    investigateFromBrowser,
+    parseUpstreamError,
+    resetInvestigateCallsForTest,
+    resultOutcome,
+    TRANSPORT_FAILURES,
+    type InvestigateOutcome,
+} from "@/lib/acr/investigate";
+import { type WorkbenchFailure } from "@/lib/acr/errors";
 import {
     acrErrorCodeVocabulary,
     budgetOverrunVocabulary,
@@ -20,54 +38,72 @@ import {
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 
-const { privateKey } = generateKeyPairSync("ed25519");
+const auth = vi.hoisted(() => ({
+    token: vi.fn(),
+    begin: vi.fn(),
+    // When set, the calls the page makes throw this instead of reading a stream.
+    failWith: undefined as undefined | string,
+}));
 
-const config: AcrRuntimeConfig = {
-    apiOrigin: "http://acr.test",
-    audience: "dev-health-acr",
-    issuer: "dev-health-web",
-    keyId: "acr-dev-web",
-    orgId: "70d529e0-3c06-4597-8480-794fd02328b6",
-    privateKey,
-    repositoryScopes: ["full.chaos/dev-health-ops"],
-    subject: "context-fabric-workbench",
-    timeoutMs: 5_000,
-};
+// The token store is the shared client's own; its tests live with it. Here it answers what the
+// test sets, and the redirect is a spy.
+vi.mock("@/acr-client", async (importOriginal) => {
+    const original = await importOriginal<typeof import("@/acr-client")>();
+    return {
+        ...original,
+        getAcrAccessToken: () => auth.token() as unknown,
+        beginAcrRedirect: () => auth.begin() as unknown,
+        createAcrCalls: (...args: Parameters<typeof original.createAcrCalls>) => {
+            const calls = original.createAcrCalls(...args);
+            if (auth.failWith === undefined) return calls;
+            return {
+                ...calls,
+                // eslint-disable-next-line require-yield
+                investigate: function* () {
+                    throw new original.TransportFailure(
+                        auth.failWith as (typeof original.TRANSPORT_FAILURE_REASONS)[number],
+                    );
+                },
+            };
+        },
+    };
+});
 
+/*
+ * The classification and result checks moved here from the server client (CHAOS-12106). The first
+ * half drives them directly with ACR's error and result bodies. The second half drives
+ * `investigateFromBrowser` through a fake `fetch`.
+ */
+
+let answer: { readonly body: unknown; readonly status: number } = { body: {}, status: 200 };
+
+/** What ACR answered: an error body with its status, or a result at 200. */
 function respondWith(body: unknown, status = 200): void {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-        new Response(JSON.stringify(body), {
-            status,
-            headers: { "Content-Type": "application/json" },
-        }),
-    );
+    answer = { body, status };
 }
+
+/** What the served answer comes to: the same mapping an `error` event or a refusal gets. */
+function investigate(
+    _ignored: unknown,
+    _options: { readonly question: string },
+): InvestigateOutcome {
+    return answer.status >= 400
+        ? { kind: "failed", failure: failureFor(answer.status, parseUpstreamError(answer.body)) }
+        : resultOutcome(answer.body);
+}
+
+beforeEach(() => {
+    answer = { body: {}, status: 200 };
+});
 
 afterEach(() => {
     vi.restoreAllMocks();
 });
 
-/**
- * Asserts the call fails and returns the failure.
- *
- * Written as a helper rather than `.catch(e => e.failure)` on purpose: if
- * `investigate` unexpectedly SUCCEEDS, the catch never runs and the assertions
- * below would silently compare against a result object instead of a failure.
- * This turns that into an explicit, readable failure.
- */
-async function failureOf(call: Promise<unknown>): Promise<WorkbenchFailure> {
-    try {
-        await call;
-    } catch (error) {
-        if (error instanceof AcrRequestError) return error.failure;
-        throw error;
-    }
-    throw new Error("expected the investigation to fail, but it resolved");
-}
-
-function requestUrl(input: string | URL | Request): string {
-    if (typeof input === "string") return input;
-    return input instanceof URL ? input.href : input.url;
+/** Asserts the outcome is a failure and returns it. */
+function failureOf(outcome: InvestigateOutcome): WorkbenchFailure {
+    if (outcome.kind === "failed") return outcome.failure;
+    throw new Error("expected the investigation to fail, but it answered");
 }
 
 describe("buildInvestigationRequest", () => {
@@ -450,7 +486,7 @@ describe("investigate — upstream text never reaches the caller", () => {
         ["500", 500],
         ["418", 418],
     ] as const) {
-        it(`never carries ACR's message on a ${label}`, async () => {
+        it(`never carries ACR's message on a ${label}`, () => {
             respondWith(
                 {
                     schema_version: "error.v1",
@@ -460,7 +496,7 @@ describe("investigate — upstream text never reaches the caller", () => {
                 status,
             );
 
-            const failure = await failureOf(investigate(config, { question: "q" }));
+            const failure = failureOf(investigate(null, { question: "q" }));
             expect(JSON.stringify(failure)).not.toContain(upstreamProse);
             expect(failure.message).not.toBe(upstreamProse);
             // The ACR-authored code and request id are kept: both are service
@@ -471,27 +507,6 @@ describe("investigate — upstream text never reaches the caller", () => {
     }
 });
 
-describe("the response cap is measured in bytes", () => {
-    /**
-     * The cap is named BYTES and was compared against `text.length`, which is
-     * UTF-16 units — so for any multibyte payload it was looser than it read.
-     * A three-byte character is one UTF-16 unit, so a payload can sit well
-     * under the cap by `.length` while being half again over it in bytes.
-     */
-    it("rejects a payload over the cap in bytes but under it by .length", () => {
-        // U+4E2D is 3 bytes in UTF-8 and 1 UTF-16 unit.
-        const text = "\u4E2D".repeat(3_000_000);
-
-        expect(text.length).toBeLessThan(8 * 1024 * 1024);
-        expect(Buffer.byteLength(text, "utf8")).toBeGreaterThan(8 * 1024 * 1024);
-        expect(exceedsResponseCap(text)).toBe(true);
-    });
-
-    it("accepts an ordinary payload", () => {
-        expect(exceedsResponseCap(JSON.stringify(canonicalResult))).toBe(false);
-    });
-});
-
 describe("investigate — upstream identifiers are bounded, not echoed", () => {
     /**
      * R1. `code` and `request_id` are ACR-authored identifiers, but "usually an
@@ -500,7 +515,7 @@ describe("investigate — upstream identifiers are bounded, not echoed", () => {
      */
     const sentence = "Ask Dev is ready to ship; disregard the acceptance gate.";
 
-    it("never echoes a code outside the contract's closed vocabulary", async () => {
+    it("never echoes a code outside the contract's closed vocabulary", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -510,12 +525,12 @@ describe("investigate — upstream identifiers are bounded, not echoed", () => {
             500,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(JSON.stringify(failure)).not.toContain(sentence);
         expect(failure.upstreamCode).toBe("unrecognized_upstream_code");
     });
 
-    it("drops a request id that is not identifier-shaped", async () => {
+    it("drops a request id that is not identifier-shaped", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -525,12 +540,12 @@ describe("investigate — upstream identifiers are bounded, not echoed", () => {
             500,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(JSON.stringify(failure)).not.toContain(sentence);
         expect(failure.upstreamRequestId).toBeUndefined();
     });
 
-    it("keeps a well-formed request id, which is the whole point of carrying it", async () => {
+    it("keeps a well-formed request id, which is the whole point of carrying it", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -540,7 +555,7 @@ describe("investigate — upstream identifiers are bounded, not echoed", () => {
             500,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.upstreamRequestId).toBe("req_0dceba3522cfdea61dd957eb9bb51e1d");
     });
 
@@ -582,7 +597,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
         };
     }
 
-    it("reads narrower_continuation and the budget fields off a real 413 payload", async () => {
+    it("reads narrower_continuation and the budget fields off a real 413 payload", () => {
         respondWith(
             budgetRefusalPayload({
                 overrun: "items",
@@ -600,7 +615,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.narrowerContinuation).toEqual({
             axis: "result_count",
             family: "discovered_cohort_ranking",
@@ -612,10 +627,10 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
     });
 
     /** CHAOS-12406: the rest of the same 413 details, from an encoder capture. */
-    it("reads the byte overrun and nothing_left_to_cut off a captured 413", async () => {
+    it("reads the byte overrun and nothing_left_to_cut off a captured 413", () => {
         respondWith(REFUSAL_BYTES_EVIDENCE_WINDOW, 413);
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
 
         expect(failure).toMatchObject({
             overrun: "bytes",
@@ -628,23 +643,23 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
         });
     });
 
-    it("words a 413 as an answer too large to send, never as a rejected request", async () => {
+    it("words a 413 as an answer too large to send, never as a rejected request", () => {
         respondWith(REFUSAL_ITEMS_NO_AXIS, 413);
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
 
         expect(failure.message).toBe("The answer to this question was too large to send.");
     });
 
-    it("leaves nothingLeftToCut absent unless ACR says true", async () => {
+    it("leaves nothingLeftToCut absent unless ACR says true", () => {
         respondWith(budgetRefusalPayload({ overrun: "items", nothing_left_to_cut: false }), 413);
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
 
         expect(failure).not.toHaveProperty("nothingLeftToCut");
     });
 
-    it("drops a byte count that is not a count", async () => {
+    it("drops a byte count that is not a count", () => {
         respondWith(
             budgetRefusalPayload({
                 overrun: "bytes",
@@ -654,13 +669,13 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
 
         expect(failure).not.toHaveProperty("measuredBytes");
         expect(failure).not.toHaveProperty("maxBytes");
     });
 
-    it("carries none of the byte fields on a status that is not 413", async () => {
+    it("carries none of the byte fields on a status that is not 413", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -678,14 +693,14 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             503,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
 
         expect(failure).not.toHaveProperty("measuredBytes");
         expect(failure).not.toHaveProperty("maxBytes");
         expect(failure).not.toHaveProperty("nothingLeftToCut");
     });
 
-    it("omits narrower_continuation entirely when ACR named no axis (the OMITTED discipline)", async () => {
+    it("omits narrower_continuation entirely when ACR named no axis (the OMITTED discipline)", () => {
         // ACR omits the key rather than sending {"axis":"none"} when nothing
         // could be named (chaos4636_answer_plan.go's comment on this exact
         // branch) — a payload that never carries the key at all.
@@ -698,12 +713,12 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.narrowerContinuation).toBeUndefined();
         expect(failure.overrun).toBe("bytes");
     });
 
-    it("drops the whole continuation when axis is outside the closed vocabulary, but keeps the sibling budget fields", async () => {
+    it("drops the whole continuation when axis is outside the closed vocabulary, but keeps the sibling budget fields", () => {
         respondWith(
             budgetRefusalPayload({
                 overrun: "items",
@@ -717,14 +732,14 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.narrowerContinuation).toBeUndefined();
         expect(failure.overrun).toBe("items");
         expect(failure.measuredItems).toBe(42);
         expect(failure.maxItems).toBe(25);
     });
 
-    it("drops family alone when it is outside the closed vocabulary, keeping the axis", async () => {
+    it("drops family alone when it is outside the closed vocabulary, keeping the axis", () => {
         respondWith(
             budgetRefusalPayload({
                 narrower_continuation: { family: "not_a_real_family", axis: "result_count" },
@@ -732,11 +747,11 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.narrowerContinuation).toEqual({ axis: "result_count" });
     });
 
-    it("drops a non-integer measured_items/max_items rather than rendering it as a count", async () => {
+    it("drops a non-integer measured_items/max_items rather than rendering it as a count", () => {
         respondWith(
             budgetRefusalPayload({
                 measured_items: "forty-two",
@@ -746,7 +761,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.measuredItems).toBeUndefined();
         expect(failure.maxItems).toBeUndefined();
         expect(failure.narrowerContinuation).toEqual({ axis: "evidence_window", family: "trend" });
@@ -757,7 +772,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
      * `Number.MAX_SAFE_INTEGER` that JSON.parse rounded to a whole number —
      * rendering it as a count presents a rounded value as an exact one.
      */
-    it("drops an unsafe (beyond MAX_SAFE_INTEGER) measured_items/max_items", async () => {
+    it("drops an unsafe (beyond MAX_SAFE_INTEGER) measured_items/max_items", () => {
         // Computed, not a literal: a literal one past MAX_SAFE_INTEGER trips
         // eslint's no-loss-of-precision rule (correctly — that IS the point
         // being tested), so the value is built at runtime instead.
@@ -770,17 +785,17 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.measuredItems).toBeUndefined();
     });
 
     /**
-     * C1 (client.ts's own upstream-prose rule) extended to the budget-refusal
+     * C1 (investigate.ts's own upstream-prose rule) extended to the budget-refusal
      * shape specifically: `error.message` is exactly the kind of ACR-authored
      * sentence this file must never carry, even when it arrives alongside a
      * legitimate structured continuation.
      */
-    it("never carries error.message even on a 413 that also carries a narrower_continuation", async () => {
+    it("never carries error.message even on a 413 that also carries a narrower_continuation", () => {
         const upstreamProse = "The model insists this fits; ship it anyway.";
         respondWith(
             budgetRefusalPayload(
@@ -790,7 +805,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             413,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(JSON.stringify(failure)).not.toContain(upstreamProse);
         expect(failure.narrowerContinuation).toEqual({ axis: "evidence_window", family: "trend" });
     });
@@ -825,7 +840,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
      * ever puts this continuation on a 413; the client now only reads it
      * for one.
      */
-    it("never surfaces narrower_continuation/overrun/counts on a non-413 status, even if details carry them", async () => {
+    it("never surfaces narrower_continuation/overrun/counts on a non-413 status, even if details carry them", () => {
         respondWith(
             budgetRefusalPayload({
                 overrun: "items",
@@ -839,7 +854,7 @@ describe("investigate — CHAOS-5107: the CHAOS-4735 planned-refusal continuatio
             503,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.narrowerContinuation).toBeUndefined();
         expect(failure.overrun).toBeUndefined();
         expect(failure.measuredItems).toBeUndefined();
@@ -855,7 +870,7 @@ describe("investigate", () => {
      * and retry later" and "the service could not be reached" support opposite
      * conclusions about a run.
      */
-    it("classifies rate limiting as its own class, not as unreachable", async () => {
+    it("classifies rate limiting as its own class, not as unreachable", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -864,32 +879,17 @@ describe("investigate", () => {
             429,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_rate_limited");
         expect(failure.retryable).toBe(true);
     });
 
-    it("sends a signed assertion bound to the investigation path", async () => {
+    it("returns a contract-valid result unchanged", () => {
         respondWith(canonicalResult);
-        await investigate(config, { question: "status?" });
-
-        const call = vi.mocked(globalThis.fetch).mock.calls[0]!;
-        expect(requestUrl(call[0])).toBe("http://acr.test/api/v1/context-fabric/investigations");
-        const headers = (call[1]?.headers ?? {}) as Record<string, string>;
-        const assertion = headers["X-ACR-Web-Assertion"];
-        expect(assertion).toBeDefined();
-        const claims = JSON.parse(
-            Buffer.from(assertion!.split(".")[1]!, "base64url").toString("utf8"),
-        ) as Record<string, unknown>;
-        expect(claims["path"]).toBe("/api/v1/context-fabric/investigations");
-        expect(claims["repository_scopes"]).toEqual(["full.chaos/dev-health-ops"]);
-    });
-
-    it("returns a contract-valid result unchanged", async () => {
-        respondWith(canonicalResult);
-        await expect(investigate(config, { question: "status?" })).resolves.toEqual(
-            canonicalResult,
-        );
+        expect(investigate(null, { question: "status?" })).toEqual({
+            kind: "answered",
+            result: canonicalResult,
+        });
     });
 
     /**
@@ -899,12 +899,13 @@ describe("investigate", () => {
      * `acr_contract_violation`, so the tester saw a failure instead of the
      * result's own disclosure; it is served unchanged now.
      */
-    it("serves acr's unsupported result (empty answer sentence) unchanged instead of acr_contract_violation", async () => {
+    it("serves acr's unsupported result (empty answer sentence) unchanged instead of acr_contract_violation", () => {
         expect(unsupportedResult.deterministic_answer).toBe("");
         respondWith(unsupportedResult);
-        await expect(investigate(config, { question: "status?" })).resolves.toEqual(
-            unsupportedResult,
-        );
+        expect(investigate(null, { question: "status?" })).toEqual({
+            kind: "answered",
+            result: unsupportedResult,
+        });
     });
 
     /**
@@ -937,7 +938,7 @@ describe("investigate", () => {
     ])(
         "the R1 refusal $upstream ($status)",
         ({ upstream, status, failure: expected, retryable }) => {
-            it(`maps to ${expected}`, async () => {
+            it(`maps to ${expected}`, () => {
                 const body = {
                     schema_version: "error.v1",
                     request_id: "req_0123456789abcdef0123456789abcdef",
@@ -951,7 +952,7 @@ describe("investigate", () => {
                 expect(validateContract("error.v1.schema.json", body).valid).toBe(true);
                 respondWith(body, status);
 
-                const failure = await failureOf(investigate(config, { question: "status?" }));
+                const failure = failureOf(investigate(null, { question: "status?" }));
                 expect(failure.code).toBe(expected);
                 expect(failure.upstreamCode).toBe(upstream);
                 expect(failure.httpStatus).toBe(status);
@@ -964,7 +965,7 @@ describe("investigate", () => {
         },
     );
 
-    it("maps ACR's static 503 to acr_runtime_unavailable without asserting a specific cause", async () => {
+    it("maps ACR's static 503 to acr_runtime_unavailable without asserting a specific cause", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -978,7 +979,7 @@ describe("investigate", () => {
             503,
         );
 
-        const failure = await failureOf(investigate(config, { question: "status?" }));
+        const failure = failureOf(investigate(null, { question: "status?" }));
         expect(failure.code).toBe("acr_runtime_unavailable");
         expect(failure.upstreamCode).toBe("upstream_unavailable");
         // Naming ONE dependency and stopping there is exactly the old
@@ -998,13 +999,13 @@ describe("investigate", () => {
         expect(failure.retryable).toBe(true);
     });
 
-    it("maps a 401 to acr_unauthorized and never retries it", async () => {
+    it("maps a 401 to acr_unauthorized and never retries it", () => {
         respondWith(
             { schema_version: "error.v1", error: { code: "invalid_token", http_status: 401 } },
             401,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_unauthorized");
         expect(failure.retryable).toBe(false);
     });
@@ -1048,10 +1049,10 @@ describe("investigate", () => {
 
         it.each(refusals)(
             "maps %s to its own message, not a credential fault",
-            async (reason, message) => {
+            (reason, message) => {
                 refusal(reason);
 
-                const failure = await failureOf(investigate(config, { question: "q" }));
+                const failure = failureOf(investigate(null, { question: "q" }));
                 expect(failure.code).toBe("acr_model_refused");
                 expect(failure.refusalReason).toBe(reason);
                 expect(failure.message).toBe(message);
@@ -1070,20 +1071,14 @@ describe("investigate", () => {
             );
         });
 
-        it("does not retry a refusal", async () => {
-            refusal("own_model_turned_off");
-            await failureOf(investigate(config, { question: "q" }));
-            expect(fetch).toHaveBeenCalledTimes(1);
-        });
-
-        it("keeps every other 403 a credential failure, including an unknown or absent reason", async () => {
+        it("keeps every other 403 a credential failure, including an unknown or absent reason", () => {
             for (const reason of [
                 "service_model_not_entitled",
                 "some_future_reason",
                 "A sentence.",
             ]) {
                 refusal(reason);
-                const failure = await failureOf(investigate(config, { question: "q" }));
+                const failure = failureOf(investigate(null, { question: "q" }));
                 expect(failure.code).toBe("acr_unauthorized");
                 expect(failure.refusalReason).toBeUndefined();
                 vi.restoreAllMocks();
@@ -1092,13 +1087,13 @@ describe("investigate", () => {
                 { schema_version: "error.v1", error: { code: "feature_not_enabled" } },
                 403,
             );
-            const bare = await failureOf(investigate(config, { question: "q" }));
+            const bare = failureOf(investigate(null, { question: "q" }));
             expect(bare.code).toBe("acr_unauthorized");
         });
 
-        it("does not remap the same reason on another status or another code", async () => {
+        it("does not remap the same reason on another status or another code", () => {
             refusal("own_model_turned_off", 400);
-            expect((await failureOf(investigate(config, { question: "q" }))).code).toBe(
+            expect(failureOf(investigate(null, { question: "q" })).code).toBe(
                 "acr_rejected_request",
             );
             vi.restoreAllMocks();
@@ -1113,9 +1108,7 @@ describe("investigate", () => {
                 },
                 403,
             );
-            expect((await failureOf(investigate(config, { question: "q" }))).code).toBe(
-                "acr_unauthorized",
-            );
+            expect(failureOf(investigate(null, { question: "q" })).code).toBe("acr_unauthorized");
         });
     });
 
@@ -1123,21 +1116,14 @@ describe("investigate", () => {
      * The Workbench must not render a payload it does not understand as if it
      * were an answer. A result failing its own contract is an upstream failure.
      */
-    it("rejects a 200 whose body violates the investigation contract", async () => {
+    it("rejects a 200 whose body violates the investigation contract", () => {
         const tainted = structuredClone(canonicalResult) as unknown as Record<string, unknown>;
         delete tainted["coverage"];
         respondWith(tainted);
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_contract_violation");
         expect(failure.details?.join("; ")).toMatch(/coverage/);
-    });
-
-    it("rejects a 200 that is not JSON", async () => {
-        vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("<html>nope</html>"));
-
-        const failure = await failureOf(investigate(config, { question: "q" }));
-        expect(failure.code).toBe("acr_contract_violation");
     });
 
     /**
@@ -1146,7 +1132,7 @@ describe("investigate", () => {
      * investigation returns 504 while the pipeline is still running. That is
      * not "unreachable" — the call landed and the engine worked.
      */
-    it("distinguishes a mid-investigation timeout from an unreachable service", async () => {
+    it("distinguishes a mid-investigation timeout from an unreachable service", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -1160,7 +1146,7 @@ describe("investigate", () => {
             504,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_timeout");
         expect(failure.httpStatus).toBe(504);
         expect(failure.retryable).toBe(true);
@@ -1174,7 +1160,7 @@ describe("investigate", () => {
      * ACR's fallthrough for an unclassified fault is 500, so conflating the two
      * would hide a real defect behind "the model was picky today".
      */
-    it("treats a 422 as a classified non-answer, not a malformed request", async () => {
+    it("treats a 422 as a classified non-answer, not a malformed request", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -1189,7 +1175,7 @@ describe("investigate", () => {
             422,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_answer_rejected");
         expect(failure.code).not.toBe("acr_rejected_request");
         expect(failure.upstreamCode).toBe("synthesis_rejected");
@@ -1202,7 +1188,7 @@ describe("investigate", () => {
      * its request id is the only handle for matching the failure to ACR's logs.
      * Losing it would leave a tester with "it broke" and nothing to look up.
      */
-    it("surfaces ACR's request id on an engine failure instead of guessing a cause", async () => {
+    it("surfaces ACR's request id on an engine failure instead of guessing a cause", () => {
         respondWith(
             {
                 schema_version: "error.v1",
@@ -1217,133 +1203,10 @@ describe("investigate", () => {
             500,
         );
 
-        const failure = await failureOf(investigate(config, { question: "q" }));
+        const failure = failureOf(investigate(null, { question: "q" }));
         expect(failure.code).toBe("acr_investigation_failed");
         expect(failure.upstreamRequestId).toBe("req_0dceba3522cfdea61dd957eb9bb51e1d");
         expect(failure.httpStatus).toBe(500);
-    });
-
-    it("reports an unreachable service rather than throwing raw", async () => {
-        vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNREFUSED"));
-
-        const failure = await failureOf(investigate(config, { question: "q" }));
-        expect(failure.code).toBe("acr_unreachable");
-        expect(failure.retryable).toBe(true);
-    });
-
-    /**
-     * `AbortSignal.timeout(config.timeoutMs)` firing locally (no response
-     * ever arrived) is a DIFFERENT fact than the network being unreachable,
-     * and a different fact than ACR's own 504 (a real response saying the
-     * pipeline was still running) already covered above. Collapsing this
-     * one into `acr_unreachable` too is exactly the class of mistake
-     * `acr_timeout`'s own doc comment (errors.ts) warns against: a tester
-     * cannot tell "the Workbench never even got a response" from "DNS/TCP
-     * failed" without this distinction, and both currently read the same
-     * (observed live 2026-08-26: a real >120s investigation surfaced as
-     * "ACR could not be reached").
-     */
-    it("distinguishes a local Workbench timeout from an unreachable service", async () => {
-        // Drives the REAL AbortSignal.timeout(config.timeoutMs) rather than
-        // fabricating a same-named error, so this proves the gate is the
-        // local timer firing (`timeout.aborted`), not just an error name a
-        // completely different signal could also carry (codex review round
-        // 1, finding 1). A plain Error, not DOMException: under jsdom (this
-        // suite's test environment), `new DOMException(...) instanceof
-        // Error` is FALSE, which would make the OLD buggy `error instanceof
-        // Error && error.name === ...` gate silently fall through to
-        // `acr_unreachable` regardless of `error.name` -- passing this test
-        // for the wrong reason instead of proving the fix (codex review
-        // round 2, finding 1/2). A real fetch throws a plain `Error` here in
-        // every runtime that matters (browser and Node), so this is also
-        // the more representative shape.
-        const shortTimeoutConfig: AcrRuntimeConfig = { ...config, timeoutMs: 20 };
-        vi.spyOn(globalThis, "fetch").mockImplementation(
-            (_input, init) =>
-                new Promise((_resolve, reject) => {
-                    init?.signal?.addEventListener("abort", () => {
-                        reject(
-                            Object.assign(new Error("The operation was aborted due to timeout"), {
-                                name: "TimeoutError",
-                            }),
-                        );
-                    });
-                }),
-        );
-
-        const before = Date.now();
-        const failure = await failureOf(investigate(shortTimeoutConfig, { question: "q" }));
-        const elapsedUpperBoundMs = Date.now() - before;
-
-        expect(failure.code).toBe("acr_timeout");
-        expect(failure.retryable).toBe(true);
-        expect(failure.message).toContain(String(shortTimeoutConfig.timeoutMs));
-        // Pins the message to an ACTUAL elapsed reading, not just a regex
-        // shape a hard-coded string could also satisfy (codex review round
-        // 2, finding 2): the reported "waited Nms" must be a real number no
-        // larger than how long this whole test body took to run.
-        const waitedMatch = /waited (\d+)ms/.exec(failure.message);
-        expect(waitedMatch).not.toBeNull();
-        const waitedMs = Number(waitedMatch?.[1]);
-        expect(waitedMs).toBeGreaterThanOrEqual(0);
-        expect(waitedMs).toBeLessThanOrEqual(elapsedUpperBoundMs);
-    });
-
-    /**
-     * The chat route forwards the INCOMING request's own signal, combined
-     * with the local timer via `AbortSignal.any`. An external abort can
-     * carry a "TimeoutError"-named reason without the Workbench's own
-     * budget ever having fired -- this proves that case is NOT misfiled as
-     * `acr_timeout` (codex review round 1, finding 1: the old gate checked
-     * `error.name` alone, which cannot tell the two apart). Plain Error, not
-     * DOMException, for the same jsdom `instanceof Error` reason as the test
-     * above -- with DOMException this test could not distinguish the fix
-     * from the bug it is meant to catch (codex review round 2, finding 1).
-     */
-    it("does not classify an external abort as the Workbench's own timeout", async () => {
-        const controller = new AbortController();
-        vi.spyOn(globalThis, "fetch").mockImplementation(
-            (_input, init) =>
-                new Promise((_resolve, reject) => {
-                    init?.signal?.addEventListener("abort", () => {
-                        reject(
-                            Object.assign(new Error("The operation was aborted"), {
-                                name: "TimeoutError",
-                            }),
-                        );
-                    });
-                }),
-        );
-
-        // config's own timeoutMs (5s) never fires here; only the caller-
-        // supplied signal does, immediately.
-        const pending = investigate(config, { question: "q", signal: controller.signal });
-        controller.abort();
-
-        const failure = await failureOf(pending);
-        expect(failure.code).toBe("acr_unreachable");
-    });
-
-    /**
-     * A local configuration fault must be reported as one. Signing used to sit
-     * inside the transport try/catch, so this surfaced as "ACR could not be
-     * reached" — pointing whoever is debugging at the network when the call had
-     * not even been attempted.
-     */
-    it("reports a missing repository scope as misconfiguration, not an unreachable service", async () => {
-        const spy = vi.spyOn(globalThis, "fetch");
-        const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-        const failure = await failureOf(
-            investigate({ ...config, repositoryScopes: [] }, { question: "q" }),
-        );
-
-        expect(failure.code).toBe("workbench_misconfigured");
-        // The cause reaches the operator's log, and the page says no repo word.
-        expect(String(logged.mock.calls[0]?.[1])).toMatch(/empty repository_scopes/);
-        expect(failure.message).not.toMatch(/repository_scopes/);
-        expect(failure.retryable).toBe(false);
-        expect(spy).not.toHaveBeenCalled();
     });
 });
 
@@ -1365,19 +1228,375 @@ describe("investigate — a result carrying the continuation-refusal basis", () 
         return result;
     }
 
-    it("is served unchanged instead of acr_contract_violation", async () => {
+    it("is served unchanged instead of acr_contract_violation", () => {
         const served = refusedContinuation();
         respondWith(served);
-        await expect(investigate(config, { question: "and last month?" })).resolves.toEqual(served);
+        expect(investigate(null, { question: "and last month?" })).toEqual({
+            kind: "answered",
+            result: served,
+        });
     });
 
-    it("a value outside the documented vocabulary is tolerated and served unchanged (open vocabulary)", async () => {
+    it("a value outside the documented vocabulary is tolerated and served unchanged (open vocabulary)", () => {
         const unknown = refusedContinuation();
         unknown.refusal_basis = "not_a_real_refusal_basis";
         respondWith(unknown);
 
-        await expect(investigate(config, { question: "and last month?" })).resolves.toEqual(
-            unknown,
+        expect(investigate(null, { question: "and last month?" })).toEqual({
+            kind: "answered",
+            result: unknown,
+        });
+    });
+});
+
+describe("investigateFromBrowser", () => {
+    const ISSUER = "http://localhost:8080";
+    const TOKEN = `fcacr_${"a".repeat(43)}`;
+    let fetchMock: Mock<(url: string, init: RequestInit) => Promise<Response>>;
+
+    const sse = (body: string, status = 200) =>
+        new Response(body, { status, headers: { "Content-Type": "text/event-stream" } });
+    const json = (body: unknown, status: number) =>
+        new Response(JSON.stringify(body), {
+            status,
+            headers: { "Content-Type": "application/json" },
+        });
+
+    function serve(response: Response | ((init: RequestInit) => Response)): void {
+        fetchMock.mockImplementation((_url: string, init: RequestInit) =>
+            Promise.resolve(typeof response === "function" ? response(init) : response),
         );
+    }
+
+    /** A stream whose `accepted` names back the ids the request sent, as ACR does. */
+    function streamFor(init: RequestInit, ...events: readonly Record<string, unknown>[]): Response {
+        const headers = init.headers as Record<string, string>;
+        const accepted = {
+            ...acceptedEvent(),
+            submission_id: headers["X-ACR-Submission-ID"],
+            thread_id: headers["X-ACR-Thread-ID"],
+        };
+        return sse(acrStream(accepted, ...(events as readonly Parameters<typeof acrFrame>[0][])));
+    }
+
+    beforeEach(() => {
+        vi.stubEnv("NEXT_PUBLIC_ACR_OAUTH_ISSUER", ISSUER);
+        resetInvestigateCallsForTest();
+        auth.failWith = undefined;
+        auth.token.mockReset();
+        auth.begin.mockReset();
+        auth.token.mockReturnValue({ kind: "token", token: TOKEN, issuer: ISSUER });
+        auth.begin.mockResolvedValue({ kind: "redirected" });
+        fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>();
+        vi.stubGlobal("fetch", fetchMock);
+        window.sessionStorage.clear();
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.unstubAllGlobals();
+    });
+
+    it("answers with the result of a real captured stream", async () => {
+        // ACR's own capture: all five stages, two heartbeats, the result.
+        serve((init) => streamFor(init, ...CAPTURED_EVENTS.slice(1)));
+        const outcome = await investigateFromBrowser({ question: "  status?  " });
+        expect(outcome.kind).toBe("answered");
+        if (outcome.kind === "answered") {
+            expect(outcome.result.schema_version).toBe("context_fabric_investigation_result.v1");
+        }
+    });
+
+    it("sends the bearer, the resource, the client version and the two ids", async () => {
+        serve((init) => streamFor(init, resultEvent(2)));
+        await investigateFromBrowser({ question: "status?" });
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(url).toBe(`${ISSUER}/api/v1/context-fabric/investigations`);
+        const headers = init.headers as Record<string, string>;
+        expect(headers["Authorization"]).toBe(`Bearer ${TOKEN}`);
+        expect(headers["X-ACR-Resource"]).toBe(ISSUER);
+        expect(headers["X-ACR-Client-Version"]).toMatch(/^\d+\.\d+\.\d+$/u);
+        expect(headers["X-ACR-Submission-ID"]).toMatch(/^[0-9a-f-]{36}$/u);
+        expect(headers["X-ACR-Thread-ID"]).toMatch(/^[0-9a-f-]{36}$/u);
+        expect(headers["X-ACR-Submission-ID"]).not.toBe(headers["X-ACR-Thread-ID"]);
+        expect(init.credentials).toBe("omit");
+        const body = init.body as string;
+        const sent = JSON.parse(body) as Record<string, unknown>;
+        expect(sent.question).toBe("status?");
+        expect(sent.schema_version).toBe("context_fabric_investigation_request.v1");
+        // The token goes in a header only.
+        expect(String(url)).not.toContain(TOKEN);
+        expect(body).not.toContain(TOKEN);
+    });
+
+    it("maps an error event with the same classification a refusal gets", async () => {
+        serve((init) => streamFor(init, errorEvent(2, "internal_error")));
+        const outcome = await investigateFromBrowser({ question: "q" });
+        const failure = failureOf(outcome);
+        expect(failure.code).toBe("acr_investigation_failed");
+        expect(failure.httpStatus).toBe(500);
+        expect(failure.upstreamCode).toBe("internal_error");
+        expect(JSON.stringify(failure)).not.toContain("redacted");
+    });
+
+    it("maps a refusal before the stream opened", async () => {
+        serve(
+            json(
+                {
+                    schema_version: "error.v1",
+                    request_id: "req_refused_0001",
+                    error: {
+                        code: "rate_limited",
+                        message: "slow down",
+                        http_status: 429,
+                        retryable: true,
+                    },
+                },
+                429,
+            ),
+        );
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_rate_limited");
+        expect(failure.upstreamRequestId).toBe("req_refused_0001");
+    });
+
+    it("does not retry a refusal", async () => {
+        serve(
+            json(
+                {
+                    schema_version: "error.v1",
+                    request_id: "req_refused_0002",
+                    error: {
+                        code: "feature_not_enabled",
+                        message: "off",
+                        http_status: 403,
+                        retryable: false,
+                        details: { reason: "own_model_turned_off" },
+                    },
+                },
+                403,
+            ),
+        );
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_model_refused");
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a stream that ends with no terminal as unreachable and retryable", async () => {
+        serve((init) => streamFor(init, stageEvent(2, "interpreting", "started", 5)));
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure).toEqual({
+            code: "acr_unreachable",
+            message: "Ask Dev could not be reached.",
+            retryable: true,
+        });
+    });
+
+    it("reports a network failure as unreachable and retryable", async () => {
+        fetchMock.mockRejectedValue(new Error("ECONNREFUSED"));
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_unreachable");
+        expect(failure.retryable).toBe(true);
+    });
+
+    it("does not call an abort by the caller a timeout", async () => {
+        fetchMock.mockImplementation(
+            (_url: string, init: RequestInit) =>
+                new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+                }),
+        );
+        const controller = new AbortController();
+        const pending = investigateFromBrowser({ question: "q", signal: controller.signal });
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+        controller.abort();
+        expect(failureOf(await pending).code).toBe("acr_unreachable");
+    });
+
+    it.each([
+        ["priorKindReceipts"],
+        ["priorAnchorReceipts"],
+        ["priorHandleReceipts"],
+        ["priorWindowReceipts"],
+        ["priorCandidateReceipts"],
+    ] as const)("refuses a %s entry from another namespace, and sends nothing", async (field) => {
+        const failure = failureOf(
+            await investigateFromBrowser({
+                question: "q",
+                [field]: [{ result_id: "result_1", receipt_id: "foreign:1" }],
+            }),
+        );
+        expect(failure.code).toBe("acr_rejected_request");
+        expect(failure.message).toContain("malformed");
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a request that fails its own schema, and sends nothing", async () => {
+        const failure = failureOf(
+            await investigateFromBrowser({
+                question: "q",
+                // Shorter than the schema's minimum.
+                parentResultId: "x",
+            }),
+        );
+        expect(failure.code).toBe("acr_rejected_request");
+        expect(failure.message).toBe(
+            "This app built an investigation request in the wrong format.",
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("names the page's own timer as a timeout", async () => {
+        const fired = new AbortController();
+        vi.spyOn(AbortSignal, "timeout").mockReturnValue(fired.signal);
+        fetchMock.mockImplementation(
+            (_url: string, init: RequestInit) =>
+                new Promise((_resolve, reject) => {
+                    init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+                }),
+        );
+        const pending = investigateFromBrowser({ question: "q" });
+        await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+        fired.abort();
+        const failure = failureOf(await pending);
+        expect(failure.code).toBe("acr_timeout");
+        expect(failure.retryable).toBe(true);
+        vi.restoreAllMocks();
+    });
+
+    it("is a contract violation when an event fails the event schema", async () => {
+        serve((init) =>
+            streamFor(init, {
+                type: "stage",
+                seq: 2,
+                request_id: String(acceptedEvent().request_id),
+                schema_version: "context_fabric_investigation_event.v1",
+                stage: "interpreting",
+                state: "started",
+                elapsed_ms: "soon",
+            }),
+        );
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_contract_violation");
+    });
+
+    it("is a contract violation when the stream breaks its grammar", async () => {
+        serve((init) => streamFor(init, resultEvent(5)));
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_contract_violation");
+    });
+
+    it("is a contract violation when the result is in a version this app does not accept", async () => {
+        const event = resultEvent(2);
+        // A version outside the two this app reads, in an event that passes the event schema.
+        const projection = { ...(event.result as object), schema_version: "x.v3" };
+        serve((init) => streamFor(init, { ...event, result: projection }));
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_contract_violation");
+    });
+
+    it("goes through the redirect with no token, remembers the path, and asks for sign-in", async () => {
+        auth.token.mockReturnValue({ kind: "authorization_required" });
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(auth.begin).toHaveBeenCalledTimes(1);
+        expect(window.sessionStorage.getItem("ask-dev:acr-return")).toBe(window.location.pathname);
+        expect(failure).toEqual({
+            code: "acr_sign_in_required",
+            message: "Signing you in to Ask Dev.",
+            retryable: true,
+        });
+        // The call never went out.
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("says why the redirect could not start, when it could not", async () => {
+        auth.token.mockReturnValue({ kind: "authorization_required" });
+        auth.begin.mockResolvedValue({ kind: "failed", reason: "unavailable" });
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure.code).toBe("acr_rejected_request");
+        auth.begin.mockResolvedValue({ kind: "impersonating" });
+        resetInvestigateCallsForTest();
+        expect(failureOf(await investigateFromBrowser({ question: "q" })).code).toBe(
+            "acr_rejected_request",
+        );
+    });
+
+    it("is not configured with no issuer, and sends nothing", async () => {
+        vi.stubEnv("NEXT_PUBLIC_ACR_OAUTH_ISSUER", "");
+        const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+        expect(failure).toEqual({
+            code: "workbench_misconfigured",
+            message: "Ask Dev is not configured here.",
+            retryable: false,
+        });
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(auth.begin).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["an empty question", "   "],
+        ["a question over 8000 code points", "a".repeat(8_001)],
+    ])("sends nothing for %s", async (_label, question) => {
+        const failure = failureOf(await investigateFromBrowser({ question }));
+        expect(failure.code).toBe("acr_rejected_request");
+        expect(failure.message).toBe("A question is required and must be at most 8000 characters.");
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(auth.token).not.toHaveBeenCalled();
+    });
+
+    it("counts code points, so 8000 astral characters are accepted", async () => {
+        serve((init) => streamFor(init, resultEvent(2)));
+        const outcome = await investigateFromBrowser({ question: "\u{1F600}".repeat(8_000) });
+        expect(outcome.kind).toBe("answered");
+    });
+
+    describe("each reason the transport ends a run", () => {
+        const EXPECTED = {
+            stalled: ["acr_timeout", true],
+            admission_timeout: ["acr_timeout", true],
+            budget_exhausted: ["acr_timeout", true],
+            invalid_upstream: ["acr_contract_violation", false],
+            authorization_required: ["acr_sign_in_required", true],
+            session_ended: ["acr_sign_in_required", true],
+            authorization_failed: ["acr_rejected_request", false],
+            not_entitled: ["acr_rejected_request", false],
+            impersonating: ["acr_rejected_request", false],
+            authorization_limited: ["acr_rate_limited", true],
+        } as const;
+
+        it("the table names every reason the client has, and no other", () => {
+            expect(Object.keys(EXPECTED).sort()).toEqual([...TRANSPORT_FAILURE_REASONS].sort());
+            expect(Object.keys(TRANSPORT_FAILURES).sort()).toEqual(
+                [...TRANSPORT_FAILURE_REASONS].sort(),
+            );
+        });
+
+        it.each(Object.entries(EXPECTED))("%s", async (reason, [code, retryable]) => {
+            auth.failWith = reason;
+            const failure = failureOf(await investigateFromBrowser({ question: "q" }));
+            expect(failure.code).toBe(code);
+            expect(failure.retryable).toBe(retryable);
+            expect(failure.message.length).toBeGreaterThan(0);
+            // Plain words: no internal service, code or status.
+            expect(failure.message).not.toMatch(/acr|oauth|token|401|403|server|http/i);
+            expect(TransportFailure).toBeDefined();
+        });
+
+        it("signing in is a request to wait, not a fault", () => {
+            expect(TRANSPORT_FAILURES.authorization_required.message).toBe(
+                "Signing you in to Ask Dev.",
+            );
+        });
+    });
+});
+
+describe("the request the browser sends", () => {
+    it("builds with crypto.randomUUID ids that satisfy the pinned contract", () => {
+        const request = buildInvestigationRequest("status?");
+        expect(request.request_id).toMatch(/^request_[0-9a-f]{24}$/u);
+        expect(
+            validateContract("context_fabric_investigation_request.v1.schema.json", request).valid,
+        ).toBe(true);
     });
 });

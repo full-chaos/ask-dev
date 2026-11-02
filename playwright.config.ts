@@ -5,37 +5,28 @@ const port = Number(process.env["PLAYWRIGHT_WEB_PORT"] ?? "3021");
 const baseURL = process.env["PLAYWRIGHT_BASE_URL"] ?? `http://127.0.0.1:${port}`;
 const resultsDirectory = process.env["PLAYWRIGHT_RESULTS_DIR"] ?? "test-results/playwright";
 
-// A SECOND app instance, configured with a fake (but real, wire-level) ACR
-// standing in behind it — see tests/support/fake-acr-server.mjs's own header
-// for why this exists rather than mocking inside the browser or the app.
-// Runs against the SAME production build as the unconfigured instance above
-// (`next start` only reads `.next`, so two instances on different ports are
-// safe); it exists purely so the chat surface's clarification-chip,
-// structure-needs-chip, mixed-receipt-family, conversation-threading, and
-// same-conversation-carry (CHAOS-5837) coverage can drive real, schema-valid
-// responses, which the unconfigured instance can never produce.
-// Fixed default ports, same convention as `PLAYWRIGHT_WEB_PORT`/
-// `PLAYWRIGHT_BASE_URL` above (both pre-existing): every port here is
-// independently overridable so two concurrent local runs of THIS repo can
-// avoid colliding, exactly as they already had to for the original single
-// webServer entry. Automatic collision-proofing (ephemeral port allocation)
-// would mean redesigning that pre-existing pair too, which is out of scope
-// here — flagged (codex review round 1, finding 5) rather than silently
-// left as a latent gap.
+// Two app instances stand in front of a fake (but real, wire-level) ACR: see
+// tests/support/fake-acr-server.mjs's own header for why this exists rather than mocking inside the
+// browser or the app. Both serve the SAME production build (`next start` only reads `.next`).
+// CHAOS-12106: the app is a browser OAuth client of ACR, so the browser talks to the fake ACR
+// directly: sign-in (the redirect to its /authorize and back), then the event stream.
+//
+// - The default instance (`baseURL`) is a user ACR refuses: the fake answers its investigations
+//   with 403, so a failure must present as a failure, never as a thin answer.
+// - The configured instance answers: it exists so the chat surface's clarification-chip,
+//   structure-needs-chip, mixed-receipt-family, conversation-threading, and same-conversation-carry
+//   (CHAOS-5837) coverage can drive real, schema-valid responses.
+//
+// `NEXT_PUBLIC_ACR_OAUTH_ISSUER` is inlined by `next build`, so only the build's value counts:
+// ci/run_checks.sh builds with it pointing at the fake ACR's port. It is also set on the servers
+// below so the intent reads here; `next start` ignores it.
 const fakeAcrPort = Number(process.env["FAKE_ACR_PORT"] ?? "4021");
 const fakeAcrOrigin = `http://127.0.0.1:${fakeAcrPort}`;
+// The origin the fake ACR refuses: the default instance.
+const refusedOrigin = new URL(baseURL).origin;
 const configuredPort = Number(process.env["PLAYWRIGHT_CONFIGURED_WEB_PORT"] ?? "3022");
 export const configuredBaseURL =
     process.env["PLAYWRIGHT_CONFIGURED_BASE_URL"] ?? `http://127.0.0.1:${configuredPort}`;
-// Written fresh by tests/support/gen-e2e-key.mjs on every run — never
-// committed (test-results/ is gitignored, and *.pem/*.key are too, belt and
-// braces). See that script's header for why a throwaway key is safe here.
-// PID-suffixed (codex review round 1, finding 5) so two `playwright test`
-// invocations running concurrently on the same machine (e.g. two worktrees
-// of this repo, or a developer running e2e while CI also has a job in
-// flight) never race on the SAME file — this config's own process id is
-// stable for the whole run and unique per run.
-const e2eSigningKeyPath = `${resultsDirectory}/e2e-acr-key-${process.pid}.pem`;
 
 export default defineConfig({
     testDir: "./tests",
@@ -56,41 +47,32 @@ export default defineConfig({
         screenshot: "only-on-failure",
     },
     webServer: [
-        // The suite asserts the shell renders and that a question produces an
-        // HONEST failure when the server hop is unconfigured — it never
-        // asserts an answer here, because an answer requires the real
-        // service and this instance has no mock path. No ACR_* variables are
-        // supplied on purpose.
+        // The default instance: a user the fake ACR refuses.
         {
             command: `pnpm exec next start --hostname 127.0.0.1 --port ${port}`,
             url: baseURL,
             reuseExistingServer: false,
             timeout: 120_000,
+            env: { NEXT_PUBLIC_ACR_OAUTH_ISSUER: fakeAcrOrigin },
         },
-        // The fake-ACR double, started before the configured app instance so
-        // its port is already listening once ACR_API_ORIGIN gets used.
+        // The fake-ACR double, started with the app instances: it serves the OAuth endpoints and
+        // the event stream, and refuses the default instance's origin.
         {
             command: `node tests/support/fake-acr-server.mjs`,
             url: fakeAcrOrigin,
-            env: { FAKE_ACR_PORT: String(fakeAcrPort) },
+            env: { FAKE_ACR_PORT: String(fakeAcrPort), FAKE_ACR_REFUSED_ORIGIN: refusedOrigin },
             reuseExistingServer: false,
             timeout: 30_000,
         },
-        // A second next-start instance, configured to talk to the fake-ACR
-        // double above. Only the `tests/chat.spec.ts` describe blocks that
-        // opt in via `test.use({ baseURL: configuredBaseURL })` point here;
-        // every other spec uses the unconfigured instance.
+        // A second next-start instance, whose origin the fake ACR answers. Only the
+        // `tests/chat.spec.ts` describe blocks that opt in via
+        // `test.use({ baseURL: configuredBaseURL })` point here.
         {
-            command: `bash -c "node tests/support/gen-e2e-key.mjs '${e2eSigningKeyPath}' && pnpm exec next start --hostname 127.0.0.1 --port ${configuredPort}"`,
+            command: `pnpm exec next start --hostname 127.0.0.1 --port ${configuredPort}`,
             url: configuredBaseURL,
             reuseExistingServer: false,
             timeout: 120_000,
-            env: {
-                ACR_API_ORIGIN: fakeAcrOrigin,
-                ACR_ORG_ID: "org_e2e",
-                ACR_WEB_ASSERTION_KEY_FILE: e2eSigningKeyPath,
-                ACR_REPOSITORY_SCOPES: "full-chaos/ask-dev",
-            },
+            env: { NEXT_PUBLIC_ACR_OAUTH_ISSUER: fakeAcrOrigin },
         },
     ],
 });

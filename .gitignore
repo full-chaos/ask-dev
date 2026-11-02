@@ -11,8 +11,7 @@ coverage
 test-results
 playwright-report
 
-# Never commit real environment values, and never the ACR signing key.
-# ACR_WEB_ASSERTION_KEY_FILE points at a path outside this repo.
+# Never commit real environment values or key material (this app holds none: CHAOS-12106).
 .env
 .env.*
 !.env.example

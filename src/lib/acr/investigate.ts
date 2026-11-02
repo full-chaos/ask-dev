@@ -1,10 +1,19 @@
-import "server-only";
-
-import { randomUUID } from "node:crypto";
-
-import { signWebAssertion } from "@/lib/acr/assertion";
-import type { AcrRuntimeConfig } from "@/lib/acr/config";
-import { AcrRequestError, type WorkbenchFailure } from "@/lib/acr/errors";
+import {
+    createAcrCalls,
+    getAcrAccessToken,
+    reportAcrTokenRejected,
+    RUN_TIMEOUT_DEFAULT_MS,
+    TransportFailure,
+    TransportRefusal,
+    type AcrCalls,
+    type TransportFailureReason,
+} from "@/acr-client";
+import {
+    acrClientConfig,
+    authorizeByRedirect,
+    isInvestigationResult,
+} from "@/lib/acr/browser-host";
+import { type WorkbenchFailure } from "@/lib/acr/errors";
 import { REFUSAL_COPY } from "@/lib/acr/narrower-continuation-copy";
 import {
     boundedBudgetOverrun,
@@ -17,72 +26,64 @@ import {
     boundedUpstreamRequestId,
     type NarrowingContinuationAxis,
 } from "@/lib/acr/upstream-vocabulary";
+import { loadStreamValidators, streamEnvelopeValidators } from "@/lib/acr/stream-validators";
 import { validateContract, type ContractSchemaName } from "@/lib/acr/validate";
 import { MAX_CONVERSATION_TURNS_ON_WIRE, MAX_SUBJECT_HINTS_ON_WIRE } from "@/lib/conversation";
 import { CHAT_STATUS_COPY, NOT_RUN_COPY } from "@/render/chat-copy";
-import type {
-    BoundStructureReceipt,
-    ConversationTurn,
-    InvestigationRequest,
-    InvestigationResult,
-    StructureSubjectKind,
-    SubjectHint,
+import {
+    STRUCTURE_RECEIPT_PREFIX,
+    type BoundStructureReceipt,
+    type ConversationTurn,
+    type InvestigationRequest,
+    type InvestigationResult,
+    type StructureSubjectKind,
+    type SubjectHint,
 } from "@/lib/contracts";
 
 /**
- * Server-only client for ACR's Context Fabric investigation API.
+ * The Workbench's investigation, run from the browser (CHAOS-12106). The page is a browser OAuth
+ * client of ACR, as the web app is: it builds the request, validates it, and reads ACR's event
+ * stream through the shared client (`@/acr-client`). No key, assertion or identity of its own
+ * exists anywhere in this app.
  *
- * The Workbench calls the REAL investigation API — it never consumes a mock
- * result (CHAOS-3738 hard boundary). When ACR cannot answer, this surfaces the
- * failure honestly instead of substituting anything.
- *
- * Verified against the live local stack: signing, method/path binding, and
- * body-digest binding all pass; see `signWebAssertion` for the empty-scopes
- * trap that a first-time consumer will otherwise hit as an opaque 401.
+ * The Workbench calls the REAL investigation API: it never consumes a mock result (CHAOS-3738 hard
+ * boundary). When ACR cannot answer, this surfaces the failure honestly instead of substituting
+ * anything.
  */
 
-const INVESTIGATION_PATH = "/api/v1/context-fabric/investigations";
 /**
- * Result schema by the payload's own `schema_version` (CHAOS-11906). acr serves
- * v2 whenever it minted a membership-verify anchor option; v1 results are never
- * reinterpreted. An unlisted version is a contract violation, never a guess.
+ * Result schema by the payload's own `schema_version` (CHAOS-11906). acr serves v2 whenever it
+ * minted a membership-verify anchor option; v1 results are never reinterpreted. An unlisted version
+ * is a contract violation, never a guess.
+ *
+ * The `result` event carries the investigation RESPONSE: the result's fields plus an optional
+ * `synthesis_input`, under the same `schema_version`. The result schemas close their properties, so
+ * they would refuse that extra field; the response schemas are the result schemas plus it.
+ * The bounded answer projection (`context_fabric_answer_projection.v1`) has no entry: this app has
+ * no view for it.
  */
 const RESULT_SCHEMAS = {
-    "context_fabric_investigation_result.v1": "context_fabric_investigation_result.v1.schema.json",
-    "context_fabric_investigation_result.v2": "context_fabric_investigation_result.v2.schema.json",
+    "context_fabric_investigation_result.v1":
+        "context_fabric_investigation_response.v1.schema.json",
+    "context_fabric_investigation_result.v2":
+        "context_fabric_investigation_response.v2.schema.json",
 } as const satisfies Record<string, ContractSchemaName>;
 
-function resultSchemaFor(payload: unknown): ContractSchemaName | undefined {
+export function resultSchemaFor(payload: unknown): ContractSchemaName | undefined {
     if (typeof payload !== "object" || payload === null) return undefined;
     const version = (payload as { schema_version?: unknown }).schema_version;
     if (typeof version !== "string" || !Object.hasOwn(RESULT_SCHEMAS, version)) return undefined;
     return RESULT_SCHEMAS[version as keyof typeof RESULT_SCHEMAS];
 }
 
-/**
- * Upper bound on a result payload, in BYTES.
- *
- * It was compared against `text.length`, which is UTF-16 units — not bytes, so
- * the cap was both misnamed and looser than it read for any multibyte payload.
- * Measured properly now.
- *
- * Worth being precise about what it does and does not do, because the name
- * implies more than it delivers: the check runs AFTER `response.text()` has
- * materialised the body, so it cannot protect against the allocation. It is a
- * contract sanity bound — a payload this size is not an answer — not a memory
- * guard. Making it one would mean bounding the read itself.
- */
-const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+const MAX_QUESTION_LENGTH = 8_000;
 
 /**
- * Exported so the unit is testable.
- *
- * Left inline, the byte-vs-UTF-16 fix was unpinned: reverting it to `.length`
- * kept the whole suite green, which makes it indistinguishable from a fix that
- * was never made.
+ * Counts CODE POINTS, not UTF-16 units. ACR bounds the question at 8000 runes, which is also what
+ * JSON Schema's `maxLength` means; an astral character counts once there.
  */
-export function exceedsResponseCap(text: string): boolean {
-    return Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES;
+function codePointLength(value: string): number {
+    return [...value].length;
 }
 
 /**
@@ -130,11 +131,11 @@ export type InvestigationOptions = {
      */
     readonly parentResultId?: string | undefined;
     readonly subjectHints?: readonly SubjectHint[] | undefined;
-    readonly signal?: AbortSignal;
+    readonly signal?: AbortSignal | undefined;
 };
 
 function requestId(): string {
-    return `request_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
+    return `request_${crypto.randomUUID().replaceAll("-", "").slice(0, 24)}`;
 }
 
 /**
@@ -194,7 +195,7 @@ export function buildInvestigationRequest(
     // so attaching them is legal on the wire unconditionally. Still attached
     // ONLY WHEN NON-EMPTY, but that is wire minimization now, not a
     // correctness requirement — an empty array is just as schema-valid as an
-    // absent key. `client.test.ts` pins this behavior.
+    // absent key. `investigate.test.ts` pins this behavior.
     // Same "unavoidable cast" reasoning as `receipts` above, applied per
     // field: each of the four generated properties is its OWN maxItems-20
     // tuple-union type (`KindBoundReceipt`/etc., not a plain array). `Pick`
@@ -344,7 +345,7 @@ type UpstreamError = {
     readonly refusalReason?: ModelRefusalReason;
 };
 
-function parseUpstreamError(payload: unknown): UpstreamError {
+export function parseUpstreamError(payload: unknown): UpstreamError {
     if (typeof payload !== "object" || payload === null) return {};
     // `request_id` sits at the TOP level of error.v1, not inside `error`.
     const requestId = (payload as { request_id?: unknown }).request_id;
@@ -374,7 +375,7 @@ function parseUpstreamError(payload: unknown): UpstreamError {
  * Nothing here reads `error.message`, `question_text`, or any other free-text
  * field — the corpus/tester's question never appears in this file.
  */
-function parseUpstreamErrorDetails(
+export function parseUpstreamErrorDetails(
     details: unknown,
 ): Pick<
     UpstreamError,
@@ -456,7 +457,7 @@ const modelRefusalMessages: Readonly<Record<ModelRefusalReason, string>> = {
         "An organization admin turned this organization's own model off. No model was used.",
 };
 
-function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
+export function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     // Both upstream fields are bounded before they can be carried anywhere.
     // "Usually an identifier" is not a guarantee, and an upstream that put a
     // sentence in either would otherwise put it straight into the DOM.
@@ -549,7 +550,7 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
         return {
             ...upstreamFields,
             code: "acr_unauthorized",
-            message: "Ask Dev's server credential was rejected for this organization.",
+            message: "Ask Dev did not accept your access.",
             retryable: false,
         };
     }
@@ -642,12 +643,170 @@ function failureFor(status: number, upstream: UpstreamError): WorkbenchFailure {
     };
 }
 
-export async function investigate(
-    config: AcrRuntimeConfig,
+export type InvestigateOutcome =
+    | { kind: "answered"; result: InvestigationResult }
+    | { kind: "failed"; failure: WorkbenchFailure };
+
+const failed = (failure: WorkbenchFailure): InvestigateOutcome => ({ kind: "failed", failure });
+
+/**
+ * Why the transport ended a run itself, in the Workbench's failure vocabulary. Short, plain words;
+ * none names an internal service.
+ */
+export const TRANSPORT_FAILURES: Readonly<Record<TransportFailureReason, WorkbenchFailure>> = {
+    stalled: {
+        code: "acr_timeout",
+        message: "Ask Dev stopped answering before it finished.",
+        retryable: true,
+    },
+    admission_timeout: {
+        code: "acr_timeout",
+        message: "Ask Dev did not answer in time.",
+        retryable: true,
+    },
+    budget_exhausted: {
+        code: "acr_timeout",
+        message: "Ask Dev had too little time left to run this.",
+        retryable: true,
+    },
+    invalid_upstream: {
+        code: "acr_contract_violation",
+        message: "Ask Dev sent an answer this app could not read.",
+        retryable: false,
+    },
+    authorization_required: {
+        code: "acr_sign_in_required",
+        message: "Signing you in to Ask Dev.",
+        retryable: true,
+    },
+    session_ended: {
+        code: "acr_sign_in_required",
+        message: "Signing you in to Ask Dev.",
+        retryable: true,
+    },
+    authorization_failed: {
+        code: "acr_rejected_request",
+        message: "Ask Dev could not sign you in.",
+        retryable: false,
+    },
+    not_entitled: {
+        code: "acr_rejected_request",
+        message: "Your organization does not have Ask Dev.",
+        retryable: false,
+    },
+    impersonating: {
+        code: "acr_rejected_request",
+        message: "Ask Dev is not available while you act as another user.",
+        retryable: false,
+    },
+    authorization_limited: {
+        code: "acr_rate_limited",
+        message: "Too many sign-in attempts. Try again soon.",
+        retryable: true,
+    },
+};
+
+/**
+ * The result must satisfy its own contract before the UI sees it. Anything else is an upstream
+ * failure, reported as one.
+ */
+export function resultOutcome(payload: unknown): InvestigateOutcome {
+    const schema = resultSchemaFor(payload);
+    if (schema === undefined) {
+        const seen = (payload as { schema_version?: unknown } | null)?.schema_version;
+        console.error("acr result carries an unsupported schema_version", {
+            schema_version: typeof seen === "string" ? seen.slice(0, 80) : typeof seen,
+        });
+        return failed({
+            code: "acr_contract_violation",
+            message: "Ask Dev returned a result in a version this app does not accept.",
+            retryable: false,
+        });
+    }
+    const validation = validateContract(schema, payload);
+    if (!validation.valid) {
+        return failed({
+            code: "acr_contract_violation",
+            message: "Ask Dev returned a result that does not meet the required format.",
+            details: validation.errors,
+            retryable: false,
+        });
+    }
+    // The cast is honest: the response schema declares the result's fields, and it just passed.
+    return { kind: "answered", result: payload as InvestigationResult };
+}
+
+let cached:
+    { readonly key: string; readonly calls: AcrCalls<InvestigationResult, unknown> } | undefined;
+
+/** Tests only: drop the calls made for the page. */
+export function resetInvestigateCallsForTest(): void {
+    cached = undefined;
+}
+
+/** One set of calls per page, made on the first question. */
+function callsFor(config: NonNullable<ReturnType<typeof acrClientConfig>>) {
+    const key = `${config.issuer}|${config.clientId}|${config.redirectUri}`;
+    if (cached?.key !== key) {
+        cached = {
+            key,
+            calls: createAcrCalls<InvestigationResult, unknown>(config, {
+                fetch: (input, init) => globalThis.fetch(input, init),
+                now: () => Date.now(),
+                token: getAcrAccessToken,
+                rejected: reportAcrTokenRejected,
+                authorize: authorizeByRedirect,
+                envelope: streamEnvelopeValidators,
+                validators: loadStreamValidators,
+                isResult: isInvestigationResult,
+            }),
+        };
+    }
+    return cached.calls;
+}
+
+/**
+ * The five structure-receipt fields, each with the id namespace its offers use (design brief
+ * §2.1: none may accept another's). A wrong one REJECTS the request rather than being filtered:
+ * a dropped receipt would run the re-ask without the tester's choice, and look exactly like it
+ * working.
+ */
+const STRUCTURE_RECEIPT_FIELDS = [
+    ["priorKindReceipts", STRUCTURE_RECEIPT_PREFIX.expected_kind],
+    ["priorAnchorReceipts", STRUCTURE_RECEIPT_PREFIX.subject_anchor],
+    ["priorHandleReceipts", STRUCTURE_RECEIPT_PREFIX.subject_handle],
+    ["priorWindowReceipts", STRUCTURE_RECEIPT_PREFIX.window],
+    ["priorCandidateReceipts", STRUCTURE_RECEIPT_PREFIX.subject_candidate],
+] as const;
+
+function hasForeignReceipt(options: InvestigationOptions): boolean {
+    return STRUCTURE_RECEIPT_FIELDS.some(([field, prefix]) =>
+        (options[field] ?? []).some((receipt) => !receipt.receipt_id.startsWith(prefix)),
+    );
+}
+
+/** Asks one question of ACR from this page, and reads the stream to its terminal. */
+export async function investigateFromBrowser(
     options: InvestigationOptions,
-): Promise<InvestigationResult> {
+): Promise<InvestigateOutcome> {
+    const question = options.question.trim();
+    if (question === "" || codePointLength(question) > MAX_QUESTION_LENGTH) {
+        return failed({
+            code: "acr_rejected_request",
+            message: `A question is required and must be at most ${MAX_QUESTION_LENGTH} characters.`,
+            retryable: false,
+        });
+    }
+    if (hasForeignReceipt(options)) {
+        return failed({
+            code: "acr_rejected_request",
+            message:
+                "A supplied choice was malformed. The request was rejected rather than run without the chosen selection.",
+            retryable: false,
+        });
+    }
     const request = buildInvestigationRequest(
-        options.question,
+        question,
         options.priorSubjectReceipts ?? [],
         {
             priorKindReceipts: options.priorKindReceipts,
@@ -661,162 +820,71 @@ export async function investigate(
         options.parentResultId,
         options.subjectHints ?? [],
     );
-    const body = JSON.stringify(request);
-
-    // The request is validated against the pinned schema BEFORE it is sent, so
-    // a Workbench-side mistake surfaces here rather than as an opaque ACR 400.
+    // Validated BEFORE it is sent, so a mistake in this app surfaces here, not as an opaque 400.
     const requestValidation = validateContract(
         "context_fabric_investigation_request.v1.schema.json",
         request,
     );
     if (!requestValidation.valid) {
-        throw new AcrRequestError({
+        return failed({
             code: "acr_rejected_request",
             message: "This app built an investigation request in the wrong format.",
             details: requestValidation.errors,
             retryable: false,
         });
     }
-
-    const timeout = AbortSignal.timeout(config.timeoutMs);
-    const signal =
-        options.signal === undefined ? timeout : AbortSignal.any([options.signal, timeout]);
-
-    // Sign OUTSIDE the fetch try/catch, deliberately.
-    //
-    // Signing inside it meant a configuration fault — an empty
-    // `repository_scopes`, an unusable key — was caught by the transport
-    // handler and reported as "ACR could not be reached". That sends whoever is
-    // debugging to the network when the fault is local config, and the call was
-    // never even attempted. A misconfiguration must never present as an
-    // upstream problem.
-    let assertion: string;
-    try {
-        assertion = signWebAssertion({
-            body,
-            config,
-            method: "POST",
-            orgId: config.orgId,
-            path: INVESTIGATION_PATH,
-            permissions: ["context:read", "evidence:read"],
-            privateKey: config.privateKey,
-            repositoryScopes: config.repositoryScopes,
-            subject: config.subject,
-        });
-    } catch (error) {
-        // The cause is the operator's, so it goes to the log, never to the page.
-        console.error("the server could not sign the ACR assertion", error);
-        throw new AcrRequestError({
+    const config = acrClientConfig();
+    if (config === undefined) {
+        return failed({
             code: "workbench_misconfigured",
-            message: "Ask Dev's server could not sign this request.",
+            message: "Ask Dev is not configured here.",
             retryable: false,
         });
     }
 
-    let response: Response;
-    const fetchStartedAt = Date.now();
+    const timeout = AbortSignal.timeout(RUN_TIMEOUT_DEFAULT_MS);
+    const signal =
+        options.signal === undefined ? timeout : AbortSignal.any([options.signal, timeout]);
     try {
-        response = await fetch(`${config.apiOrigin}${INVESTIGATION_PATH}`, {
-            method: "POST",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                "X-ACR-Client-Version": "0.1.0",
-                "X-Request-ID": randomUUID(),
-                "X-ACR-Web-Assertion": assertion,
-            },
-            body,
+        const events = callsFor(config).investigate({
+            request,
+            submissionId: crypto.randomUUID(),
+            threadId: crypto.randomUUID(),
+            deadline: Date.now() + RUN_TIMEOUT_DEFAULT_MS,
             signal,
-            cache: "no-store",
         });
-    } catch (_error) {
-        // `timeout.aborted` (the LOCAL AbortSignal.timeout instance, not
-        // `error.name`) is the gate: `signal` above is `AbortSignal.any([
-        // options.signal, timeout])` when a caller supplies its own signal
-        // (the chat route forwards the incoming request's), and an external
-        // abort can surface with the same "TimeoutError" name without our
-        // own budget ever having fired -- checking the name alone would
-        // misclassify that as a local timeout it was not (codex review).
-        // A real `timeout.aborted` means no response ever arrived, which is
-        // a DIFFERENT fact from the network being unreachable (a DNS/TCP
-        // failure) and from ACR's own 504 (a real response saying the
-        // pipeline was still running, handled separately below via
-        // `parseUpstreamFailure`). Collapsing all three into
-        // `acr_unreachable` is exactly what `acr_timeout`'s own doc comment
-        // (errors.ts) warns against: a tester cannot tell "the Workbench
-        // gave up waiting" from "the service could not be reached at all"
-        // without this distinction.
+        for await (const event of events) {
+            if (event.type === "result") return resultOutcome(event.result);
+            if (event.type === "error") {
+                return failed(
+                    failureFor(event.error.error.http_status, parseUpstreamError(event.error)),
+                );
+            }
+        }
+        // The stream ended with no terminal event: it was interrupted, which is neither an
+        // answer nor a failure ACR reported.
+        return failed({
+            code: "acr_unreachable",
+            message: "Ask Dev could not be reached.",
+            retryable: true,
+        });
+    } catch (error) {
+        if (error instanceof TransportRefusal) {
+            return failed(failureFor(error.status, parseUpstreamError(error.error)));
+        }
+        if (error instanceof TransportFailure) return failed(TRANSPORT_FAILURES[error.reason]);
+        // Only the local timer counts as a timeout: an abort by the caller is not one.
         if (timeout.aborted) {
-            throw new AcrRequestError({
+            return failed({
                 code: "acr_timeout",
-                message: `Ask Dev did not answer within this app's ${String(config.timeoutMs)}ms budget (waited ${String(Date.now() - fetchStartedAt)}ms).`,
+                message: "Ask Dev did not answer in time.",
                 retryable: true,
             });
         }
-        throw new AcrRequestError({
+        return failed({
             code: "acr_unreachable",
             message: "Ask Dev could not be reached.",
             retryable: true,
         });
     }
-
-    const text = await response.text();
-    if (exceedsResponseCap(text)) {
-        throw new AcrRequestError({
-            code: "acr_contract_violation",
-            message: "Ask Dev returned a response larger than this app accepts.",
-            httpStatus: response.status,
-            retryable: false,
-        });
-    }
-
-    let payload: unknown;
-    try {
-        payload = JSON.parse(text);
-    } catch {
-        throw new AcrRequestError({
-            code: "acr_contract_violation",
-            message: "Ask Dev returned a response this app could not read.",
-            httpStatus: response.status,
-            retryable: false,
-        });
-    }
-
-    if (!response.ok) {
-        throw new AcrRequestError(failureFor(response.status, parseUpstreamError(payload)));
-    }
-
-    // The result must satisfy its own contract before the UI sees it. Anything
-    // else is an upstream failure, reported as one.
-    const resultSchema = resultSchemaFor(payload);
-    if (resultSchema === undefined) {
-        const seen = (payload as { schema_version?: unknown } | null)?.schema_version;
-        console.error("acr result carries an unsupported schema_version", {
-            schema_version: typeof seen === "string" ? seen.slice(0, 80) : typeof seen,
-            httpStatus: response.status,
-        });
-        throw new AcrRequestError({
-            code: "acr_contract_violation",
-            message: "Ask Dev returned a result in a version this app does not accept.",
-            httpStatus: response.status,
-            retryable: false,
-        });
-    }
-    const validation = validateContract(resultSchema, payload);
-    if (!validation.valid) {
-        throw new AcrRequestError({
-            code: "acr_contract_violation",
-            message: "Ask Dev returned a result that does not meet the required format.",
-            httpStatus: response.status,
-            details: validation.errors,
-            retryable: false,
-        });
-    }
-
-    // The cast is honest: `validation` above proved `payload` satisfies the
-    // pinned result schema, and that schema now declares `InvestigationResult`
-    // itself (THE SEAM landed — see `@/lib/contracts`'s own header), so this
-    // is the same validated-payload cast every other contract type in this
-    // file already relies on.
-    return payload as InvestigationResult;
 }

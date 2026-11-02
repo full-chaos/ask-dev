@@ -3,7 +3,6 @@ import {
     type BoundStructureReceipt,
     type StructureNeedKind,
 } from "./contracts";
-import type { StructureOfferSelectionOutcome } from "./telemetry/outcome";
 
 /**
  * Accumulate-and-re-ask-ONCE (CHAOS-3927 P2, design brief §2.2).
@@ -111,9 +110,9 @@ const MAX_RECEIPTS_PER_MEMBER = 20;
 
 /**
  * Builds the five `prior_*_receipts` request bodies from an accumulated
- * batch — camelCase, matching the `/api/investigations` POST body's own
- * `priorSubjectReceipts` naming (the route translates to the contract's
- * snake_case fields, exactly as it already does for subject receipts).
+ * batch — camelCase, matching `InvestigationOptions`' own `priorSubjectReceipts` naming
+ * (`buildInvestigationRequest` translates to the contract's snake_case fields, exactly as it
+ * already does for subject receipts).
  * `priorCandidateReceipts` is CHAOS-4012's own addition, same shape as the
  * other four.
  *
@@ -145,19 +144,16 @@ export function buildStructureReceiptFields(batch: StructureSelectionBatch): {
     };
 }
 
+/** How a client-observed structure-offer selection ended. */
+export type StructureOfferSelectionOutcome = "submitted" | "rejected_malformed";
+
 /**
- * One client-observed selection outcome, queued for the NEXT submit
- * (CHAOS-4171 standing order: telemetry baked into new logic, same PR).
+ * One client-observed selection outcome, queued for the NEXT submit (CHAOS-4171).
  *
- * Not emitted client-side: a browser `console.info` lands only in that
- * viewer's own devtools, collected nowhere in prod (team-lead ruling,
- * 2026-08-24). Instead this rides the next `/api/investigations` POST body
- * alongside the structure receipts it travels with, and the ROUTE emits it
- * (see `src/app/api/investigations/route.ts`'s own `structureSelectionEvents`
- * handling) — server stdout is the surface the log pipeline actually
- * collects. `useStructureSelections` owns the accumulation; this module only
- * holds the pure shape and reducer, matching every other batch operation
- * here.
+ * CHAOS-12106: the standalone app has no server to emit it, so its source and Workbench no longer
+ * send it. The hooks still queue it and the `ChatSource` seam still carries it, because a host
+ * (web) may read it. `useStructureSelections` owns the accumulation; this module only holds the
+ * pure shape and reducer, matching every other batch operation here.
  */
 export type PendingSelectionEvent = {
     readonly member: StructureNeedKind;

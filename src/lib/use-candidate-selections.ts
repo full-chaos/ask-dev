@@ -18,13 +18,13 @@ export type UseCandidateSelectionsResult = {
     readonly toggle: (receiptId: string) => void;
     /**
      * Every selection outcome observed since the last `reset()`, queued for
-     * the next `/api/investigations` submit — same telemetry pipe as
+     * the next submit — same telemetry pipe as
      * `useStructureSelections`'s own `pendingSelectionEvents` (CHAOS-4171
      * standing order: telemetry baked into new logic, same PR).
      * `subject_candidate` is already one of the five `StructureNeedKind`
      * members (CHAOS-4012), so this reuses `recordSelectionEvent`/
      * `PendingSelectionEvent` verbatim rather than inventing a parallel
-     * shape the route would need its own parser for.
+     * shape.
      */
     readonly pendingSelectionEvents: readonly PendingSelectionEvent[];
     readonly reset: () => void;
