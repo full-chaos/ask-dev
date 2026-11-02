@@ -19,6 +19,27 @@ export function declaredUnit(
 }
 
 /**
+ * The declaration a panel that stands for several claims reads units from (CHAOS-12570, codex r1
+ * P2). Claims share a panel when their rows are byte-identical (CHAOS-4672), so the panel's numbers
+ * are every claim's: a unit is stated only where every claim's table states the same one. This is
+ * the first table, with each measure whose unit another claim states differently, or not at all,
+ * taken out of `measure_units`.
+ */
+export function agreedTable(
+    tables: readonly (ClaimedFactTable | undefined)[],
+): ClaimedFactTable | undefined {
+    const [primary, ...others] = tables;
+    if (primary === undefined || others.length === 0) return primary;
+    const declared = primary.measure_units ?? [];
+    const agreed = declared.filter(({ measure, unit }) =>
+        others.every((table) => declaredUnit(table, measure) === unit),
+    );
+    if (agreed.length === declared.length) return primary;
+    const { measure_units: _disagreed, ...rest } = primary;
+    return agreed.length === 0 ? rest : { ...rest, measure_units: agreed };
+}
+
+/**
  * The one unit every point of a shape cites (CHAOS-12570), or `undefined`. A point names a claim's
  * row and field; the table that declares that row is the claim's `time_series_table` when the
  * shape plots `time_series_rows`, else its `table` (`renderableRowsSource`, the same choice the

@@ -16,7 +16,7 @@ import {
     selectPresentation,
 } from "../lib/fact-rows";
 import { rollupsOfClaims } from "../lib/investment-rollup";
-import { declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
+import { agreedTable, declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
 import { factShapesForClaim, THEME_SHARE_RULE } from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
@@ -140,6 +140,8 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     const word = useVocabularyWord();
     const fieldWord = useClaimFieldWord();
     const unitWord = useMeasureUnitWord();
+    // The rows are every grouped claim's: units only where they all agree (codex r1 P2).
+    const table = agreedTable([fact.table, ...alsoClaims.map((claim) => claim.table)]);
     const titleId = `fact-rows-${idPrefix}-${fact.claim_id}`;
     const tiles = factRowTiles(rows);
     const rollups = rollupsOfClaims(allFacts, [
@@ -193,7 +195,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                         const unit =
                             tile.value === null
                                 ? undefined
-                                : unitWord(declaredUnit(fact.table, tile.label));
+                                : unitWord(declaredUnit(table, tile.label));
                         return (
                             <div className="tile" key={tile.label}>
                                 <span className="tile__value">
@@ -252,7 +254,7 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                         chartKind={presentation.chartKind}
                         rows={rows}
                         seriesColumns={presentation.seriesColumns}
-                        table={fact.table}
+                        table={table}
                     />
                     {presentation.truncatedSeriesColumns.length > 0 ? (
                         <p className="fact-panel__caption">
@@ -277,12 +279,12 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
                         <FactTable
                             focusable={presentation.truncatedSeriesColumns.length > 0}
                             rows={rows}
-                            table={fact.table}
+                            table={table}
                         />
                     </div>
                 </>
             ) : (
-                <FactTable rows={rows} table={fact.table} />
+                <FactTable rows={rows} table={table} />
             )}
         </section>
     );
