@@ -442,7 +442,10 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // d617cbd2 -> da2efe68 (CHAOS-12520): the investment theme share train, the same SHA as web. The closed
 // rule vocabulary gains `investment_theme_share` and `RenderShape` gains an optional `value_unit`
 // (acr #1895, CHAOS-12496). No producer emits the rule yet.
-export const SOURCE_COMMIT = "da2efe686952f2c9dadb340ef5783d3b21f6a2e7";
+// da2efe68 -> 7b0caff2 (CHAOS-12544): the comparison table train, the same SHA as web. The closed
+// rule vocabulary gains `comparison_side_by_side`, and the source kinds gain `claimed_fact_value`,
+// addressing a claim's own value (acr #1907, CHAOS-12513). No producer emits the rule yet.
+export const SOURCE_COMMIT = "7b0caff2273ea10eeb0a670ac965e8a4eac97916";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
