@@ -12,7 +12,7 @@ import { servedWordScenarios } from "@/test/fixtures/served-words";
 
 afterEach(cleanup);
 
-/** The real selector with the flag on, `Validate` and the real encoder (acr `ab88349f`). */
+/** The real selector with the flag on, `Validate` and the real encoder (acr `9c324bbb`). */
 const answer = servedShapeScenarios["investment-treemap"];
 const treemap = answer.render_shapes![0]!;
 
@@ -73,6 +73,13 @@ describe("the verifier reads a treemap as one whole (CHAOS-12496)", () => {
             (_, r) => void (fact(r).time_series_rows = structuredClone(fact(r).rows!)),
         ],
         ["a row left out", (s) => void (s.series[0].points as unknown[]).pop()],
+        [
+            "a table a budget cut, with every row it holds plotted",
+            (s, r) => {
+                (s.series[0].points as unknown[]).pop();
+                fact(r).rows!.pop();
+            },
+        ],
         [
             "a point on another field, even with the same value",
             (s, r) => {

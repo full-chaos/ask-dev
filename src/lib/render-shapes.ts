@@ -326,10 +326,14 @@ function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolea
     return subjectKinds.size === 1 && [...sides.values()].includes(shape.series.length);
 }
 
+/** The canonical themes are fixed (AGENTS.md), so a whole table holds this many rows. */
+const INVESTMENT_THEME_COUNT = 5;
+
 /**
  * True when a treemap is ALL the parts of ONE whole: one claim's declared `theme_breakdown` table,
- * every row once, the same measure, and a real split. Mirrors acr's `validateTreemapShape`. A row
- * left out makes it a different claim, and one part above 0 says nothing the sentence does not.
+ * every row once, every theme, the same measure, and a real split. Mirrors acr's
+ * `validateTreemapShape`. A row left out makes it a different claim, a table with fewer themes was
+ * cut by a budget, and one part above 0 says nothing the sentence does not.
  * `verifyRenderShape`'s own checks cover the rest of acr's clauses: a kind with no rule here, a time
  * axis, a point of another source kind, and a share below 0, which the `ratio` unit refuses.
  *
@@ -349,7 +353,7 @@ function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): b
         return false;
     }
     const rows = fact.rows ?? [];
-    if (points.length !== rows.length) return false;
+    if (points.length !== rows.length || rows.length !== INVESTMENT_THEME_COUNT) return false;
     const seen = new Set<number>();
     let above = 0;
     for (const { source, value } of points) {
