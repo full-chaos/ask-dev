@@ -61,7 +61,8 @@ func ZZTreemapResult(shares []float64) InvestigationResult {
 			},
 		}},
 	}
-	result.RenderShapes, _ = selectRenderShapes(result, nil, RenderShapeOptions{InvestmentThemeShare: true})
+	frame := &QuestionFrame{Goals: []InvestigationGoal{GoalAllocateInvestment}}
+	result.RenderShapes, _ = selectRenderShapes(result, frame, RenderShapeOptions{InvestmentThemeShare: true})
 	result.Completeness = ComputeAnswerCompleteness(result)
 	return result
 }
