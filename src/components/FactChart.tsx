@@ -1,12 +1,16 @@
+import { MeasureUnitWord } from "./MeasureUnitWord";
 import { useVocabularyWord } from "./VocabularyWordContext";
-import type { ClaimedFactRow } from "../lib/contracts";
+import type { ClaimedFactRow, ClaimedFactTable } from "../lib/contracts";
 import { cellValue, parseIsoDate, type ChartAxis } from "../lib/fact-rows";
+import { declaredUnit } from "../lib/measure-units";
 
 export type FactChartProps = {
     readonly rows: readonly ClaimedFactRow[];
     readonly axis: ChartAxis;
     readonly seriesColumns: readonly string[];
     readonly chartKind: "line" | "bar";
+    /** What `rows` is, as ACR declares it: a series' served unit word is its y-axis caption. */
+    readonly table?: ClaimedFactTable | undefined;
 };
 
 const SINGLE_WIDTH = 640;
@@ -135,6 +139,7 @@ type SeriesChartProps = {
     readonly height: number;
     readonly maxAxisLabels: number;
     readonly showTitle: boolean;
+    readonly table: ClaimedFactTable | undefined;
 };
 
 /**
@@ -153,6 +158,7 @@ function SeriesChart({
     height,
     maxAxisLabels,
     showTitle,
+    table,
 }: SeriesChartProps) {
     const word = useVocabularyWord();
     // Time rows are ordered — and, when every axis value parses as a real
@@ -235,6 +241,14 @@ function SeriesChart({
                     {columnWord}
                 </p>
             ) : null}
+            {
+                // CHAOS-12570: the y-axis caption, this series' own unit (each series has its own axis).
+            }
+            <MeasureUnitWord
+                className="fact-chart__unit"
+                testId="fact-chart-unit"
+                unit={declaredUnit(table, column)}
+            />
             <svg
                 aria-label={axisDescription}
                 className="fact-chart__svg"
@@ -386,7 +400,7 @@ function SeriesChart({
  * renders a visually-hidden full data table alongside every chart so the
  * underlying numbers are never SVG-only (codex round 1, CHAOS-4355).
  */
-export function FactChart({ rows, axis, seriesColumns, chartKind }: FactChartProps) {
+export function FactChart({ rows, axis, seriesColumns, chartKind, table }: FactChartProps) {
     if (seriesColumns.length <= 1) {
         const column = seriesColumns[0];
         if (column === undefined) return null;
@@ -400,6 +414,7 @@ export function FactChart({ rows, axis, seriesColumns, chartKind }: FactChartPro
                     maxAxisLabels={MAX_AXIS_LABELS_SINGLE}
                     rows={rows}
                     showTitle={false}
+                    table={table}
                     width={SINGLE_WIDTH}
                     column={column}
                 />
@@ -419,6 +434,7 @@ export function FactChart({ rows, axis, seriesColumns, chartKind }: FactChartPro
                     maxAxisLabels={MAX_AXIS_LABELS_MULTIPLE}
                     rows={rows}
                     showTitle
+                    table={table}
                     width={MULTIPLE_WIDTH}
                     column={column}
                 />

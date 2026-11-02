@@ -5,6 +5,10 @@ import comparisonTableServed from "./served-shapes/comparison-table-served.json"
 import comparisonTable from "./served-shapes/comparison-table.json";
 import dateTable from "./served-shapes/date-oracle.json";
 import investmentTreemap from "./served-shapes/investment-treemap.json";
+import measureUnitsLabelsOff from "./served-shapes/measure-units-labels-off.json";
+import measureUnitsRepository from "./served-shapes/measure-units-repository.json";
+import measureUnitsUndeclared from "./served-shapes/measure-units-undeclared.json";
+import measureUnits from "./served-shapes/measure-units.json";
 import edgeWords from "./served-shapes/edge-words.json";
 import zoneLessTrend from "./served-shapes/zone-less-trend.json";
 
@@ -23,6 +27,10 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * `investment-treemap` is the real selector with the flag on, at the producer commit `ab88349f`
  * (`served-shapes/generate-treemap.go.txt`). `dateOracle` is
  * what ACR's own `parseRenderDate` reads: `millis` is null where it refuses the value.
+ * `measure-units*` are the contract example through ACR's real declared units and cadence, selector
+ * and encoder at 4eb93cf9 (`served-shapes/generate-units.go.txt`): with words, with the labels flag
+ * off, with no declaration at all, and with the commits claim about a repository, whose daily
+ * metrics declare a unit and a cadence (CHAOS-12570, CHAOS-12571).
  */
 export const servedShapeScenarios = {
     "category-order": categoryOrder as unknown as InvestigationResult,
@@ -30,6 +38,10 @@ export const servedShapeScenarios = {
     "comparison-table-served": comparisonTableServed as unknown as InvestigationResult,
     "investment-treemap": investmentTreemap as unknown as InvestigationResult,
     "edge-words": edgeWords as unknown as InvestigationResult,
+    "measure-units": measureUnits as unknown as InvestigationResult,
+    "measure-units-labels-off": measureUnitsLabelsOff as unknown as InvestigationResult,
+    "measure-units-repository": measureUnitsRepository as unknown as InvestigationResult,
+    "measure-units-undeclared": measureUnitsUndeclared as unknown as InvestigationResult,
     "zone-less-trend": zoneLessTrend as unknown as InvestigationResult,
 } as const;
 

@@ -7,7 +7,17 @@ export type RenderShapeChartProps = {
     readonly shape: RenderShape;
     /** The cohort a cohort chart plots: its axis follows the served rank (`axisLabels`). */
     readonly cohort?: Cohort;
+    /**
+     * CHAOS-12570: ACR's served word for the unit every point cites (`shapeMeasureUnit`), or
+     * nothing. It follows `value_label` wherever that is said, and is the y-axis caption.
+     */
+    readonly unit?: string | undefined;
 };
+
+/** `value_label`, and the served unit word after it when there is one. */
+function valueLabelOf(shape: RenderShape, unit: string | undefined): string {
+    return unit === undefined ? shape.value_label : `${shape.value_label} (${unit})`;
+}
 
 const WIDTH = 640;
 const HEIGHT = 240;
@@ -109,9 +119,12 @@ export function ShapeDataTable({
     labels,
     visible = false,
     format = formatValue,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    /** CHAOS-12570: the served unit word of every value, under each value column's word. */
+    readonly unit?: string | undefined;
     /** How a cell prints a value. Exact unless the caller keeps the exact value elsewhere. */
     readonly format?: (value: number) => string;
     /** A shape no chart draws: the table is then what the reader sees (`RichShape`). */
@@ -126,6 +139,11 @@ export function ShapeDataTable({
                     {shape.series.map((series) => (
                         <th key={series.key} scope="col">
                             {series.label}
+                            {unit === undefined ? null : (
+                                <span className="fact-table__unit" data-testid="measure-unit">
+                                    {unit}
+                                </span>
+                            )}
                         </th>
                     ))}
                 </tr>
@@ -189,10 +207,13 @@ function Legend({ shape }: { readonly shape: RenderShape }) {
 function CategoryBars({
     shape,
     labels,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    readonly unit?: string | undefined;
 }) {
+    const valueLabel = valueLabelOf(shape, unit);
     const stacked = shape.presentation === "stacked_bars";
     const singleMax = Math.max(
         0,
@@ -227,7 +248,7 @@ function CategoryBars({
 
     return (
         <svg
-            aria-label={`${shape.title}: ${shape.value_label} by ${shape.axis_label}`}
+            aria-label={`${shape.title}: ${valueLabel} by ${shape.axis_label}`}
             className="fact-chart__svg"
             role="img"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -277,7 +298,7 @@ function CategoryBars({
                             if (stacked) cursor += value;
                             const top = yFor(base + value);
                             const height = Math.abs(yFor(base) - top);
-                            const markLabel = `${label}, ${series.label}: ${formatValue(value)} ${shape.value_label}`;
+                            const markLabel = `${label}, ${series.label}: ${formatValue(value)} ${valueLabel}`;
                             return (
                                 <g
                                     aria-label={markLabel}
@@ -368,10 +389,13 @@ function CategoryBars({
 function TimeLines({
     shape,
     labels,
+    unit,
 }: {
     readonly shape: RenderShape;
     readonly labels: readonly string[];
+    readonly unit?: string | undefined;
 }) {
+    const valueLabel = valueLabelOf(shape, unit);
     const times = labels.map((label) => parseIsoDate(label) ?? Number.NaN);
     const usable = times.every((time) => !Number.isNaN(time));
     const minTime = usable ? Math.min(...times) : 0;
@@ -391,7 +415,7 @@ function TimeLines({
 
     return (
         <svg
-            aria-label={`${shape.title}: ${shape.value_label} over ${shape.axis_label}`}
+            aria-label={`${shape.title}: ${valueLabel} over ${shape.axis_label}`}
             className="fact-chart__svg"
             role="img"
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
@@ -446,7 +470,7 @@ function TimeLines({
                             />
                         ))}
                         {points.map((point) => {
-                            const markLabel = `${point.label}, ${series.label}: ${formatValue(point.value)} ${shape.value_label}`;
+                            const markLabel = `${point.label}, ${series.label}: ${formatValue(point.value)} ${valueLabel}`;
                             return (
                                 <g
                                     aria-label={markLabel}
@@ -509,7 +533,7 @@ function TimeLines({
  * component has never seen is how a chart starts claiming something the
  * answer does not.
  */
-export function RenderShapeChart({ shape, cohort }: RenderShapeChartProps) {
+export function RenderShapeChart({ shape, cohort, unit }: RenderShapeChartProps) {
     if (shape.kind !== "series") return null;
     const labels = axisLabels(shape, cohort);
     if (labels.length === 0) return null;
@@ -517,12 +541,17 @@ export function RenderShapeChart({ shape, cohort }: RenderShapeChartProps) {
         <figure className="render-shape">
             <figcaption className="render-shape__title">{shape.title}</figcaption>
             <Legend shape={shape} />
-            {shape.presentation === "line" ? (
-                <TimeLines labels={labels} shape={shape} />
-            ) : (
-                <CategoryBars labels={labels} shape={shape} />
+            {unit === undefined ? null : (
+                <p className="render-shape__unit" data-testid="render-shape-unit">
+                    {unit}
+                </p>
             )}
-            <ShapeDataTable labels={labels} shape={shape} />
+            {shape.presentation === "line" ? (
+                <TimeLines labels={labels} shape={shape} unit={unit} />
+            ) : (
+                <CategoryBars labels={labels} shape={shape} unit={unit} />
+            )}
+            <ShapeDataTable labels={labels} shape={shape} unit={unit} />
         </figure>
     );
 }
