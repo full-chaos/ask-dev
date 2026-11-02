@@ -134,6 +134,49 @@ describe("the token store's host", () => {
         await expect(auth.authorizeAcrSilently()).resolves.toEqual({ kind: "not_entitled" });
     });
 
+    it("binds an empty org id and no org id as the same principal", async () => {
+        const access = `fcacr_${"A".repeat(43)}`;
+        const refresh = `acrrt_${"R".repeat(43)}`;
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(() =>
+                Promise.resolve(
+                    json({
+                        access_token: access,
+                        token_type: "Bearer",
+                        expires_in: 600,
+                        refresh_token: refresh,
+                    }),
+                ),
+            ),
+        );
+        const auth = await import("../auth");
+        window.sessionStorage.setItem(
+            auth.ACR_TOKEN_FAMILY_KEY,
+            JSON.stringify({
+                v: 2,
+                familyId: "F".repeat(22),
+                issuer: ISSUER,
+                clientId: CONFIG.clientId,
+                refreshToken: `acrrt_${"S".repeat(43)}`,
+                tokenEndpoint: `${ISSUER}/token`,
+                revocationEndpoint: `${ISSUER}/revoke`,
+                userId: "user-1",
+                orgId: null,
+            }),
+        );
+        auth.configureAcrAuth({
+            config: () => CONFIG,
+            session: () => Promise.resolve({ user: { id: "user-1", org_id: "" } }),
+            routes: ROUTES,
+        });
+        await expect(auth.getAcrAccessToken()).resolves.toEqual({
+            kind: "token",
+            token: access,
+            issuer: ISSUER,
+        });
+    });
+
     it("keeps the host through the test seam and its reset", async () => {
         stubFetch({});
         const auth = await import("../auth");
