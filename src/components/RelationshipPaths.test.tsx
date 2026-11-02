@@ -6,6 +6,7 @@ import { EvidenceOpenContext } from "@/components/EvidenceOpenContext";
 import type { InvestigationResult, RelationshipPath } from "@/lib/contracts";
 import { withholdUnrankableRankings } from "@/lib/ranking-withheld";
 import { cohortMemberScenarios } from "@/test/fixtures/cohort-members";
+import { servedShapeScenarios } from "@/test/fixtures/served-shapes";
 import { visibleText } from "@/test/visible-text";
 
 afterEach(cleanup);
@@ -137,6 +138,40 @@ describe("paths no driver cites sit in one collapsed panel (CHAOS-12479)", () =>
         );
         expect(otherPanel()).toBeNull();
         expect(screen.queryByTestId("relationship-path")).toBeNull();
+    });
+});
+
+describe("an edge reads ACR's word (CHAOS-12499)", () => {
+    const served = servedShapeScenarios["edge-words"];
+    const words = served.vocabulary_labels!;
+    const hops = () => screen.getAllByTestId("path-hop").map((hop) => hop.textContent);
+
+    it("the fixture is the case: a served word that is not the generic form", () => {
+        expect(words["relationship_type:RELATED_TO"]).toBe("associated with");
+    });
+
+    it("draws the served word of every edge, between the edge's two ends", () => {
+        draw(served);
+        const expected = served.paths.flatMap((path) =>
+            path.edges.map((edge) => {
+                const word = words[`relationship_type:${edge.type}`]!;
+                return `${edge.from.label} — ${word} → ${edge.to.label}`;
+            }),
+        );
+        const shown = hops().map((hop) => hop?.split(" · ")[0]);
+        expect(shown.toSorted()).toEqual(expected.toSorted());
+    });
+
+    it("takes the generic path for a type with no word", () => {
+        const { "relationship_type:RELATED_TO": _gone, ...left } = words;
+        draw({ ...served, vocabulary_labels: left });
+        expect(hops().join()).toContain("CHAOS-2001 — related to → CHAOS-2002");
+    });
+
+    it("takes the generic path with no map, as a status-only tier serves", () => {
+        const { vocabulary_labels: _gone, ...result } = structuredClone(served);
+        draw(result);
+        expect(hops().join()).toContain("CHAOS-2001 — related to → CHAOS-2002");
     });
 });
 
