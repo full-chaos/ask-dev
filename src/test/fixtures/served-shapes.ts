@@ -7,6 +7,7 @@ import comparisonTableServed from "./served-shapes/comparison-table-served.json"
 import comparisonTable from "./served-shapes/comparison-table.json";
 import dateTable from "./served-shapes/date-oracle.json";
 import investmentTreemap from "./served-shapes/investment-treemap.json";
+import landscapeQuadrant from "./served-shapes/landscape-quadrant.json";
 import measureUnitsLabelsOff from "./served-shapes/measure-units-labels-off.json";
 import measureUnitsRepository from "./served-shapes/measure-units-repository.json";
 import measureUnitsUndeclared from "./served-shapes/measure-units-undeclared.json";
@@ -40,6 +41,10 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * the sankey that plots it, through ACR's real vocabulary labels, `Validate` and encoder at the
  * contract commit (`served-shapes/generate-sankey.go.txt`). No producer emits the rule yet
  * (CHAOS-12582), so the shape is built as ACR's own contract test builds it (CHAOS-12579).
+ * `landscape-quadrant` is five teams of four providers compared on landscape facts, through ACR's
+ * real quadrant selector (flag on), served line, vocabulary labels, `Validate` and encoder at the
+ * producer branch (`served-shapes/generate-quadrant.go.txt`). The fifth team has one identity, so
+ * it gives no point (CHAOS-12624).
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
@@ -48,6 +53,7 @@ export const servedShapeScenarios = {
     "comparison-table": comparisonTable as unknown as InvestigationResult,
     "comparison-table-served": comparisonTableServed as unknown as InvestigationResult,
     "investment-treemap": investmentTreemap as unknown as InvestigationResult,
+    "landscape-quadrant": landscapeQuadrant as unknown as InvestigationResult,
     "edge-words": edgeWords as unknown as InvestigationResult,
     "measure-units": measureUnits as unknown as InvestigationResult,
     "measure-units-labels-off": measureUnitsLabelsOff as unknown as InvestigationResult,

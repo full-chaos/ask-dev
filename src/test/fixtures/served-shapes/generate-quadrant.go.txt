@@ -1,0 +1,152 @@
+// Scratch generator of landscape-quadrant.json, not built by this repo. From a detached acr worktree
+// at the producer branch, then `go run ./cmd/zzquadrant <this directory>`, then `prettier --write`
+// on the output (whitespace only; the JSON is unchanged). Ran at acr 55b61fd2 (#1963, CHAOS-12626,
+// open), on the contract of acr 5cb92237 (#1953, the pin of record).
+//
+// The shape is the real selector's (`selectRenderShapes`, flag on), with the real served line
+// (`withLandscapeLimitation`), vocabulary labels, `Validate` and `json.Marshal`. The claims are built
+// as acr's own selection test builds them (`chaos12626_landscape_quadrant_test.go`): each team's two
+// claims on one landscape fact, each carrying the fact's one area_breakdown row. The teams are the
+// ones `dho fixtures generate` writes for its mixed world (seed 9440), one per provider. Refresh it
+// from #1963's merge commit.
+
+// internal/contextfabric/zz_quadrant_export.go
+package contextfabric
+
+import (
+	"strings"
+	"time"
+
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+// ZZQuadrantTeam is one team's landscape fact: its one area_breakdown row.
+type ZZQuadrantTeam struct {
+	ID, Label, Day           string
+	Identities, Churn, Units int64
+}
+
+func zzInteger(value int64) ScalarValue { return ScalarValue{Integer: &value} }
+
+// Scratch only (CHAOS-12624), never committed: a comparison of teams that asks for landscape facts,
+// each team claiming both measures from its one landscape fact (one area_breakdown row, as
+// attachCanonicalRows gives it), through the real selector with the flag on and the real served line.
+func ZZQuadrantResult(teams []ZZQuadrantTeam) InvestigationResult {
+	committed := []SubjectRef{}
+	claims := []ClaimedFact{}
+	for _, team := range teams {
+		subject := SubjectRef{Kind: contractsv1.ContextFabricSubjectTeam, CanonicalID: TeamCanonicalID(team.ID), Label: team.Label}
+		committed = append(committed, subject)
+		day := team.Day
+		row := contractsv1.ContextFabricClaimedFactRow{Fields: map[string]ScalarValue{
+			"as_of_day": {String: &day}, "identity_count": zzInteger(team.Identities),
+			"churn_loc_30d": zzInteger(team.Churn), "delivery_units_30d": zzInteger(team.Units),
+		}}
+		table := &contractsv1.ContextFabricClaimedFactTable{
+			Field: "area_breakdown", Shape: contractsv1.ContextFabricFactTableShapeBreakdown, Key: []string{"as_of_day"},
+			Measures: []string{"identity_count", "churn_loc_30d", "delivery_units_30d"},
+		}
+		name := strings.NewReplacer(":", "_", "/", "_", "-", "_").Replace(team.ID)
+		for _, field := range []string{"churn_loc_30d", "delivery_units_30d"} {
+			value := team.Churn
+			if field == "delivery_units_30d" {
+				value = team.Units
+			}
+			claims = append(claims, ClaimedFact{
+				ClaimID: "claim_" + name + "_" + field, FactID: "fact_landscape_" + name, Kind: FactLandscape, Subject: subject,
+				Field: field, Value: zzInteger(value), Rows: []contractsv1.ContextFabricClaimedFactRow{row}, Table: table,
+			})
+		}
+	}
+	result := InvestigationResult{
+		SchemaVersion: InvestigationResultSchemaV1, ResultID: "result_quadrant_0001", RequestID: "request_quadrant_0001",
+		GeneratedAt: time.Date(2026, 11, 2, 12, 0, 0, 0, time.UTC), Status: InvestigationComplete,
+		Question: "Where do these teams stand on churn and delivery?",
+		Interpretation: InterpretedQuestion{
+			Shape: ShapeExplicitCohort, RequestedJudgment: "compare",
+			TimeContext:      TimeContext{Axis: TemporalCurrent},
+			FactRequirements: []FactRequirement{{Kind: FactLandscape}},
+		},
+		SubjectResolution:   SubjectResolution{Candidates: []SubjectCandidate{}, Committed: committed},
+		DirectJudgment:      "Identity appears to carry the most churn of these teams.",
+		CurrentState:        "The teams appear to differ most in churn.",
+		StrongestPressures:  []string{},
+		Drivers:             []DriverJudgment{},
+		RemainingWork:       []Finding{},
+		ReadinessGaps:       []Finding{},
+		Paths:               []RelationshipPath{},
+		Conflicts:           []Finding{},
+		Limitations:         []string{},
+		EvidenceRefIDs:      []string{},
+		Coverage:            Coverage{Sources: []SourceObservation{}, DegradedReasons: []string{}},
+		Versions:            VersionSet{ServiceVersion: "test-v1", ContractVersion: InvestigationResultSchemaV1, Backend: "test"},
+		DeterministicAnswer: "Identity leans to the most churn of these teams on this day.",
+		Warnings:            []string{},
+		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
+			Family: QuestionFamilyExplicitComparison, FamilyVersion: QuestionFamilyTableVersion,
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 64, SynthesisHeadroom: 40, NarrowingBasis: contractsv1.ContextFabricNarrowingBasisCanonicalIDLexical},
+			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindTable, contractsv1.ContextFabricRenderKindQuadrant},
+		},
+		ClaimedFacts: claims,
+	}
+	shapes, event := selectRenderShapes(result, nil, RenderShapeOptions{LandscapePosition: true})
+	if err := event.Accounted(); err != nil {
+		panic(err)
+	}
+	quadrants := 0
+	for _, shape := range shapes {
+		if shape.SelectedBy == contractsv1.ContextFabricRenderRuleLandscapePosition {
+			quadrants++
+		}
+	}
+	if quadrants != 1 {
+		panic("the real selector drew no quadrant")
+	}
+	result.RenderShapes = shapes
+	result.Limitations, _ = withLandscapeLimitation(result.Limitations, shapes)
+	result.Completeness = ComputeAnswerCompleteness(result)
+	return result
+}
+
+// cmd/zzquadrant/main.go
+// Scratch only (CHAOS-12624): the real selector, flag on, then the real vocabulary labels, Validate and encoder.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	// The teams `dho fixtures generate` writes for its mixed world (seed 9440), one per provider,
+	// as acr's real-store test reads them (testdata/dho_mixed_s9440_teams.json). Mobile has one
+	// identity, so the real rule gives it no point and counts it left out.
+	result := contextfabric.ZZQuadrantResult([]contextfabric.ZZQuadrantTeam{
+		{ID: "gh:identity", Label: "Identity", Day: "2026-11-02", Identities: 4, Churn: 18240, Units: 46},
+		{ID: "gl:chaos-gl", Label: "Delivery", Day: "2026-11-02", Identities: 3, Churn: 9310, Units: 27},
+		{ID: "jira:9a1f0c3e-0000-4000-8000-0000000d0001", Label: "Payments", Day: "2026-11-02", Identities: 2, Churn: 0, Units: 9},
+		{ID: "linear:CHK", Label: "Checkout", Day: "2026-11-02", Identities: 5, Churn: 2720, Units: 31},
+		{ID: "linear:MOB", Label: "Mobile", Day: "2026-11-02", Identities: 1, Churn: 1200, Units: 3},
+	})
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var example contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &example))
+	result.Versions = example.Versions
+	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
+	must(served.Validate())
+	encoded, err := json.MarshalIndent(served, "", "    ")
+	must(err)
+	must(os.WriteFile(filepath.Join(os.Args[1], "landscape-quadrant.json"), append(encoded, '\n'), 0o644))
+	fmt.Printf("tier=%s shapes=%d bytes=%d\n", tier, len(served.RenderShapes), len(encoded))
+}
