@@ -81,9 +81,17 @@ describe("the verifier reads a forecast as one claim's whole distribution (CHAOS
                 s.presentation = "line";
             },
         ],
+        ["the rule on a treemap", (s) => void (s.kind = "treemap")],
         ["a presentation", (s) => void (s.presentation = "line")],
         ["a time axis", (s) => void (s.axis_kind = "time")],
         ["no unit", (s) => void delete s.value_unit],
+        [
+            "a point that cites another row, with that row's share",
+            (s) => {
+                points(s)[1]!.source.row_index = 0;
+                points(s)[1]!.value = points(s)[0].value;
+            },
+        ],
         [
             "two series",
             (s) => void (s.series as unknown[]).push({ ...s.series[0], key: "cumulative_share_2" }),
@@ -150,6 +158,22 @@ describe("the verifier reads a forecast as one claim's whole distribution (CHAOS
         ["two labels the same", (s) => void (points(s)[1]!.label = points(s)[0].label)],
     ])("refuses %s", (_, change) => {
         const { shape, result } = changed(change);
+        expect(verifyRenderShape(shape, result)).toBe(false);
+    });
+
+    it("refuses a curve whose summary states no horizon, even one point long", () => {
+        // One point is its own last point, so only the horizon clause can refuse it.
+        const onePoint = (keepHorizon: boolean) =>
+            changed((s, r) => {
+                s.series[0].points = [points(s)[0]];
+                fact(r).rows = [fact(r).rows![0]!];
+                if (!keepHorizon) delete summary(r).horizon_days;
+            });
+        const control = onePoint(true);
+        expect(verifyRenderShape(control.shape, control.result), "the control: a horizon").toBe(
+            true,
+        );
+        const { shape, result } = onePoint(false);
         expect(verifyRenderShape(shape, result)).toBe(false);
     });
 });
@@ -219,6 +243,30 @@ describe("the verifier reads the percentiles table as its claims' own percentile
                     ...structuredClone(s.series[0]),
                     key: "again",
                 }),
+        ],
+        ["the rule on a treemap", (s) => void (s.kind = "treemap")],
+        [
+            "a percentile cited as the claimed value of a forecast field",
+            (s, r) => {
+                // A workload claim may state its median as its own scalar. The table cites the
+                // summary, never a claim's value, even when the two agree.
+                const median = structuredClone(fact(r));
+                median.claim_id = "claim_median_value";
+                median.field = "forecast_p50_days";
+                median.value = { integer: summary(r).forecast_p50_days! };
+                r.claimed_facts.push(median);
+                const point = points(s).find((p) => p.source.field === "forecast_p50_days")!;
+                s.series[0].points = [
+                    {
+                        ...point,
+                        source: {
+                            kind: "claimed_fact_value",
+                            claim_id: "claim_median_value",
+                            field: "forecast_p50_days",
+                        },
+                    },
+                ];
+            },
         ],
         ["a unit", (s) => void (s.value_unit = "ratio")],
         ["a presentation", (s) => void (s.presentation = "bars")],

@@ -402,8 +402,10 @@ function holdsCompletionDistribution(fact: ClaimedFact): boolean {
  * completion day; and a day at or past the horizon only as the last point.
  */
 function isCompletionCurve(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+    // A category axis: a time axis needs the line presentation (`verifyRenderShape`'s own check),
+    // and a forecast has none.
     if (shape.kind !== "forecast" || shape.presentation !== undefined) return false;
-    if (shape.axis_kind !== "category" || shape.value_unit !== "ratio") return false;
+    if (shape.value_unit !== "ratio") return false;
     if (shape.series.length !== 1 || shape.series[0].key !== FORECAST_SHARE_FIELD) return false;
     const points = shape.series[0].points;
     const claimId = points[0]?.source.claim_id;
@@ -445,7 +447,8 @@ function forecastScope(fact: ClaimedFact, summary: CompletionForecastSummary): s
  * that clause, as the treemap does. It holds the part it can: the field is a percentile.
  */
 function isForecastPercentiles(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
-    if (shape.kind !== "table" || shape.axis_kind !== "category") return false;
+    // A category axis, as for the curve: a time axis is refused by `verifyRenderShape`'s own check.
+    if (shape.kind !== "table") return false;
     if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
     const scopes = new Set<string>();
     for (const series of shape.series) {
