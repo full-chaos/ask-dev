@@ -68,6 +68,19 @@ describe("a derived number equal to a table's cell", () => {
     });
 });
 
+describe("a derived number equal to an observed one", () => {
+    it("is not folded into it: they are two facts", () => {
+        render(
+            <VocabularyLabelsContext.Provider
+                value={{ ...WORDS, "fact_field:total_activity": "Total activity" }}
+            >
+                <ScalarFactsPanel facts={[observed as ClaimedFact, derived]} result={undefined} />
+            </VocabularyLabelsContext.Provider>,
+        );
+        expect(screen.getByTestId("claim-derivation")).toHaveTextContent("operation: sum");
+    });
+});
+
 describe.each([
     ["the scalar panel's fold", scalar],
     ["a driver's claimed facts", driver],
@@ -79,7 +92,8 @@ describe.each([
     });
 
     it("is in a fold", () => {
-        expect(draw(derived).closest("details")).not.toBeNull();
+        expect(draw(derived).closest("details")).not.toHaveAttribute("open");
+        expect(screen.getByTestId("claim-derivation").closest("details")).not.toBeNull();
     });
 
     it("draws nothing for a claim that is not derived", () => {

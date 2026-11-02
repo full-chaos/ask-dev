@@ -75,6 +75,8 @@ const factIdentity = (fact: ClaimedFact): string =>
         fact.kind,
         fact.field,
         cellValue(fact.value),
+        // A derived number is its own fact, though its value equals an observed one.
+        fact.derived_from,
     ]);
 
 export type ScalarFacts = {
