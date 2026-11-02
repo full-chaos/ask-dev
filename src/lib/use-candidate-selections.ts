@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 
 import {
+    chooseCandidateSelection,
     EMPTY_CANDIDATE_SELECTION_BATCH,
     toggleCandidateSelection,
     type CandidateSelectionBatch,
@@ -39,18 +40,30 @@ export type UseCandidateSelectionsResult = {
  * threaded to every renderer, `reset()` called whenever the underlying
  * question/result changes (i.e. right before the confirmed selections are
  * sent, same point `useStructureSelections` resets at).
+ *
+ * `picks` (CHAOS-12146): `"several"` keeps every tapped candidate (the standalone Workbench's
+ * fan-out); `"one"` keeps only the last one tapped (a host's popup, one request per Continue).
  */
-export function useCandidateSelections(): UseCandidateSelectionsResult {
+export function useCandidateSelections(
+    picks: "several" | "one" = "several",
+): UseCandidateSelectionsResult {
     const [batch, setBatch] = useState<CandidateSelectionBatch>(EMPTY_CANDIDATE_SELECTION_BATCH);
     const [pendingSelectionEvents, setPendingSelectionEvents] =
         useState<readonly PendingSelectionEvent[]>(EMPTY_SELECTION_EVENTS);
 
-    const toggle = useCallback((receiptId: string) => {
-        setBatch((current) => toggleCandidateSelection(current, receiptId));
-        setPendingSelectionEvents((current) =>
-            recordSelectionEvent(current, "subject_candidate", "submitted"),
-        );
-    }, []);
+    const toggle = useCallback(
+        (receiptId: string) => {
+            setBatch((current) =>
+                picks === "one"
+                    ? chooseCandidateSelection(current, receiptId)
+                    : toggleCandidateSelection(current, receiptId),
+            );
+            setPendingSelectionEvents((current) =>
+                recordSelectionEvent(current, "subject_candidate", "submitted"),
+            );
+        },
+        [picks],
+    );
 
     const reset = useCallback(() => {
         setBatch(EMPTY_CANDIDATE_SELECTION_BATCH);

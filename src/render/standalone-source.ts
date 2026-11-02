@@ -354,6 +354,7 @@ export function createStandaloneSource(investigate: StandaloneInvestigate): Chat
         },
         ask,
         askBatch,
+        multiPick: true,
         retry,
         newConversation() {
             commit([]);
