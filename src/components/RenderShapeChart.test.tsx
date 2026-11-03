@@ -217,7 +217,9 @@ describe("a line on a category axis (CHAOS-12838)", () => {
 
         const ticks = Array.from(
             container.querySelectorAll(
-                'svg > text.fact-chart__axis-label[text-anchor="middle"] > title',
+                // The axis ticks, not the value-axis label drawn at x 0 (CHAOS-12854 moved the edge
+                // ticks off a middle anchor, so the anchor no longer tells them apart).
+                'svg > text.fact-chart__axis-label:not([x="0"]) > title',
             ),
         ).map((title) => title.textContent);
         expect(ticks).toEqual(SERVED);
@@ -259,5 +261,40 @@ describe("a line on a category axis (CHAOS-12838)", () => {
             (line) => line.getAttribute("points")!.split(" ").length,
         );
         expect(full).toEqual([3]);
+    });
+});
+
+describe("a line's edge axis labels grow inward (CHAOS-12854)", () => {
+    // The first and last labels sit on the plot's edges: a centred one ran half its width past the
+    // viewBox and was cut off. tests/trend-axis-labels.spec.ts measures the drawn boxes in a browser.
+    const timeLine = {
+        ...categoryLine,
+        shape_id: "rs_time_line",
+        axis_kind: "time",
+        axis_label: "day",
+        series: [
+            {
+                ...categoryLine.series[0],
+                points: ["2026-08-28", "2026-08-29", "2026-08-31"].map((label, index) => ({
+                    ...categoryLine.series[0].points[index]!,
+                    label,
+                })),
+            },
+        ],
+    } as RenderShape;
+
+    it("anchors the first label at its start, the last at its end, the rest in the middle", () => {
+        const { container } = render(<RenderShapeChart shape={timeLine} />);
+        const anchors = Array.from(container.querySelectorAll("svg > text.fact-chart__axis-label"))
+            .filter((text) => text.querySelector("title")?.textContent?.startsWith("2026-"))
+            .map((text) => [
+                text.querySelector("title")!.textContent,
+                text.getAttribute("text-anchor"),
+            ]);
+        expect(anchors).toEqual([
+            ["2026-08-28", "start"],
+            ["2026-08-29", "middle"],
+            ["2026-08-31", "end"],
+        ]);
     });
 });
