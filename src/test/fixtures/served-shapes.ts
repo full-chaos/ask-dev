@@ -7,6 +7,7 @@ import comparisonTableServed from "./served-shapes/comparison-table-served.json"
 import comparisonTable from "./served-shapes/comparison-table.json";
 import dateTable from "./served-shapes/date-oracle.json";
 import investmentTreemap from "./served-shapes/investment-treemap.json";
+import landscapeQuadrant from "./served-shapes/landscape-quadrant.json";
 import measureUnitsLabelsOff from "./served-shapes/measure-units-labels-off.json";
 import measureUnitsRepository from "./served-shapes/measure-units-repository.json";
 import measureUnitsUndeclared from "./served-shapes/measure-units-undeclared.json";
@@ -40,6 +41,11 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * the sankey that plots it, through ACR's real vocabulary labels, `Validate` and encoder at the
  * contract commit (`served-shapes/generate-sankey.go.txt`). No producer emits the rule yet
  * (CHAOS-12582), so the shape is built as ACR's own contract test builds it (CHAOS-12579).
+ * `landscape-quadrant` is a whole served document from acr's real engine (`Engine.Investigate` over a
+ * real ClickHouse, production registry, flag on) at the producer branch, acr #1963 9599f5c0
+ * (`TestAComparisonOfTeamsOnOneDayDrawsTheirQuadrant`, p4-acr-conversation): five teams of the dho
+ * mixed world, one per provider, compared on landscape facts. The landscape rows are hand-seeded.
+ * The fifth team has one identity, so the real rule gives it no point (CHAOS-12624).
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
@@ -48,6 +54,7 @@ export const servedShapeScenarios = {
     "comparison-table": comparisonTable as unknown as InvestigationResult,
     "comparison-table-served": comparisonTableServed as unknown as InvestigationResult,
     "investment-treemap": investmentTreemap as unknown as InvestigationResult,
+    "landscape-quadrant": landscapeQuadrant as unknown as InvestigationResult,
     "edge-words": edgeWords as unknown as InvestigationResult,
     "measure-units": measureUnits as unknown as InvestigationResult,
     "measure-units-labels-off": measureUnitsLabelsOff as unknown as InvestigationResult,

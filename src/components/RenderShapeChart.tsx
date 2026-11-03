@@ -141,7 +141,12 @@ export function ShapeDataTable({
             <caption className={visible ? "sr-only" : undefined}>{shape.title}</caption>
             <thead>
                 <tr>
-                    <th scope="col">{shape.axis_label}</th>
+                    {
+                        // A quadrant's axis word is its x measure's (CHAOS-12623), and that word
+                        // heads x's own column. Its rows are teams, which have no served word, so
+                        // the label column has no header rather than the x word over team names.
+                    }
+                    <th scope="col">{shape.kind === "quadrant" ? null : shape.axis_label}</th>
                     {shape.series.map((series) => (
                         <th key={series.key} scope="col">
                             {series.label}

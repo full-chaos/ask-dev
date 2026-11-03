@@ -19,6 +19,7 @@ import { DriversPanel } from "./DriversPanel";
 import { EvidenceReferences } from "./EvidenceReferences";
 import { FactRowsPanels } from "./FactRowsPanel";
 import { FindingsPanel } from "./FindingsPanel";
+import { LandscapeQuadrantPanel } from "./LandscapeQuadrantPanel";
 import { LimitationsPanel } from "./LimitationsPanel";
 import { SemanticReadingNotice } from "./SemanticReadingNotice";
 import { ShapesNotDrawn } from "./ShapesNotDrawn";
@@ -487,6 +488,7 @@ function AnswerView({
             <CohortMembersPanel result={result} />
             <CohortGroupsPanel cohort={result.cohort} />
             <ComparisonTablePanel result={result} />
+            <LandscapeQuadrantPanel result={result} />
             <WorkItemStatusPanel result={result} />
             {cohortRanking(askedForCohort(result.interpretation.shape, result), result.cohort)
                 .state === "rows" ? (
