@@ -31,7 +31,7 @@
     "answer_plan": {
         "family": "investment_allocation",
         "family_source": "model",
-        "family_version": "question-family.v5",
+        "family_version": "question-family.v6",
         "require_drivers": false,
         "require_ranking": false,
         "render_kinds": ["treemap", "table"],
@@ -168,7 +168,10 @@
                 "shape": "breakdown",
                 "key": ["theme"],
                 "measures": ["share", "weighted_effort"],
-                "observations": ["source", "attribution"]
+                "observations": ["source", "attribution"],
+                "column_vocabularies": {
+                    "theme": "investment_theme"
+                }
             }
         }
     ],
@@ -185,7 +188,12 @@
         "fact_field:theme": "Theme",
         "fact_field:weighted_effort": "Weighted effort",
         "fact_kind:investment": "investment",
-        "generated_at:note": "Answered"
+        "generated_at:note": "Answered",
+        "investment_theme:feature_delivery": "Feature Delivery",
+        "investment_theme:maintenance": "Maintenance / Tech Debt",
+        "investment_theme:operational": "Operational / Support",
+        "investment_theme:quality": "Quality / Reliability",
+        "investment_theme:risk": "Risk / Security"
     },
     "versions": {
         "service_version": "0.2.0",

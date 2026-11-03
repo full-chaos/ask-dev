@@ -1,7 +1,8 @@
 // Scratch generator of repository-flow-sankey.json, not built by this repo. From a detached acr
 // worktree at the contract commit, then `go run ./cmd/zzsankey <this directory>`, then
-// `prettier --write` on the output (whitespace only; the JSON is unchanged). Ran at acr 271ce38b
-// (#1939's merge, the pin of record).
+// `prettier --write` on the output (whitespace only; the JSON is unchanged). Ran at acr a60efd6c: the
+// tip of the PR that adds the table (#1962), which holds the pin of record (26237a42) and the table's
+// declaration. Each table's column words come from that real declaration (ZZWithDeclaredColumnWords).
 //
 // No producer emits this rule yet (CHAOS-12582), so the shape is built here the way acr's own
 // contract test builds it (`chaos12578_sankey_shape_test.go`): one series per theme with effort,
@@ -106,6 +107,13 @@ func ZZSankeyResult(links []ZZSankeyLink) InvestigationResult {
 	return result
 }
 
+// ZZWithDeclaredColumnWords states each claimed table's column words from the producers' own
+// declarations, the step finalizeResult runs (withDeclaredColumnWords, declaredColumnWordsOf).
+func ZZWithDeclaredColumnWords(result InvestigationResult, capabilities []FactCapability) InvestigationResult {
+	result.ClaimedFacts = withDeclaredColumnWords(result.ClaimedFacts, declaredColumnWordsOf(capabilities))
+	return result
+}
+
 // cmd/zzsankey/main.go
 // Scratch only (CHAOS-12579): acr's real vocabulary labels, Validate and encoder.
 package main
@@ -117,6 +125,7 @@ import (
 	"path/filepath"
 
 	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric/devhealthfacts"
 )
 
 func must(err error) {
@@ -140,6 +149,12 @@ func main() {
 	var example contextfabric.InvestigationResult
 	must(json.Unmarshal(raw, &example))
 	result.Versions = example.Versions
+	// The producers' real declarations state each table's column words (CHAOS-12639).
+	var capabilities []contextfabric.FactCapability
+	for _, provider := range devhealthfacts.NewProviders(nil) {
+		capabilities = append(capabilities, provider.Capability())
+	}
+	result = contextfabric.ZZWithDeclaredColumnWords(result, capabilities)
 	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
 	must(served.Validate())
 	encoded, err := json.MarshalIndent(served, "", "    ")
