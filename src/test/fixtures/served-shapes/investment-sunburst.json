@@ -1,0 +1,618 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_sunburst_0001",
+    "request_id": "request_sunburst_0001",
+    "generated_at": "2026-11-03T12:00:00Z",
+    "status": "complete",
+    "question": "Where is acme/web's effort going, by subcategory?",
+    "interpretation": {
+        "shape": "single_subject",
+        "requested_judgment": "allocation",
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "investment"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [],
+        "committed": [
+            {
+                "kind": "repository",
+                "canonical_id": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001",
+                "label": "acme/web"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "investment_allocation",
+        "family_source": "model",
+        "family_version": "question-family.v5",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["sunburst", "table"],
+        "budget": {
+            "max_items": 400,
+            "max_serialized_bytes": 262144,
+            "max_members": 1,
+            "synthesis_headroom": 40,
+            "narrowing_basis": "canonical_id_lexical"
+        }
+    },
+    "direct_judgment": "The repository's effort leans to feature delivery for customers.",
+    "current_state": "Most of the repository's effort appears to go to feature delivery.",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_investment_repository_subcategories",
+            "kind": "investment",
+            "subject": {
+                "kind": "repository",
+                "canonical_id": "repository:0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001",
+                "label": "acme/web"
+            },
+            "field": "attribution_basis",
+            "value": {
+                "string": "work_unit_investments"
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.25
+                        },
+                        "subcategory": {
+                            "string": "feature_delivery.customer"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "theme_share": {
+                            "number": 0.4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "feature_delivery.enablement"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "theme_share": {
+                            "number": 0.4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.15
+                        },
+                        "subcategory": {
+                            "string": "feature_delivery.roadmap"
+                        },
+                        "theme": {
+                            "string": "feature_delivery"
+                        },
+                        "theme_share": {
+                            "number": 0.4
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.1
+                        },
+                        "subcategory": {
+                            "string": "maintenance.debt"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "theme_share": {
+                            "number": 0.1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "maintenance.refactor"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "theme_share": {
+                            "number": 0.1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "maintenance.upgrade"
+                        },
+                        "theme": {
+                            "string": "maintenance"
+                        },
+                        "theme_share": {
+                            "number": 0.1
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "operational.incident_response"
+                        },
+                        "theme": {
+                            "string": "operational"
+                        },
+                        "theme_share": {
+                            "number": 0.2
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "operational.on_call"
+                        },
+                        "theme": {
+                            "string": "operational"
+                        },
+                        "theme_share": {
+                            "number": 0.2
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.2
+                        },
+                        "subcategory": {
+                            "string": "operational.support"
+                        },
+                        "theme": {
+                            "string": "operational"
+                        },
+                        "theme_share": {
+                            "number": 0.2
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.2
+                        },
+                        "subcategory": {
+                            "string": "quality.bugfix"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "theme_share": {
+                            "number": 0.25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "quality.reliability"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "theme_share": {
+                            "number": 0.25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.05
+                        },
+                        "subcategory": {
+                            "string": "quality.testing"
+                        },
+                        "theme": {
+                            "string": "quality"
+                        },
+                        "theme_share": {
+                            "number": 0.25
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "risk.compliance"
+                        },
+                        "theme": {
+                            "string": "risk"
+                        },
+                        "theme_share": {
+                            "number": 0.05
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0.05
+                        },
+                        "subcategory": {
+                            "string": "risk.security"
+                        },
+                        "theme": {
+                            "string": "risk"
+                        },
+                        "theme_share": {
+                            "number": 0.05
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "share": {
+                            "number": 0
+                        },
+                        "subcategory": {
+                            "string": "risk.vulnerability"
+                        },
+                        "theme": {
+                            "string": "risk"
+                        },
+                        "theme_share": {
+                            "number": 0.05
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "subcategory_breakdown",
+                "shape": "breakdown",
+                "key": ["subcategory"],
+                "measures": ["share", "theme_share"],
+                "observations": ["theme"]
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [],
+        "partial": false
+    },
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer",
+        "fact_field:attribution_basis": "Attribution basis",
+        "fact_field:share": "Share (ratio)",
+        "fact_field:theme": "Theme",
+        "fact_kind:investment": "investment",
+        "generated_at:note": "Answered",
+        "subcategory:feature_delivery.customer": "Customer",
+        "subcategory:feature_delivery.enablement": "Enablement",
+        "subcategory:feature_delivery.roadmap": "Roadmap",
+        "subcategory:maintenance.debt": "Debt",
+        "subcategory:maintenance.refactor": "Refactor",
+        "subcategory:maintenance.upgrade": "Upgrade",
+        "subcategory:operational.incident_response": "Incident Response",
+        "subcategory:operational.on_call": "On Call",
+        "subcategory:operational.support": "Support",
+        "subcategory:quality.bugfix": "Bugfix",
+        "subcategory:quality.reliability": "Reliability",
+        "subcategory:quality.testing": "Testing",
+        "subcategory:risk.compliance": "Compliance",
+        "subcategory:risk.security": "Security",
+        "subcategory:risk.vulnerability": "Vulnerability"
+    },
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "deterministic_answer": "The repository's effort leans to feature delivery in this window.",
+    "warnings": [],
+    "reused": false,
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "sunburst",
+            "selected_by": "investment_subcategory_share",
+            "title": "Effort share by theme and subcategory",
+            "axis_kind": "category",
+            "axis_label": "Subcategory",
+            "value_label": "Share of effort (ratio)",
+            "value_unit": "ratio",
+            "series": [
+                {
+                    "key": "themes",
+                    "label": "Themes",
+                    "points": [
+                        {
+                            "label": "Feature Delivery",
+                            "value": 0.4,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 0,
+                                "field": "theme_share"
+                            }
+                        },
+                        {
+                            "label": "Maintenance / Tech Debt",
+                            "value": 0.1,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 3,
+                                "field": "theme_share"
+                            }
+                        },
+                        {
+                            "label": "Operational / Support",
+                            "value": 0.2,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 6,
+                                "field": "theme_share"
+                            }
+                        },
+                        {
+                            "label": "Quality / Reliability",
+                            "value": 0.25,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 9,
+                                "field": "theme_share"
+                            }
+                        },
+                        {
+                            "label": "Risk / Security",
+                            "value": 0.05,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 12,
+                                "field": "theme_share"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "feature_delivery",
+                    "label": "Feature Delivery",
+                    "points": [
+                        {
+                            "label": "Customer",
+                            "value": 0.25,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 0,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Enablement",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 1,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Roadmap",
+                            "value": 0.15,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 2,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "maintenance",
+                    "label": "Maintenance / Tech Debt",
+                    "points": [
+                        {
+                            "label": "Debt",
+                            "value": 0.1,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 3,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Refactor",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 4,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Upgrade",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 5,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "operational",
+                    "label": "Operational / Support",
+                    "points": [
+                        {
+                            "label": "Incident Response",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 6,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "On Call",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 7,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Support",
+                            "value": 0.2,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 8,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "quality",
+                    "label": "Quality / Reliability",
+                    "points": [
+                        {
+                            "label": "Bugfix",
+                            "value": 0.2,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 9,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Reliability",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 10,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Testing",
+                            "value": 0.05,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 11,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "key": "risk",
+                    "label": "Risk / Security",
+                    "points": [
+                        {
+                            "label": "Compliance",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 12,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Security",
+                            "value": 0.05,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 13,
+                                "field": "share"
+                            }
+                        },
+                        {
+                            "label": "Vulnerability",
+                            "value": 0,
+                            "source": {
+                                "kind": "claimed_fact_row",
+                                "claim_id": "claim_investment_repository_subcategories",
+                                "row_index": 14,
+                                "field": "share"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 1,
+        "rows_count": 15,
+        "state": "not_derived"
+    }
+}

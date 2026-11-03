@@ -22,6 +22,7 @@ import {
     COMPLETION_FORECAST_RULE,
     factShapesForClaim,
     REPOSITORY_FLOW_RULE,
+    SUBCATEGORY_SHARE_RULE,
     shapeDetail,
     THEME_SHARE_RULE,
 } from "../lib/render-shapes";
@@ -126,12 +127,14 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
     // numbers twice under two different selection rules.
     const claimIds = [fact.claim_id, ...alsoClaims.map((c) => c.claim_id)];
     const trends = shapesForGroup(result, claimIds, "dated_fact_trend");
-    // The host's charts: a treemap (CHAOS-12496) and a team's repository flow (CHAOS-12579).
+    // The host's charts: a treemap (CHAOS-12496), a team's repository flow (CHAOS-12579) and a
+    // theme and subcategory sunburst (CHAOS-12812).
     const themeShares = shapesForGroup(result, claimIds, THEME_SHARE_RULE);
     const flows = shapesForGroup(result, claimIds, REPOSITORY_FLOW_RULE);
+    const sunbursts = shapesForGroup(result, claimIds, SUBCATEGORY_SHARE_RULE);
     const hostShapes = {
-        shapes: [...themeShares.shapes, ...flows.shapes],
-        withheld: themeShares.withheld + flows.withheld,
+        shapes: [...themeShares.shapes, ...flows.shapes, ...sunbursts.shapes],
+        withheld: themeShares.withheld + flows.withheld + sunbursts.withheld,
     };
     // CHAOS-4613: acr's completion curve of this fact's distribution, drawn by the host as the
     // capacity page draws it. Like a treemap, it replaces the client-side chart.
