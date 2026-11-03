@@ -24,6 +24,11 @@ export type { AnswerProjection } from "../lib/contracts";
 export type { ShapeSlot } from "../components/ShapeSlotContext";
 export type { WorkbenchFailure } from "../lib/acr/errors";
 export type { RenderShape } from "../lib/contracts";
+export type {
+    CompletionForecastSummary,
+    ForecastShapeDetail,
+    ShapeDetail,
+} from "../lib/render-shapes";
 export {
     isBudgetRefusal,
     narrowerContinuationCopy,

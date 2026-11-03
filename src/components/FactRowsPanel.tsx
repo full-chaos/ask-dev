@@ -18,7 +18,13 @@ import {
 import { rollupsOfClaims } from "../lib/investment-rollup";
 import { shapeCadence } from "../lib/cadence";
 import { agreedTable, declaredUnit, shapeMeasureUnit } from "../lib/measure-units";
-import { factShapesForClaim, REPOSITORY_FLOW_RULE, THEME_SHARE_RULE } from "../lib/render-shapes";
+import {
+    COMPLETION_FORECAST_RULE,
+    factShapesForClaim,
+    REPOSITORY_FLOW_RULE,
+    shapeDetail,
+    THEME_SHARE_RULE,
+} from "../lib/render-shapes";
 import { humanizeTerm } from "../lib/presentation";
 import { Details } from "./Details";
 import { useClaimFieldWord, useVocabularyWord } from "./VocabularyWordContext";
@@ -127,7 +133,15 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
         shapes: [...themeShares.shapes, ...flows.shapes],
         withheld: themeShares.withheld + flows.withheld,
     };
-    const selected = trends.shapes.length + trends.withheld + hostShapes.shapes.length;
+    // CHAOS-4613: acr's completion curve of this fact's distribution, drawn by the host as the
+    // capacity page draws it. Like a treemap, it replaces the client-side chart.
+    const forecasts = shapesForGroup(result, claimIds, COMPLETION_FORECAST_RULE);
+    const selected =
+        trends.shapes.length +
+        trends.withheld +
+        hostShapes.shapes.length +
+        forecasts.shapes.length +
+        forecasts.withheld;
     const presentation =
         selected + hostShapes.withheld > 0 ? { mode: "table" as const } : selectPresentation(rows);
     // `rollup_basis` states how a rollup fact (e.g. a project's per-team
@@ -232,6 +246,19 @@ function FactRowsPanel({ fact, alsoClaims, allFacts, result }: FactRowsPanelProp
             {hostShapes.shapes.map((shape) => (
                 <RichShape key={shape.shape_id} shape={shape} />
             ))}
+            {forecasts.shapes.map((forecast) => (
+                <RichShape
+                    detail={shapeDetail(forecast, result?.claimed_facts ?? [])}
+                    key={forecast.shape_id}
+                    shape={forecast}
+                />
+            ))}
+            {forecasts.withheld > 0 ? (
+                <p className="fact-panel__caption" data-testid="forecast-shape-withheld">
+                    A completion forecast chart was withheld: it could not be checked against this
+                    fact&apos;s own rows.
+                </p>
+            ) : null}
             {hostShapes.withheld > 0 ? (
                 <p className="fact-panel__caption" data-testid="rich-shape-withheld">
                     A chart was withheld: it could not be checked against this fact&apos;s own rows.

@@ -1,0 +1,49 @@
+{
+    "kind": "forecast",
+    "summary": {
+        "work_scope_id": "linear:CHAOS",
+        "state": "available",
+        "computed_at": "2026-11-02T04:00:00Z",
+        "simulation_count": 10000,
+        "horizon_days": 365,
+        "unfinished_runs": 500,
+        "forecast_p50_days": 15,
+        "forecast_p85_days": 21,
+        "forecast_p95_days": 30,
+        "forecast_p50_date": "2026-11-17",
+        "forecast_p85_date": "2026-11-23",
+        "forecast_p95_date": "2026-12-02"
+    },
+    "rows": [
+        {
+            "day": 9,
+            "runs": 1000,
+            "cumulativeShare": 0.1
+        },
+        {
+            "day": 12,
+            "runs": 2500,
+            "cumulativeShare": 0.35
+        },
+        {
+            "day": 15,
+            "runs": 3000,
+            "cumulativeShare": 0.65
+        },
+        {
+            "day": 21,
+            "runs": 2000,
+            "cumulativeShare": 0.85
+        },
+        {
+            "day": 30,
+            "runs": 1000,
+            "cumulativeShare": 0.95
+        },
+        {
+            "day": 365,
+            "runs": 500,
+            "cumulativeShare": 0.95
+        }
+    ]
+}

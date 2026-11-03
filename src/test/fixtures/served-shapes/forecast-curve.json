@@ -1,0 +1,286 @@
+{
+    "schema_version": "context_fabric_investigation_result.v1",
+    "result_id": "result_forecast_0001",
+    "request_id": "request_forecast_0001",
+    "generated_at": "2026-11-02T12:00:00Z",
+    "status": "complete",
+    "question": "When will CHAOS finish its backlog?",
+    "interpretation": {
+        "shape": "single_subject",
+        "requested_judgment": "completion",
+        "time_context": {
+            "axis": "current"
+        },
+        "fact_requirements": [
+            {
+                "kind": "workload"
+            }
+        ],
+        "clarification_needed": false
+    },
+    "subject_resolution": {
+        "candidates": [],
+        "committed": [
+            {
+                "kind": "team",
+                "canonical_id": "team:chaos",
+                "label": "CHAOS"
+            }
+        ]
+    },
+    "answer_plan": {
+        "family": "subject_investigation",
+        "family_source": "model",
+        "family_version": "question-family.v6",
+        "require_drivers": false,
+        "require_ranking": false,
+        "render_kinds": ["forecast", "table", "series"],
+        "budget": {
+            "max_items": 400,
+            "max_serialized_bytes": 262144,
+            "max_members": 1,
+            "synthesis_headroom": 40,
+            "narrowing_basis": "canonical_id_lexical"
+        }
+    },
+    "direct_judgment": "The work appears likely to finish within the forecast range.",
+    "current_state": "The stored forecast suggests a completion range.",
+    "strongest_pressures": [],
+    "drivers": [],
+    "remaining_work": [],
+    "readiness_gaps": [],
+    "paths": [],
+    "conflicts": [],
+    "limitations": [],
+    "evidence_ref_ids": [],
+    "claimed_facts": [
+        {
+            "claim_id": "claim_workload_team",
+            "kind": "workload",
+            "subject": {
+                "kind": "team",
+                "canonical_id": "team:chaos",
+                "label": "CHAOS"
+            },
+            "field": "forecast_p50_days",
+            "value": {
+                "integer": 15
+            },
+            "rows": [
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 9
+                        },
+                        "cumulative_share": {
+                            "number": 0.1
+                        },
+                        "runs": {
+                            "integer": 1000
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 12
+                        },
+                        "cumulative_share": {
+                            "number": 0.35
+                        },
+                        "runs": {
+                            "integer": 2500
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 15
+                        },
+                        "cumulative_share": {
+                            "number": 0.65
+                        },
+                        "runs": {
+                            "integer": 3000
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 21
+                        },
+                        "cumulative_share": {
+                            "number": 0.85
+                        },
+                        "runs": {
+                            "integer": 2000
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 30
+                        },
+                        "cumulative_share": {
+                            "number": 0.95
+                        },
+                        "runs": {
+                            "integer": 1000
+                        }
+                    }
+                },
+                {
+                    "fields": {
+                        "completion_days": {
+                            "integer": 365
+                        },
+                        "cumulative_share": {
+                            "number": 0.95
+                        },
+                        "runs": {
+                            "integer": 500
+                        }
+                    }
+                }
+            ],
+            "table": {
+                "field": "completion_distribution",
+                "shape": "distribution",
+                "key": ["completion_days"],
+                "measures": ["runs", "cumulative_share"]
+            },
+            "completion_forecast": {
+                "work_scope_id": "linear:CHAOS",
+                "state": "available",
+                "computed_at": "2026-11-02T04:00:00Z",
+                "simulation_count": 10000,
+                "horizon_days": 365,
+                "unfinished_runs": 500,
+                "forecast_p50_days": 15,
+                "forecast_p85_days": 21,
+                "forecast_p95_days": 30,
+                "forecast_p50_date": "2026-11-17",
+                "forecast_p85_date": "2026-11-23",
+                "forecast_p95_date": "2026-12-02"
+            }
+        }
+    ],
+    "coverage": {
+        "sources": [],
+        "partial": false
+    },
+    "vocabulary_labels": {
+        "answer_status:complete": "Answer",
+        "completion_distribution_state:available": "Distribution available",
+        "fact_field:completion_days": "Completion days",
+        "fact_field:cumulative_share": "Share of runs finished (ratio)",
+        "fact_field:forecast_p50_days": "Median forecast (days)",
+        "fact_field:runs": "Simulation runs",
+        "fact_kind:workload": "workload",
+        "generated_at:note": "Answered"
+    },
+    "versions": {
+        "service_version": "0.2.0",
+        "contract_version": "context_fabric_investigation_result.v1",
+        "backend": "graph",
+        "backend_version": "v3",
+        "projection_version": "projection-v1",
+        "query_version": "query-v1",
+        "interpretation_version": "interpretation-v1",
+        "synthesis_version": "synthesis-v1",
+        "canonical_service_version": "ops-v1",
+        "model_identity": "openai-compatible/gpt-5-nano"
+    },
+    "deterministic_answer": "The stored forecast gives a completion range.",
+    "warnings": [],
+    "reused": false,
+    "render_shapes": [
+        {
+            "shape_id": "rs_1",
+            "kind": "forecast",
+            "selected_by": "completion_forecast",
+            "title": "Completion forecast",
+            "axis_kind": "category",
+            "axis_label": "Days to complete",
+            "value_label": "Share of runs finished",
+            "value_unit": "ratio",
+            "series": [
+                {
+                    "key": "cumulative_share",
+                    "label": "Share of runs finished",
+                    "points": [
+                        {
+                            "label": "9",
+                            "value": 0.1,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 0,
+                                "field": "cumulative_share"
+                            }
+                        },
+                        {
+                            "label": "12",
+                            "value": 0.35,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 1,
+                                "field": "cumulative_share"
+                            }
+                        },
+                        {
+                            "label": "15",
+                            "value": 0.65,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 2,
+                                "field": "cumulative_share"
+                            }
+                        },
+                        {
+                            "label": "21",
+                            "value": 0.85,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 3,
+                                "field": "cumulative_share"
+                            }
+                        },
+                        {
+                            "label": "30",
+                            "value": 0.95,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 4,
+                                "field": "cumulative_share"
+                            }
+                        },
+                        {
+                            "label": "365",
+                            "value": 0.95,
+                            "source": {
+                                "kind": "claimed_fact_table_row",
+                                "claim_id": "claim_workload_team",
+                                "row_index": 5,
+                                "field": "cumulative_share"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "completeness": {
+        "terminal_status": "complete",
+        "claimed_facts_count": 1,
+        "rows_count": 6,
+        "state": "not_derived"
+    }
+}

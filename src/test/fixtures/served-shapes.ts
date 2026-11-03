@@ -14,6 +14,9 @@ import measureUnitsUndeclared from "./served-shapes/measure-units-undeclared.jso
 import measureUnits from "./served-shapes/measure-units.json";
 import edgeWords from "./served-shapes/edge-words.json";
 import repositoryFlowSankey from "./served-shapes/repository-flow-sankey.json";
+import forecastCurve from "./served-shapes/forecast-curve.json";
+import forecastNoRun from "./served-shapes/forecast-no-run.json";
+import forecastNotStored from "./served-shapes/forecast-not-stored.json";
 import zoneLessTrend from "./served-shapes/zone-less-trend.json";
 
 /**
@@ -46,6 +49,10 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * (`TestAComparisonOfTeamsOnOneDayDrawsTheirQuadrant`, p4-acr-conversation): five teams of the dho
  * mixed world, one per provider, compared on landscape facts. The landscape rows are hand-seeded.
  * The fifth team has one identity, so the real rule gives it no point (CHAOS-12624).
+ * `forecast-*` are stored forecast rows through ACR's real team workload field writer, claim attach,
+ * forecast summary, selector (forecast flag on) and encoder (`served-shapes/generate-forecast.go.txt`,
+ * CHAOS-4613): a curve with runs stopped at the horizon, every run at the horizon, and no stored
+ * distribution. The last two serve the percentiles table, not a curve.
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
@@ -56,6 +63,9 @@ export const servedShapeScenarios = {
     "investment-treemap": investmentTreemap as unknown as InvestigationResult,
     "landscape-quadrant": landscapeQuadrant as unknown as InvestigationResult,
     "edge-words": edgeWords as unknown as InvestigationResult,
+    "forecast-curve": forecastCurve as unknown as InvestigationResult,
+    "forecast-no-run": forecastNoRun as unknown as InvestigationResult,
+    "forecast-not-stored": forecastNotStored as unknown as InvestigationResult,
     "measure-units": measureUnits as unknown as InvestigationResult,
     "measure-units-labels-off": measureUnitsLabelsOff as unknown as InvestigationResult,
     "measure-units-repository": measureUnitsRepository as unknown as InvestigationResult,

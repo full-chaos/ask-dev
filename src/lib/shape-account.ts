@@ -6,6 +6,7 @@ import {
     COMPARISON_RULE,
     FACT_PANEL_RULES,
     LANDSCAPE_POSITION_RULE,
+    FORECAST_PERCENTILES_RULE,
     renderShapesFor,
     shapeMentionsClaim,
 } from "./render-shapes";
@@ -20,8 +21,8 @@ import {
  *   check, so a chart that passes is left over here.
  * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows`, on no
  *   person, has a panel. That panel draws it or says it was withheld.
- * - A side-by-side table has a panel of its own, which draws it or says it was withheld. So has a
- *   quadrant (CHAOS-12624).
+ * - A side-by-side table, a quadrant (CHAOS-12624) and a forecast percentiles table (CHAOS-4613)
+ *   each have a panel of their own, which draws it or says it was withheld.
  * - Every other shape has no reader.
  */
 export function shapesNoPanelTakes(result: InvestigationResult): readonly RenderShape[] {
@@ -38,6 +39,7 @@ export function shapesNoPanelTakes(result: InvestigationResult): readonly Render
         }
         if (shape.selected_by === COMPARISON_RULE) return false;
         if (shape.selected_by === LANDSCAPE_POSITION_RULE) return false;
+        if (shape.selected_by === FORECAST_PERCENTILES_RULE) return false;
         return !(
             FACT_PANEL_RULES.includes(shape.selected_by) &&
             claimsWithAPanel.some((claimId) => shapeMentionsClaim(shape, claimId))
