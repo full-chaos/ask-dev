@@ -521,7 +521,12 @@ function TimeLines({
                     <text
                         className="fact-chart__axis-label"
                         key={label}
-                        textAnchor="middle"
+                        // CHAOS-12854: the first and last labels sit on the plot's own edges, so a
+                        // centred one ran about half its width past the viewBox and was cut off
+                        // ("26-08-28"). They grow inward instead, as FactChart's do (CHAOS-4672).
+                        textAnchor={
+                            index === 0 ? "start" : index === labels.length - 1 ? "end" : "middle"
+                        }
                         x={xFor(index)}
                         y={HEIGHT - 10}
                     >
