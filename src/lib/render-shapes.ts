@@ -29,6 +29,7 @@ import type {
 } from "./contracts";
 import { aboutNoPerson, cellValue, parseIsoDate } from "./fact-rows";
 import { nonBlank } from "./presentation";
+import { isServedWordOrUnserved, type VocabularyLabels } from "./vocabulary-labels";
 
 /** The selection rule that produced a shape (acr's closed vocabulary). */
 export type RenderShapeRule = RenderShape["selected_by"];
@@ -311,13 +312,18 @@ function claimFor(facts: readonly ClaimedFact[], claimId: string | undefined) {
  * so its cell stays empty, never zero. Rows mix measures, so the shape declares no unit.
  *
  * Two clauses differ from acr's:
- * - A label is the served word of its field. The word map is acr's, and a copy here would be a
- *   consumer table (CHAOS-4690), so this trusts acr's validator for that clause, as the treemap
- *   does. It holds the part it can: one label, one field, on every side. Acr's word names one
- *   field, so a served answer cannot fail this.
+ * - A label is the served word of its field. ask-dev keeps no copy of acr's word map (CHAOS-4690),
+ *   so a label is held to the answer's own `fact_field` word where the answer serves one
+ *   (`isServedWordOrUnserved`, CHAOS-12697), and is otherwise trusted to acr's validator. It also
+ *   holds one label, one field, on every side. The series words (subject labels) and the axis
+ *   words are not vocabulary words, so they are not checked here.
  * - No side is a person: individual views are single-person (AGENTS.md).
  */
-function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+function isSideBySide(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
     if (shape.kind !== "table" || shape.axis_kind !== "category") return false;
     if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
     if (shape.series.length < 2) return false;
@@ -332,6 +338,7 @@ function isSideBySide(shape: RenderShape, facts: readonly ClaimedFact[]): boolea
             const claim = claimFor(facts, source.claim_id);
             if (claim === undefined || claim.subject.canonical_id !== series.key) return false;
             if (!aboutNoPerson(claim)) return false;
+            if (!isServedWordOrUnserved(labels, "fact_field", claim.field, label)) return false;
             subjectKinds.add(claim.subject.kind);
             const measure = JSON.stringify([claim.kind, claim.field]);
             if ((measures.get(label) ?? measure) !== measure) return false;
@@ -442,20 +449,30 @@ function forecastScope(fact: ClaimedFact, summary: CompletionForecastSummary): s
  * forecast (team and work scope) has one series, whichever of its claims it cites. A percentile the
  * summary does not carry is no point. A table declares no unit and no presentation.
  *
- * One clause is acr's alone: that a label is the served word of its percentile. The word map is
- * acr's, and a copy here would be a consumer table (CHAOS-4690), so this trusts acr's validator for
- * that clause, as the treemap does. It holds the part it can: the field is a percentile.
+ * A label is the served word of its percentile. ask-dev keeps no copy of acr's word map
+ * (CHAOS-4690), so a label is held to the answer's own `fact_field` word where the answer serves one
+ * (`isServedWordOrUnserved`, CHAOS-12697). acr serves words only for the fields an answer uses, so
+ * today that is the P50 word; a P85 or P95 word, or any word with the labels flag off, stays
+ * trusted to acr's validator. The series word (the subject's label) and the axis words are not
+ * vocabulary words, so they are not checked here.
  */
-function isForecastPercentiles(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+function isForecastPercentiles(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
     // A category axis, as for the curve: a time axis is refused by `verifyRenderShape`'s own check.
     if (shape.kind !== "table") return false;
     if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
     const scopes = new Set<string>();
     for (const series of shape.series) {
         let claimId: string | undefined;
-        for (const { source } of series.points) {
+        for (const { label, source } of series.points) {
             if (source.kind !== "claimed_fact_forecast_summary") return false;
-            if (!PERCENTILE_FIELDS.includes(source.field ?? "")) return false;
+            if (source.field === undefined || !PERCENTILE_FIELDS.includes(source.field)) {
+                return false;
+            }
+            if (!isServedWordOrUnserved(labels, "fact_field", source.field, label)) return false;
             claimId ??= source.claim_id;
             if (source.claim_id !== claimId) return false;
         }
@@ -528,11 +545,17 @@ const INVESTMENT_THEME_COUNT = 5;
  * `verifyRenderShape`'s own checks cover the rest of acr's clauses: a kind with no rule here, a time
  * axis, a point of another source kind, and a share below 0, which the `ratio` unit refuses.
  *
- * One clause is acr's alone: that a label is the served word of its row's theme. The word map is
- * acr's (`ContextFabricInvestmentThemeLabel`), and a copy here would be a consumer table
- * (CHAOS-4690). So this trusts acr's validator for that one clause, by the lead's ruling.
+ * A label is the served word of its row's theme. ask-dev keeps no copy of acr's word map
+ * (`ContextFabricInvestmentThemeLabel`, CHAOS-4690), so a label is held to the answer's own
+ * `investment_theme` word where the answer serves one (`isServedWordOrUnserved`, CHAOS-12697), and
+ * is otherwise trusted to acr's validator. The series word ("Share of effort") and the axis words
+ * are not vocabulary words, so they are not checked here.
  */
-function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+function isThemeShareWhole(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
     if (shape.kind !== "treemap" || shape.presentation !== undefined) return false;
     if (shape.series.length !== 1 || shape.value_unit !== "ratio") return false;
     const points = shape.series[0].points;
@@ -547,13 +570,15 @@ function isThemeShareWhole(shape: RenderShape, facts: readonly ClaimedFact[]): b
     if (points.length !== rows.length || rows.length !== INVESTMENT_THEME_COUNT) return false;
     const seen = new Set<number>();
     let above = 0;
-    for (const { source, value } of points) {
+    for (const { label, source, value } of points) {
         if (source.field !== "share") return false;
         if (source.claim_id !== claimId || source.row_index === undefined) return false;
         if (seen.has(source.row_index)) return false;
         seen.add(source.row_index);
         const theme = rows[source.row_index]?.fields.theme;
-        if (theme === undefined || typeof cellValue(theme) !== "string") return false;
+        const token = theme === undefined ? undefined : cellValue(theme);
+        if (typeof token !== "string") return false;
+        if (!isServedWordOrUnserved(labels, "investment_theme", token, label)) return false;
         if (value > 0) above += 1;
     }
     return above >= 2;
@@ -605,13 +630,19 @@ type FlowLink = { readonly word: string; readonly theme: string };
  *
  * A theme left out leaves its links out, so the count of plotted links refuses it.
  *
- * One clause is acr's alone: that a series label is the served word of its theme. The word map is
- * acr's, and a copy here would be a consumer table (CHAOS-4690), so this holds only that the label
- * is there. Each link is drawn once because a series holds one point per label and a point must sit
+ * A series label is the served word of its theme. ask-dev keeps no copy of acr's word map
+ * (CHAOS-4690), so a label is held to the answer's own `investment_theme` word where the answer
+ * serves one (`isServedWordOrUnserved`, CHAOS-12697), and is otherwise trusted to acr's validator.
+ * A point's word is its row's served `repository_label` cell, held above; the axis words are not
+ * vocabulary words, so they are not checked here. Each link is drawn once because a series holds one point per label and a point must sit
  * under its own theme. `verifyRenderShape`'s own checks cover the rest: exact values, the source's
  * address, and one label per position.
  */
-function isRepositoryFlow(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+function isRepositoryFlow(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
     if (shape.kind !== "sankey" || shape.axis_kind !== "category") return false;
     if (shape.presentation !== undefined || shape.value_unit !== undefined) return false;
     const claimId = shape.series[0]?.points[0]?.source.claim_id;
@@ -679,6 +710,9 @@ function isRepositoryFlow(shape: RenderShape, facts: readonly ClaimedFact[]): bo
     let plotted = 0;
     for (const series of shape.series) {
         if (!linkedThemes.has(series.key) || nonBlank(series.label) === undefined) return false;
+        if (!isServedWordOrUnserved(labels, "investment_theme", series.key, series.label)) {
+            return false;
+        }
         if (nodeWords.has(series.label)) return false;
         nodeWords.add(series.label);
         let sum = 0;
@@ -755,13 +789,18 @@ function landscapePointClaim(
  * team two points; and every cited row names one `as_of_day`. A quadrant of different days places
  * teams that were never measured together.
  *
- * One clause is acr's alone: that a series label is its field's served word. The word map is acr's,
- * and a copy here would be a consumer table (CHAOS-4690), so this trusts acr's validator for that
- * clause, as the treemap does. It holds the part it can: each word is there, and it is its axis's
- * word. `verifyRenderShape`'s own checks cover the rest: exact values, the source's address, one
+ * A series label is its field's served word, and is its axis's word. ask-dev keeps no copy of acr's
+ * word map (CHAOS-4690), so each series word is held to the answer's own `fact_field` word where
+ * the answer serves one (`isServedWordOrUnserved`, CHAOS-12697), and is otherwise trusted to acr's
+ * validator. A point's word is its team's label, held in `landscapePointClaim`.
+ * `verifyRenderShape`'s own checks cover the rest: exact values, the source's address, one
  * label per position, and a claim that is not derived.
  */
-function isLandscapePosition(shape: RenderShape, facts: readonly ClaimedFact[]): boolean {
+function isLandscapePosition(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
     // A category axis: a time axis needs the line presentation (`verifyRenderShape`'s own check),
     // and a quadrant has none.
     if (shape.kind !== "quadrant") return false;
@@ -771,6 +810,9 @@ function isLandscapePosition(shape: RenderShape, facts: readonly ClaimedFact[]):
     if (x.key !== LANDSCAPE_X_FIELD || y.key !== LANDSCAPE_Y_FIELD) return false;
     if (nonBlank(x.label) === undefined || nonBlank(y.label) === undefined) return false;
     if (shape.axis_label !== x.label || shape.value_label !== y.label) return false;
+    // The axis words equal the series words (above), so this holds all four.
+    if (!isServedWordOrUnserved(labels, "fact_field", x.key, x.label)) return false;
+    if (!isServedWordOrUnserved(labels, "fact_field", y.key, y.label)) return false;
     if (x.points.length < 2 || x.points.length !== y.points.length) return false;
     const placed = new Set<string>();
     let day: string | undefined;
@@ -882,6 +924,7 @@ function resolvePointSource(
  * see acr's `validateRenderShapes`.
  */
 export function verifyRenderShape(shape: RenderShape, result: InvestigationResult): boolean {
+    const labels = result.vocabulary_labels;
     // Structure first, then values. acr enforces every rule below before it
     // serves, and the published JSON Schema cannot express any of them, so
     // this is the last place a payload acr would never emit can be refused
@@ -901,17 +944,17 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // response to one arriving is "withheld", not a blank space. When a
     // renderer lands, its kind joins this list in the same change.
     if (shape.selected_by === THEME_SHARE_RULE) {
-        if (!isThemeShareWhole(shape, result.claimed_facts)) return false;
+        if (!isThemeShareWhole(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === COMPARISON_RULE) {
-        if (!isSideBySide(shape, result.claimed_facts)) return false;
+        if (!isSideBySide(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === REPOSITORY_FLOW_RULE) {
-        if (!isRepositoryFlow(shape, result.claimed_facts)) return false;
+        if (!isRepositoryFlow(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === LANDSCAPE_POSITION_RULE) {
-        if (!isLandscapePosition(shape, result.claimed_facts)) return false;
+        if (!isLandscapePosition(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === COMPLETION_FORECAST_RULE) {
         if (!isCompletionCurve(shape, result.claimed_facts)) return false;
     } else if (shape.selected_by === FORECAST_PERCENTILES_RULE) {
-        if (!isForecastPercentiles(shape, result.claimed_facts)) return false;
+        if (!isForecastPercentiles(shape, result.claimed_facts, labels)) return false;
     } else if (shape.kind !== "series") {
         return false;
     }
