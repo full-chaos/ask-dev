@@ -4,7 +4,8 @@
 // real team workload field writer (distribution switch on), the real claim attach
 // (attachCanonicalRows), the real summary (discloseCompletionForecast), the real selector with the
 // forecast flag on, ServeVocabularyLabels, Validate and the real encoder.
-// Ran at acr 098de0ca (#1949's merge, the pin of record).
+// Ran at acr a70e1c78 (#1956's merge, the pin of record). The row stores an item target of 40
+// (CHAOS-12708), so the summary serves target_items.
 
 // internal/contextfabric/devhealthfacts/zz_forecast_export.go
 
@@ -130,7 +131,7 @@ func must(err error) {
 func row(p50, p85, p95 int64, dates [3]string, values []uint16, counts []uint32) readers.CompletionForecastRow {
 	r := readers.CompletionForecastRow{
 		TeamID: "chaos", HasWorkScope: 1, WorkScopeID: "linear:CHAOS", ComputedAt: "2026-11-02 04:00:00.000",
-		SimulationCount: 10000, BacklogSize: 40,
+		SimulationCount: 10000, BacklogSize: 40, HasTargetItems: 1, TargetItems: 40,
 		HasP50Days: 1, P50Days: p50, HasP85Days: 1, P85Days: p85, HasP95Days: 1, P95Days: p95,
 		P50Date: dates[0], P85Date: dates[1], P95Date: dates[2],
 		CompletionDayBins: uint64(len(values)), CompletionCountBins: uint64(len(counts)),

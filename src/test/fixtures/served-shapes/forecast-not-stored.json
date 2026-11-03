@@ -71,6 +71,7 @@
                 "state": "not_stored",
                 "computed_at": "2026-11-02T04:00:00Z",
                 "simulation_count": 10000,
+                "target_items": 40,
                 "forecast_p50_days": 40,
                 "forecast_p85_days": 55,
                 "forecast_p95_days": 70,

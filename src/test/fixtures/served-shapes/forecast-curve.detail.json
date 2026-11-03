@@ -7,6 +7,7 @@
         "simulation_count": 10000,
         "horizon_days": 365,
         "unfinished_runs": 500,
+        "target_items": 40,
         "forecast_p50_days": 15,
         "forecast_p85_days": 21,
         "forecast_p95_days": 30,
