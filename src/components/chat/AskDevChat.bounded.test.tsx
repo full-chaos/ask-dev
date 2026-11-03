@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AskDevChat } from "@/components/chat/AskDevChat";
 import { createStandaloneSource } from "@/render/standalone-source";
 import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
-import { investigateFromGlobalFetch } from "@/test/fixtures/investigate-fake";
+import { resultOutcome } from "@/lib/acr/investigate";
+import type { StandaloneInvestigate } from "@/render/standalone-source";
 import type { ChatEvidenceRef } from "@/render/source";
 import { assistantTurn, hostSource, snapshotOf, userTurn } from "@/test/fixtures/host-source";
 
@@ -18,13 +19,23 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
+/**
+ * The fake ACR's `{ result }`, through the app's own classifier, as on the real stream. Kept here,
+ * not in the shared fetch fixture: other suites mock `@/lib/acr/investigate` with a factory that
+ * imports that fixture, so the fixture must not import the module they mock.
+ */
+const investigateThroughTheClassifier: StandaloneInvestigate = async () => {
+    const reply = (await (await fetch("/investigate")).json()) as { result: unknown };
+    return resultOutcome(reply.result);
+};
+
 async function ask(result: unknown) {
     const user = userEvent.setup();
     vi.stubGlobal(
         "fetch",
         vi.fn(() => Promise.resolve({ json: () => Promise.resolve({ result }) })),
     );
-    render(<AskDevChat source={createStandaloneSource(investigateFromGlobalFetch)} />);
+    render(<AskDevChat source={createStandaloneSource(investigateThroughTheClassifier)} />);
     await user.type(
         screen.getByRole("textbox", { name: "Ask a question" }),
         "Which teams struggle?{Enter}",
