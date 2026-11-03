@@ -47,6 +47,8 @@ async function axisLabelBoxes(figure: Locator) {
                             .filter((node) => node.nodeType === Node.TEXT_NODE)
                             .map((node) => node.textContent ?? "")
                             .join(""),
+                        width: box.width,
+                        height: box.height,
                         left: Math.round(box.x * 10) / 10,
                         right: Math.round((box.x + box.width) * 10) / 10,
                         viewLeft: view.x,
@@ -83,6 +85,8 @@ test.describe("axis labels are drawn whole (CHAOS-12854)", () => {
             expect(boxes.length).toBeGreaterThanOrEqual(2);
             expect(boxes.every((box) => /^\d{4}-\d{2}-\d{2}$/u.test(box.text.trim()))).toBe(true);
             await figure.screenshot({ path: testInfo.outputPath(`trend-axis-${name}.png`) });
+            // A label with no box (hidden, not drawn) cannot pass the bounds check (codex r1 P3).
+            expect(boxes.filter((box) => !(box.width > 0 && box.height > 0))).toEqual([]);
             expect(outside(boxes)).toEqual([]);
         });
 
@@ -96,6 +100,7 @@ test.describe("axis labels are drawn whole (CHAOS-12854)", () => {
             await expect(figure).toBeVisible();
             const boxes = await axisLabelBoxes(figure);
             expect(boxes.length).toBeGreaterThanOrEqual(2);
+            expect(boxes.filter((box) => !(box.width > 0 && box.height > 0))).toEqual([]);
             expect(outside(boxes)).toEqual([]);
         });
     }
