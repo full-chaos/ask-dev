@@ -38,6 +38,7 @@ import {
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
 import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
+import { servedShapeScenarios } from "@/test/fixtures/served-shapes";
 import { OMISSION_COUNTS } from "@/lib/projection-budget";
 
 const auth = vi.hoisted(() => ({
@@ -1383,6 +1384,37 @@ describe("investigateFromBrowser", () => {
         const failure = failureOf(await investigateFromBrowser({ question: "q" }));
         expect(failure.code).toBe("acr_model_refused");
         expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    describe("a render shape of a kind the contract does not declare (CHAOS-12839, E8 AC-3)", () => {
+        /** ACR's result event, carrying one served shape (the investment treemap) of `kind`. */
+        function resultWithShapeOfKind(kind: string): Record<string, unknown> {
+            const event = structuredClone(resultEvent(2)) as unknown as {
+                result: { render_shapes?: unknown[] };
+            };
+            const shape = structuredClone(
+                servedShapeScenarios["investment-treemap"].render_shapes![0]!,
+            ) as unknown as Record<string, unknown>;
+            event.result.render_shapes = [{ ...shape, kind }];
+            return event;
+        }
+
+        it("ends invalid_upstream (a contract violation), never a drawn or partly drawn answer", async () => {
+            serve((init) => streamFor(init, resultWithShapeOfKind("pie_chart")));
+            const outcome = await investigateFromBrowser({ question: "q" });
+            const failure = failureOf(outcome);
+            expect(failure.code).toBe("acr_contract_violation");
+            expect(failure.retryable).toBe(false);
+        });
+
+        it("the same shape with a declared kind answers, as the control", async () => {
+            serve((init) => streamFor(init, resultWithShapeOfKind("treemap")));
+            const outcome = await investigateFromBrowser({ question: "q" });
+            expect(outcome.kind).toBe("answered");
+            if (outcome.kind === "answered") {
+                expect(outcome.result.render_shapes?.[0]?.kind).toBe("treemap");
+            }
+        });
     });
 
     it("reports a stream that ends with no terminal as unreachable and retryable", async () => {

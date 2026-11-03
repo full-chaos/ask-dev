@@ -140,3 +140,124 @@ describe("RenderShapeChart", () => {
         expect(container).toBeEmptyDOMElement();
     });
 });
+
+/**
+ * CHAOS-12838 (E8 AC-2): a LINE over a category axis. The time-axis line is pinned elsewhere; this is
+ * the other axis acr may draw a line on. Served order is the order the reader sees: acr chose it, and
+ * no live producer serves one yet, so a re-sort here would go unnoticed. Labels are served out of
+ * alphabetical order on purpose ("web", "api", "ops"), and the second series has no point for "api".
+ */
+const categoryLine: RenderShape = {
+    shape_id: "rs_category_line",
+    kind: "series",
+    presentation: "line",
+    selected_by: "cohort_attention_score",
+    title: "Attention score by repository",
+    axis_kind: "category",
+    axis_label: "repository",
+    value_label: "attention score",
+    series: [
+        {
+            key: "this_window",
+            label: "This window",
+            points: [
+                {
+                    label: "web",
+                    value: 30,
+                    source: { kind: "cohort_member_score", subject_canonical_id: "repo:gh:web" },
+                },
+                {
+                    label: "api",
+                    value: 12,
+                    source: { kind: "cohort_member_score", subject_canonical_id: "repo:gh:api" },
+                },
+                {
+                    label: "ops",
+                    value: 25,
+                    source: { kind: "cohort_member_score", subject_canonical_id: "repo:gh:ops" },
+                },
+            ],
+        },
+        {
+            key: "last_window",
+            label: "Last window",
+            points: [
+                {
+                    label: "web",
+                    value: 18,
+                    source: { kind: "cohort_member_score", subject_canonical_id: "repo:gh:web" },
+                },
+                {
+                    label: "ops",
+                    value: 9,
+                    source: { kind: "cohort_member_score", subject_canonical_id: "repo:gh:ops" },
+                },
+            ],
+        },
+    ],
+};
+
+describe("a line on a category axis (CHAOS-12838)", () => {
+    const SERVED = ["web", "api", "ops"];
+
+    const markX = (container: HTMLElement, label: string, series: string) =>
+        Number(
+            container
+                .querySelector(`g[aria-label^="${label}, ${series}:"] circle`)
+                ?.getAttribute("cx"),
+        );
+
+    it("keeps the served order in the value table, the axis and the marks", () => {
+        const { container } = render(<RenderShapeChart shape={categoryLine} />);
+        const table = screen.getByRole("table", { name: "Attention score by repository" });
+        const rowHeads = within(table)
+            .getAllByRole("rowheader")
+            .map((cell) => cell.textContent);
+        expect(rowHeads).toEqual(SERVED);
+
+        const ticks = Array.from(
+            container.querySelectorAll(
+                'svg > text.fact-chart__axis-label[text-anchor="middle"] > title',
+            ),
+        ).map((title) => title.textContent);
+        expect(ticks).toEqual(SERVED);
+
+        const xs = SERVED.map((label) => markX(container, label, "This window"));
+        expect(xs.every(Number.isFinite)).toBe(true);
+        expect(xs).toEqual([...xs].sort((left, right) => left - right));
+        expect(new Set(xs).size).toBe(SERVED.length);
+    });
+
+    it("shows a missing point as a gap: an em dash, no mark, and no line across it", () => {
+        const { container } = render(<RenderShapeChart shape={categoryLine} />);
+        const table = screen.getByRole("table", { name: "Attention score by repository" });
+        const apiRow = within(table).getByRole("rowheader", { name: "api" }).closest("tr")!;
+        expect(Array.from(apiRow.querySelectorAll("td")).map((cell) => cell.textContent)).toEqual([
+            "12",
+            "—",
+        ]);
+
+        expect(screen.queryByLabelText(/^api, Last window:/)).toBeNull();
+        expect(screen.getByLabelText(/^web, Last window:/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/^ops, Last window:/)).toBeInTheDocument();
+
+        // "Last window" has points at web and ops only: two one-point runs, never one line from web
+        // to ops that would draw a value for api.
+        const lastWindow = container.querySelector(
+            'g[aria-label^="web, Last window:"]',
+        )!.parentElement!;
+        const runs = Array.from(lastWindow.querySelectorAll(":scope > polyline")).map(
+            (line) => line.getAttribute("points")!.split(" ").length,
+        );
+        expect(runs).toEqual([1, 1]);
+
+        // The full series is one unbroken line across all three served labels.
+        const thisWindow = container.querySelector(
+            'g[aria-label^="web, This window:"]',
+        )!.parentElement!;
+        const full = Array.from(thisWindow.querySelectorAll(":scope > polyline")).map(
+            (line) => line.getAttribute("points")!.split(" ").length,
+        );
+        expect(full).toEqual([3]);
+    });
+});
