@@ -445,7 +445,9 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // da2efe68 -> 7b0caff2 (CHAOS-12544): the comparison table train, the same SHA as web. The closed
 // rule vocabulary gains `comparison_side_by_side`, and the source kinds gain `claimed_fact_value`,
 // addressing a claim's own value (acr #1907, CHAOS-12513). No producer emits the rule yet.
-export const SOURCE_COMMIT = "26237a42c2c199701c96972b7953ba3754787e57";
+// 26237a42 -> dc765c2e (CHAOS-12744): the same SHA as web (CHAOS-12743). No file ask-dev vendors
+// changed: acr #1980's nested repository key pattern is in schemas ask-dev does not vendor.
+export const SOURCE_COMMIT = "dc765c2ec3f2aee9be04c94a88794db681475fc3";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
