@@ -205,5 +205,28 @@ export function buildClarificationPages(
     return pages;
 }
 
+/**
+ * CHAOS-12725: whether the popup opens ON ITS OWN for `result`. Only a clarification asks the
+ * reader before it answers. An answer that also carries `structure_needs` (acr answered on an
+ * inferred window and offers the window beside it, CHAOS-4451) gets its offers as a control
+ * under the answer instead, and the popup opens only when the reader asks for it: opening it
+ * over an answer covered the answer's chart.
+ */
+export function popupOpensOnItsOwn(result: InvestigationResult): boolean {
+    return result.status === "clarification_required";
+}
+
+/**
+ * CHAOS-12725: the served label of the window an answer read — the offered window whose
+ * `relative_id` is the effective window's — or undefined when no offer matches. Served words
+ * only (CHAOS-4690): the label is acr's, never a phrasing of ours.
+ */
+export function answeredWindowLabel(result: InvestigationResult): string | undefined {
+    const relative = result.effective_evidence_window?.relative_id;
+    if (relative === undefined) return undefined;
+    return result.structure_needs?.window_options?.find((option) => option.relative_id === relative)
+        ?.label;
+}
+
 /** Re-exported for callers that want the member's plain-English label (e.g. the chosen-answers summary card). */
 export { structureMemberLabel };

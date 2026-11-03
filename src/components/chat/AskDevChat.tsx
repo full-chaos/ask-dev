@@ -33,7 +33,13 @@ import { ShapeSlotContext } from "../ShapeSlotContext";
 import type { ClarificationChoice } from "../ClarificationPanel";
 import { EMPTY_CANDIDATE_SELECTION_BATCH } from "../../lib/candidate-selections";
 import { subjectForReceipt } from "../../lib/clarification";
-import { buildClarificationPages, type PopupOptionSource } from "../../lib/clarification-popup";
+import {
+    answeredWindowLabel,
+    buildClarificationPages,
+    popupOpensOnItsOwn,
+    type PopupOptionSource,
+} from "../../lib/clarification-popup";
+import { AnsweredOffers } from "./AnsweredOffers";
 import type { BoundStructureReceipt, InvestigationResult } from "../../lib/contracts";
 import { withholdUnrankableRankings } from "../../lib/ranking-withheld";
 import {
@@ -352,6 +358,9 @@ function ChatSurface({
     // always mints a NEW turn id, so a stale dismissal can never suppress a
     // later turn's popup by accident.
     const [dismissedPopupTurnId, setDismissedPopupTurnId] = useState<number | undefined>(undefined);
+    // CHAOS-12725: the answered turn whose offers the reader opened from under the answer. An
+    // answer's offers never open the popup on their own (it covered the answer's chart).
+    const [openedOffersTurnId, setOpenedOffersTurnId] = useState<number | undefined>(undefined);
     // `popupAutoConfirmRef`/`popupAutoConfirmTick`: set by the popup's
     // `onComplete` the instant the flow reaches its last page, INSTEAD of
     // reading the selection hooks' `.batch` synchronously right there. A
@@ -777,6 +786,8 @@ function ChatSurface({
         !composerHidden &&
         latestAssistantTurn?.role === "assistant" &&
         latestAssistantTurn.outcome.kind === "answered" &&
+        (popupOpensOnItsOwn(latestAssistantTurn.outcome.result) ||
+            latestAssistantTurn.id === openedOffersTurnId) &&
         latestAssistantTurn.id !== dismissedPopupTurnId &&
         !unrecorded.has(latestAssistantTurn.id)
             ? buildClarificationPages(
@@ -1226,6 +1237,26 @@ function ChatSurface({
                                                         />
                                                     </ShapeSlotContext.Provider>
                                                 </EvidenceOpenProvider>
+                                            ) : null}
+                                            {turn.outcome.kind === "answered" &&
+                                            offersChoice &&
+                                            !popupOpensOnItsOwn(turn.outcome.result) ? (
+                                                <AnsweredOffers
+                                                    onOpen={() => {
+                                                        setDismissedPopupTurnId(undefined);
+                                                        setOpenedOffersTurnId(turn.id);
+                                                    }}
+                                                    pages={buildClarificationPages(
+                                                        turn.outcome.result,
+                                                        structureSelections.batch,
+                                                        structureCandidateSelections.batch,
+                                                        candidateSelections.batch,
+                                                    )}
+                                                    pending={isPending}
+                                                    windowLabel={answeredWindowLabel(
+                                                        turn.outcome.result,
+                                                    )}
+                                                />
                                             ) : null}
                                             {turn.outcome.kind === "bounded" ? (
                                                 // The same host integrations as a whole answer:

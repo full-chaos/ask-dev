@@ -1654,6 +1654,50 @@
         }
     }
 
+    /*
+     * The offers an answer carries (CHAOS-12725): a row under the answer, never a popup over it.
+     */
+    .chat__answered-offers {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .chat__answered-offer {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chat__answered-offer-value {
+        color: var(--text);
+    }
+
+    .chat__answered-offer-change {
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-pill);
+        background: var(--surface-1);
+        color: var(--text-strong);
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .chat__answered-offer-change:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
+    }
+
+    .chat__answered-offer-change:disabled {
+        cursor: default;
+        opacity: 0.6;
+    }
+
     /* Stop: shown only when the source can stop a run (CHAOS-12382). */
     .chat__stop-row {
         display: flex;
