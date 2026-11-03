@@ -1075,6 +1075,8 @@ describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
                 ],
             },
         };
+        // CHAOS-12725: an answer's offers sit under the answer (the popup opens only on a
+        // clarification or when the reader asks), so the control is the offers row.
         const control = render(
             <AskDevChat
                 source={hostSource(
@@ -1082,7 +1084,7 @@ describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
                 )}
             />,
         );
-        expect(document.querySelector(".clarification-popup")).not.toBeNull();
+        expect(screen.getByRole("group", { name: "Answer offers" })).toBeInTheDocument();
         control.unmount();
 
         render(
@@ -1093,6 +1095,7 @@ describe("AskDevChat with a host source: the withheld boundary (F1)", () => {
             />,
         );
         expect(document.querySelector(".clarification-popup")).toBeNull();
+        expect(screen.queryByRole("group", { name: "Answer offers" })).toBeNull();
     });
 
     it("an already-withheld result with a marker keeps the notice", () => {
