@@ -16,6 +16,13 @@ import type {
     PriorSubjectReceiptDispositionEntry,
     StructureNeeds,
 } from "../contracts/generated/investigation-result";
+import type { ACRContextFabricAnswerProjectionV1 } from "../contracts/generated/answer-projection";
+
+/**
+ * ACR's bounded answer (`context_fabric_answer_projection.v1`, CHAOS-12559): the projection of a
+ * result over the caller's byte option. It is drawn from its own fields, never mapped onto a result.
+ */
+export type AnswerProjection = ACRContextFabricAnswerProjectionV1;
 
 /**
  * CHAOS-11906: an investigation result is v1 or v2. An anchor option has one

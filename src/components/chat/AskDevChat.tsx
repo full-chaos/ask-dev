@@ -25,6 +25,7 @@ import {
 } from "./ChatThreadState";
 import { ClarificationPopup } from "./ClarificationPopup";
 import { InspectorRail } from "./InspectorRail";
+import { BoundedAnswerView } from "../BoundedAnswerView";
 import { DeterministicAnswerView } from "../DeterministicAnswerView";
 import { EvidenceOpenContext, type EvidenceOpen } from "../EvidenceOpenContext";
 import { FailurePanel } from "../FailurePanel";
@@ -1222,6 +1223,23 @@ function ChatSurface({
                                                                     ? structureSelections.batch
                                                                     : turn.submittedStructureBatch
                                                             }
+                                                        />
+                                                    </ShapeSlotContext.Provider>
+                                                </EvidenceOpenProvider>
+                                            ) : null}
+                                            {turn.outcome.kind === "bounded" ? (
+                                                // The same host integrations as a whole answer:
+                                                // evidence opens through the host, charts go to its
+                                                // slot.
+                                                <EvidenceOpenProvider
+                                                    evidence={chat.evidence}
+                                                    resultId={turn.outcome.projection.result_id}
+                                                >
+                                                    <ShapeSlotContext.Provider
+                                                        value={chat.slots?.shape ?? null}
+                                                    >
+                                                        <BoundedAnswerView
+                                                            projection={turn.outcome.projection}
                                                         />
                                                     </ShapeSlotContext.Provider>
                                                 </EvidenceOpenProvider>

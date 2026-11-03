@@ -67,8 +67,44 @@ export type ConversationSourceTurn =
                             readonly committed: readonly SubjectRef[];
                         };
                     };
+                }
+              // CHAOS-12559: ACR's bounded answer threads as an answer does, from its own fields.
+              | {
+                    readonly kind: "bounded";
+                    readonly projection: {
+                        readonly deterministic_answer?: string;
+                        readonly result_id: string;
+                        readonly committed_subjects: readonly SubjectRef[];
+                    };
                 };
       };
+
+type AnsweredSourceTurn = {
+    readonly answer: string | undefined;
+    readonly resultId: string;
+    readonly committed: readonly SubjectRef[];
+};
+
+/** What a settled answer, whole or bounded, carries into the next turn. */
+function answeredSourceTurn(
+    outcome: Extract<ConversationSourceTurn, { readonly role: "assistant" }>["outcome"],
+): AnsweredSourceTurn | undefined {
+    if (outcome.kind === "answered") {
+        return {
+            answer: outcome.result.deterministic_answer,
+            resultId: outcome.result.result_id,
+            committed: outcome.result.subject_resolution.committed,
+        };
+    }
+    if (outcome.kind === "bounded") {
+        return {
+            answer: outcome.projection.deterministic_answer,
+            resultId: outcome.projection.result_id,
+            committed: outcome.projection.committed_subjects,
+        };
+    }
+    return undefined;
+}
 
 /**
  * Builds the `conversation` field for a re-ask from the chat timeline's own
@@ -113,8 +149,9 @@ export function buildConversationTurns(
             });
             continue;
         }
-        if (turn.outcome.kind !== "answered") continue;
-        const answer = nonBlank(turn.outcome.result.deterministic_answer);
+        const settledAnswer = answeredSourceTurn(turn.outcome);
+        if (settledAnswer === undefined) continue;
+        const answer = nonBlank(settledAnswer.answer);
         if (answer === undefined) continue;
         settled.push({
             turn_id: `turn_${String(turn.id)}`,
@@ -202,38 +239,39 @@ export function deriveParentReference(
     priorTurns: readonly ConversationSourceTurn[],
 ): ParentReference {
     const last = priorTurns[priorTurns.length - 1];
-    if (last === undefined || last.role !== "assistant" || last.outcome.kind !== "answered") {
+    const answered =
+        last === undefined || last.role !== "assistant"
+            ? undefined
+            : answeredSourceTurn(last.outcome);
+    if (answered === undefined) {
         return { parentResultId: undefined, subjectHints: [], unsentSubjects: [] };
     }
-    const { result } = last.outcome;
     const unsentSubjects: UnsentSubject[] = [];
-    const allHints: readonly SubjectHint[] = result.subject_resolution.committed.flatMap(
-        (subject) => {
-            // The result's `SubjectRef.kind` is an open vocabulary but the
-            // request's `SubjectHint.kind` is closed: a kind this pin does
-            // not know cannot be sent as a hint, so it is omitted, never
-            // coerced or reworded. It is RECORDED in `unsentSubjects`, so the
-            // loss of scope is disclosed by the caller, never silent.
-            const kind = SUBJECT_KIND_VOCABULARY.find((known) => known === subject.kind);
-            if (kind === undefined) {
-                unsentSubjects.push({ kind: subject.kind, label: subject.label });
-                return [];
-            }
-            return [
-                {
-                    kind,
-                    id: subject.canonical_id,
-                    label: subject.label,
-                    source: PARENT_SUBJECT_HINT_SOURCE,
-                },
-            ];
-        },
-    );
+    const allHints: readonly SubjectHint[] = answered.committed.flatMap((subject) => {
+        // The result's `SubjectRef.kind` is an open vocabulary but the
+        // request's `SubjectHint.kind` is closed: a kind this pin does
+        // not know cannot be sent as a hint, so it is omitted, never
+        // coerced or reworded. It is RECORDED in `unsentSubjects`, so the
+        // loss of scope is disclosed by the caller, never silent.
+        const kind = SUBJECT_KIND_VOCABULARY.find((known) => known === subject.kind);
+        if (kind === undefined) {
+            unsentSubjects.push({ kind: subject.kind, label: subject.label });
+            return [];
+        }
+        return [
+            {
+                kind,
+                id: subject.canonical_id,
+                label: subject.label,
+                source: PARENT_SUBJECT_HINT_SOURCE,
+            },
+        ];
+    });
     // The wire cap must never drop a subject silently either: whatever it
     // cuts joins `unsentSubjects`, so the same notice discloses it.
     const sentHints = allHints.slice(0, MAX_SUBJECT_HINTS_ON_WIRE);
     for (const cut of allHints.slice(MAX_SUBJECT_HINTS_ON_WIRE)) {
         unsentSubjects.push({ kind: cut.kind, label: cut.label ?? cut.id ?? cut.kind });
     }
-    return { parentResultId: result.result_id, subjectHints: sentHints, unsentSubjects };
+    return { parentResultId: answered.resultId, subjectHints: sentHints, unsentSubjects };
 }

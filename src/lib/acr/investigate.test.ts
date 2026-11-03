@@ -37,6 +37,8 @@ import {
 } from "@/test/fixtures/budget-refusal";
 import canonicalResult from "@/contracts/examples/context_fabric_investigation_result.v1.json";
 import unsupportedResult from "@/contracts/examples/context_fabric_investigation_result_unsupported.v1.json";
+import { boundedAnswerScenarios } from "@/test/fixtures/bounded-answers";
+import { OMISSION_COUNTS } from "@/lib/projection-budget";
 
 const auth = vi.hoisted(() => ({
     token: vi.fn(),
@@ -1465,16 +1467,79 @@ describe("investigateFromBrowser", () => {
         vi.restoreAllMocks();
     });
 
-    it("says an answer was too large when ACR sends its bounded form", () => {
+    // CHAOS-12559: ACR's bounded form is an answer, drawn as itself, not a failure.
+    it("returns ACR's bounded form as a bounded answer when it meets its own schema", () => {
+        for (const projection of Object.values(boundedAnswerScenarios)) {
+            const outcome = resultOutcome(projection);
+            expect(outcome).toEqual({ kind: "bounded", projection });
+        }
+    });
+
+    it("is a contract violation when ACR's bounded form fails its own schema", () => {
         const outcome = resultOutcome({
             schema_version: "context_fabric_answer_projection.v1",
             result_id: "result_1",
         });
-        expect(failureOf(outcome)).toEqual({
-            code: "acr_answer_too_large",
-            message: "This answer is too large to show here. Ask about a narrower scope.",
-            retryable: false,
-        });
+        expect(failureOf(outcome).code).toBe("acr_contract_violation");
+        expect(failureOf(outcome).retryable).toBe(false);
+    });
+
+    // ACR's own rule (acr validate_context_fabric_answer_projection.go): truncated iff a count is
+    // above zero or the whole result was withheld. The JSON Schema cannot state it.
+    it("is a contract violation when the budget's truncated contradicts its counts", () => {
+        const answer = boundedAnswerScenarios["bounded-answer"];
+        const nothingCut = {
+            ...answer.projection_budget,
+            drivers_omitted: 0,
+            withheld_drivers_omitted: 0,
+            cohort_members_omitted: 0,
+            cohort_groups_omitted: 0,
+            facts_omitted: 0,
+            candidates_omitted: 0,
+            evidence_refs_omitted: 0,
+            limitations_omitted: 0,
+            warnings_omitted: 0,
+            coverage_omitted: 0,
+            reasons_omitted: 0,
+            values_clamped: 0,
+            render_shapes_omitted: 0,
+            full_result_omitted: false,
+        };
+        const cases = {
+            "truncated with nothing cut": { ...nothingCut, truncated: true },
+            "not truncated with a count": { ...nothingCut, truncated: false, facts_omitted: 1 },
+            "not truncated with a shortened value": {
+                ...nothingCut,
+                truncated: false,
+                values_clamped: 1,
+            },
+            "not truncated with the whole result withheld": {
+                ...nothingCut,
+                truncated: false,
+                full_result_omitted: true,
+            },
+        };
+        for (const [name, budget] of Object.entries(cases)) {
+            const outcome = resultOutcome({ ...answer, projection_budget: budget });
+            expect(outcome.kind, name).toBe("failed");
+            expect(failureOf(outcome).code, name).toBe("acr_contract_violation");
+        }
+        // Every omission count, one at a time (the rule must not skip one).
+        for (const key of OMISSION_COUNTS) {
+            const cut = { ...nothingCut, [key]: 1 };
+            expect(
+                resultOutcome({ ...answer, projection_budget: { ...cut, truncated: false } }).kind,
+                key,
+            ).toBe("failed");
+            expect(
+                resultOutcome({ ...answer, projection_budget: { ...cut, truncated: true } }).kind,
+                key,
+            ).toBe("bounded");
+        }
+        expect(
+            resultOutcome({ ...answer, projection_budget: { ...nothingCut, truncated: false } })
+                .kind,
+        ).toBe("bounded");
     });
 
     it("is a contract violation when an event fails the event schema", async () => {

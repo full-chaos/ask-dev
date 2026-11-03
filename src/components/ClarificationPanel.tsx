@@ -16,6 +16,19 @@ export type ClarificationChoice = {
 
 const EMPTY_SELECTED_RECEIPT_IDS: ReadonlySet<string> = new Set();
 
+/**
+ * What one drawn candidate needs: a whole result's `SubjectCandidate`, or a bounded answer's
+ * projected candidate, which carries no evidence references (CHAOS-12559).
+ */
+export type ClarificationCandidateInput = Pick<
+    SubjectCandidate,
+    "receipt_id" | "state" | "confidence"
+> & {
+    readonly subject: Pick<SubjectCandidate["subject"], "kind" | "canonical_id" | "label">;
+    readonly match_reasons: readonly string[];
+    readonly evidence_ref_ids?: readonly string[] | undefined;
+};
+
 export type ClarificationPanelProps = {
     readonly result: InvestigationResult;
     /** The candidate receipt ids selected so far, owned by the caller (mirrors `StructureNeedsPanel`'s `batch`). */
@@ -70,7 +83,7 @@ function CandidateRecord({
     onToggle,
     evidenceRefLabels,
 }: {
-    readonly candidate: SubjectCandidate;
+    readonly candidate: ClarificationCandidateInput;
     readonly rank: number;
     readonly pending: boolean;
     readonly selected: boolean;
@@ -130,13 +143,42 @@ function CandidateRecord({
     );
 }
 
-export function ClarificationPanel({
-    result,
+export function ClarificationPanel({ result, ...rest }: ClarificationPanelProps) {
+    return (
+        <ClarificationView
+            candidates={result.subject_resolution.candidates}
+            evidenceRefLabels={result.evidence_ref_labels}
+            prompt={result.subject_resolution.clarification_prompt}
+            reason={result.interpretation.clarification_reason}
+            resultId={result.result_id}
+            {...rest}
+        />
+    );
+}
+
+/**
+ * The clarification's own fields, from a whole result (`ClarificationPanel`) or a bounded answer's
+ * projected clarification (CHAOS-12559): the same panel, drawn once.
+ */
+export type ClarificationViewProps = Omit<ClarificationPanelProps, "result"> & {
+    readonly prompt: string | undefined;
+    readonly reason: string | undefined;
+    readonly candidates: readonly ClarificationCandidateInput[];
+    readonly evidenceRefLabels: EvidenceRefLabels;
+    readonly resultId: string;
+};
+
+export function ClarificationView({
+    prompt,
+    reason,
+    candidates,
+    evidenceRefLabels,
+    resultId,
     selectedReceiptIds = EMPTY_SELECTED_RECEIPT_IDS,
     onToggle,
     onConfirm,
     pending = false,
-}: ClarificationPanelProps) {
+}: ClarificationViewProps) {
     // Portability/multi-instance safety (CHAOS-4343: item 2 makes several
     // simultaneous ClarificationPanel instances — one per stacked turn — the
     // COMMON case, not a rare edge case): a hardcoded heading id broke
@@ -144,7 +186,6 @@ export function ClarificationPanel({
     // class of bug `StructureNeedsPanel` already fixed with `useId()` (see
     // that component's own header comment for why).
     const idPrefix = useId();
-    const { candidates, clarification_prompt: prompt } = result.subject_resolution;
     const selectedCount = candidates.filter((candidate) =>
         selectedReceiptIds.has(candidate.receipt_id),
     ).length;
@@ -168,9 +209,7 @@ export function ClarificationPanel({
                 // clarification prompt of its own.
                 <p className="answer__body">{prompt}</p>
             )}
-            {result.interpretation.clarification_reason === undefined ? null : (
-                <p className="record__meta">{result.interpretation.clarification_reason}</p>
-            )}
+            {reason === undefined ? null : <p className="record__meta">{reason}</p>}
             {onConfirm === undefined ? (
                 <p className="record__meta" data-testid="cannot-choose-here">
                     {CANNOT_REASK_HERE_COPY}
@@ -190,7 +229,7 @@ export function ClarificationPanel({
                     {candidates.map((candidate, index) => (
                         <CandidateRecord
                             candidate={candidate}
-                            evidenceRefLabels={result.evidence_ref_labels}
+                            evidenceRefLabels={evidenceRefLabels}
                             key={candidate.receipt_id}
                             onToggle={
                                 onToggle === undefined
@@ -219,7 +258,7 @@ export function ClarificationPanel({
                             candidates
                                 .filter((candidate) => selectedReceiptIds.has(candidate.receipt_id))
                                 .map((candidate) => ({
-                                    result_id: result.result_id,
+                                    result_id: resultId,
                                     receipt_id: candidate.receipt_id,
                                 })),
                         );

@@ -166,6 +166,50 @@ describe("buildConversationTurns", () => {
     });
 });
 
+const boundedAssistantTurn = (
+    id: number,
+    deterministicAnswer: string,
+    resultId: string,
+    committed: readonly SubjectRef[],
+    createdAt = "2026-01-01T00:00:01.000Z",
+) =>
+    ({
+        role: "assistant",
+        id,
+        createdAt,
+        outcome: {
+            kind: "bounded",
+            projection: {
+                deterministic_answer: deterministicAnswer,
+                result_id: resultId,
+                committed_subjects: committed,
+            },
+        },
+    }) as const;
+
+// CHAOS-12559: ACR's bounded answer carries the conversation as a whole answer does.
+describe("a bounded answer in the conversation", () => {
+    const team: SubjectRef = { kind: "team", canonical_id: "team:CHAOS", label: "CHAOS" };
+    const turns: readonly ConversationSourceTurn[] = [
+        userTurn(0, "Which teams are struggling?"),
+        boundedAssistantTurn(1, "CHAOS leads on attention.", "result_bounded_1", [team]),
+    ];
+
+    it("is the parent of the next turn, with its committed subjects as hints", () => {
+        const reference = deriveParentReference(turns);
+        expect(reference.parentResultId).toBe("result_bounded_1");
+        expect(reference.subjectHints.map((hint) => hint.id)).toEqual(["team:CHAOS"]);
+        expect(reference.unsentSubjects).toEqual([]);
+    });
+
+    it("threads its own answer text into the conversation", () => {
+        expect(buildConversationTurns(turns).map((turn) => turn.content)).toEqual([
+            "Which teams are struggling?",
+            "CHAOS leads on attention.",
+        ]);
+    });
+});
+
 describe("deriveParentReference", () => {
     it("sends neither on a first turn (an empty timeline)", () => {
         expect(deriveParentReference([])).toEqual({

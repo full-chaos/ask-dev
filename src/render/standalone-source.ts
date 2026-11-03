@@ -26,6 +26,7 @@ import type {
 import type { ClarificationChoice } from "../components/ClarificationPanel";
 import type { WorkbenchFailure } from "../lib/acr/errors";
 import type {
+    AnswerProjection,
     BoundStructureReceipt,
     ConversationTurn,
     InvestigationResult,
@@ -63,6 +64,7 @@ export type StandaloneInvestigationOptions = {
 /** The call's answer: a result, or a failure in the Workbench's own words. */
 export type StandaloneInvestigateOutcome =
     | { readonly kind: "answered"; readonly result: InvestigationResult }
+    | { readonly kind: "bounded"; readonly projection: AnswerProjection }
     | { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
 export type StandaloneInvestigate = (
@@ -114,7 +116,7 @@ async function fireInvestigation(
             ...params.structureReceiptFields,
             ...(expectedKinds.length > 0 ? { expectedKinds } : {}),
         });
-        if (outcome.kind === "failed") return outcome;
+        if (outcome.kind === "failed" || outcome.kind === "bounded") return outcome;
         // The boundary: unrankable cohorts are withheld where the result enters client state, and
         // the scope-loss notice is built here, once.
         const boundary = withholdUnrankableRankings(outcome.result);
@@ -264,7 +266,7 @@ export function createStandaloneSource(investigate: StandaloneInvestigate): Chat
                 structureBatch === undefined ? {} : buildStructureReceiptFields(structureBatch),
         });
         settleTurn(assistantTurnId, outcome);
-        return outcome.kind === "answered";
+        return outcome.kind === "answered" || outcome.kind === "bounded";
     }
 
     /**

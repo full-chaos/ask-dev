@@ -21,7 +21,7 @@ const URL_PATTERN = /https?:\/\/[^\s<>"]+/g;
 // segment), and stripping them on the strength of a regex guess broke a URL
 // that legitimately ended in `!` (codex review round 1, finding 2). `.` `,`
 // `;` `:` essentially never end a real URL, so those stay safe to strip.
-const TRAILING_PUNCTUATION = /[.,;:]+$/;
+const TRAILING_PUNCTUATION = ".,;:";
 
 /**
  * Peels sentence-level noise off the end of a matched URL: an unbalanced
@@ -30,24 +30,27 @@ const TRAILING_PUNCTUATION = /[.,;:]+$/;
  * the other (`"...(mathematics))."` needs both peeled, more than once).
  */
 function stripTrailingNoise(matchedUrl: string): string {
-    let url = matchedUrl;
-    for (;;) {
-        if (url.endsWith(")")) {
-            const opens = (url.match(/\(/g) ?? []).length;
-            const closes = (url.match(/\)/g) ?? []).length;
-            if (closes > opens) {
-                url = url.slice(0, -1);
-                continue;
-            }
-        }
-        const trailing = TRAILING_PUNCTUATION.exec(url);
-        if (trailing !== null) {
-            url = url.slice(0, url.length - trailing[0].length);
-            continue;
-        }
-        break;
+    // One pass to count the parentheses, then one step back per peeled character, so the work is
+    // linear in the URL's length. Recounting per peeled `)`, or the regex `/[.,;:]+$/`, is
+    // quadratic on a long run inside a URL (CodeQL js/polynomial-redos, CHAOS-12559).
+    let opens = 0;
+    let closes = 0;
+    for (let index = 0; index < matchedUrl.length; index += 1) {
+        const char = matchedUrl.charAt(index);
+        if (char === "(") opens += 1;
+        else if (char === ")") closes += 1;
     }
-    return url;
+    let end = matchedUrl.length;
+    while (end > 0) {
+        const last = matchedUrl.charAt(end - 1);
+        if (last === ")" && closes > opens) {
+            closes -= 1;
+        } else if (!TRAILING_PUNCTUATION.includes(last)) {
+            break;
+        }
+        end -= 1;
+    }
+    return matchedUrl.slice(0, end);
 }
 
 function linkifyLine(line: string, keyPrefix: string) {

@@ -23,7 +23,7 @@ import type { ReactNode } from "react";
 import type { ClarificationChoice } from "../components/ClarificationPanel";
 import type { ShapeSlot } from "../components/ShapeSlotContext";
 import type { WorkbenchFailure } from "../lib/acr/errors";
-import type { InvestigationResult, SubjectRef } from "../lib/contracts";
+import type { AnswerProjection, InvestigationResult, SubjectRef } from "../lib/contracts";
 import type { RankingWithheld } from "../lib/ranking-withheld";
 import type { PendingSelectionEvent, StructureSelectionBatch } from "../lib/structure-selections";
 
@@ -131,6 +131,12 @@ export type AnsweredOutcome = {
     readonly scopeLossNotice?: string;
 };
 
+/**
+ * ACR's bounded answer (CHAOS-12559): the projection ACR serves when the whole result is over the
+ * caller's byte option. The render draws it as itself (`BoundedAnswerView`), with what it left out.
+ */
+export type BoundedOutcome = { readonly kind: "bounded"; readonly projection: AnswerProjection };
+
 /** Unchanged from before the seam. Refusals keep using it. */
 export type FailedOutcome = { readonly kind: "failed"; readonly failure: WorkbenchFailure };
 
@@ -145,7 +151,8 @@ export type StatusOutcome = {
     readonly retry: boolean;
 };
 
-export type AssistantOutcome = PendingOutcome | AnsweredOutcome | FailedOutcome | StatusOutcome;
+export type AssistantOutcome =
+    PendingOutcome | AnsweredOutcome | BoundedOutcome | FailedOutcome | StatusOutcome;
 
 export type ChatUserTurn = {
     readonly role: "user";
