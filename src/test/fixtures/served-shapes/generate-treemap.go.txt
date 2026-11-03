@@ -1,5 +1,7 @@
 // Scratch generator of investment-treemap.json, not built by this repo. From a detached acr worktree
 // at the producer commit, with the selector flag on, then `go run ./cmd/zztreemap <this directory>`.
+// Last run at acr a60efd6c, which holds the pin of record (26237a42): each table's column words come
+// from the producers' real declarations (ZZWithDeclaredColumnWords).
 
 // internal/contextfabric/zz_treemap_export.go
 package contextfabric
@@ -67,6 +69,13 @@ func ZZTreemapResult(shares []float64) InvestigationResult {
 	return result
 }
 
+// ZZWithDeclaredColumnWords states each claimed table's column words from the producers' own
+// declarations, the step finalizeResult runs (withDeclaredColumnWords, declaredColumnWordsOf).
+func ZZWithDeclaredColumnWords(result InvestigationResult, capabilities []FactCapability) InvestigationResult {
+	result.ClaimedFacts = withDeclaredColumnWords(result.ClaimedFacts, declaredColumnWordsOf(capabilities))
+	return result
+}
+
 // cmd/zztreemap/main.go
 // Scratch only (CHAOS-12496): the real selector, flag on, then the real encoder.
 package main
@@ -78,6 +87,7 @@ import (
 	"path/filepath"
 
 	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric/devhealthfacts"
 )
 
 func must(err error) {
@@ -93,6 +103,12 @@ func main() {
 	var example contextfabric.InvestigationResult
 	must(json.Unmarshal(raw, &example))
 	result.Versions = example.Versions
+	// The producers' real declarations state each table's column words (CHAOS-12639).
+	var capabilities []contextfabric.FactCapability
+	for _, provider := range devhealthfacts.NewProviders(nil) {
+		capabilities = append(capabilities, provider.Capability())
+	}
+	result = contextfabric.ZZWithDeclaredColumnWords(result, capabilities)
 	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
 	must(served.Validate())
 	encoded, err := json.MarshalIndent(served, "", "    ")

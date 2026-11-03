@@ -65,7 +65,12 @@ Rendered today:
   column — when there is more than one) when the rows have a usable axis
   plus at least one numeric column (`src/lib/fact-rows.ts`). The caption
   shows the fact's subject, row count, and the sibling `rollup_basis` claim
-  when the producer emits one.
+  when the producer emits one. Where ACR declares a column's words
+  (CHAOS-12635: `column_vocabularies`, `word_columns`), the table shows them:
+  an id column shows its declared word column in its place, and a vocabulary
+  column shows each value's served word (else the generic path). The exact
+  values, ids and tokens included, are then one collapsed "Exact values" fold
+  under the table. The words come from the answer; ask-dev holds none.
 - **cohort ranking** (CHAOS-4449, acr CHAOS-4398 PR3/PR3b) — when the question
   asked for one (`interpretation.shape` is `explicit_cohort` or
   `discovered_cohort`) **and** the result carries a cohort whose members acr

@@ -31,7 +31,7 @@
     "answer_plan": {
         "family": "investment_allocation",
         "family_source": "model",
-        "family_version": "question-family.v5",
+        "family_version": "question-family.v6",
         "require_drivers": false,
         "require_ranking": false,
         "render_kinds": ["sankey", "table"],
@@ -206,7 +206,13 @@
                 "shape": "breakdown",
                 "key": ["repository", "theme"],
                 "measures": ["weighted_effort", "theme_weighted_effort"],
-                "observations": ["repository_label"]
+                "observations": ["repository_label"],
+                "column_vocabularies": {
+                    "theme": "investment_theme"
+                },
+                "word_columns": {
+                    "repository": "repository_label"
+                }
             }
         }
     ],
@@ -217,10 +223,17 @@
     "vocabulary_labels": {
         "answer_status:complete": "Answer",
         "fact_field:attribution_basis": "Attribution basis",
+        "fact_field:repository": "Repository id",
+        "fact_field:repository_label": "Repository",
         "fact_field:theme": "Theme",
+        "fact_field:theme_weighted_effort": "Team weighted effort in the theme",
         "fact_field:weighted_effort": "Weighted effort",
         "fact_kind:investment": "investment",
-        "generated_at:note": "Answered"
+        "generated_at:note": "Answered",
+        "investment_theme:feature_delivery": "Feature Delivery",
+        "investment_theme:maintenance": "Maintenance / Tech Debt",
+        "investment_theme:operational": "Operational / Support",
+        "investment_theme:quality": "Quality / Reliability"
     },
     "versions": {
         "service_version": "0.2.0",

@@ -8,7 +8,13 @@
  * `rollup_basis` sibling claim the producer emits alongside a rollup
  * (`devhealthfacts/metrics.go`'s project rollup), never computes one.
  */
-import type { ClaimedFact, ClaimedFactRow, ScalarValue, SubjectRef } from "./contracts";
+import type {
+    ClaimedFact,
+    ClaimedFactRow,
+    ClaimedFactTable,
+    ScalarValue,
+    SubjectRef,
+} from "./contracts";
 
 export type Cell = string | number | boolean | null;
 
@@ -43,6 +49,74 @@ export function columnOrder(rows: readonly ClaimedFactRow[]): string[] {
         }
     }
     return order;
+}
+
+/** The closed vocabulary ACR declares for a column's values (CHAOS-12639). */
+export type ColumnVocabulary = NonNullable<
+    NonNullable<ClaimedFactTable["column_vocabularies"]>[string]
+>;
+
+/** One column a reader sees, by ACR's declaration of the table (CHAOS-12635). */
+export type ShownColumn = {
+    /** The column whose served `fact_field` word heads it. */
+    readonly header: string;
+    /** The column whose cells it shows. */
+    readonly source: string;
+    /** The vocabulary of its values, when ACR declares one: each cell shows the served word. */
+    readonly vocabulary?: ColumnVocabulary;
+};
+
+/**
+ * The columns a reader sees, from ACR's declaration and nothing else (CHAOS-12635, CHAOS-4690).
+ *
+ * - An id column with a declared word column (`word_columns`) is shown as that word column, at the
+ *   id's place, under the word column's header. The id is not shown, and the word column is not shown
+ *   a second time. A row with no word reads a dash: the id stays in the exact values.
+ * - A column with a declared vocabulary (`column_vocabularies`) shows each value's served word.
+ *
+ * `exact` is true when what is shown differs from the served cells, so the exact values need their
+ * own fold. A table with no declaration is shown as served.
+ */
+export function shownColumns(
+    columns: readonly string[],
+    table: ClaimedFactTable | undefined,
+): { readonly shown: readonly ShownColumn[]; readonly exact: boolean } {
+    const words = table?.word_columns ?? {};
+    const vocabularies = table?.column_vocabularies ?? {};
+    const wordOf = (column: string) => {
+        const word = words[column];
+        return word === undefined || word === column ? undefined : word;
+    };
+    const placed = new Set(
+        columns.flatMap((column) => {
+            const word = wordOf(column);
+            return word === undefined ? [] : [word];
+        }),
+    );
+    let exact = false;
+    const shown: ShownColumn[] = [];
+    for (const column of columns) {
+        const word = wordOf(column);
+        if (word !== undefined) {
+            // A word column holds words already: it takes no vocabulary.
+            exact = true;
+            shown.push({ header: word, source: word });
+            continue;
+        }
+        // The word of an id this table shows: it is already shown at the id's place.
+        if (placed.has(column)) continue;
+        const vocabulary = vocabularies[column];
+        if (vocabulary !== undefined) exact = true;
+        shown.push(withVocabulary({ header: column, source: column }, vocabulary));
+    }
+    return { shown, exact };
+}
+
+function withVocabulary(
+    column: ShownColumn,
+    vocabulary: ColumnVocabulary | undefined,
+): ShownColumn {
+    return vocabulary === undefined ? column : { ...column, vocabulary };
 }
 
 // ISO 8601 date or date-time — the shape every producer in this codebase
