@@ -45,6 +45,22 @@ export function servedWord(
 }
 
 /**
+ * True unless the answer serves a word for `token` and `label` is not that word (CHAOS-12697). This
+ * is the answer's own served map, not a consumer copy (CHAOS-4690): a token the map holds no word
+ * for (the flag is off, an old pin, or a token the answer does not use) stays trusted to acr's
+ * validator, so it is true. Every rich-shape verifier holds its words through this one check.
+ */
+export function isServedWordOrUnserved(
+    labels: VocabularyLabels,
+    vocabulary: Vocabulary,
+    token: string,
+    label: string,
+): boolean {
+    const word = servedWord(labels, vocabulary, token);
+    return word === undefined || word === label;
+}
+
+/**
  * The sentence ACR composes for one field of this result (CHAOS-12487). There is no generic path:
  * no key, no line, and the raw field stays in its fold. The map holds a key only for a field that
  * says something, and near the size bound ACR sheds most of them.
