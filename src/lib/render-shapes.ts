@@ -641,14 +641,14 @@ function sunburstThemeTotals(rows: readonly ClaimedFactRow[]): Map<string, numbe
     const totals = new Map<string, number>();
     const seen = new Set<string>();
     for (const { fields } of rows) {
-        const subcategory = fields.subcategory?.string;
-        const theme = fields.theme?.string;
+        const subcategory = fields?.subcategory?.string;
+        const theme = fields?.theme?.string;
         if (subcategory === undefined || theme === undefined) return undefined;
         const dot = subcategory.indexOf(".");
         if (dot <= 0 || subcategory.slice(0, dot) !== theme) return undefined;
         if (seen.has(subcategory)) return undefined;
         seen.add(subcategory);
-        const total = numericCell(fields.theme_share);
+        const total = numericCell(fields?.theme_share);
         if (total === undefined) return undefined;
         if ((totals.get(theme) ?? total) !== total) return undefined;
         totals.set(theme, total);
@@ -670,7 +670,7 @@ function sunburstPointRow(
     const { source } = point;
     if (source.kind !== "claimed_fact_row" || source.field !== field) return undefined;
     if (source.claim_id !== claimId || source.row_index === undefined) return undefined;
-    return rows[source.row_index]?.fields[column]?.string;
+    return rows[source.row_index]?.fields?.[column]?.string;
 }
 
 /**
@@ -733,13 +733,13 @@ function isSubcategoryShareWhole(
         if (!isServedWordOrUnserved(labels, "investment_theme", series.key, series.label)) {
             return false;
         }
-        const want = rows.filter(({ fields }) => fields.theme?.string === series.key).length;
+        const want = rows.filter(({ fields }) => fields?.theme?.string === series.key).length;
         if (series.points.length !== want) return false;
         let sum = 0;
         for (const point of series.points) {
             const subcategory = sunburstPointRow(point, claimId, "share", rows, "subcategory");
             if (subcategory === undefined) return false;
-            if (rows[point.source.row_index!]?.fields.theme?.string !== series.key) return false;
+            if (rows[point.source.row_index!]?.fields?.theme?.string !== series.key) return false;
             if (plotted.has(point.source.row_index!)) return false;
             plotted.add(point.source.row_index!);
             if (!isServedWordOrUnserved(labels, "subcategory", subcategory, point.label)) {

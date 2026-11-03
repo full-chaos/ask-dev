@@ -344,6 +344,23 @@ describe("the sunburst verifier mirrors acr's validateSunburstShape (CHAOS-12812
         expect(verifyRenderShape(shape, result)).toBe(false);
     });
 
+    it.each<[string, Edit]>([
+        [
+            "a row with no fields",
+            (_, r) =>
+                void delete (rows(r)[rowIndex(r, "risk.vulnerability")] as { fields?: unknown })
+                    .fields,
+        ],
+        [
+            "a point with no row index",
+            (s, r) => void delete pointOf(s, r, "risk.compliance").source.row_index,
+        ],
+    ])("refuses malformed input without throwing: %s", (_, edit) => {
+        const { shape, result } = changed(edit);
+        expect(() => verifyRenderShape(shape, result)).not.toThrow();
+        expect(verifyRenderShape(shape, result)).toBe(false);
+    });
+
     it("trusts a theme word the answer serves none for", () => {
         const { shape, result } = changed(
             (s) => void (series(s, "risk").label = "Quality / Reliability"),
