@@ -13,8 +13,16 @@ afterEach(cleanup);
  * because a drawing with a name is valid on its own; so the check adds one rule of ours: every
  * drawn view (`figure.render-shape`) carries its value table, the accessible form of the drawing.
  * The red control is a planted render without `ShapeDataTable`: this test must then fail.
+ *
+ * CHAOS-12847: a fact's own chart (`FactChart`, drawn by `FactRowsPanel`) is no `figure`, so it has
+ * a rule of its own: the fact's table follows the chart in the same panel. The red control is a
+ * planted render without that `FactTable`.
  */
 const CHART_RULE = "ask-dev-chart-value-table";
+const FACT_CHART_RULE = "ask-dev-fact-chart-value-table";
+
+/** A table with at least one body row: a value table a reader can read. */
+const hasRows = (table: Element) => table.querySelectorAll("tbody tr").length > 0;
 
 beforeAll(() => {
     axe.configure({
@@ -26,9 +34,22 @@ beforeAll(() => {
                     // The table of THIS drawing: its caption is the drawing's title, and it has rows.
                     return Array.from(node.querySelectorAll("table")).some(
                         (table) =>
-                            table.querySelector("caption")?.textContent === title &&
-                            table.querySelectorAll("tbody tr").length > 0,
+                            table.querySelector("caption")?.textContent === title && hasRows(table),
                     );
+                },
+            },
+            {
+                id: "ask-dev-fact-chart-has-value-table",
+                evaluate: (node: Element) => {
+                    // The table of THIS chart: in an element after it, inside the same parent, so a
+                    // table of another fact's panel or one drawn inside the chart does not count.
+                    for (let next = node.nextElementSibling; next; next = next.nextElementSibling) {
+                        const tables = next.matches("table.fact-table")
+                            ? [next]
+                            : Array.from(next.querySelectorAll("table.fact-table"));
+                        if (tables.some(hasRows)) return true;
+                    }
+                    return false;
                 },
             },
         ],
@@ -37,6 +58,12 @@ beforeAll(() => {
                 id: CHART_RULE,
                 selector: "figure.render-shape",
                 any: ["ask-dev-figure-has-value-table"],
+                tags: ["ask-dev-chart"],
+            },
+            {
+                id: FACT_CHART_RULE,
+                selector: "div.fact-chart",
+                any: ["ask-dev-fact-chart-has-value-table"],
                 tags: ["ask-dev-chart"],
             },
         ],
@@ -81,11 +108,13 @@ describe("the chart a11y check (CHAOS-12840)", () => {
         30_000,
     );
 
-    it("draws both kinds of view, so the check has charts to read", () => {
-        // Discriminating: a pass above is not an answer that drew nothing. Both seams are here:
-        // ask-dev's own SVG chart (RenderShapeChart) and a host's chart (RichShape).
+    it("draws every kind of view, so the check has charts to read", () => {
+        // Discriminating: a pass above is not an answer that drew nothing. All three seams are here:
+        // ask-dev's own SVG chart (RenderShapeChart), a host's chart (RichShape) and a fact's own
+        // chart (FactChart).
         let svg = 0;
         let host = 0;
+        let fact = 0;
         for (const [, result] of scenarios) {
             const { container, unmount } = render(
                 <ShapeSlotContext.Provider value={hostChart}>
@@ -96,9 +125,11 @@ describe("the chart a11y check (CHAOS-12840)", () => {
                 if (figure.querySelector("svg[role='img']")) svg += 1;
                 else if (figure.querySelector("div[role='img']")) host += 1;
             }
+            fact += container.querySelectorAll("div.fact-chart svg[role='img']").length;
             unmount();
         }
         expect(svg).toBeGreaterThan(0);
         expect(host).toBeGreaterThan(0);
+        expect(fact).toBeGreaterThan(0);
     });
 });
