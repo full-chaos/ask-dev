@@ -445,7 +445,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // da2efe68 -> 7b0caff2 (CHAOS-12544): the comparison table train, the same SHA as web. The closed
 // rule vocabulary gains `comparison_side_by_side`, and the source kinds gain `claimed_fact_value`,
 // addressing a claim's own value (acr #1907, CHAOS-12513). No producer emits the rule yet.
-export const SOURCE_COMMIT = "5cb92237097cb95afe2666cdf429a20eb4cc4482";
+export const SOURCE_COMMIT = "098de0ca02f82a9cce0baa7e4ae533b056ac9a21";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
