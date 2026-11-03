@@ -19,8 +19,9 @@ import {
  * - A cohort chart belongs to the ranking, which draws it or says it was withheld. "Ranking not
  *   shown" says it too. With no ranking, `CohortMembersPanel` says only the charts that fail their
  *   check, so a chart that passes is left over here.
- * - A trend or a treemap belongs to the panel of a fact it cites, and only a fact with `rows`, on no
- *   person, has a panel. That panel draws it or says it was withheld.
+ * - A trend, a treemap, a sankey, a completion curve or a sunburst (CHAOS-12812) belongs to the
+ *   panel of a fact it cites, and only a fact with `rows`, on no person, has a panel. That panel
+ *   draws it or says it was withheld.
  * - A side-by-side table, a quadrant (CHAOS-12624) and a forecast percentiles table (CHAOS-4613)
  *   each have a panel of their own, which draws it or says it was withheld.
  * - Every other shape has no reader.

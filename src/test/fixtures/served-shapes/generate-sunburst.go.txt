@@ -1,0 +1,148 @@
+// Scratch generator of investment-sunburst.json, not built by this repo. From a detached acr worktree
+// at the contract commit 89c9133c (acr #1930, CHAOS-12588), then `go run ./cmd/zzsunburst <this
+// directory>`, then `prettier --write` on the output (whitespace only; the JSON is unchanged).
+//
+// No producer emits this rule yet (CHAOS-12554), so the shape is built here the way acr's own
+// contract test builds it (`chaos12554_sunburst_shape_test.go`, newSunburstFixture): the inner ring
+// cites each theme's `theme_share`, one ring per theme cites each subcategory's `share`, labelled
+// with `ContextFabricInvestmentThemeLabel` and the `subcategory` registry word. What makes it served
+// is the rest: acr's real `ServeVocabularyLabels`, `Validate` (which runs `validateSunburstShape`)
+// and `json.Marshal`. At 89c9133c a claim must state a value, so the claim states its
+// `attribution_basis` and carries the declared table, as the sankey fixture does. Refresh it from
+// the real selector when CHAOS-12554 lands.
+
+// internal/contextfabric/zz_sunburst_export.go
+package contextfabric
+
+import (
+	"time"
+
+	contractsv1 "github.com/full-chaos/dev-health-acr/internal/contracts/v1"
+)
+
+// Scratch only (CHAOS-12812), never committed: a repository's investment answer whose claim holds a
+// declared subcategory_breakdown table, and the sunburst that plots it, built as acr's own contract
+// test builds it (chaos12554_sunburst_shape_test.go newSunburstFixture).
+func ZZSunburstResult(shares map[string]float64) InvestigationResult {
+	const claim = "claim_investment_repository_subcategories"
+	basis := "work_unit_investments"
+	vocabulary := contractsv1.ContextFabricInvestmentSubcategoryVocabulary()
+	totals := map[string]float64{}
+	for _, subcategory := range vocabulary {
+		theme, _ := contractsv1.ContextFabricInvestmentSubcategoryTheme(subcategory)
+		totals[theme] += shares[subcategory]
+	}
+	rows := make([]ClaimedFactRow, 0, len(vocabulary))
+	inner := contractsv1.ContextFabricRenderSeries{Key: contractsv1.ContextFabricRenderSunburstThemeSeriesKey, Label: "Themes"}
+	rings := map[string]*contractsv1.ContextFabricRenderSeries{}
+	var order []string
+	for index, subcategory := range vocabulary {
+		theme, _ := contractsv1.ContextFabricInvestmentSubcategoryTheme(subcategory)
+		sub, themeToken, share, total := subcategory, theme, shares[subcategory], totals[theme]
+		rows = append(rows, ClaimedFactRow{Fields: map[string]ScalarValue{
+			"subcategory": {String: &sub}, "theme": {String: &themeToken},
+			"share": {Number: &share}, "theme_share": {Number: &total},
+		}})
+		row := index
+		word, _ := contractsv1.ContextFabricInvestmentThemeLabel(theme)
+		ring, known := rings[theme]
+		if !known {
+			order = append(order, theme)
+			ring = &contractsv1.ContextFabricRenderSeries{Key: theme, Label: word}
+			rings[theme] = ring
+			inner.Points = append(inner.Points, contractsv1.ContextFabricRenderPoint{Label: word, Value: total, Source: contractsv1.ContextFabricRenderPointSource{
+				Kind: contractsv1.ContextFabricRenderSourceClaimedFactRow, ClaimID: claim, RowIndex: &row, Field: "theme_share",
+			}})
+		}
+		label, _ := contractsv1.ContextFabricVocabularyLabel(contractsv1.ContextFabricVocabularySubcategory, subcategory)
+		ring.Points = append(ring.Points, contractsv1.ContextFabricRenderPoint{Label: label, Value: share, Source: contractsv1.ContextFabricRenderPointSource{
+			Kind: contractsv1.ContextFabricRenderSourceClaimedFactRow, ClaimID: claim, RowIndex: &row, Field: "share",
+		}})
+	}
+	series := []contractsv1.ContextFabricRenderSeries{inner}
+	for _, theme := range order {
+		series = append(series, *rings[theme])
+	}
+	repository := SubjectRef{Kind: contractsv1.ContextFabricSubjectRepository, CanonicalID: RepositoryCanonicalID("0b6f6a52-6c0e-4f7e-9d0b-3a1f2f6f0001"), Label: "acme/web"}
+	result := InvestigationResult{
+		SchemaVersion: InvestigationResultSchemaV1, ResultID: "result_sunburst_0001", RequestID: "request_sunburst_0001",
+		GeneratedAt: time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC), Status: InvestigationComplete,
+		Question: "Where is acme/web's effort going, by subcategory?",
+		Interpretation: InterpretedQuestion{
+			Shape: ShapeSingleSubject, RequestedJudgment: "allocation",
+			TimeContext:      TimeContext{Axis: TemporalCurrent},
+			FactRequirements: []FactRequirement{{Kind: FactInvestment}},
+		},
+		SubjectResolution:   SubjectResolution{Candidates: []SubjectCandidate{}, Committed: []SubjectRef{repository}},
+		DirectJudgment:      "The repository's effort leans to feature delivery for customers.",
+		CurrentState:        "Most of the repository's effort appears to go to feature delivery.",
+		StrongestPressures:  []string{},
+		Drivers:             []DriverJudgment{},
+		RemainingWork:       []Finding{},
+		ReadinessGaps:       []Finding{},
+		Paths:               []RelationshipPath{},
+		Conflicts:           []Finding{},
+		Limitations:         []string{},
+		EvidenceRefIDs:      []string{},
+		Coverage:            Coverage{Sources: []SourceObservation{}, DegradedReasons: []string{}},
+		Versions:            VersionSet{ServiceVersion: "test-v1", ContractVersion: InvestigationResultSchemaV1, Backend: "test"},
+		DeterministicAnswer: "The repository's effort leans to feature delivery in this window.",
+		Warnings:            []string{},
+		AnswerPlan: &contractsv1.ContextFabricAnswerPlan{
+			Family: QuestionFamilyInvestmentAllocation, FamilyVersion: QuestionFamilyTableVersion,
+			FamilySource: contractsv1.ContextFabricQuestionFamilySourceModel, Budget: contractsv1.ContextFabricAnswerPlanBudget{MaxItems: 400, MaxSerializedBytes: 262144, MaxMembers: 1, SynthesisHeadroom: 40, NarrowingBasis: contractsv1.ContextFabricNarrowingBasisCanonicalIDLexical},
+			RenderKinds: []contractsv1.ContextFabricRenderKind{contractsv1.ContextFabricRenderKindSunburst, contractsv1.ContextFabricRenderKindTable},
+		},
+		ClaimedFacts: []ClaimedFact{{
+			ClaimID: claim, Kind: FactInvestment, Field: "attribution_basis", Value: ScalarValue{String: &basis}, Rows: rows, Subject: repository,
+			Table: &contractsv1.ContextFabricClaimedFactTable{
+				Field: "subcategory_breakdown", Shape: contractsv1.ContextFabricFactTableShapeBreakdown, Key: []string{"subcategory"},
+				Measures: []string{"share", "theme_share"}, Observations: []string{"theme"},
+			},
+		}},
+		RenderShapes: []contractsv1.ContextFabricRenderShape{{
+			ShapeID: "rs_1", Kind: contractsv1.ContextFabricRenderKindSunburst, SelectedBy: contractsv1.ContextFabricRenderRuleInvestmentSubcategoryShare,
+			Title: "Effort share by theme and subcategory", AxisKind: contractsv1.ContextFabricRenderAxisCategory,
+			AxisLabel: "Subcategory", ValueLabel: "Share of effort (ratio)", ValueUnit: contractsv1.ContextFabricRenderValueUnitRatio, Series: series,
+		}},
+	}
+	result.Completeness = ComputeAnswerCompleteness(result)
+	return result
+}
+
+// cmd/zzsunburst/main.go
+// Scratch only (CHAOS-12812): acr's real vocabulary labels, Validate and encoder.
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/full-chaos/dev-health-acr/internal/contextfabric"
+)
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	result := contextfabric.ZZSunburstResult(map[string]float64{
+		"feature_delivery.customer": 0.25, "feature_delivery.roadmap": 0.15, "maintenance.debt": 0.1,
+		"operational.support": 0.2, "quality.bugfix": 0.2, "quality.testing": 0.05, "risk.security": 0.05,
+	})
+	raw, err := os.ReadFile("contracts/examples/v1/context_fabric_investigation_result_render_shapes.v1.json")
+	must(err)
+	var example contextfabric.InvestigationResult
+	must(json.Unmarshal(raw, &example))
+	result.Versions = example.Versions
+	served, tier := contextfabric.ServeVocabularyLabels(result, true, 262144)
+	must(served.Validate())
+	encoded, err := json.MarshalIndent(served, "", "    ")
+	must(err)
+	must(os.WriteFile(filepath.Join(os.Args[1], "investment-sunburst.json"), append(encoded, '\n'), 0o644))
+	fmt.Printf("tier=%s shapes=%d bytes=%d\n", tier, len(served.RenderShapes), len(encoded))
+}

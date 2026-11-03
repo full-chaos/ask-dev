@@ -6,6 +6,7 @@ import categoryOrder from "./served-shapes/category-order.json";
 import comparisonTableServed from "./served-shapes/comparison-table-served.json";
 import comparisonTable from "./served-shapes/comparison-table.json";
 import dateTable from "./served-shapes/date-oracle.json";
+import investmentSunburst from "./served-shapes/investment-sunburst.json";
 import investmentTreemap from "./served-shapes/investment-treemap.json";
 import landscapeQuadrant from "./served-shapes/landscape-quadrant.json";
 import measureUnitsLabelsOff from "./served-shapes/measure-units-labels-off.json";
@@ -53,6 +54,10 @@ import zoneLessTrend from "./served-shapes/zone-less-trend.json";
  * forecast summary, selector (forecast flag on) and encoder (`served-shapes/generate-forecast.go.txt`,
  * CHAOS-4613): a curve with runs stopped at the horizon, every run at the horizon, and no stored
  * distribution. The last two serve the percentiles table, not a curve.
+ * `investment-sunburst` is one repository's claim with a declared `subcategory_breakdown` table and
+ * the sunburst that plots it, through ACR's real vocabulary labels, `Validate` and encoder at the
+ * contract commit 89c9133c (`served-shapes/generate-sunburst.go.txt`, CHAOS-12812). No producer
+ * emits the rule yet (CHAOS-12554), so the shape is built as ACR's own contract test builds it.
  */
 export const servedShapeScenarios = {
     "cadence-every-day": cadenceEveryDay as unknown as InvestigationResult,
@@ -60,6 +65,7 @@ export const servedShapeScenarios = {
     "category-order": categoryOrder as unknown as InvestigationResult,
     "comparison-table": comparisonTable as unknown as InvestigationResult,
     "comparison-table-served": comparisonTableServed as unknown as InvestigationResult,
+    "investment-sunburst": investmentSunburst as unknown as InvestigationResult,
     "investment-treemap": investmentTreemap as unknown as InvestigationResult,
     "landscape-quadrant": landscapeQuadrant as unknown as InvestigationResult,
     "edge-words": edgeWords as unknown as InvestigationResult,

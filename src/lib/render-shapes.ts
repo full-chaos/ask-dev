@@ -282,12 +282,16 @@ export const THEME_SHARE_RULE: RenderShapeRule = "investment_theme_share";
 /** The rule of a completion curve: its fact's panel draws it, through the host (CHAOS-4613). */
 export const COMPLETION_FORECAST_RULE: RenderShapeRule = "completion_forecast";
 
+/** The rule of a fact's two-ring theme and subcategory chart: its panel draws it, through the host (CHAOS-12812). */
+export const SUBCATEGORY_SHARE_RULE: RenderShapeRule = "investment_subcategory_share";
+
 /** The rules whose shape belongs to the panel of a fact it cites. */
 export const FACT_PANEL_RULES: readonly RenderShapeRule[] = [
     "dated_fact_trend",
     THEME_SHARE_RULE,
     "investment_repository_flow",
     COMPLETION_FORECAST_RULE,
+    SUBCATEGORY_SHARE_RULE,
 ];
 
 /**
@@ -602,6 +606,152 @@ const REPOSITORY_ID_PREFIX = "repository:";
 
 function partsSumToWhole(sum: number, whole: number): boolean {
     return Math.abs(sum - whole) <= SHARE_SUM_TOLERANCE * Math.max(Math.abs(sum), Math.abs(whole));
+}
+
+/**
+ * A sunburst plots every canonical subcategory once (acr's `contextFabricInvestmentSubcategories`
+ * has 15), so a whole table holds this many rows. A count, not a list: the tokens and their words
+ * are ACR's (CHAOS-4690).
+ */
+const INVESTMENT_SUBCATEGORY_COUNT = 15;
+
+/** The key of the sunburst's inner ring: acr's `ContextFabricRenderSunburstThemeSeriesKey`. */
+const SUNBURST_THEME_SERIES_KEY = "themes";
+
+/** A claim's declared `subcategory_breakdown` table: acr's `holdsSubcategoryShareTable`. */
+function holdsSubcategoryShareTable(fact: ClaimedFact): boolean {
+    const table = fact.table;
+    if (table === undefined || (fact.time_series_rows?.length ?? 0) > 0) return false;
+    if (table.field !== "subcategory_breakdown" || table.shape !== "breakdown") return false;
+    if (table.key.length !== 1 || table.key[0] !== "subcategory") return false;
+    return (
+        (table.measures ?? []).includes("share") &&
+        (table.measures ?? []).includes("theme_share") &&
+        (table.observations ?? []).includes("theme")
+    );
+}
+
+/**
+ * Each theme's served share of the whole, from the table's rows: acr's `sunburstThemeTotals`. Every
+ * row names a subcategory and a theme; the theme is the subcategory's own (the token before its
+ * first dot, as acr's taxonomy defines it); no subcategory repeats; every row of a theme carries one
+ * `theme_share`; and the table holds every canonical subcategory. Undefined when any of that fails.
+ */
+function sunburstThemeTotals(rows: readonly ClaimedFactRow[]): Map<string, number> | undefined {
+    const totals = new Map<string, number>();
+    const seen = new Set<string>();
+    for (const { fields } of rows) {
+        const subcategory = fields.subcategory?.string;
+        const theme = fields.theme?.string;
+        if (subcategory === undefined || theme === undefined) return undefined;
+        const dot = subcategory.indexOf(".");
+        if (dot <= 0 || subcategory.slice(0, dot) !== theme) return undefined;
+        if (seen.has(subcategory)) return undefined;
+        seen.add(subcategory);
+        const total = numericCell(fields.theme_share);
+        if (total === undefined) return undefined;
+        if ((totals.get(theme) ?? total) !== total) return undefined;
+        totals.set(theme, total);
+    }
+    return seen.size === INVESTMENT_SUBCATEGORY_COUNT ? totals : undefined;
+}
+
+/**
+ * The string cell of the row a sunburst point cites: acr's `sunburstPointRow`. The point cites
+ * `field` of one claimed fact row of `claimId`; the cell is the row's `column`.
+ */
+function sunburstPointRow(
+    point: RenderShape["series"][number]["points"][number],
+    claimId: string,
+    field: string,
+    rows: readonly ClaimedFactRow[],
+    column: string,
+): string | undefined {
+    const { source } = point;
+    if (source.kind !== "claimed_fact_row" || source.field !== field) return undefined;
+    if (source.claim_id !== claimId || source.row_index === undefined) return undefined;
+    return rows[source.row_index]?.fields[column]?.string;
+}
+
+/**
+ * True when a sunburst is a nested part of a whole: mirrors acr's `validateSunburstShape` clause by
+ * clause (CHAOS-12554, CHAOS-12812).
+ *
+ * - A category axis, a `ratio` unit, no presentation.
+ * - The points are one claim's declared `subcategory_breakdown` table, and that table holds every
+ *   canonical subcategory once, each under its own theme (`sunburstThemeTotals`). A table the
+ *   budget cut lacks a subcategory, so it gets no shape.
+ * - The inner ring (key `themes`) plots each theme once, from a `theme_share` cell of that theme's
+ *   rows. One series per theme, keyed by its token, plots each subcategory of that theme once, from
+ *   the row's `share`. A subcategory never sits under another theme's ring.
+ * - Each theme's subcategory shares add up to its theme share within `SHARE_SUM_TOLERANCE`,
+ *   relative. That sum is the only number not copied from a cell, and it is a check, never plotted.
+ * - A real split: at least 2 subcategories above 0. `verifyRenderShape`'s own checks cover the
+ *   rest: exact values, the source's address, a value in 0..1, one label per position.
+ *
+ * Words: a ring's label and an inner-ring point's label are held to the answer's own served
+ * `investment_theme` word, and a subcategory point's label to its served `subcategory` word, where
+ * the answer serves one (`isServedWordOrUnserved`, CHAOS-12697). ask-dev keeps no copy of acr's word
+ * map or taxonomy (CHAOS-4690), so two clauses stay acr's alone: that a token is canonical, and a
+ * word the answer does not serve. The per-theme point count is the table's own count of that
+ * theme's rows; with the whole table, that is acr's taxonomy count.
+ */
+function isSubcategoryShareWhole(
+    shape: RenderShape,
+    facts: readonly ClaimedFact[],
+    labels: VocabularyLabels,
+): boolean {
+    if (shape.kind !== "sunburst" || shape.axis_kind !== "category") return false;
+    if (shape.presentation !== undefined || shape.value_unit !== "ratio") return false;
+    const claimId = shape.series[0]?.points[0]?.source.claim_id;
+    const fact = claimFor(facts, claimId);
+    if (fact === undefined || claimId === undefined || !holdsSubcategoryShareTable(fact)) {
+        return false;
+    }
+    const rows = fact.rows ?? [];
+    const totals = sunburstThemeTotals(rows);
+    if (totals === undefined) return false;
+    if (shape.series.length !== 1 + totals.size) return false;
+    const plotted = new Set<number>();
+    let above = 0;
+    for (const series of shape.series) {
+        if (series.key === SUNBURST_THEME_SERIES_KEY) {
+            if (series.points.length !== totals.size) return false;
+            const themes = new Set<string>();
+            for (const point of series.points) {
+                const theme = sunburstPointRow(point, claimId, "theme_share", rows, "theme");
+                if (theme === undefined || themes.has(theme)) return false;
+                themes.add(theme);
+                if (!isServedWordOrUnserved(labels, "investment_theme", theme, point.label)) {
+                    return false;
+                }
+            }
+            continue;
+        }
+        const total = totals.get(series.key);
+        if (total === undefined) return false;
+        if (!isServedWordOrUnserved(labels, "investment_theme", series.key, series.label)) {
+            return false;
+        }
+        const want = rows.filter(({ fields }) => fields.theme?.string === series.key).length;
+        if (series.points.length !== want) return false;
+        let sum = 0;
+        for (const point of series.points) {
+            const subcategory = sunburstPointRow(point, claimId, "share", rows, "subcategory");
+            if (subcategory === undefined) return false;
+            if (rows[point.source.row_index!]?.fields.theme?.string !== series.key) return false;
+            if (plotted.has(point.source.row_index!)) return false;
+            plotted.add(point.source.row_index!);
+            if (!isServedWordOrUnserved(labels, "subcategory", subcategory, point.label)) {
+                return false;
+            }
+            if (point.value < 0) return false;
+            if (point.value > 0) above += 1;
+            sum += point.value;
+        }
+        if (!partsSumToWhole(sum, total)) return false;
+    }
+    return above >= 2;
 }
 
 /** A claim's declared `repository_theme_breakdown` table: acr's `holdsRepositoryFlowTable`. */
@@ -945,6 +1095,8 @@ export function verifyRenderShape(shape: RenderShape, result: InvestigationResul
     // renderer lands, its kind joins this list in the same change.
     if (shape.selected_by === THEME_SHARE_RULE) {
         if (!isThemeShareWhole(shape, result.claimed_facts, labels)) return false;
+    } else if (shape.selected_by === SUBCATEGORY_SHARE_RULE) {
+        if (!isSubcategoryShareWhole(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === COMPARISON_RULE) {
         if (!isSideBySide(shape, result.claimed_facts, labels)) return false;
     } else if (shape.selected_by === REPOSITORY_FLOW_RULE) {
