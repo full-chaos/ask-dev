@@ -4,7 +4,7 @@
 // real team workload field writer (distribution switch on), the real claim attach
 // (attachCanonicalRows), the real summary (discloseCompletionForecast), the real selector with the
 // forecast flag on, ServeVocabularyLabels, Validate and the real encoder.
-// Ran at acr #1949's head 6d238c8a (open; draft). Regenerate at its merge commit.
+// Ran at acr 098de0ca (#1949's merge, the pin of record).
 
 // internal/contextfabric/devhealthfacts/zz_forecast_export.go
 
