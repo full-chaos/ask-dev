@@ -308,6 +308,19 @@ describe("the host gets the forecast's served detail (CHAOS-4613)", () => {
         });
     });
 
+    it("hands the host the served work scope count and its floor, so a caption never takes one scope for the team (CHAOS-12726)", () => {
+        const { shape, result } = changed((_, r) => {
+            summary(r).scope_count = 14;
+            summary(r).scope_count_at_least = true;
+        });
+        expect(shapeDetail(shape, result.claimed_facts)?.summary).toMatchObject({
+            work_scope_id: "linear:CHAOS",
+            scope_count: 14,
+            scope_count_at_least: true,
+        });
+        expect(shapeDetail(curve, curveAnswer.claimed_facts)?.summary.scope_count).toBeUndefined();
+    });
+
     it("gives no detail for a shape that needs none", () => {
         expect(shapeDetail(noRunAnswer.render_shapes![0]!, noRunAnswer.claimed_facts)).toBe(
             undefined,
