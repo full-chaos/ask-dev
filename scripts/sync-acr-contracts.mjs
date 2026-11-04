@@ -447,7 +447,7 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // addressing a claim's own value (acr #1907, CHAOS-12513). No producer emits the rule yet.
 // 26237a42 -> dc765c2e (CHAOS-12744): the same SHA as web (CHAOS-12743). No file ask-dev vendors
 // changed: acr #1980's nested repository key pattern is in schemas ask-dev does not vendor.
-export const SOURCE_COMMIT = "7a9e803655a401ccf5e1bb567bd976e427bcb654";
+export const SOURCE_COMMIT = "37f994f3cf3f6680befe43e6b419903fd41c83ac";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
