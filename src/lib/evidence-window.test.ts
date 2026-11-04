@@ -81,13 +81,22 @@ describe("a window reads in UTC, not in the reader's zone", () => {
         process.env.TZ = zone;
         try {
             expect(evidenceWindowRange(WINDOW, undefined)).toBe(
-                `${utc(WINDOW.start)} – ${utc(WINDOW.end)}`,
+                `${utc(WINDOW.start)} – ${utc("2026-11-03T00:00:00Z")}`,
             );
             expect(evidenceWindowRange(WINDOW, undefined)).toContain(" 6, 2026");
-            expect(evidenceWindowRange(WINDOW, undefined)).toContain(" 4, 2026");
+            expect(evidenceWindowRange(WINDOW, undefined)).toContain(" 3, 2026");
         } finally {
             if (before === undefined) delete process.env.TZ;
             else process.env.TZ = before;
         }
+    });
+
+    it("shows the last covered day for an end-exclusive midnight, and an end that is not midnight as its own day", () => {
+        expect(evidenceWindowRange(WINDOW, undefined)).toBe(
+            `${utc(WINDOW.start)} – ${utc("2026-11-03T00:00:00Z")}`,
+        );
+        expect(evidenceWindowRange({ ...WINDOW, end: "2026-11-04T12:00:00Z" }, undefined)).toBe(
+            `${utc(WINDOW.start)} – ${utc("2026-11-04T12:00:00Z")}`,
+        );
     });
 });

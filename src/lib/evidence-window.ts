@@ -29,6 +29,20 @@ export function formatWindowDay(timestamp: string): string {
 }
 
 /**
+ * The last day a window covers. The served end is an end-exclusive instant: at UTC midnight it
+ * is the first day NOT covered, so the reader gets the day before; any other instant is its own
+ * day (CHAOS-13005, lead ruling).
+ */
+function formatWindowEndDay(timestamp: string): string {
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return timestamp;
+    const atMidnight = date.getTime() % 86_400_000 === 0;
+    return formatWindowDay(
+        atMidnight ? new Date(date.getTime() - 86_400_000).toISOString() : timestamp,
+    );
+}
+
+/**
  * The one reading of a window, for the rail and for the answer's Coverage panel (CHAOS-12421).
  * `undefined` means nothing was reported: the caller says so, and never shows it as complete.
  */
@@ -37,7 +51,7 @@ export function evidenceWindowRange(
     labels: VocabularyLabels,
 ): string | undefined {
     if (window?.start !== undefined && window.end !== undefined) {
-        return `${formatWindowDay(window.start)} – ${formatWindowDay(window.end)}`;
+        return `${formatWindowDay(window.start)} – ${formatWindowEndDay(window.end)}`;
     }
     if (window?.relative_id !== undefined) {
         return vocabularyWord(labels, "window_relative_id", window.relative_id);
