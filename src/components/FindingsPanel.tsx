@@ -9,7 +9,6 @@ import { useVocabularyWord } from "./VocabularyWordContext";
 export type FindingsPanelProps = {
     readonly title: string;
     readonly findings: readonly DedupedFinding[];
-    readonly emptyMessage: string;
     readonly evidenceRefLabels: EvidenceRefLabels;
     /** True when the Workbench withheld this part: renders "withheld", never the empty message. */
     readonly withheld?: boolean;
@@ -29,12 +28,13 @@ export type FindingsPanelProps = {
 export function FindingsPanel({
     title,
     findings,
-    emptyMessage,
     evidenceRefLabels,
     withheld = false,
 }: FindingsPanelProps) {
     const word = useVocabularyWord();
     const titleId = `findings-${title.toLowerCase().replaceAll(" ", "-")}`;
+    // A section with no findings has nothing to say (CHAOS-13005); only a withheld one says so.
+    if (findings.length === 0 && !withheld) return null;
     return (
         <section role="group" className="panel" aria-labelledby={titleId}>
             <h2 className="panel__title" id={titleId}>
@@ -42,8 +42,6 @@ export function FindingsPanel({
             </h2>
             {withheld && findings.length === 0 ? (
                 <WithheldPart label={title} />
-            ) : findings.length === 0 ? (
-                <p className="panel__empty">{emptyMessage}</p>
             ) : (
                 <ul className="stack">
                     {findings.map(({ finding, isDuplicate, primarySurface }) =>

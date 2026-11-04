@@ -238,12 +238,11 @@ describe("E: the no-score caption under a cohort chart", () => {
                 shape="discovered_cohort"
             />,
         );
+        // The same sentence under several charts is said once (CHAOS-13005).
         const captions = screen.getAllByTestId("cohort-chart-caption");
-        expect(captions.length).toBeGreaterThan(0);
-        for (const caption of captions) {
-            expect(caption).toHaveTextContent("1 ranked member has no score.");
-            expect(caption.textContent).not.toMatch(/team/iu);
-        }
+        expect(captions).toHaveLength(1);
+        expect(captions[0]).toHaveTextContent("1 ranked member has no score.");
+        expect(captions[0]!.textContent).not.toMatch(/team/iu);
     });
 
     it("says nothing when every ranked member is drawn", () => {

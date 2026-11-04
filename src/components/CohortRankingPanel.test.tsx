@@ -726,6 +726,24 @@ describe("CohortRankingPanel — what the ranking rests on", () => {
             expect(weights).toEqual([...weights].sort((a, b) => b - a));
         });
 
+        it("rounds float noise in a served driver number (CHAOS-13005)", () => {
+            const noisy = drivers.map((driver) => ({
+                ...driver,
+                value: 0.44999999999999996,
+                weight_contributed: 13.499999999999998,
+            }));
+            const restored = {
+                ...ranked,
+                members: [{ ...ranked.members[0]!, drivers: noisy }],
+            } as unknown as Cohort;
+            const { container } = render(
+                <CohortRankingPanel cohort={restored} result={undefined} shape="explicit_cohort" />,
+            );
+            expect(container.textContent).not.toContain("0.44999999999999996");
+            expect(container.textContent).not.toContain("13.499999999999998");
+            expect(container.textContent).toMatch(/value 0\.45 · contributed 13\.5 of/u);
+        });
+
         it("shows an odd restored value as it came, and does not throw", () => {
             const odd = drivers.map((driver, index) =>
                 index === drivers.length - 1

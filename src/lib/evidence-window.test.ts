@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evidenceWindowRange, formatDay } from "./evidence-window";
+import { evidenceWindowRange, formatWindowDay } from "./evidence-window";
 
 const START = "2026-10-01T12:00:00Z";
 const END = "2026-10-30T12:00:00Z";
@@ -19,7 +19,7 @@ describe("evidenceWindowRange", () => {
                 },
                 undefined,
             ),
-        ).toBe(`${formatDay(START)} – ${formatDay(END)}`);
+        ).toBe(`${formatWindowDay(START)} – ${formatWindowDay(END)}`);
     });
 
     it("reads a relative id over an as_of", () => {
@@ -51,11 +51,43 @@ describe("evidenceWindowRange", () => {
 
 describe("formatDay", () => {
     it("shows a date a reader can read", () => {
-        expect(formatDay(END)).toContain("2026");
-        expect(formatDay(END)).not.toContain("T12");
+        expect(formatWindowDay(END)).toContain("2026");
+        expect(formatWindowDay(END)).not.toContain("T12");
     });
 
     it("shows an unreadable value as it came, never as a guess", () => {
-        expect(formatDay("not a date")).toBe("not a date");
+        expect(formatWindowDay("not a date")).toBe("not a date");
+    });
+});
+
+/** CHAOS-13005: a window of UTC midnights is the served days in every reader's zone. */
+describe("a window reads in UTC, not in the reader's zone", () => {
+    const WINDOW = {
+        start: "2026-08-06T00:00:00Z",
+        end: "2026-11-04T00:00:00Z",
+        relative_id: "trailing_90d",
+        provenance: "inferred_default",
+    } as const;
+    const utc = (iso: string) =>
+        new Date(iso).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            timeZone: "UTC",
+        });
+
+    it.each(["America/Los_Angeles", "Pacific/Auckland", "UTC"])("in %s", (zone) => {
+        const before = process.env.TZ;
+        process.env.TZ = zone;
+        try {
+            expect(evidenceWindowRange(WINDOW, undefined)).toBe(
+                `${utc(WINDOW.start)} – ${utc(WINDOW.end)}`,
+            );
+            expect(evidenceWindowRange(WINDOW, undefined)).toContain(" 6, 2026");
+            expect(evidenceWindowRange(WINDOW, undefined)).toContain(" 4, 2026");
+        } finally {
+            if (before === undefined) delete process.env.TZ;
+            else process.env.TZ = before;
+        }
     });
 });

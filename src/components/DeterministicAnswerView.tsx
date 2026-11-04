@@ -541,21 +541,18 @@ function AnswerView({
                 title="Remaining work"
                 withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.remaining_work}
-                emptyMessage="No remaining work was reported."
             />
             <FindingsPanel
                 evidenceRefLabels={result.evidence_ref_labels}
                 title="Readiness gaps"
                 withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.readiness_gaps}
-                emptyMessage="No readiness gaps were reported."
             />
             <FindingsPanel
                 evidenceRefLabels={result.evidence_ref_labels}
                 title="Conflicts"
                 withheld={rankingWithheld !== undefined}
                 findings={dedupedFindings.conflicts}
-                emptyMessage="No conflicting evidence was reported."
             />
 
             <section role="group" className="panel" aria-labelledby={`${idPrefix}-evidence-title`}>
