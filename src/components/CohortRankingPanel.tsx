@@ -42,6 +42,13 @@ export type CohortRankingPanelProps = {
     readonly shape: InterpretedShape;
 };
 
+/** A served number for a reader: float noise (0.44999999999999996) is rounded to 2 places. */
+function shownNumber(value: unknown): string {
+    return typeof value === "number" && Number.isFinite(value)
+        ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+        : rawText(value);
+}
+
 /** A driver's contribution, as the member itself states it. Nothing re-derived. */
 function DriverCell({ driver }: { readonly driver: CohortMemberDriver }) {
     const word = useVocabularyWord();
@@ -50,8 +57,8 @@ function DriverCell({ driver }: { readonly driver: CohortMemberDriver }) {
         <li className="ranking__driver">
             <span className="ranking__driver-signal">{word("ranking_signal", driver.signal)}</span>{" "}
             <span className="record__meta">
-                value {rawText(driver.value)} · contributed {rawText(driver.weight_contributed)} of{" "}
-                {rawText(driver.weight)}
+                value {shownNumber(driver.value)} · contributed{" "}
+                {shownNumber(driver.weight_contributed)} of {shownNumber(driver.weight)}
                 {thresholdLabel === undefined ? null : (
                     <> · {word("threshold_label", thresholdLabel)}</>
                 )}
@@ -205,16 +212,23 @@ export function CohortRankingPanel({ cohort, result, shape }: CohortRankingPanel
                 // directly below, carrying every value the chart shows plus
                 // the ones it does not.
             }
-            {cohortShapes.map((cohortShape) => {
+            {cohortShapes.map((cohortShape, index) => {
                 // CHAOS-12429 E: which ranked members this chart does not show, counted from the
                 // verified cohort, never from the chart's numbers.
                 const caption = coverageCaption(cohortShape, cohort);
+                // The same sentences under an earlier chart say it once (CHAOS-13005).
+                const text = caption.sentences.join(" ");
+                const repeated = cohortShapes
+                    .slice(0, index)
+                    .some(
+                        (earlier) => coverageCaption(earlier, cohort).sentences.join(" ") === text,
+                    );
                 return (
                     <div key={cohortShape.shape_id}>
                         <RenderShapeChart cohort={cohort} shape={cohortShape} />
-                        {caption.sentences.length === 0 ? null : (
+                        {caption.sentences.length === 0 || repeated ? null : (
                             <p className="record__meta" data-testid="cohort-chart-caption">
-                                {caption.sentences.join(" ")}
+                                {text}
                             </p>
                         )}
                     </div>

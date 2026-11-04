@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { FindingsPanel } from "@/components/FindingsPanel";
@@ -38,7 +38,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Readiness gaps"
                 findings={[PRIMARY]}
-                emptyMessage="No readiness gaps were reported."
             />,
         );
         expect(screen.getByText("Release acceptance remains incomplete.")).toBeInTheDocument();
@@ -50,7 +49,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[DUPLICATE]}
-                emptyMessage="No remaining work was reported."
             />,
         );
         // The full sentence never appears a second time.
@@ -68,7 +66,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                     evidenceRefLabels={undefined}
                     title="Remaining work"
                     findings={[DUPLICATE]}
-                    emptyMessage="No remaining work was reported."
                 />
             </VocabularyLabelsContext.Provider>,
         );
@@ -83,7 +80,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[PRIMARY, DUPLICATE]}
-                emptyMessage="No remaining work was reported."
             />,
         );
         expect(screen.getAllByText("Release acceptance remains incomplete.").length).toBe(1);
@@ -114,7 +110,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[duplicateWithOwnEvidence]}
-                emptyMessage="No remaining work was reported."
             />,
         );
         expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
@@ -135,7 +130,6 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[DUPLICATE]}
-                emptyMessage="No remaining work was reported."
             />,
         );
         expect(screen.queryByText(/already/i)).toBeNull();
@@ -168,22 +162,26 @@ describe("FindingsPanel — CHAOS-4669 defect 1 dedup rendering", () => {
                 evidenceRefLabels={undefined}
                 title="Remaining work"
                 findings={[duplicateWithOwnSubject]}
-                emptyMessage="No remaining work was reported."
             />,
         );
         expect(screen.getByText(/also shown in full under Readiness gaps/i)).toBeInTheDocument();
         expect(screen.getByText("Beta")).toBeInTheDocument();
     });
 
-    it("still says so explicitly when there are no findings", () => {
+    it("renders nothing when there are no findings, and still says withheld when withheld (CHAOS-13005)", () => {
+        const { container } = render(
+            <FindingsPanel evidenceRefLabels={undefined} title="Conflicts" findings={[]} />,
+        );
+        expect(container).toBeEmptyDOMElement();
+        cleanup();
         render(
             <FindingsPanel
                 evidenceRefLabels={undefined}
                 title="Conflicts"
                 findings={[]}
-                emptyMessage="No conflicting evidence was reported."
+                withheld
             />,
         );
-        expect(screen.getByText("No conflicting evidence was reported.")).toBeInTheDocument();
+        expect(screen.getByTestId("withheld-part")).toBeInTheDocument();
     });
 });
