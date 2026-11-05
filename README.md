@@ -11,9 +11,11 @@ Tracked as **CHAOS-3738** (repo scaffolded under CHAOS-3803).
 
 The Workbench lets an authorized tester ask Context Fabric the real product
 questions and inspect the answer **and** its presentation, without depending on
-the legacy Ask Dev path or its UX. It is platform/test scoped until the Context
-Fabric beta gate passes, and is explicitly **separate from the Ask Dev window
-and `/dev`**.
+the Ask Dev product path or its UX. It is **internal only**: a tester's tool, not
+a product chat. The product Ask Dev lives in `dev-health-web` (plan of record:
+Ask Dev in web, 2026-10-29); this repo stays the Workbench and keeps its ACR
+contract pin in step with web's. It is explicitly **separate from the Ask Dev
+window and `/dev`**.
 
 It is a **read-only consumer**. It authors no facts, metrics, health states,
 drivers, evidence, scope, or authorization. Its only write-shaped interaction is
@@ -23,9 +25,9 @@ It **calls the real ACR investigation API**. It does not consume mock
 investigation results — fixtures exist only inside unit tests, and a lint rule
 fails the build if product code imports one.
 
-The manifest, component library, and interaction model are meant to be promoted
-into Ask Dev later, so portability is a standing constraint: React + TypeScript,
-minimal dependencies, and the same Next.js version `dev-health-web` runs.
+The manifest, component library, and interaction model stay portable to the
+product Ask Dev in `dev-health-web`: React + TypeScript, minimal dependencies,
+and the same Next.js version `dev-health-web` runs.
 
 ## The three views
 

@@ -2,6 +2,8 @@
 
 Context Fabric Workbench (CHAOS-3738). See [`README.md`](README.md) for what this repo is and is not.
 
+This repo is the **Workbench only**: an internal test tool that asks the ACR investigation API real questions and shows the answer, its structure and its presentation. It is not the product chat. The product Ask Dev lives in `dev-health-web`; this repo keeps its ACR contract pin in step with web's (pin-before-proof, below) and adds no product-chat framing, copy or flows. Do not describe it, or build it, as the Ask Dev window.
+
 ## ACR access (CHAOS-12106)
 
 This app is a **browser OAuth client of ACR**, as the web app is: the user is the signed-in web user, and consent happens on web's review page. No key, assertion or env identity may exist in the bundle or on a server — there is no server route (`src/app/api` does not exist), and `src/lib/acr/secret-boundary.test.ts` fails on their return. The shared client is `src/acr-client/` (do not change its behavior here); `src/lib/acr/browser-host.ts` hosts it, and `src/lib/acr/investigate.ts` asks the question. The one setting is `NEXT_PUBLIC_ACR_OAUTH_ISSUER`, a public origin that `next build` inlines. Local runs use port 3021 and ACR's dev client `https://localhost/acr/dev-browser-client` (redirect `http://localhost:3021/oauth/callback`, CORS origin `http://localhost:3021`).
