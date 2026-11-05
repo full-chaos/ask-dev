@@ -597,4 +597,41 @@ export const DECIDED_OPEN_VOCABULARIES: Readonly<Record<string, readonly string[
     ],
     "context_fabric_investigation_result.v1.schema.json#/properties/semantic_reading/properties/reason":
         ["semantic_state_absent", "semantic_state_unreadable"],
+    // CHAOS-13002: answer_plan.fallback is a record the service stamps when the model planned some reads.
+    // ask-dev draws no part of it; the service limitation sentence carries the reader-facing statement.
+    "context_fabric_common.v1.schema.json#/$defs/AnswerPlanFallback/properties/reason": [
+        "judgment_unservable",
+        "kind_unserved_for_member",
+    ],
+    "context_fabric_common.v1.schema.json#/$defs/AnswerPlanFallback/properties/planned_kinds/items":
+        [
+            "identity",
+            "membership",
+            "status",
+            "actual_completion",
+            "work",
+            "blockers",
+            "required_children",
+            "pull_requests",
+            "reviews",
+            "continuous_integration",
+            "deployments",
+            "incidents",
+            "metrics",
+            "health",
+            "workload",
+            "investment",
+            "readiness",
+            "operational_deficiencies",
+            "source_health",
+            "evidence",
+            "flow",
+            "landscape",
+            "security_alerts",
+            "commitment",
+            "file_hotspots",
+        ],
+    "context_fabric_common.v1.schema.json#/$defs/AnswerPlanFallback/properties/outcome": [
+        "applied",
+    ],
 };
