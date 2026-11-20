@@ -449,7 +449,8 @@ const ARTIFACT_ROOT = path.join(ROOT, "src/contracts");
 // changed: acr #1980's nested repository key pattern is in schemas ask-dev does not vendor.
 // c2914f0b -> 3a5bf05a: the same SHA as web (web #2034). No file ask-dev vendors changed: acr
 // #2117's throughputForecast `degradedReason` is in `contracts/mcp`, which ask-dev does not vendor.
-export const SOURCE_COMMIT = "3a5bf05ae5bdc6815b2f8f53dade65641994827b";
+// 3a5bf05a -> ff4ae590: the same SHA as web (web main).
+export const SOURCE_COMMIT = "ff4ae5908c73c740da7e57fce384ec1871f67493";
 
 const PRETTIER_OPTIONS = Object.freeze({
     parser: "typescript",
